@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}System Status{% endblock %}
+{% block content %}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="/">← Back to Kauli</a>
+  </div>
+</nav>
+
+<section class="m-section" style="padding-top:48px;">
+  <div class="m-inner narrow">
+    <h1 class="m-h2" style="text-align:left;">System Status</h1>
+    <p class="m-lede" style="text-align:left; margin-bottom:8px;">
+      Checked live at {{ checked_at.strftime('%b %d, %Y %H:%M UTC') }} - not a static badge, every row below is a
+      real check run the moment this page loaded.</p>
+
+    {% if all_core_ok %}
+    <div class="modal-warning" style="background:var(--ok-soft); border-color:var(--ok);">
+      <strong style="color:var(--ok);">All core systems operational.</strong>
+    </div>
+    {% else %}
+    <div class="modal-warning">
+      <strong>Something's not right with a core system</strong> - see below.
+    </div>
+    {% endif %}
+
+    <h3 style="margin-top:28px;">Core platform</h3>
+    <table class="status-table">
+      <tbody>
+        {% for c in core_checks %}
+        <tr>
+          <td class="status-dot"><span class="{{ 'ok' if c['ok'] else 'bad' }}">●</span></td>
+          <td>{{ c['name'] }}</td>
+          <td class="muted">{{ c['detail'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:28px;">Payment &amp; AI integrations</h3>
+    <p class="muted" style="margin-top:-4px; font-size:0.85rem;">"Not configured" here isn't a failure - it's an
+       honest reflection of what's wired up right now, same as everything else on this page.</p>
+    <table class="status-table">
+      <tbody>
+        {% for c in integration_checks %}
+        <tr>
+          <td class="status-dot"><span class="{{ 'ok' if c['ok'] else 'neutral' }}">●</span></td>
+          <td>{{ c['name'] }}</td>
+          <td class="muted">{{ c['detail'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h3 style="margin-top:28px;">Processing queue</h3>
+    <table class="status-table">
+      <tbody>
+        <tr><td class="status-dot"><span class="{{ 'ok' if dead_letter_count == 0 else 'neutral' }}">●</span></td>
+            <td>Orders currently queued or processing</td><td class="muted">{{ queue_depth }}</td></tr>
+        <tr><td class="status-dot"><span class="{{ 'ok' if dead_letter_count == 0 else 'bad' }}">●</span></td>
+            <td>Orders that exhausted retries (dead letter)</td><td class="muted">{{ dead_letter_count }}</td></tr>
+        <tr><td class="status-dot"><span class="ok">●</span></td>
+            <td>This server process has been running for</td>
+            <td class="muted">{{ (uptime_seconds / 3600)|round(1) }} hours</td></tr>
+      </tbody>
+    </table>
+    <p class="muted" style="font-size:0.78rem; margin-top:24px;">
+      This is a real, live-checked status page for a single-server deployment, not a historical uptime tracker
+      or an SLA commitment. Something look wrong? <a href="mailto:{{ email }}">Tell us</a> or
+      <a href="{{ whatsapp_url }}" target="_blank" rel="noopener">WhatsApp us</a>.</p>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

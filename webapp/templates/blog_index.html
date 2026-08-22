@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}Blog{% endblock %}
+{% block head_extra %}
+<meta name="description" content="Notes on Swahili, Kikuyu and English dubbing, translation and subtitling - real technical detail from the team building Kauli.">
+<meta property="og:title" content="Kauli Blog">
+<meta property="og:description" content="Notes on Swahili, Kikuyu and English dubbing, translation and subtitling.">
+<link rel="icon" href="/static/kauli-icon.png">
+{% endblock %}
+{% block content %}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="/">← Back to Kauli</a>
+  </div>
+</nav>
+
+<section class="m-section" style="padding-top:48px;">
+  <div class="m-inner narrow">
+    <h1 class="m-h2" style="text-align:left;">Blog</h1>
+    <p class="m-lede" style="text-align:left;">Real technical detail on Swahili, Kikuyu and English
+       localization - not fluff.</p>
+
+    {% if not posts %}
+    <p class="muted">Nothing published yet - check back soon.</p>
+    {% endif %}
+
+    <div class="m-blog-list">
+      {% for post in posts %}
+      <a href="/blog/{{ post['slug'] }}" class="m-blog-card">
+        <div class="m-blog-card-visual" data-category="{{ post['category'] or '' }}" aria-hidden="true">
+          <svg viewBox="0 0 200 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <g fill="currentColor" opacity="0.5">
+              {% for i in range(24) %}
+              <rect x="{{ i * 8.4 }}" y="{{ 30 - (((i * 37) % 26) + 4) }}" width="4" height="{{ ((i * 37) % 26) + 4 }}" rx="2"/>
+              {% endfor %}
+            </g>
+          </svg>
+        </div>
+        {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
+        <h2>{{ post['title'] }}</h2>
+        {% if post['description'] %}<p>{{ post['description'] }}</p>{% endif %}
+        <span class="m-blog-date">{{ post['published_at']|int|timestamp_to_str }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

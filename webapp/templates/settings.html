@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="muted" style="margin-top:0;">Your name and photo appear wherever Kauli shows who did what -
+   order history, review notes, delivery records.</p>
+
+<div class="card" style="max-width:480px;">
+  {% if saved %}<p class="ok">✓ Saved</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/settings" enctype="multipart/form-data">
+    <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+      <div class="avatar-upload" id="avatar-upload" tabindex="0" role="button" title="Change profile photo">
+        {% if user['avatar_path'] %}
+          <img src="/avatar/{{ user['id'] }}" alt="" id="avatar-upload-preview">
+        {% else %}
+          <div class="avatar" id="avatar-upload-preview" style="width:100%;height:100%;font-size:1.3rem;">{{ user['display_name'][0]|upper }}</div>
+        {% endif %}
+        <div class="avatar-upload-overlay">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.5A1.5 1.5 0 0 1 9.4 3.7h5.2a1.5 1.5 0 0 1 1.3.8L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6"/>
+            <circle cx="12" cy="13" r="3.4" stroke="currentColor" stroke-width="1.6"/>
+          </svg>
+        </div>
+        <input type="file" name="avatar" id="avatar-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none;">
+      </div>
+      <div>
+        <div style="font-size:0.86rem; font-weight:600;">Profile photo</div>
+        <div class="muted" style="font-size:0.78rem;">Click your photo to change it. PNG, JPEG or WebP.</div>
+      </div>
+    </div>
+
+    <label>Name
+      <input type="text" name="display_name" value="{{ user['display_name'] }}" required>
+    </label>
+    <label>Email
+      <input type="email" value="{{ user['email'] }}" disabled style="opacity:0.6;">
+    </label>
+    <label>Role
+      <input type="text" value="{{ user['role'] }}" disabled style="opacity:0.6; text-transform:capitalize;">
+    </label>
+
+    <button type="submit">Save changes</button>
+  </form>
+</div>
+
+{% if user['role'] == 'client' %}
+<div class="card" style="max-width:480px;">
+  <h2 style="margin-top:0;">Communication preferences</h2>
+  <p class="muted" style="font-size:0.85rem; margin-top:0;">Service emails (order status, receipts,
+     security) are sent regardless - they're how the account actually works, not something to opt out of.
+     This is only about anything beyond that.</p>
+  <form method="post" action="/settings/marketing-consent">
+    <label class="auth-checkbox-row" style="margin-bottom:14px;">
+      <input type="checkbox" name="marketing_consent" value="1" {% if user['marketing_consent'] %}checked{% endif %}>
+      <span>Send me occasional Kauli tips and updates</span>
+    </label>
+    <button type="submit" class="secondary">Save preference</button>
+  </form>
+</div>
+
+<div class="card" style="max-width:480px;">
+  <h2 style="margin-top:0;">Your data</h2>
+  {% if deletion_requested %}
+    <p class="ok">✓ Deletion request received - we'll follow up by email once it's handled.</p>
+  {% else %}
+    <p class="muted" style="font-size:0.85rem; margin-top:0;">We don't auto-delete anything - a real
+       person reviews every request (order/payment records sometimes need to stick around a little
+       longer for accounting reasons). See our <a href="/privacy">privacy policy</a> for what we keep.</p>
+    <form method="post" action="/settings/request-deletion">
+      <button type="submit" class="secondary">Request my data be deleted</button>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card" style="max-width:480px; border-color:var(--err);">
+  <h2 style="margin-top:0; color:var(--err);">Close my account</h2>
+  <p class="muted" style="font-size:0.85rem;">You won't be able to sign in afterward. Your order history
+     stays as it is unless you separately request deletion above - closing your account isn't the same
+     as deleting your data.</p>
+  <form method="post" action="/settings/close-account">
+    <label>Type your email ({{ user['email'] }}) to confirm
+      <input type="email" name="confirm_text" required placeholder="{{ user['email'] }}">
+    </label>
+    <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
+            onclick="return confirm('Close your Kauli account? You won\'t be able to sign back in.');">
+      Close my account
+    </button>
+  </form>
+</div>
+{% endif %}
+<script>
+  (function () {
+    var wrap = document.getElementById("avatar-upload");
+    var input = document.getElementById("avatar-upload-input");
+    if (!wrap || !input) return;
+    wrap.addEventListener("click", function () { input.click(); });
+    wrap.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var preview = document.getElementById("avatar-upload-preview");
+        var img = document.createElement("img");
+        img.id = "avatar-upload-preview";
+        img.src = reader.result;
+        preview.replaceWith(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  })();
+</script>
+{% endblock %}

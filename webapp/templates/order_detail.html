@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order['id'] }}{% endblock %}
+{% block content %}
+{% if order['status'] in ['queued', 'processing', 'awaiting_review'] %}
+<meta http-equiv="refresh" content="4">
+{% endif %}
+
+<div class="card">
+  <a href="/client" class="breadcrumb">&larr; back to my orders</a>
+  <h1>{{ order['original_filename'] }}</h1>
+  <p><span class="status status-{{ order['status'] }}">{{ order['status'].replace('_', ' ') }}</span>
+     &middot; {{ order['source_lang'] }} → {{ order['target_lang'] }}
+     &middot; {{ order['tier']|capitalize }} plan
+     {% if receipt %}&middot; <a href="/receipts/{{ receipt['id'] }}">View receipt ({{ receipt['receipt_number'] }}) →</a>{% endif %}</p>
+
+  {% set ts = tat_status(order['tat_start_at'], order['deadline_at']) %}
+  {% if ts and order['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
+  <div style="margin-top:14px;">
+    <div style="display:flex; justify-content:space-between; align-items:baseline; font-size:0.82rem; gap:10px;">
+      <span class="muted">Estimated delivery</span>
+      <span class="deadline-pill deadline-{{ ts['level'] }}">
+        {% if ts['overdue'] %}Running behind schedule - we'll update you{% else %}by {{ order['deadline_at']|int|timestamp_to_date }}{% endif %}
+      </span>
+    </div>
+    <div class="deadline-bar-track">
+      <div class="deadline-bar-fill deadline-{{ ts['level'] }}" style="width:{{ ts['pct_remaining'] }}%;"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if order['source_youtube_id'] %}
+  <p class="muted" style="font-size:0.85rem;">
+    Want this same video in another language? <a href="/client?reorder_youtube_url=https://www.youtube.com/watch?v={{ order['source_youtube_id'] }}&reorder_source_lang={{ order['source_lang'] }}">Start a new order from it →</a>
+    (a real new order - re-fetches the video fresh and processes it as its own job).
+  </p>
+  {% else %}
+  <p class="muted" style="font-size:0.85rem;">
+    Want this same file in another language? Upload it again on a new order and pick a different target
+    language - we don't yet have a way to reuse an uploaded file without re-uploading it.
+  </p>
+  {% endif %}
+
+  {% if order['tts'] != 'stub' %}
+    {% if order['voice_clone_consent_given_at'] %}
+    <p class="muted" style="font-size:0.82rem;">✓ Voice-cloning consent on file for this order
+       ({{ order['voice_clone_consent_given_at']|int|timestamp_to_str }}).</p>
+    {% else %}
+    <div class="modal-warning" style="font-size:0.85rem;">
+      This order doesn't have voice-cloning consent on file. We won't clone any speaker's voice on this
+      order unless you grant it - only needed if you specifically want the dub to sound like the original
+      speaker rather than one of our standard voices.
+      <form method="post" action="/client/orders/{{ order['id'] }}/grant-voice-clone-consent" style="margin-top:10px;">
+        <button type="submit" class="secondary">I confirm I have the rights and consent to voice cloning on this order</button>
+      </form>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {% if order['status'] == 'failed' %}
+    <p class="error">Something went wrong on our end - we've been notified and will follow up.</p>
+  {% elif order['status'] in ['queued', 'processing'] %}
+    <p class="muted">Your file is being transcribed, translated, and voiced.
+       This page updates itself automatically.</p>
+  {% elif order['status'] == 'awaiting_review' %}
+    <p class="muted">First pass is done - one of our team is reviewing it before delivery.</p>
+  {% elif order['status'] == 'editor_returned' %}
+    <p class="muted">Our team flagged something on this order and is looking into it - we'll be in touch
+       shortly, either here or by message below.</p>
+  {% elif order['status'] == 'returned_to_client' %}
+    <p class="error">This order was returned without completing - see the message thread below for why.
+       Submit a new order once it's ready to go again.</p>
+  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order['difficulty_surcharge_status'] == 'pending_approval' %}
+    <div class="modal-warning">
+      Your delivery is ready, but this order needed additional work beyond what was originally covered - a
+      ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} charge applies before it unlocks.
+    </div>
+    <a class="btn" href="/client/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px;">Review &amp; pay charge →</a>
+  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order['is_free_preview'] %}
+    <div class="modal-warning">
+      This ran on your free trial minutes - a transcription preview, not a downloadable file. Submit a
+      paid order (any service level, any time) to get the real, downloadable deliverables.
+    </div>
+    <div class="card" style="margin-top:14px; max-height:360px; overflow-y:auto; white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">
+{%- for seg in (job.segments if job else []) -%}
+{{ seg.source_final_text }}{{ "\n\n" if not loop.last }}
+{%- endfor -%}
+    </div>
+    <a class="btn" href="/client" style="margin-top:14px;">Submit a paid order for the downloadable file →</a>
+  {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
+    <p class="ok">Ready. Download your files below.</p>
+    <div class="downloads">
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/audio">Dubbed audio (.wav)</a>
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/srt">Subtitles (.srt)</a>
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/vtt">Subtitles (.vtt)</a>
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
+      {% if burned_ready %}
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/burned">Video with burned-in captions</a>
+      {% endif %}
+      {% if dubbed_ready %}
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Dubbed video</a>
+      {% endif %}
+    </div>
+    {% if not burned_ready and not dubbed_ready %}
+    <p class="muted" style="margin-top:8px;">Need a captioned or dubbed video file instead of just audio?
+       Ask us in the message thread below - available on Premium and up, or as a paid add-on on your
+       next order.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+<details class="card message-collapsible" open>
+  <summary><h2 style="display:inline;">Messages ({{ messages|length }})</h2></summary>
+  <div class="message-thread">
+    {% if not messages %}
+      <p class="muted">No messages yet - questions, revisions and delivery updates will appear here.</p>
+    {% endif %}
+    {% for m in messages %}
+    <div class="message {{ 'message-me' if m['sender_id'] == user['id'] else 'message-them' }}">
+      <div class="message-meta">{{ m['sender_name'] if m['sender_id'] != user['id'] else 'You' }}
+        &middot; {{ m['created_at']|int|timestamp_to_str }}</div>
+      <div class="message-body">{{ m['body'] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/client/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
+    <textarea name="body" rows="2" placeholder="Write a message..." required></textarea>
+    <button type="submit">Send</button>
+  </form>
+</details>
+{% endblock %}

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="{% block theme %}light{% endblock %}" data-theme-locked="{% block theme_locked %}{% endblock %}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Runs before paint: a saved user override beats the page's own
+    // default theme. Without this the page would flash its default
+    // theme first, then jump to the user's preference. Skipped when
+    // data-theme-locked is set (see login.html) - the split-screen login/
+    // signup page is designed as one committed dark look (branded photo
+    // panel + matching form), not something that should flip to a
+    // completely different, unrelated light theme just because that's
+    // what the visitor last picked inside the app they haven't even
+    // logged into yet. That mismatch was the actual bug behind the
+    // "blinding white panel" report - the page's own dark default was
+    // being silently overridden by a stale saved preference.
+    (function () {
+      if (document.documentElement.getAttribute("data-theme-locked") === "1") return;
+      var t = localStorage.getItem("kauli_theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <title>{% block title %}Kauli{% endblock %} - Kauli (demo)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head_extra %}{% endblock %}
+  <!-- Cloudflare Web Analytics - cookieless, no personal data, see Privacy Policy -->
+  <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "7d7177ddf4eb4c22ab931af3ffa28bef"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  {% if self.body_class() != 'auth-page' %}
+  {% if paystack_live_mode() %}
+  <div class="banner" style="background:var(--warn-soft); color:var(--warn);">Local prototype, not publicly launched yet - card payments via Paystack are real; M-Pesa and bank transfer are still test-only.</div>
+  {% else %}
+  <div class="banner" style="background:var(--warn-soft); color:var(--warn);">Local prototype, not publicly launched yet - no real payments.</div>
+  {% endif %}
+  {% endif %}
+  {% if user %}
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="wordmark">KAULI</div>
+      <div class="sub-wordmark">Forge Media Services</div>
+    </div>
+    <div class="account-menu" id="account-menu">
+      <button type="button" class="account-menu-trigger" id="account-menu-trigger" aria-haspopup="true" aria-expanded="false">
+        {% if user['avatar_path'] %}
+          <img class="avatar-img" src="/avatar/{{ user['id'] }}" alt="">
+        {% else %}
+          <div class="avatar">{{ user['display_name'][0]|upper }}</div>
+        {% endif %}
+        <span class="account-menu-name">{{ user['display_name'] }}</span>
+        <span class="chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="account-menu-panel" id="account-menu-panel" hidden>
+        <div class="account-menu-identity">
+          <div class="user-name">{{ user['display_name'] }}</div>
+          <div class="user-role">{{ user['role'] }}</div>
+        </div>
+        <button type="button" class="account-menu-item" id="theme-toggle">
+          <span class="icon">T</span><span id="theme-toggle-label">Switch theme</span>
+        </button>
+        <a href="/settings" class="account-menu-item"><span class="icon">S</span>Settings</a>
+        <a href="/logout" class="account-menu-item account-menu-item-danger"><span class="icon">O</span>Sign out</a>
+      </div>
+    </div>
+  </header>
+  {% endif %}
+  <div class="app-shell{% if not user %} no-sidebar{% endif %}" id="app-shell">
+    {% if user %}
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">«</button>
+      </div>
+      <nav class="sidebar-nav">
+        {% if user['role'] == 'staff' %}
+        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}"><span class="icon">Q</span><span class="label">Queue</span></a>
+        <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}"><span class="icon">R</span><span class="label">Reports</span></a>
+        <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}"><span class="icon">C</span><span class="label">CRM</span></a>
+        <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}"><span class="icon">E</span><span class="label">Exceptions</span></a>
+        <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
+        <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}"><span class="icon">W</span><span class="label">Blog</span></a>
+        <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}"><span class="icon">•</span><span class="label">Status</span></a>
+        {% if user['is_admin'] %}
+        <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}"><span class="icon">A</span><span class="label">Admin</span></a>
+        {% endif %}
+        {% else %}
+        <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}"><span class="icon">D</span><span class="label">Dashboard</span></a>
+        <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
+        {% endif %}
+        <a href="/settings" class="{{ 'active' if request.url.path == '/settings' else '' }}"><span class="icon">S</span><span class="label">Settings</span></a>
+      </nav>
+    </aside>
+    {% endif %}
+    <div class="app-main">
+      <main>
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <div class="cookie-notice" id="cookie-notice" style="display:none;" role="region" aria-label="Cookie notice">
+    <p><span class="cookie-notice-full">We use one strictly necessary cookie to keep you signed in, plus
+       cookieless Cloudflare Web Analytics (no tracking, no client-side state) to see aggregate site
+       traffic. No advertising or cross-site tracking cookies.</span><span class="cookie-notice-short">One
+       necessary cookie, plus cookieless analytics. No tracking or ad cookies.</span> See our
+       <a href="/privacy#cookies">Privacy Policy</a>.</p>
+    <button type="button" id="cookie-notice-dismiss" class="btn secondary">Got it</button>
+  </div>
+
+  <script>
+    (function () {
+      var notice = document.getElementById("cookie-notice");
+      var dismissBtn = document.getElementById("cookie-notice-dismiss");
+      if (notice && dismissBtn && localStorage.getItem("kauli_cookie_notice_dismissed") !== "1") {
+        notice.style.display = "flex";
+        // Push page content up rather than relying on z-index alone - a
+        // fixed banner sitting ON TOP of a CTA is still blocking it even
+        // if it's "above" it in stacking order.
+        document.body.style.paddingBottom = notice.offsetHeight + 16 + "px";
+        dismissBtn.addEventListener("click", function () {
+          notice.style.display = "none";
+          document.body.style.paddingBottom = "";
+          localStorage.setItem("kauli_cookie_notice_dismissed", "1");
+        });
+      }
+    })();
+  </script>
+  <script>
+    (function () {
+      var sidebar = document.getElementById("sidebar");
+      var collapseBtn = document.getElementById("sidebar-collapse-btn");
+      if (sidebar && collapseBtn) {
+        if (localStorage.getItem("kauli_sidebar_collapsed") === "1") {
+          sidebar.classList.add("collapsed");
+          collapseBtn.textContent = "»";
+        }
+        collapseBtn.addEventListener("click", function () {
+          var collapsed = sidebar.classList.toggle("collapsed");
+          collapseBtn.textContent = collapsed ? "»" : "«";
+          localStorage.setItem("kauli_sidebar_collapsed", collapsed ? "1" : "0");
+        });
+      }
+
+      var themeBtn = document.getElementById("theme-toggle");
+      var themeLabel = document.getElementById("theme-toggle-label");
+      function paintThemeLabel() {
+        if (!themeLabel) return;
+        var current = document.documentElement.getAttribute("data-theme");
+        themeLabel.textContent = current === "dark" ? "Switch to light" : "Switch to dark";
+      }
+      paintThemeLabel();
+      if (themeBtn) {
+        themeBtn.addEventListener("click", function () {
+          var current = document.documentElement.getAttribute("data-theme");
+          var next = current === "dark" ? "light" : "dark";
+          document.documentElement.setAttribute("data-theme", next);
+          localStorage.setItem("kauli_theme", next);
+          paintThemeLabel();
+        });
+      }
+
+      // Account menu (top right) - the one place to switch theme, reach
+      // Settings, or sign out, on every screen size and for every role.
+      var menu = document.getElementById("account-menu");
+      var trigger = document.getElementById("account-menu-trigger");
+      var panel = document.getElementById("account-menu-panel");
+      if (menu && trigger && panel) {
+        function closeMenu() {
+          panel.hidden = true;
+          trigger.setAttribute("aria-expanded", "false");
+        }
+        function openMenu() {
+          panel.hidden = false;
+          trigger.setAttribute("aria-expanded", "true");
+        }
+        trigger.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (panel.hidden) { openMenu(); } else { closeMenu(); }
+        });
+        document.addEventListener("click", function (e) {
+          if (!panel.hidden && !menu.contains(e.target)) closeMenu();
+        });
+        document.addEventListener("keydown", function (e) {
+          if (e.key === "Escape" && !panel.hidden) { closeMenu(); trigger.focus(); }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Admin{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="muted" style="margin-top:0;">Manage who has staff access. Only accounts listed in
+   KAULI_STAFF_EMAILS (yours) can see this page.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0;">Add a staff member</h2>
+  <p class="muted" style="margin-top:-6px; font-size:0.85rem;">If they already have a Kauli account, this
+     promotes it immediately. If not, they get staff access automatically the moment they sign up with this
+     email - no separate invite link to send.</p>
+  <form method="post" action="/staff/admin/invite" style="max-width:420px; display:flex; gap:10px; align-items:flex-end;">
+    <label style="flex:1;">Email<input type="email" name="email" required placeholder="colleague@example.com"></label>
+    <button type="submit">Add</button>
+  </form>
+</div>
+
+<div class="card" style="padding:0;">
+  <div style="padding:20px 24px 10px;"><h2 style="margin:0;">Current staff</h2></div>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+    <tbody>
+      {% for s in staff_users %}
+      <tr>
+        <td>{{ s['display_name'] }}</td>
+        <td>{{ s['email'] }}</td>
+        <td>{{ 'Admin' if s['is_admin'] else 'Staff' }}</td>
+        <td>
+          {% if s['id'] != user['id'] %}
+          <form method="post" action="/staff/admin/demote/{{ s['id'] }}"
+                onsubmit="return confirm('Remove staff access for {{ s['email'] }}?');">
+            <button type="submit" class="row-action-chip">Remove staff access</button>
+          </form>
+          {% else %}
+          <span class="muted" style="font-size:0.78rem;">(you)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if staff_invites %}
+<div class="card" style="padding:0;">
+  <div style="padding:20px 24px 10px;"><h2 style="margin:0;">Pending invites</h2></div>
+  <table>
+    <thead><tr><th>Email</th><th>Invited</th><th></th></tr></thead>
+    <tbody>
+      {% for inv in staff_invites %}
+      <tr>
+        <td>{{ inv['email'] }}</td>
+        <td class="muted">{{ inv['invited_at']|timestamp_to_str }}</td>
+        <td>
+          <form method="post" action="/staff/admin/remove-invite">
+            <input type="hidden" name="email" value="{{ inv['email'] }}">
+            <button type="submit" class="row-action-chip">Cancel invite</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

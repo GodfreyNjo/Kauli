@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}CRM{% endblock %}
+{% block content %}
+<h1>CRM</h1>
+<p class="muted" style="margin-top:0;">Every lead, wherever it came from - the website form lands here automatically;
+   log anything from Instagram, WhatsApp, a referral, etc. by hand below.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="stat-grid">
+  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('new', 0) }}</div><div class="stat-label">New</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('contacted', 0) }}</div><div class="stat-label">Contacted</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('qualified', 0) }}</div><div class="stat-label">Qualified</div></div>
+  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('proposal', 0) }}</div><div class="stat-label">Proposal sent</div></div>
+  <div class="stat-tile ok"><div class="stat-value">{{ pipeline['won'] }}</div><div class="stat-label">Won</div></div>
+  <div class="stat-tile{% if pipeline['conversion_rate'] is not none and pipeline['conversion_rate'] < 0.3 %} warn{% endif %}">
+    <div class="stat-value">{% if pipeline['conversion_rate'] is not none %}{{ "%.0f"|format(pipeline['conversion_rate'] * 100) }}%{% else %}-{% endif %}</div>
+    <div class="stat-label">Conversion rate</div>
+    <div class="stat-sub">of {{ pipeline['won'] + pipeline['lost'] }} decided</div>
+  </div>
+</div>
+
+{% if stale_leads %}
+<div class="card internal-card">
+  <h2 style="margin-top:0;">⚠ Going cold - no activity in 48h+</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Source</th><th>Waiting</th><th></th></tr></thead>
+    <tbody>
+      {% for lead in stale_leads %}
+      <tr>
+        <td>{{ lead['name'] }}</td>
+        <td><span class="source-badge">{{ lead['source'] }}</span></td>
+        <td class="stuck-hours">{{ "%.0f"|format((now_ts - lead['created_at']) / 3600) }}h</td>
+        <td><a href="/staff/leads/{{ lead['id'] }}" class="row-action-btn" title="Follow up">→</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0;">Client onboarding</h2>
+  <p class="muted" style="margin-top:0; font-size:0.85rem;">There's no email service connected yet, so nothing here
+     sends itself - every message below is real, ready to use, and waiting for you to actually send it (email or
+     WhatsApp) and click "Mark as sent".</p>
+
+  {% if pending_onboarding_messages %}
+  <table>
+    <thead><tr><th>To</th><th>Kind</th><th>Message</th><th></th></tr></thead>
+    <tbody>
+      {% for m in pending_onboarding_messages %}
+      <tr>
+        <td>{{ m['user_display_name'] }}<br><span class="muted" style="font-size:0.78rem;">{{ m['user_email'] }}</span></td>
+        <td><span class="source-badge">{{ m['kind']|replace('_', ' ') }}</span></td>
+        <td>
+          <details>
+            <summary style="cursor:pointer;">{{ m['subject'] }}</summary>
+            <pre style="white-space:pre-wrap; font-family:inherit; margin:8px 0 0; font-size:0.85rem;">{{ m['body'] }}</pre>
+          </details>
+        </td>
+        <td>
+          <form method="post" action="/staff/onboarding/{{ m['id'] }}/mark-sent">
+            <button type="submit" class="row-action-chip" title="I sent this by hand">✓ Mark as sent</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">Nothing queued right now.</p>
+  {% endif %}
+
+  {% if clients_needing_nudge %}
+  <h3 style="margin-top:20px;">Signed up, never uploaded anything (48h+)</h3>
+  <table>
+    <thead><tr><th>Client</th><th>Waiting</th><th></th></tr></thead>
+    <tbody>
+      {% for c in clients_needing_nudge %}
+      <tr>
+        <td>{{ c['display_name'] }}<br><span class="muted" style="font-size:0.78rem;">{{ c['email'] }}</span></td>
+        <td class="stuck-hours">{{ "%.0f"|format((now_ts - c['created_at']) / 3600) }}h</td>
+        <td>
+          <form method="post" action="/staff/onboarding/{{ c['id'] }}/nudge">
+            <button type="submit" class="row-action-chip" title="Queue a check-in message">+ Queue nudge</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if pending_deletion_requests %}
+  <h3 style="margin-top:20px;">Data deletion requests</h3>
+  <table>
+    <thead><tr><th>Client</th><th>Requested</th><th></th></tr></thead>
+    <tbody>
+      {% for r in pending_deletion_requests %}
+      <tr>
+        <td>{{ r['user_display_name'] }}<br><span class="muted" style="font-size:0.78rem;">{{ r['user_email'] }}</span></td>
+        <td class="muted">{{ r['requested_at']|int|timestamp_to_str }}</td>
+        <td style="display:flex; gap:6px;">
+          <form method="post" action="/staff/deletion-requests/{{ r['id'] }}/resolve">
+            <input type="hidden" name="status" value="done">
+            <button type="submit" class="row-action-chip" title="Mark deleted">✓ Done</button>
+          </form>
+          <form method="post" action="/staff/deletion-requests/{{ r['id'] }}/resolve">
+            <input type="hidden" name="status" value="declined">
+            <button type="submit" class="row-action-chip" title="Decline (e.g. still needed for accounting)">Decline</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">By source</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Leads</th><th>Won</th></tr></thead>
+    <tbody>
+      {% for row in pipeline['by_source'] %}
+      <tr><td style="text-transform:capitalize;">{{ row['source'] }}</td><td>{{ row['n'] }}</td><td>{{ row['won'] }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <details id="log-lead-form">
+    <summary style="cursor:pointer; font-weight:650; font-size:1rem;">+ Log a lead manually</summary>
+    <form method="post" action="/staff/leads/new" style="margin-top:16px; max-width:600px;">
+      <div class="row">
+        <label>Name<input type="text" name="name" required></label>
+        <label>Email<input type="email" name="email" required></label>
+      </div>
+      <div class="row">
+        <label>Phone (optional)<input type="tel" name="phone"></label>
+        <label>Company (optional)<input type="text" name="company"></label>
+      </div>
+      <label>Source
+        <select name="source">
+          {% for s in lead_sources %}<option value="{{ s }}" {% if s == 'other' %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Notes (optional)<textarea name="message" rows="2" placeholder="What did they say / ask about?"></textarea></label>
+      <button type="submit">Add lead</button>
+    </form>
+  </details>
+</div>
+
+<div class="card" style="padding:0;">
+  <div style="padding:20px 24px 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+    <h2 style="margin:0;">All leads</h2>
+    <div class="filter-tabs">
+      <a href="/staff/leads" class="{{ 'active' if not filter_status else '' }}">All <span class="tab-count">{{ pipeline['by_status'].values() | sum }}</span></a>
+      {% for s in lead_statuses %}
+      <a href="/staff/leads?status={{ s }}" class="{{ 'active' if filter_status == s else '' }}">{{ s|capitalize }} <span class="tab-count">{{ pipeline['by_status'].get(s, 0) }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  {% if not leads %}
+    <div class="empty-state">
+      <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M8 20a4 4 0 0 1 4-4h13l5 6h22a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4H12a4 4 0 0 1-4-4V20Z" stroke="currentColor" stroke-width="2"/>
+      </svg>
+      <p>No leads match this filter.</p>
+      <a href="#log-lead-form" class="btn secondary" onclick="document.getElementById('log-lead-form').open = true;">+ Log a lead manually</a>
+    </div>
+  {% else %}
+  <table>
+    <thead><tr><th>Received</th><th>Name</th><th>Contact</th><th>Org type</th><th>Volume</th><th>Source</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for lead in leads %}
+      <tr onclick="location.href='/staff/leads/{{ lead['id'] }}'" style="cursor:pointer;">
+        <td>{{ lead['created_at']|int|timestamp_to_str }}</td>
+        <td>{{ lead['name'] }}</td>
+        <td>{{ lead['email'] }}{% if lead['personal_email_flag'] %} <span class="muted" style="font-size:0.72rem;" title="Personal email domain - not a rejection, just a triage signal">(personal)</span>{% endif %}</td>
+        <td class="muted" style="font-size:0.82rem;">{{ (lead['org_type'] or '-')|replace('_', ' ') }}</td>
+        <td class="muted" style="font-size:0.82rem;">{{ (lead['volume_estimate'] or '-')|replace('_', ' ') }}</td>
+        <td><span class="source-badge">{{ lead['source'] }}</span></td>
+        <td><span class="status status-{{ lead['status'] }}">{{ lead['status'] }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}{{ lead['name'] }}{% endblock %}
+{% block content %}
+<a href="/staff/leads" style="color:var(--muted); font-size:0.85rem; text-decoration:none;">← All leads</a>
+<h1 style="margin-top:8px;">{{ lead['name'] }}</h1>
+
+<div class="card">
+  <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+    <div>
+      <p style="margin:0 0 4px;"><a href="mailto:{{ lead['email'] }}">{{ lead['email'] }}</a></p>
+      {% if lead['phone'] %}<p style="margin:0 0 4px;"><a href="tel:{{ lead['phone'] }}">{{ lead['phone'] }}</a></p>{% endif %}
+      {% if lead['company'] %}<p class="muted" style="margin:0 0 4px;">{{ lead['company'] }}</p>{% endif %}
+      {% if lead['personal_email_flag'] %}<p class="muted" style="margin:0 0 4px; font-size:0.8rem;">⚠ Personal email domain - not a rejection, just a triage signal; verify org details before deprioritizing.</p>{% endif %}
+      {% if lead['org_type'] or lead['volume_estimate'] %}
+      <p class="muted" style="margin:0 0 4px; font-size:0.85rem;">
+        {% if lead['org_type'] %}{{ lead['org_type']|replace('_', ' ')|capitalize }}{% endif %}
+        {% if lead['org_type'] and lead['volume_estimate'] %} &middot; {% endif %}
+        {% if lead['volume_estimate'] %}{{ lead['volume_estimate']|replace('_', ' ') }}/month{% endif %}
+      </p>
+      {% endif %}
+      <p style="margin:10px 0 0;">
+        <span class="source-badge">{{ lead['source'] }}</span>
+        <span class="status status-{{ lead['status'] }}" style="margin-left:8px;">{{ lead['status'] }}</span>
+      </p>
+      {% if converted_user %}
+        <p class="ok" style="margin-top:10px;">✓ Converted - signed up as {{ converted_user['display_name'] }} ({{ converted_user['email'] }})</p>
+      {% endif %}
+    </div>
+    <form method="post" action="/staff/leads/{{ lead['id'] }}/status">
+      <input type="hidden" name="next" value="/staff/leads/{{ lead['id'] }}">
+      <label>Stage
+        <select name="status" onchange="this.form.submit()">
+          {% for s in lead_statuses %}<option value="{{ s }}" {% if s == lead['status'] %}selected{% endif %}>{{ s|capitalize }}</option>{% endfor %}
+        </select>
+      </label>
+    </form>
+  </div>
+
+  {% if lead['message'] or lead['preferred_time'] %}
+  <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border-subtle);">
+    {% if lead['preferred_time'] %}<p class="muted" style="margin:0 0 6px;"><strong>Preferred time:</strong> {{ lead['preferred_time'] }}</p>{% endif %}
+    {% if lead['message'] %}<p style="margin:0; white-space:pre-wrap;">{{ lead['message'] }}</p>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Activity</h2>
+  <div class="message-thread" style="max-height:none;">
+    {% for note in notes %}
+    <div class="message message-internal" style="align-self:stretch; max-width:100%;">
+      <div class="message-meta">{{ note['author_name'] or 'System' }} · {{ note['created_at']|int|timestamp_to_str }}</div>
+      <div class="message-body">{{ note['body'] }}</div>
+    </div>
+    {% else %}
+    <p class="muted">No activity logged yet.</p>
+    {% endfor %}
+  </div>
+  <form method="post" action="/staff/leads/{{ lead['id'] }}/notes" style="margin-top:16px;">
+    <label>Add a note (call made, email sent, etc.)
+      <textarea name="body" rows="3" required></textarea>
+    </label>
+    <button type="submit">Add note</button>
+  </form>
+</div>
+{% endblock %}

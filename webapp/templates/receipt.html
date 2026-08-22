@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Receipt {{ receipt['receipt_number'] }}{% endblock %}
+{% block content %}
+<div class="card receipt-card" style="max-width:640px;">
+  <div class="receipt-head">
+    <div>
+      <div class="wordmark">KAULI</div>
+      <div class="sub-wordmark">Forge Media Services</div>
+    </div>
+    <div style="text-align:right;">
+      <h1 style="margin:0; font-size:1.3rem;">Receipt</h1>
+      <p class="muted" style="margin:2px 0 0; font-size:0.85rem;">{{ receipt['receipt_number'] }}</p>
+      <span class="ok" style="margin-top:6px; font-weight:700; letter-spacing:0.04em;">PAID</span>
+    </div>
+  </div>
+
+  <div class="receipt-meta">
+    <div>
+      <div class="muted" style="font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em;">Billed to</div>
+      <div>{{ client['display_name'] }}</div>
+      <div class="muted" style="font-size:0.88rem;">{{ client['email'] }}</div>
+      {% if order %}
+      <div class="muted" style="font-size:0.8rem; margin-top:6px;">Order ID: {{ order['id'] }}</div>
+      {% endif %}
+    </div>
+    <div style="text-align:right;">
+      <div class="muted" style="font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em;">Date</div>
+      <div>{{ receipt['issued_at']|int|timestamp_to_date }}</div>
+    </div>
+  </div>
+
+  {% if order %}
+  <div class="receipt-service-summary">
+    <div class="muted" style="font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:6px;">Service summary</div>
+    <div class="receipt-service-grid">
+      <div><span class="muted">Source</span><br>{{ {'sw': 'Swahili', 'en': 'English', 'ki': 'Kikuyu (Gikuyu)'}.get(order['source_lang'], order['source_lang']) }}</div>
+      <div><span class="muted">Target</span><br>{{ {'sw': 'Swahili', 'en': 'English'}.get(order['target_lang'], order['target_lang']) }}</div>
+      {% if order['duration_minutes'] %}
+      <div><span class="muted">Duration</span><br>{{ "%.1f"|format(order['duration_minutes']) }} min</div>
+      {% endif %}
+      <div><span class="muted">Verification</span><br>Human-reviewed before delivery</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <table style="margin-top:24px;">
+    <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
+    <tbody>
+      {% if line_items %}
+        {% for line in line_items %}
+        <tr>
+          <td>
+            {{ line['label'] }}
+            {% if line['detail'] %}<div class="muted" style="font-size:0.78rem; margin-top:2px;">{{ line['detail'] }}</div>{% endif %}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            {{ '-' if line['amount_usd'] < 0 else '' }}${{ "%.2f"|format(line['amount_usd']|abs) }}
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td>{{ receipt['description'] }}</td>
+          <td style="text-align:right;">${{ "%.2f"|format(receipt['amount_usd']) }}</td>
+        </tr>
+      {% endif %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td style="font-weight:700;">Total paid</td>
+        <td style="text-align:right; font-weight:700;">
+          ${{ "%.2f"|format(receipt['amount_usd']) }}
+          {% if receipt['amount_local'] and receipt['currency'] != 'USD' %}
+          <div class="muted" style="font-size:0.78rem; font-weight:400;">{{ receipt['currency'] }} {{ "%.2f"|format(receipt['amount_local']) }}</div>
+          {% endif %}
+        </td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="receipt-meta" style="margin-top:20px;">
+    <div>
+      <div class="muted" style="font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em;">Payment method</div>
+      <div>{{ receipt['provider']|replace('mpesa', 'M-Pesa')|replace('paystack', 'Paystack')|replace('bank', 'Bank transfer')|capitalize }}</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="muted" style="font-size:0.76rem; text-transform:uppercase; letter-spacing:0.04em;">Reference</div>
+      {% if receipt['provider'] == 'bank' %}
+        <div>Verified manually by our team</div>
+      {% elif receipt['provider_reference'] %}
+        <div>{{ receipt['provider_reference'] }}</div>
+      {% else %}
+        <div class="muted">-</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if order %}
+  <p style="margin-top:20px;"><a href="/client/orders/{{ order['id'] }}">View order →</a></p>
+  {% endif %}
+
+  <div style="margin-top:28px; padding-top:16px; border-top:1px solid var(--border-subtle);" class="muted">
+    <p style="margin:0; font-size:0.8rem;">Forge Media Services &middot; Operated by Godfrey Njoroge</p>
+    <p style="margin:2px 0 0; font-size:0.8rem;">{{ email }} &middot; {{ phone_display }}</p>
+    <p style="margin:10px 0 0; font-size:0.72rem;">Receipt No. {{ receipt['receipt_number'] }} &middot; Kauli, Forge Media Services. This is an automatically issued record of a completed payment.</p>
+  </div>
+
+  <div class="no-print" style="margin-top:24px;">
+    <button type="button" class="secondary" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+</div>
+
+<style>
+  .receipt-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .receipt-meta { display: flex; justify-content: space-between; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+  .receipt-service-summary { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
+  .receipt-service-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; font-size: 0.88rem; }
+  @media print {
+    .no-print, .sidebar, .topbar, .banner, .cookie-notice { display: none !important; }
+    .app-main { width: 100% !important; }
+    .receipt-card { border: none !important; box-shadow: none !important; }
+    body { background: #fff !important; color: #000 !important; }
+  }
+</style>
+{% endblock %}

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<h1>Reports</h1>
+<p class="muted" style="margin-top:0;">Queue health below is always live. Revenue, turnaround and volume cover the
+   last {{ days }} days.</p>
+
+<div class="period-switch">
+  <a href="/staff/ops?days=7" class="{{ 'active' if days == 7 else '' }}">7 days</a>
+  <a href="/staff/ops?days=30" class="{{ 'active' if days == 30 else '' }}">30 days</a>
+  <a href="/staff/ops?days=90" class="{{ 'active' if days == 90 else '' }}">90 days</a>
+</div>
+
+<h2>Revenue <span class="muted" style="font-weight:400; font-size:0.8rem;">(confirmed payments only)</span></h2>
+<div class="stat-grid">
+  <div class="stat-tile ok">
+    <div class="stat-value">${{ "%.2f"|format(revenue['total_period']) }}</div>
+    <div class="stat-label">Last {{ days }} days</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">${{ "%.2f"|format(revenue['total_all_time']) }}</div>
+    <div class="stat-label">All time</div>
+  </div>
+  <div class="stat-tile{% if revenue['pending_bank_count'] %} warn{% endif %}">
+    <div class="stat-value">${{ "%.2f"|format(revenue['pending_bank_amount']) }}</div>
+    <div class="stat-label">Pending bank transfers</div>
+    <div class="stat-sub">{{ revenue['pending_bank_count'] }} awaiting confirmation - see Billing</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">{{ new_leads }}</div>
+    <div class="stat-label">New leads</div>
+    <div class="stat-sub">not yet contacted - see Leads</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">By provider</h2>
+  {% if not revenue['by_provider'] %}
+    <p class="muted">No confirmed payments in this window.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Provider</th><th>Payments</th><th>Total</th></tr></thead>
+    <tbody>
+      {% for row in revenue['by_provider'] %}
+      <tr><td style="text-transform:capitalize;">{{ row['provider'] }}</td><td>{{ row['n'] }}</td><td>${{ "%.2f"|format(row['total']) }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">By type</h2>
+  {% if not revenue['by_kind'] %}
+    <p class="muted">No confirmed payments in this window.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Type</th><th>Payments</th><th>Total</th></tr></thead>
+    <tbody>
+      {% for row in revenue['by_kind'] %}
+      <tr>
+        <td>{{ 'Per-order usage charge' if row['kind'] == 'usage' else 'Plan subscription' }}</td>
+        <td>{{ row['n'] }}</td><td>${{ "%.2f"|format(row['total']) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<h2>Margin <span class="muted" style="font-weight:400; font-size:0.8rem;">(internal only - not shown to clients)</span></h2>
+<p class="muted" style="margin-top:0; font-size:0.82rem;">Revenue is what orders were billed for in this window
+   (may include unpaid pending_payment orders). AI cost uses the real, metered cost from Claude's own
+   token usage for any order that has one; orders processed before that was tracked (or on local/stub
+   MT, which is genuinely free) fall back to a rough per-minute estimate
+   (billing.ESTIMATED_AI_COST_PER_MINUTE) - not exact accounting for those, but real for anything Claude
+   actually touched.</p>
+
+<div class="{{ 'modal-warning' if ai_spend_today >= ai_spend_alert_threshold else 'card' }}" style="margin-bottom:16px;">
+  <strong>Today's real AI spend: ${{ "%.4f"|format(ai_spend_today) }}</strong>
+  <span class="muted"> / ${{ "%.2f"|format(ai_spend_alert_threshold) }} alert threshold</span>
+  {% if ai_spend_today >= ai_spend_alert_threshold %}
+    <p style="margin:6px 0 0;">This is unusually high for a normal day - worth checking for a bugged
+       retry loop or unexpected order volume before it keeps climbing. Adjust the threshold with
+       <code>KAULI_DAILY_AI_COST_ALERT_USD</code> in <code>.env</code>.</p>
+  {% endif %}
+</div>
+
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="stat-value">${{ "%.2f"|format(margin['total_revenue_usd']) }}</div>
+    <div class="stat-label">Revenue billed</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">${{ "%.2f"|format(margin['total_est_ai_cost_usd']) }}</div>
+    <div class="stat-label">Est. AI cost</div>
+  </div>
+  <div class="stat-tile{% if margin['total_est_margin_usd'] < 0 %} err{% else %} ok{% endif %}">
+    <div class="stat-value">${{ "%.2f"|format(margin['total_est_margin_usd']) }}</div>
+    <div class="stat-label">Est. margin</div>
+  </div>
+</div>
+{% if margin['by_pair'] %}
+<div class="card" style="padding:0; overflow-x:auto; margin-bottom:20px;">
+  <table>
+    <thead><tr><th>Language pair</th><th>Orders</th><th>Revenue</th><th>Est. AI cost</th><th>Est. margin</th></tr></thead>
+    <tbody>
+      {% for row in margin['by_pair'] %}
+      <tr>
+        <td style="font-family:var(--font-mono);">{{ row['pair'] }}</td>
+        <td>{{ row['orders'] }}</td>
+        <td>${{ "%.2f"|format(row['revenue_usd']) }}</td>
+        <td>${{ "%.4f"|format(row['est_ai_cost_usd']) }}</td>
+        <td>${{ "%.2f"|format(row['est_margin_usd']) }}
+           {% if row['est_margin_pct'] is not none %}<span class="muted">({{ "%.0f"|format(row['est_margin_pct']*100) }}%)</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Throughput &amp; SLA <span class="muted" style="font-weight:400; font-size:0.8rem;">(last {{ days }} days)</span></h2>
+<div class="stat-grid">
+  <div class="stat-tile">
+    <div class="stat-value">{{ orders_created }}</div>
+    <div class="stat-label">Orders created</div>
+  </div>
+  <div class="stat-tile">
+    <div class="stat-value">{{ "%.1f"|format(minutes_processed) }}</div>
+    <div class="stat-label">Minutes delivered</div>
+  </div>
+  <div class="stat-tile">
+    {% if turnaround['median_hours'] is not none %}
+      <div class="stat-value">{{ "%.1f"|format(turnaround['median_hours']) }}<small> hrs</small></div>
+      <div class="stat-sub">avg {{ "%.1f"|format(turnaround['avg_hours']) }} hrs, {{ turnaround['count'] }} orders</div>
+    {% else %}
+      <div class="stat-value">-</div>
+      <div class="stat-sub">no orders completed yet in this window</div>
+    {% endif %}
+    <div class="stat-label">Median turnaround</div>
+  </div>
+  <div class="stat-tile{% if failures['rate'] and failures['rate'] > 0.1 %} err{% endif %}">
+    {% if failures['rate'] is not none %}
+      <div class="stat-value">{{ "%.0f"|format(failures['rate'] * 100) }}%</div>
+      <div class="stat-sub">{{ failures['failed'] }} failed of {{ failures['total'] }}</div>
+    {% else %}
+      <div class="stat-value">-</div>
+      <div class="stat-sub">no completed orders yet</div>
+    {% endif %}
+    <div class="stat-label">Failure rate</div>
+  </div>
+</div>
+
+<h2>Queue health <span class="muted" style="font-weight:400; font-size:0.8rem;">(live snapshot)</span></h2>
+<div class="status-breakdown" style="margin-bottom:20px;">
+  {% for s in ['pending_payment', 'queued', 'processing', 'awaiting_review', 'editor_returned', 'ready_for_delivery', 'returned_to_client', 'failed', 'dead_letter'] %}
+  <div class="status-chip">
+    <span class="status status-{{ s }}"></span>
+    <strong>{{ status_counts.get(s, 0) }}</strong>
+    <span class="muted">{{ s|replace('_', ' ') }}</span>
+  </div>
+  {% endfor %}
+</div>
+
+{% if ops_triage %}
+<div class="card internal-card" style="padding:0;">
+  <div style="padding:20px 24px 0;">
+    <h2 style="margin-top:0;">Needs an ops decision</h2>
+    <p class="muted" style="margin-top:0;">An editor returned these instead of guessing - contact the client
+       or return the job from the order page.</p>
+  </div>
+  <table>
+    <thead><tr><th>Order</th><th>Client</th><th>Reason</th><th></th></tr></thead>
+    <tbody>
+      {% for o in ops_triage %}
+      <tr>
+        <td>{{ o['original_filename'] }}</td>
+        <td>{{ o['client_name'] }}</td>
+        <td>{{ o['return_reason']|replace('_', ' ') }}{% if o['return_note'] %} - {{ o['return_note'] }}{% endif %}</td>
+        <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-btn" title="Decide">→</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card" style="padding:0;">
+  <div style="padding:20px 24px 0;">
+    <h2 style="margin-top:0;">Stuck orders <span class="muted" style="font-weight:400; font-size:0.8rem;">(in the same stage &gt;24h)</span></h2>
+  </div>
+  {% if not stale_orders %}
+    <p class="muted" style="padding:0 24px 20px;">Nothing stuck - every in-flight order has moved stage within the last day.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Order</th><th>Client</th><th>Stage</th><th>Stuck for</th><th></th></tr></thead>
+    <tbody>
+      {% for o in stale_orders %}
+      <tr>
+        <td>{{ o['original_filename'] }}</td>
+        <td>{{ o['client_name'] }}</td>
+        <td><span class="status status-{{ o['status'] }}">{{ o['status']|replace('_', ' ') }}</span></td>
+        <td class="stuck-hours">{{ "%.0f"|format((now_ts - o['updated_at']) / 3600) }}h</td>
+        <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-btn" title="Open">→</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

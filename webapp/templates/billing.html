@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% block title %}Billing{% endblock %}
+{% block content %}
+<h1>Billing</h1>
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if is_test_account %}
+  <p class="ok">Full access enabled on this account for testing - every tier's benefits apply regardless
+     of what's below.</p>
+{% endif %}
+
+<div class="card">
+  <h2>Your plan: {{ plans[current_plan]['name'] }}</h2>
+  <p class="muted" style="margin-top:0;">
+    {{ "%.1f"|format(subscription['minutes_used_this_period'] or 0) if subscription else 0 }} /
+    {{ "%.1f"|format(free_minutes_total) }} free minutes used this month
+    ({{ "%.0f"|format(free_minutes_base) }} standard{% if bonus_minutes %} + {{ "%.0f"|format(bonus_minutes) }} bonus{% endif %}) -
+    {{ "%.1f"|format(free_minutes_remaining) }} remaining.
+    Usage beyond that is billed per order at checkout - see any order you submit.
+  </p>
+  {% if bonus_minutes and subscription and subscription['bonus_note'] %}
+  <p class="muted" style="margin-top:0; font-size:0.85rem;">Bonus grant: {{ subscription['bonus_note'] }}</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Prepaid minutes</h2>
+  <p class="muted" style="margin-top:0;">
+    {{ "%.1f"|format(wallet_minutes) }} minute{{ '' if wallet_minutes == 1 else 's' }} in your balance -
+    never expires, applied automatically on every order right after your monthly free minutes,
+    before anything is billed at the per-minute rate.
+  </p>
+  <div class="row" style="gap:10px; flex-wrap:wrap;">
+    {% for key, pkg in wallet_packages.items() %}
+    <details class="card" style="margin:0; padding:14px 16px; flex:1; min-width:180px;">
+      <summary style="cursor:pointer;"><strong>{{ pkg['minutes']|int }} minutes</strong> - ${{ "%.2f"|format(pkg['price_usd']) }}</summary>
+      <form method="post" action="/client/billing/wallet" style="margin-top:12px;">
+        <input type="hidden" name="package" value="{{ key }}">
+        <label style="font-size:0.78rem;">Pay with
+          <select name="provider">
+            <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
+            <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
+            <option value="bank">Bank transfer</option>
+          </select>
+        </label>
+        <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+          <input type="tel" name="phone" placeholder="2547XXXXXXXX">
+        </label>
+        <button type="submit" class="secondary">Buy ${{ "%.2f"|format(pkg['price_usd']) }}</button>
+      </form>
+    </details>
+    {% endfor %}
+    <details class="card" style="margin:0; padding:14px 16px; flex:1; min-width:220px;">
+      <summary style="cursor:pointer;"><strong>Custom amount</strong></summary>
+      <form method="post" action="/client/billing/wallet" style="margin-top:12px;" id="wallet-custom-form">
+        <label style="font-size:0.78rem;">Minutes to prepay
+          <input type="number" name="custom_minutes" id="wallet-custom-minutes" min="5" max="2000" step="1"
+                 placeholder="e.g. 90" required>
+        </label>
+        <p class="muted" style="font-size:0.76rem; margin:4px 0 10px;" id="wallet-custom-preview">
+          The more you prepay at once, the more you save: 10% off from 30 minutes, 15% off from 60, 20% off
+          from 150 - same discount the fixed packages above use, just for whatever amount you actually need.
+        </p>
+        <label style="font-size:0.78rem;">Pay with
+          <select name="provider">
+            <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
+            <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
+            <option value="bank">Bank transfer</option>
+          </select>
+        </label>
+        <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+          <input type="tel" name="phone" placeholder="2547XXXXXXXX">
+        </label>
+        <button type="submit" class="secondary" id="wallet-custom-submit">Buy</button>
+      </form>
+    </details>
+  </div>
+</div>
+<script>
+  (function () {
+    // Mirrors billing.wallet_custom_price's real tier logic - client-side
+    // preview only, the actual price is always computed server-side again
+    // before checkout, this just shows what to expect before submitting.
+    var RATE = {{ service_levels['dub']['rate_per_min'] }};
+    var input = document.getElementById('wallet-custom-minutes');
+    var preview = document.getElementById('wallet-custom-preview');
+    var submitBtn = document.getElementById('wallet-custom-submit');
+    var defaultPreview = preview.textContent;
+    if (!input) return;
+    function tierDiscount(minutes) {
+      if (minutes >= 150) return 0.20;
+      if (minutes >= 60) return 0.15;
+      if (minutes >= 30) return 0.10;
+      return 0.0;
+    }
+    input.addEventListener('input', function () {
+      var minutes = parseFloat(input.value);
+      if (!minutes || minutes <= 0) { preview.textContent = defaultPreview; submitBtn.textContent = 'Buy'; return; }
+      var discount = tierDiscount(minutes);
+      var base = minutes * RATE;
+      var price = base * (1 - discount);
+      var saved = base - price;
+      preview.textContent = discount > 0
+        ? 'That gets you ' + Math.round(discount * 100) + '% off (you save $' + saved.toFixed(2) + ') - $' + price.toFixed(2) + ' total.'
+        : '$' + price.toFixed(2) + ' total - add ' + (30 - minutes) + ' more minutes to unlock a 10% discount.';
+      submitBtn.textContent = 'Buy $' + price.toFixed(2);
+    });
+  })();
+</script>
+
+<div class="card" style="padding:0; overflow-x:auto;">
+  <table>
+    <thead><tr>
+      <th>Plan</th><th>Price/mo</th><th>Usage discount</th><th>Translation</th>
+      <th>Video deliverables</th><th>Support</th><th></th>
+    </tr></thead>
+    <tbody>
+      {% for key, p in plans.items() %}
+      <tr>
+        <td><strong>{{ p['name'] }}</strong></td>
+        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}{% else %}Free{% endif %}</td>
+        <td>{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
+        <td>{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
+        <td>{{ '✓' if p['video_deliverables'] else '-' }}</td>
+        <td>{{ p['support'] }}</td>
+        <td>
+          {% if key == current_plan %}
+            <span class="muted">Current</span>
+          {% elif key == 'free' %}
+            -
+          {% elif key == 'enterprise' %}
+            <form method="post" action="/client/billing/checkout">
+              <input type="hidden" name="plan" value="enterprise">
+              <input type="hidden" name="provider" value="bank">
+              <button type="submit" class="secondary">Contact us</button>
+            </form>
+          {% else %}
+            <details style="display:inline-block;">
+              <summary style="cursor:pointer; color:var(--accent);">Upgrade</summary>
+              <form method="post" action="/client/billing/checkout" style="margin-top:8px; min-width:220px;">
+                <input type="hidden" name="plan" value="{{ key }}">
+                <label style="font-size:0.78rem;">Pay with
+                  <select name="provider">
+                    <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
+                    <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
+                    <option value="bank">Bank transfer</option>
+                  </select>
+                </label>
+                <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+                  <input type="tel" name="phone" placeholder="2547XXXXXXXX">
+                </label>
+                <button type="submit">Subscribe ${{ p['price_usd'] }}/mo</button>
+              </form>
+            </details>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Usage rates (charged per order, beyond your free minutes)</h2>
+  <table>
+    <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+    <tbody>
+      <tr><td>Transcription only</td><td>$0.40/audio-minute</td></tr>
+      <tr><td>Transcription + translation</td><td>$0.90/audio-minute</td></tr>
+      <tr><td>Full dub (voice + video)</td><td>$1.50/audio-minute</td></tr>
+    </tbody>
+  </table>
+  <p class="muted" style="margin-top:10px;">Your plan's discount applies automatically at checkout.</p>
+</div>
+
+{% if payments %}
+<div class="card">
+  <h2>Payment history</h2>
+  <table>
+    <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for pay in payments %}
+      <tr>
+        <td>{{ pay['created_at']|int|timestamp_to_str }}</td>
+        <td>{{ 'Order' if pay['order_id'] else (pay['plan']|capitalize + ' plan') }}</td>
+        <td>${{ "%.2f"|format(pay['amount_usd']) }}{% if pay['currency'] == 'KES' %} ({{ "%.0f"|format(pay['amount_local']) }} KES){% endif %}</td>
+        <td>{{ pay['provider'] }}</td>
+        <td>{{ pay['status'] }}</td>
+        <td>{% if receipts_by_payment.get(pay['id']) %}<a href="/receipts/{{ receipts_by_payment[pay['id']]['id'] }}">Receipt →</a>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

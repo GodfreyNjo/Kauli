@@ -1,0 +1,24 @@
+{# Shared marketing nav - used by the homepage and every /solutions/* page.
+   home ("" on the homepage itself, "/" on any other page) controls whether
+   the section links are bare fragments (#how, safe same-document scroll,
+   no page load) or prefixed back to the homepage (/#how) - a solutions
+   page has no #how section of its own to scroll to. #}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="{{ home }}#how">How it works</a>
+    <a href="{{ home }}#demo">See a demo</a>
+    <a href="{{ home }}#who">Who it's for</a>
+    <a href="{{ home }}#pricing">Pricing</a>
+    <a href="{{ home }}#faq">FAQ</a>
+    <a href="/blog">Blog</a>
+    <a href="{{ home }}#book">Book a call</a>
+    <a href="/login" class="btn secondary">Sign in</a>
+    <a href="/login?mode=signup" class="btn cta-olive">Get started free</a>
+  </div>
+</nav>

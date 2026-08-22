@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Billing{% endblock %}
+{% block content %}
+<h1>Billing</h1>
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="card" style="max-width:600px;">
+  <h2>Grant trial minutes</h2>
+  <p class="muted" style="margin-top:0;">Onboarding a prospect who needs more than the standard {{ free_minutes|int }}
+     free minutes to evaluate us before paying - their choice, your call. They need an account already.</p>
+  <form method="post" action="/staff/billing/grant-trial">
+    <div class="row">
+      <label>Client email
+        <input type="email" name="client_email" required placeholder="client@example.com">
+      </label>
+      <label>Extra minutes
+        <input type="number" name="minutes" min="1" max="120" step="1" value="10" required>
+      </label>
+    </div>
+    <button type="submit">Grant</button>
+  </form>
+</div>
+
+<h2>Pending bank transfers</h2>
+<p class="muted" style="margin-top:0;">No automated bank reconciliation - confirm here once a transfer
+   has actually landed. This activates the client's plan or releases their order for processing.</p>
+
+<div class="card" style="padding:0;">
+  {% if not pending_bank_payments %}
+    <p class="muted" style="padding:20px 24px;">Nothing waiting.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Client</th><th>Email</th><th>For</th><th>Amount</th><th>Requested</th><th></th></tr></thead>
+    <tbody>
+      {% for pay in pending_bank_payments %}
+      <tr>
+        <td>{{ pay['display_name'] }}</td>
+        <td>{{ pay['email'] }}</td>
+        <td>{{ 'Order ' + pay['order_id'] if pay['order_id'] else (pay['plan']|capitalize + ' plan') }}</td>
+        <td>${{ "%.2f"|format(pay['amount_usd']) }}</td>
+        <td>{{ pay['created_at']|int|timestamp_to_str }}</td>
+        <td>
+          <details>
+            <summary style="cursor:pointer;"><span class="approve" style="display:inline-block; padding:6px 12px; border-radius:var(--radius-sm);">Confirm received</span></summary>
+            <form method="post" action="/staff/billing/confirm/{{ pay['id'] }}" enctype="multipart/form-data" style="margin-top:10px; min-width:220px;">
+              <label style="font-size:0.78rem;">Receipt (optional - photo or PDF)
+                <input type="file" name="receipt" accept="image/*,.pdf">
+              </label>
+              <label style="font-size:0.78rem;">Note (optional)
+                <input type="text" name="staff_note" placeholder="e.g. Equity bank ref #12345">
+              </label>
+              <button type="submit" class="approve">Confirm received</button>
+            </form>
+          </details>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:24px;">
+  <h2>Receipts awaiting delivery</h2>
+  {% if email_configured %}
+  <p class="muted" style="margin-top:0;">A real receipt is auto-generated <em>and auto-emailed</em> the moment a
+     payment completes - nothing below should need you, normally. A receipt only lands here if that automatic
+     send failed (see why under each one) - forward it yourself (email, WhatsApp) and mark it sent.</p>
+  {% else %}
+  <p class="muted" style="margin-top:0;">A real receipt is auto-generated for every completed payment, viewable
+     any time by the client - but no transactional email provider is configured (BREVO_API_KEY), so nothing
+     auto-emails yet. Forward these yourself (email, WhatsApp) and mark them sent, same as onboarding messages.</p>
+  {% endif %}
+  {% if not queued_receipts %}
+  <p class="muted">Nothing queued right now.</p>
+  {% else %}
+  <table>
+    <thead><tr><th>Receipt</th><th>Client</th><th>For</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for r in queued_receipts %}
+      <tr>
+        <td>{{ r['receipt_number'] }}</td>
+        <td>{{ r['client_name'] }}<br><span class="muted" style="font-size:0.78rem;">{{ r['client_email'] }}</span></td>
+        <td>{{ r['description'] }}</td>
+        <td>${{ "%.2f"|format(r['amount_usd']) }}</td>
+        <td>
+          {% if r['email_status'] == 'failed' %}
+            <span class="error" style="padding:2px 8px; font-size:0.76rem;">Send failed</span>
+            {% if r['email_send_detail'] %}<div class="muted" style="font-size:0.72rem; margin-top:3px; max-width:220px;">{{ r['email_send_detail'] }}</div>{% endif %}
+          {% else %}
+            <span class="muted" style="font-size:0.8rem;">Queued</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="/receipts/{{ r['id'] }}" target="_blank" rel="noopener" class="row-action-chip">View</a>
+          <form method="post" action="/staff/receipts/{{ r['id'] }}/mark-sent" style="display:inline;">
+            <button type="submit" class="row-action-chip">Mark as sent</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

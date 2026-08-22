@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Pay for order{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;">
+  <a href="/client" class="breadcrumb">&larr; back to my orders</a>
+  <h1>{{ order['original_filename'] }}</h1>
+
+  {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  {% if order['status'] != 'pending_payment' %}
+    <p class="ok">This order's already paid for - <a href="/client/orders/{{ order['id'] }}">view it here</a>.</p>
+  {% else %}
+    <p class="muted">{{ "%.1f"|format(order['duration_minutes'] or 0) }} minutes
+       &middot; {{ order['service_level'] }}{% if has_video_addon %} + video deliverables add-on{% endif %}</p>
+    <p style="font-size:1.6rem; font-weight:700; margin:10px 0;">${{ "%.2f"|format(order['cost_usd']) }}</p>
+    {% if has_video_addon %}
+    <p class="muted" style="margin-top:-6px;">Includes the video deliverables add-on (burned captions + dubbed video) for this order.</p>
+    {% endif %}
+    <p class="muted" style="margin-top:-6px;">Processing starts the moment this is confirmed.</p>
+
+    <form method="post" action="/client/orders/{{ order['id'] }}/pay" style="margin-top:18px;">
+      <label>Pay with
+        <select name="provider" id="provider-select">
+          <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>
+            Card, M-Pesa or Airtel Money (via Paystack){% if not paystack_configured %} - unavailable{% endif %}
+          </option>
+          <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>
+            M-Pesa direct (no card needed){% if not mpesa_configured %} - unavailable{% endif %}
+          </option>
+          <option value="bank">Bank transfer</option>
+        </select>
+      </label>
+      <p class="muted" id="paystack-note" hidden style="margin-top:-6px;">Opens Paystack's own checkout window,
+         where you can choose card, M-Pesa, M-Pesa Till, or Airtel Money.</p>
+      <label id="phone-field" hidden>M-Pesa phone number
+        <input type="tel" name="phone" placeholder="2547XXXXXXXX">
+      </label>
+      <p class="muted" id="bank-note" hidden>We'll email transfer instructions and confirm manually once
+         it lands - usually within one business day.</p>
+      <button type="submit">Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
+    </form>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    var sel = document.getElementById('provider-select');
+    var phoneField = document.getElementById('phone-field');
+    var bankNote = document.getElementById('bank-note');
+    var paystackNote = document.getElementById('paystack-note');
+    function update() {
+      phoneField.hidden = sel.value !== 'mpesa';
+      bankNote.hidden = sel.value !== 'bank';
+      paystackNote.hidden = sel.value !== 'paystack';
+    }
+    sel.addEventListener('change', update);
+    update();
+  })();
+</script>
+{% endblock %}

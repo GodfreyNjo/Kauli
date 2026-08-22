@@ -1,0 +1,426 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Ereri - {{ order['id'] }}{% endblock %}
+{% block content %}
+<div class="editor-shell">
+  <div class="editor-topbar" id="editor-topbar">
+    <button type="button" id="topbar-collapse-btn" class="topbar-collapse-btn" title="Collapse this bar">&#9662;</button>
+    <a href="/staff/orders/{{ order['id'] }}" class="breadcrumb" style="margin-bottom:0; flex-shrink:0;">&larr; back</a>
+    <strong class="topbar-detail" style="flex-shrink:0;">Ereri</strong>
+    <span class="muted topbar-detail topbar-filename" title="{{ order['original_filename'] }}">{{ order['original_filename'] }}</span>
+    <span class="status status-{{ order['status'] }} topbar-detail" style="flex-shrink:0;">{{ order['status'].replace('_', ' ') }}</span>
+    <span id="global-save-state" class="save-state topbar-detail" style="flex-shrink:0;"></span>
+    <div class="topbar-actions">
+      {% if order['status'] not in ['ready_for_delivery', 'delivered'] %}
+      <form method="post" action="/staff/orders/{{ order['id'] }}/approve" class="split-btn" id="approve-split-btn">
+        <button type="button" class="approve split-btn-icon" id="approve-split-toggle" title="Finish job" aria-label="Finish job options">&#10003;</button>
+        <div class="split-btn-menu" id="approve-split-menu" hidden>
+          <button type="submit" name="next" value="">Finish job</button>
+          <button type="submit" name="next" value="next_job">Finish and load next job</button>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if order['status'] not in ['ready_for_delivery', 'delivered', 'editor_returned', 'returned_to_client'] %}
+  <div class="modal-overlay" id="job-return-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="job-return-title">
+      <h2 id="job-return-title">Job Return</h2>
+      <div class="modal-warning">
+        Returning this job sends it to Ops for review and takes it out of your queue. Your edits so far
+        are saved, but the job is no longer assigned to you until Ops decides what happens next.
+      </div>
+      <form method="post" action="/staff/orders/{{ order['id'] }}/return" id="job-return-form">
+        <label>Why are you returning this job?
+          <select name="reason" required>
+            <option value="" disabled selected>Choose a reason&hellip;</option>
+            {% for r in return_reasons %}<option value="{{ r }}">{{ r|replace('_', ' ')|capitalize }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Brief description (optional)
+          <textarea name="note" rows="3" placeholder="Anything Ops should know"></textarea>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="secondary" id="job-return-cancel">Cancel</button>
+          <button type="submit" class="approve">Submit job return</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="editor-left">
+    <div class="player-card">
+      <div class="media-wrap">
+        {% if youtube_video_id %}
+        <div id="editor-media"></div>
+        {% elif is_video %}
+        <video id="editor-media" src="/staff/orders/{{ order['id'] }}/source-audio" playsinline></video>
+        {% else %}
+        <audio id="editor-media" controls src="/staff/orders/{{ order['id'] }}/source-audio"></audio>
+        {% endif %}
+        <div class="video-end-burner" id="video-end-burner" hidden>
+          <div class="burner-wordmark">Ereri</div>
+        </div>
+        {% if is_video and not youtube_video_id %}
+        <div class="custom-controls" id="custom-controls">
+          <button type="button" id="cc-play" class="cc-btn" title="Play/pause (space)">▶</button>
+          <span class="cc-time" id="cc-elapsed">00:00:00</span>
+          <div class="cc-track" id="cc-track"><div class="cc-track-fill" id="cc-track-fill"></div></div>
+          <span class="cc-time" id="cc-duration">00:00:00</span>
+          <button type="button" id="cc-mute" class="cc-btn" title="Mute/unmute">🔊</button>
+          <button type="button" id="cc-fullscreen" class="cc-btn" title="Fullscreen (Esc to exit)">⛶</button>
+        </div>
+        {% endif %}
+        {% if is_video and not youtube_video_id and dubbed_video_ready %}
+        <video id="voice-track-media" style="display:none;" playsinline controls
+               src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
+        {% elif dub_audio_ready %}
+        <audio id="voice-track-media" style="display:none;" controls
+               src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+        {% endif %}
+      </div>
+      <div class="voice-mode-banner" id="voice-mode-banner" hidden>
+        Playing the cloned, dubbed voice - this replaces {{ order['source_lang'] }} audio with what the
+        client will actually hear. Edits here are still the {{ order['target_lang'] }} transcript.
+      </div>
+      {% if order['tts'] != 'stub' %}
+      <div class="voice-picker" id="voice-picker" hidden>
+        <form method="post" action="/staff/orders/{{ order['id'] }}/dub-voice" id="voice-picker-form">
+          <select name="voice" id="voice-picker-select">
+            {% for key, v in piper_voices.items() %}
+            <option value="piper:{{ key }}" {% if order['dub_voice'] == 'piper:' + key %}selected{% endif %}>{{ v['label'] }}</option>
+            {% endfor %}
+            <option value="xtts" {% if order['dub_voice'] == 'xtts' %}selected{% endif %}
+                    {% if not order['voice_clone_consent_given_at'] %}disabled{% endif %}>
+              Clone the actual speaker's voice (slow - several minutes){% if not order['voice_clone_consent_given_at'] %} - client hasn't granted consent yet{% endif %}
+            </option>
+          </select>
+          <button type="submit" class="secondary" id="voice-picker-apply">Apply &amp; re-render dub</button>
+        </form>
+        {% if not order['voice_clone_consent_given_at'] %}
+        <p class="muted" style="font-size:0.76rem; margin-top:4px;">Voice cloning is blocked server-side
+           until the client grants consent from their order page - this isn't just a UI restriction.</p>
+        {% endif %}
+        <span id="voice-picker-status" class="muted" style="font-size:0.78rem;"
+              data-initial-status="{{ order['dub_voice_job_status'] or '' }}"></span>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="info-card">
+      <div class="info-tabs">
+        <button type="button" class="active" data-pane="pane-instructions">Guide</button>
+        <button type="button" data-pane="pane-brief">Client brief</button>
+        <button type="button" data-pane="pane-preview">Preview</button>
+        <button type="button" data-pane="pane-job">Job</button>
+        <button type="button" data-pane="pane-shortcuts">Shortcuts</button>
+        <button type="button" data-pane="pane-macros">Macros</button>
+      </div>
+
+      <div class="info-pane" id="pane-instructions">
+        <p><strong>Step 1 - Swahili source:</strong> fix the ASR transcript against
+           what's actually said. Timing here is real (straight from faster-whisper),
+           so click-to-seek is accurate. Low-opacity words are ones it was less
+           confident about - once you save a correction for a segment, its words
+           go back to full opacity - you've read them, the flag's done its job.</p>
+        <p><strong>Step 2 - English translation:</strong> correct the text that
+           actually gets spoken and subtitled. If you fixed the source in step 1,
+           hit "Re-translate from corrected source" (<kbd>alt</kbd>+<kbd>r</kbd>) first to get a fresh
+           translation of it before hand-editing - a translation that's fallen behind a
+           later source correction gets a dashed blue outline automatically, so you don't
+           have to remember to check. Word timing here is <em>estimated</em>
+           (proportioned across the segment by character count) since there's no
+           real per-word alignment for translated text - the dashed underline marks
+           that.</p>
+        <p>The empty dashed boxes in either step are real gaps (a full second or
+           more of non-speech, detected from actual ASR timing) - type a tag like
+           <code>[MUSIC]</code> or <code>[PAUSE]</code> into one if it needs a
+           caption note.</p>
+        <p>Corrections save themselves - a segment saves automatically a couple of
+           seconds after you stop typing in it, so there's nothing to click.
+           <kbd>ctrl</kbd>+<kbd>s</kbd> forces it immediately, and
+           <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd> also re-renders that segment's
+           audio and rebuilds the mixed track. The topbar always shows whether
+           everything's saved.</p>
+        <p>The transcript reads as one continuous document, not a stack of separate
+           chunks - a flagged segment gets a dotted underline instead of a callout
+           box; hover it (or press <kbd>alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> to jump
+           between flagged spots) to see why. Use <kbd>ctrl</kbd>+<kbd>enter</kbd> on
+           a word to start a new paragraph where it makes sense.</p>
+        <p>When every flagged segment looks right, use "Approve &amp; mark ready
+           for delivery" above to release it to the client.</p>
+        <p>The <strong>Spell check</strong> button (step 2 only) flags possibly-misspelled words in
+           red - click a flagged cell for suggestions, click one to replace it, "Ignore" to dismiss,
+           or just type over it yourself. It's spelling only, not grammar - there's no free grammar
+           checker wired up, so read it yourself too.</p>
+        <p>Playback never auto-restarts. Once a clip finishes, the Ereri mark covers the player -
+           click it (or press play) to start again. It never covers the video before you've played
+           it or while it's playing, and never appears in anything delivered to a client.</p>
+      </div>
+
+      <div class="info-pane" id="pane-brief" hidden>
+        <dl>
+          <dt>Speaker IDs</dt><dd>{{ 'Yes - label speakers' if order['instr_speaker_ids'] else 'No' }}</dd>
+          <dt>Transcript style</dt>
+          <dd>{{ {'clean_read': 'Clean read', 'verbatim_light': 'Verbatim, lightly cleaned', 'verbatim': 'Full verbatim'}.get(order['instr_verbatim_level'], order['instr_verbatim_level']) }}</dd>
+          <dt>Song lyrics</dt><dd>{{ 'Transcribe them' if order['instr_transcribe_lyrics'] else 'Skip them' }}</dd>
+          <dt>Italics</dt><dd>{{ 'Use for on-screen text / narration' if order['instr_use_italics'] else 'Not requested' }}</dd>
+          <dt>Existing burned-in subs</dt>
+          <dd>{{ {'ignore': 'Ignore - transcribe fresh', 'match_existing': 'Match existing wording', 'flag_discrepancy': 'Flag disagreements'}.get(order['instr_existing_subs'], order['instr_existing_subs']) }}</dd>
+          <dt>No audio</dt><dd>{{ 'Return to client' if order['instr_no_audio'] == 'return' else 'Tag and continue' }}</dd>
+          <dt>Wrong language</dt><dd>{{ 'Return to client' if order['instr_wrong_language'] == 'return' else 'Tag and continue' }}</dd>
+          <dt>Instrumental / SFX only</dt><dd>{{ 'Return to client' if order['instr_instrumental_only'] == 'return' else 'Tag and continue' }}</dd>
+        </dl>
+        {% if order['style_guide_path'] %}
+        <p><a href="/orders/{{ order['id'] }}/style-guide">Download style guide: {{ order['style_guide_filename'] }} →</a></p>
+        {% endif %}
+        {% if order['instr_notes'] %}
+        <p class="muted" style="margin-top:10px;"><strong>Client notes:</strong><br>{{ order['instr_notes'] }}</p>
+        {% endif %}
+        <p class="muted" style="margin-top:14px;">Hit something this brief says to return - no audio, wrong
+           language, instrumental/SFX only? Press <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>z</kbd> to open the
+           return form rather than guessing.</p>
+      </div>
+
+      <div class="info-pane" id="pane-preview" hidden>
+        {% if dub_audio_ready %}
+        <p class="muted" style="margin-top:0;">The actual dubbed voice track, with the exact captions the
+           client will get streaming underneath it as it plays - not the source Swahili audio above.</p>
+        <audio id="preview-audio" controls style="width:100%;" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+        <div class="preview-caption" id="preview-caption">&nbsp;</div>
+        {% elif order['tts'] == 'stub' %}
+        <p class="muted" style="margin-top:0;">This job's service level doesn't include a dubbed voice
+           track (transcription or translation only) - nothing to preview here.</p>
+        {% else %}
+        <p class="muted" style="margin-top:0;">No dubbed audio has been generated yet for this order.</p>
+        {% endif %}
+      </div>
+
+      <div class="info-pane" id="pane-job" hidden>
+        <dl>
+          <dt>Route</dt><dd>{{ order['source_lang'] }} → {{ order['target_lang'] }} · {{ order['tier'] }} tier</dd>
+          <dt>Providers</dt><dd>asr={{ order['asr'] }} · mt={{ order['mt'] }} · tts={{ order['tts'] }}</dd>
+          <dt>Segments</dt><dd>{{ job.segments|length }}</dd>
+          <dt>Fit rate</dt><dd>{{ (job.fit_rate * 100)|round|int }}%</dd>
+          <dt>Flagged</dt><dd>{{ job.flagged_count }} / {{ job.segments|length }}</dd>
+          <dt>Source file</dt><dd>{{ order['original_filename'] }}</dd>
+        </dl>
+      </div>
+
+      <div class="info-pane" id="pane-shortcuts" hidden>
+        <p class="muted" style="margin-top:0;">Plain space / arrows / [ / ] only act as playback shortcuts when
+           you're not actively typing in a cell - click outside or press Esc first. Shift+space is the
+           opposite: it only fires WHILE a cell is focused. Everything below "Cell editing" also only fires
+           while a cell IS focused, and none of it touches your browser's own copy, paste, select-all or
+           undo - those still work normally inside a cell.</p>
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Playback</p>
+        <div class="shortcut-row"><kbd>space</kbd><span>Play / pause</span></div>
+        <div class="shortcut-row"><kbd>←</kbd> / <kbd>→</kbd><span>Seek −2s / +2s</span></div>
+        <div class="shortcut-row"><kbd>[</kbd> / <kbd>]</kbd><span>Playback speed −/+ 0.25x</span></div>
+        <div class="shortcut-row"><kbd>shift</kbd>+<kbd>space</kbd><span>Seek to the focused cell and play - keeps playing past it, same as normal playback</span></div>
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Global</p>
+        <div class="shortcut-row"><kbd>esc</kbd><span>Stop editing current cell</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>s</kbd><span>Save focused segment now (autosave also fires ~2s after you stop typing)</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd><span>Save + re-synthesize audio for this segment (target step)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate the focused segment from its (corrected) source</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>p</kbd><span>Toggle prose preview of the current step</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>/</kbd><span>Show this shortcuts panel</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>f</kbd><span>Find / replace in the current step</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>z</kbd><span>Open the job return form</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>f</kbd><span>Toggle flag on the focused segment</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd><span>Jump to previous / next flagged segment</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd><span>Move to previous / next cell</span></div>
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Cell editing</p>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>m</kbd><span>Merge focused cell with the next one</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>h</kbd><span>Hyphenate - merge with next, joined by "-"</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>k</kbd><span>Split cell at the text cursor (refuses to split inside a [tag])</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>enter</kbd><span>Start a new paragraph at the focused word</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>⌫</kbd><span>Remove that paragraph break</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd>,<kbd>0</kbd><span>Insert macro 1–10 at the cursor</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>b</kbd><span>Bookmark this cell (personal marker, not shared)</span></div>
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Text &amp; tags</p>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>u</kbd><span>Toggle case of the first character</span></div>
+        <div class="shortcut-row"><kbd>shift</kbd>+<kbd>.</kbd><span>Toggle case of the first character</span></div>
+        <div class="shortcut-row"><kbd>shift</kbd>+<kbd>,</kbd><span>Toggle case of the whole cell</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>,</kbd><span>Capitalize the whole cell (always up, not a toggle)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>shift</kbd>+<kbd>u</kbd><span>Toggle case of the whole cell (either direction)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>p</kbd><span>Pluralize (English only - Swahili plurals need a manual edit)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>i</kbd><span>Toggle italics (real &lt;i&gt; markup, carries into SRT/VTT)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>q</kbd><span>Prepend a quote mark</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>d</kbd><span>Add trailing -- for cut-off speech</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>n</kbd><span>Toggle [inaudible] tag</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>l</kbd><span>Toggle &gt;&gt; crosstalk / interposing-voice marker</span></div>
+
+        <p class="muted" style="margin-top:14px;">Typing a sentence-ending <code>.</code>/<code>!</code>/<code>?</code>
+           at the end of a cell automatically capitalizes the start of the next word, the same way a new
+           paragraph (<kbd>ctrl</kbd>+<kbd>enter</kbd>) auto-capitalizes itself. Neither ever touches a gap
+           cell's sound tag.</p>
+
+        <details class="diagnostics" style="margin-top:14px;">
+          <summary>Why some of these aren't on the keys you might expect</summary>
+          <p class="muted" style="margin-top:8px;">A handful of keys - Ctrl+F, Ctrl+T, Ctrl+D, Ctrl+H, Ctrl+J,
+             Ctrl+L and similar - are reserved by the browser itself (find, new tab, bookmark, history,
+             downloads, address bar) and a web page can't override them. Ctrl+C, Ctrl+V, Ctrl+A and Ctrl+Z
+             are left alone on purpose so normal copy, paste, select-all and undo keep working inside a cell.
+             Everything above does the same job using an Alt-based key instead.</p>
+        </details>
+      </div>
+
+      <div class="info-pane" id="pane-macros" hidden>
+        <p class="muted">Text snippets bound to <kbd>ctrl</kbd>+<kbd>1</kbd>…<kbd>0</kbd>, inserted at
+           your cursor - handy for speaker IDs and sound tags. Saved in this browser, per job.</p>
+        <p class="muted">Check "New paragraph" on a macro to have it also start a new paragraph when
+           inserted - useful for a speaker-change macro. Leave it unchecked for something that belongs
+           inline, like a <code>[MUSIC PLAYING]</code> sound tag.</p>
+        <p class="muted">Check "Speaker ID" on a macro that names a speaker (e.g. <code>NARRATOR:</code>).
+           Inserting it then gives the tag its own cell instead of merging into whatever word your
+           cursor is on - so "RIGATHI:" and "Haya." stay two normal cells, not one stretched-together
+           block. Combine it with "New paragraph" to have the speaker tag start the new line too.</p>
+        <div id="macro-table-body"></div>
+        <button type="button" id="macro-save-btn" style="margin-top:8px;">Save macros</button>
+        <span id="macro-save-state" class="save-state" style="margin-left:8px;"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="editor-resize-handle" id="editor-resize-handle" title="Drag to resize"></div>
+
+  <div class="transcript-col">
+    <div class="transcript-toolbar">
+      <div class="stage-picker" id="stage-picker">
+        <button type="button" class="stage-picker-btn" id="stage-picker-btn">
+          <span id="stage-picker-label">1. Swahili source</span><span class="caret">&#9662;</span>
+        </button>
+        <div class="stage-picker-menu" id="stage-picker-menu" hidden>
+          <button type="button" class="stage-picker-item active" data-step="source" data-label="1. Swahili source">1. Swahili source</button>
+          <button type="button" class="stage-picker-item" data-step="target" data-label="2. English translation">2. English translation{% if stale_translation_count %} <span class="stale-count-badge" title="{{ stale_translation_count }} segment{{ 's' if stale_translation_count != 1 }} translated before a later source correction">{{ stale_translation_count }} out of sync</span>{% endif %}</button>
+          {% for step in workflow_steps %}
+            {% if step['key'] == 'voice' %}
+            <button type="button" class="stage-picker-item" data-step="voice"
+                    data-label="{{ step['number'] }}. {{ step['label'] }}">
+              {{ step['number'] }}. {{ step['label'] }}{% if step['done'] %} &check;{% endif %}
+            </button>
+            {% elif step['key'] not in ['source', 'target'] %}
+              {% if step['manual'] %}
+              <form method="post" action="/staff/orders/{{ order['id'] }}/workflow-step" style="display:contents;">
+                <input type="hidden" name="step" value="{{ step['key'] }}">
+                <input type="hidden" name="done" value="{{ '' if step['done'] else '1' }}">
+                <input type="hidden" name="next" value="editor">
+                <button type="submit" class="stage-picker-item{{ ' done' if step['done'] else '' }}"
+                        title="Click to {{ 'undo' if step['done'] else 'mark done' }}">
+                  {{ step['number'] }}. {{ step['label'] }}{% if step['done'] %} &check;{% endif %}
+                </button>
+              </form>
+              {% else %}
+              <div class="stage-picker-item status-only{{ ' done' if step['done'] else '' }}" title="Computed automatically">
+                {{ step['number'] }}. {{ step['label'] }}{% if step['done'] %} &check;{% endif %}
+              </div>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="stage-picker" id="speed-picker">
+        <button type="button" class="stage-picker-btn" id="speed-picker-btn" title="Playback speed">
+          <span id="speed-picker-label">1.00x</span><span class="caret">&#9662;</span>
+        </button>
+        <div class="stage-picker-menu" id="speed-picker-menu" hidden>
+          <button type="button" class="stage-picker-item" data-rate="0.5">0.50x</button>
+          <button type="button" class="stage-picker-item" data-rate="0.75">0.75x</button>
+          <button type="button" class="stage-picker-item active" data-rate="1">1.00x</button>
+          <button type="button" class="stage-picker-item" data-rate="1.25">1.25x</button>
+          <button type="button" class="stage-picker-item" data-rate="1.5">1.50x</button>
+          <button type="button" class="stage-picker-item" data-rate="1.75">1.75x</button>
+          <button type="button" class="stage-picker-item" data-rate="2">2.00x</button>
+        </div>
+      </div>
+      <button type="button" id="spellcheck-btn" class="secondary icon-btn" title="Spell check" hidden disabled>S</button>
+      <span id="spellcheck-status" class="muted" style="font-size:0.78rem; align-self:center;"></span>
+      {% for step in workflow_steps %}
+        {% if step['key'] == 'voice' %}
+        <form method="post" action="/staff/orders/{{ order['id'] }}/workflow-step" id="voice-done-form" style="margin-left:auto;" hidden>
+          <input type="hidden" name="step" value="voice">
+          <input type="hidden" name="done" value="{{ '' if step['done'] else '1' }}">
+          <input type="hidden" name="next" value="editor">
+          <button type="submit" class="secondary" style="font-size:0.78rem; padding:5px 10px;">
+            {{ 'Undo mark done' if step['done'] else 'Mark voice step done' }}
+          </button>
+        </form>
+        {% endif %}
+      {% endfor %}
+    </div>
+    <div class="spell-popover" id="spell-popover" hidden></div>
+    <div class="find-replace-bar" id="find-replace-bar" hidden>
+      <input type="text" id="find-input" placeholder="Find">
+      <input type="text" id="replace-input" placeholder="Replace with">
+      <button type="button" id="find-replace-all-btn">Replace all in this step</button>
+      <span id="find-replace-count" class="muted"></span>
+      <button type="button" id="find-replace-close-btn" class="secondary" title="Close (Ctrl+Shift+F)">&times;</button>
+    </div>
+    <div class="transcript-pane" id="transcript-pane">
+      <div class="editor-words step-pane step-source" id="flow-source"></div>
+      <div class="editor-words step-pane step-target" id="flow-target" hidden></div>
+    </div>
+    <div class="preview-doc" id="preview-pane" hidden></div>
+  </div>
+</div>
+
+<script src="/static/editor.js"></script>
+<script>
+  initKauliEditor("{{ order['id'] }}", {{ segments_json|safe }}, {{ youtube_video_id_json|safe }});
+
+  (function () {
+    var bar = document.getElementById("editor-topbar");
+    var btn = document.getElementById("topbar-collapse-btn");
+    if (!bar || !btn) return;
+    if (localStorage.getItem("kauli_editor_topbar_collapsed") === "1") {
+      bar.classList.add("collapsed");
+      btn.innerHTML = "&#9656;";
+    }
+    btn.addEventListener("click", function () {
+      var collapsed = bar.classList.toggle("collapsed");
+      btn.innerHTML = collapsed ? "&#9656;" : "&#9662;";
+      localStorage.setItem("kauli_editor_topbar_collapsed", collapsed ? "1" : "0");
+    });
+  })();
+
+  // Drag the divider between the player/instructions column and the
+  // transcript to trade width between them - stored per-browser so it
+  // persists across jobs, not just this page load.
+  (function () {
+    var shell = document.querySelector(".editor-shell");
+    var handle = document.getElementById("editor-resize-handle");
+    if (!shell || !handle) return;
+    var saved = localStorage.getItem("kauli_editor_left_width");
+    if (saved) shell.style.gridTemplateColumns = saved + "px 6px 1fr";
+    var dragging = false;
+    var startX = 0;
+    var startWidth = 0;
+    handle.addEventListener("mousedown", function (e) {
+      dragging = true;
+      handle.classList.add("dragging");
+      startX = e.clientX;
+      startWidth = shell.querySelector(".editor-left").getBoundingClientRect().width;
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      var next = Math.max(220, Math.min(startWidth + (e.clientX - startX), 720));
+      shell.style.gridTemplateColumns = next + "px 6px 1fr";
+    });
+    document.addEventListener("mouseup", function () {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove("dragging");
+      var width = shell.querySelector(".editor-left").getBoundingClientRect().width;
+      localStorage.setItem("kauli_editor_left_width", String(Math.round(width)));
+    });
+  })();
+</script>
+{% endblock %}

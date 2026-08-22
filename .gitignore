@@ -1,0 +1,21 @@
+.env
+__pycache__/
+*.pyc
+output/
+data/voices/
+data/audio/
+*.wav
+*.mp3
+*.m4a
+# Real, permanent site assets, not throwaway test/client audio - the
+# blanket *.wav/*.mp3 above is aimed at generated/uploaded content, not
+# these. See webapp/mailer.py's sibling note: intent, not just pattern.
+!webapp/static/*.wav
+.venv/
+venv/
+.DS_Store
+
+# local demo webapp - uploads, generated output, sqlite db all contain
+# client audio / test data, never commit
+webapp/data/
+

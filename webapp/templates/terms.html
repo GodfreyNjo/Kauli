@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}Terms of Service{% endblock %}
+{% block content %}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="/">← Back to Kauli</a>
+  </div>
+</nav>
+
+<section class="m-section" style="padding-top:48px;">
+  <div class="m-inner narrow legal">
+    <h1 class="m-h2" style="text-align:left;">Terms of Service</h1>
+    <p class="muted" style="font-size:0.82rem;">Effective August 22, 2026. Kauli is a product of Forge Media
+       Services, operated by Godfrey Njoroge.</p>
+
+
+    <h2>1. What Kauli is</h2>
+    <p>Kauli transcribes, translates and (optionally) dubs audio and video between Swahili, English and
+       Kikuyu. Every AI-drafted transcript and translation is reviewed by a human editor before it's marked
+       ready for delivery. Kikuyu currently uses a human transcriber instead of a speech-recognition model -
+       no production-ready one exists yet, though research versions do - see our
+       <a href="/blog/kikuyu-dubbing-what-s-actually-possible-today">blog post on this</a> for the full
+       honest answer.</p>
+
+    <h2>2. Your account</h2>
+    <p>You're responsible for keeping your login credentials secure and for activity that happens under your
+       account. Give us accurate contact details - we use them to deliver your orders and reach you about
+       them.</p>
+
+    <h2>3. What you upload</h2>
+    <p>You must own the rights to, or have permission to use, everything you submit to Kauli. Don't upload
+       content you don't have the rights to, or content that's illegal to possess or distribute. We scan
+       every upload for malware and validate it's genuine audio/video before processing it, but that's a
+       safety check, not a rights check - that responsibility is yours.</p>
+    <p>Voice cloning (available on the "dub" service level) only ever runs after you explicitly confirm you
+       hold the rights and consent to use the voice being cloned. That confirmation is required at the point
+       of use, not assumed from you submitting a file.</p>
+
+    <h2>4. Pricing &amp; payment</h2>
+    <p>Orders are priced per audio-minute at the published rates on our pricing page, plus any add-ons you
+       choose. The first {{ free_minutes|int }} minutes each month are free, and apply only to
+       transcription-only orders (a preview of the transcript, not a downloadable file) - see our FAQ for the
+       full detail. Payment is handled by Paystack (card, M-Pesa, Airtel Money) or M-Pesa direct - we never
+       see or store your card number or M-Pesa PIN. Prices may change; we'll post the new rates here and on
+       our pricing page before they take effect.</p>
+
+    <h2>5. Refunds</h2>
+    <p>We don't currently run an automatic refund system. If an order genuinely didn't meet what was
+       promised - the wrong language, a broken file, a mistake on our end - contact us and we'll make it
+       right: a redo, a credit toward a future order, or a refund, decided case by case.</p>
+
+    <h2>6. Who owns the output</h2>
+    <p>You own the rights to whatever you upload and to the transcripts, translations, subtitles and dubbed
+       files we deliver back to you. We don't claim ownership of anything created for your order, and we
+       don't reuse your content for anything beyond delivering that order unless you ask us to.</p>
+
+    <h2>7. Service availability</h2>
+    <p>This runs on infrastructure sized for where the business is today, not enterprise-scale redundancy -
+       see our <a href="/status">status page</a> for real, live system state. We aim for reliable service but
+       don't guarantee uninterrupted uptime, and we're not liable for delays or losses caused by factors
+       outside our reasonable control.</p>
+
+    <h2>8. Limitation of liability</h2>
+    <p>Kauli is provided as-is. To the extent the law allows, our liability for any claim related to the
+       service is limited to the amount you actually paid us for the order in question. We're not liable for
+       indirect or consequential losses.</p>
+
+    <h2>9. Ending the relationship</h2>
+    <p>You can stop using Kauli at any time. We may suspend or close an account that abuses the service,
+       submits content in violation of section 3, or doesn't pay for completed work. Orders already in
+       progress or delivered remain billable.</p>
+
+    <h2>10. Governing law</h2>
+    <p>These terms are governed by the laws of Kenya.</p>
+
+    <h2>11. Changes to these terms</h2>
+    <p>We may update these terms as the service changes. Material changes will be posted here with a new
+       effective date.</p>
+
+    <h2>12. Contact</h2>
+    <p>Questions about these terms: <a href="mailto:{{ email }}">{{ email }}</a> or
+       <a href="tel:{{ phone_tel }}">{{ phone_display }}</a>.</p>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

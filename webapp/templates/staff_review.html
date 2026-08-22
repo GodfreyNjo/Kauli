@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Review {{ order['id'] }}{% endblock %}
+{% block content %}
+<div class="card">
+  <a href="/staff" class="breadcrumb">&larr; back to queue</a>
+  <h1>{{ order['original_filename'] }}</h1>
+  <p>
+     <span class="status status-{{ order['status'] }}">{{ order['status'].replace('_', ' ') }}</span>
+     &middot; {{ order['source_lang'] }} → {{ order['target_lang'] }} &middot; {{ order['tier'] }} tier</p>
+
+  {% if order['content_safety_flagged'] %}
+  <div class="modal-warning" style="border-color:var(--err); background:var(--err-soft);">
+    <strong style="color:var(--err);">⚠ Content-safety flag</strong> - our automated video scan flagged this
+    file ({{ order['content_safety_detail'] or 'no detail' }}). This check has real false positives (skin
+    tone, blood/medical footage, and similar close-up body content commonly trip it) - watch the actual video
+    before deciding. Clicking "Approve & mark ready for delivery" below clears this the same way it clears
+    any other review flag; if the content is genuinely a problem, use "Return to client" instead of approving.
+  </div>
+  {% endif %}
+
+  <div class="workflow-stepper" style="margin-top:20px;">
+    {% for step in workflow_steps %}
+    <div class="wf-step{{ ' done' if step['done'] else '' }}">
+      <div class="wf-step-num">{{ '✓' if step['done'] else step['number'] }}</div>
+      <div class="wf-step-label">{{ step['label'] }}</div>
+      {% if step['manual'] %}
+      <form method="post" action="/staff/orders/{{ order['id'] }}/workflow-step" class="wf-step-toggle">
+        <input type="hidden" name="step" value="{{ step['key'] }}">
+        <input type="hidden" name="done" value="{{ '' if step['done'] else '1' }}">
+        <button type="submit" class="wf-step-btn">{{ 'Undo' if step['done'] else 'Mark done' }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if not loop.last %}<div class="wf-connector{{ ' done' if step['done'] else '' }}"></div>{% endif %}
+    {% endfor %}
+  </div>
+
+  {% if order['status'] == 'dead_letter' %}
+    <p class="error">Failed {{ order['retry_count'] }} times and gave up automatically: {{ order['error'] }}</p>
+    <p class="muted" style="margin-top:-8px;">Worth checking the file itself before retrying - if it's
+       genuinely corrupt or malicious, retrying just burns time the same way again.</p>
+    <form method="post" action="/staff/orders/{{ order['id'] }}/retry" style="margin-top:10px;">
+      <button type="submit" class="secondary">Retry processing</button>
+    </form>
+  {% elif order['status'] == 'failed' %}
+    <p class="error">Pipeline failed: {{ order['error'] }}</p>
+  {% elif not job %}
+    <p class="muted">Still processing - nothing to review yet.</p>
+  {% else %}
+    <p class="muted">{{ job.segments|length }} segments &middot; fit rate {{ (job.fit_rate * 100)|round|int }}%
+       &middot; {{ job.flagged_count }} need review &middot; audio difficulty {{ (difficulty_rate * 100)|round|int }}%</p>
+
+    {% if order['difficulty_surcharge_status'] == 'pending_approval' %}
+    <div class="modal-warning" style="margin-bottom:14px;">
+      Additional charge of ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }}
+      ({{ "%.0f"|format(order['difficulty_surcharge_pct'] * 100) }}%) proposed to the client -
+      {{ extra_charge_reasons.get(order['difficulty_surcharge_reason'], 'extra work') }}. Delivery is
+      held until they pay or you waive it.
+      <form method="post" action="/staff/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:8px;">
+        <input type="hidden" name="action" value="waive">
+        <button type="submit" class="secondary">Waive charge</button>
+      </form>
+    </div>
+    {% elif order['difficulty_surcharge_status'] == 'approved' %}
+    <p class="ok">Additional charge (${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} -
+       {{ extra_charge_reasons.get(order['difficulty_surcharge_reason'], 'extra work') }}) paid.</p>
+    {% elif order['difficulty_surcharge_status'] == 'waived' %}
+    <p class="muted">An additional charge was proposed and then waived - no charge applied.</p>
+    {% else %}
+      {% if difficulty_rate >= difficulty_threshold %}
+      <div class="modal-warning" style="margin-bottom:14px;">
+        {{ (difficulty_rate * 100)|round|int }}% of segments had genuinely low ASR confidence - this audio
+        was harder to transcribe than usual (noise, overlapping speakers, accent). Consider proposing an
+        additional charge before delivery.
+        <form method="post" action="/staff/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+          <input type="hidden" name="action" value="propose">
+          <input type="hidden" name="reason" value="difficult_audio">
+          <label style="margin:0;">Charge %
+            <input type="number" name="pct" value="{{ (suggested_surcharge_pct * 100)|round|int }}" min="1" max="100" step="1" style="width:90px;">
+          </label>
+          <span class="muted" style="font-size:0.78rem; padding-bottom:8px;">≈ ${{ "%.2f"|format(suggested_surcharge_usd) }} at 25%</span>
+          <button type="submit" class="secondary" style="margin:0;">Propose to client</button>
+        </form>
+      </div>
+      {% endif %}
+      <details class="accordion" style="margin-bottom:14px;">
+        <summary>+ Propose an additional charge</summary>
+        <div class="accordion-body">
+          <p class="muted" style="margin-top:0;">For anything this job's workflow needed beyond the
+             original order - a rush turnaround, an extra revision round, a format that wasn't included.
+             The client sees why, approves it, and pays before delivery unlocks - nothing is ever charged
+             without that.</p>
+          <form method="post" action="/staff/orders/{{ order['id'] }}/difficulty-surcharge"
+                style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+            <input type="hidden" name="action" value="propose">
+            <label style="margin:0;">Reason
+              <select name="reason">
+                {% for key, label in extra_charge_reasons.items() %}
+                <option value="{{ key }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label style="margin:0;">Charge %
+              <input type="number" name="pct" value="10" min="1" max="100" step="1" style="width:90px;">
+            </label>
+            <label style="margin:0; flex:1; min-width:180px;">Note to client (optional)
+              <input type="text" name="note" placeholder="What this covers">
+            </label>
+            <button type="submit" class="secondary" style="margin:0;">Propose to client</button>
+          </form>
+        </div>
+      </details>
+    {% endif %}
+
+    <p><a class="btn" href="/staff/orders/{{ order['id'] }}/editor">Open Ereri →</a></p>
+    {% if order['status'] != 'ready_for_delivery' and order['status'] != 'delivered' %}
+    <form method="post" action="/staff/orders/{{ order['id'] }}/approve">
+      <button type="submit" class="approve">Approve &amp; mark ready for delivery</button>
+    </form>
+    {% else %}
+      <p class="ok">Approved - client can download.</p>
+    {% endif %}
+  {% endif %}
+</div>
+
+{% if order['status'] == 'editor_returned' %}
+<div class="card internal-card">
+  <h2 style="margin-top:0;">Needs an ops decision</h2>
+  <p class="muted" style="margin-top:0;">Returned by an editor - reason:
+     <strong>{{ order['return_reason']|replace('_', ' ') }}</strong>{% if order['return_note'] %} - {{ order['return_note'] }}{% endif %}</p>
+  <div class="row">
+    <form method="post" action="/staff/orders/{{ order['id'] }}/ops-decision" style="flex:1;">
+      <input type="hidden" name="action" value="contact_customer">
+      <label>Message the client to ask what's going on
+        <textarea name="message" rows="2" required></textarea>
+      </label>
+      <button type="submit" class="secondary">Contact customer</button>
+    </form>
+    <form method="post" action="/staff/orders/{{ order['id'] }}/ops-decision" style="flex:1;">
+      <input type="hidden" name="action" value="return_to_client">
+      <label>Return the job - explain why (sent to the client)
+        <textarea name="message" rows="2" required></textarea>
+      </label>
+      <button type="submit">Return job to client</button>
+    </form>
+  </div>
+  <form method="post" action="/staff/orders/{{ order['id'] }}/ops-decision" style="margin-top:10px;">
+    <input type="hidden" name="action" value="resume">
+    <button type="submit" class="secondary">False alarm - resume review</button>
+  </form>
+</div>
+{% endif %}
+
+{% if job and has_video_source %}
+<div class="card">
+  <h2>Video deliverables</h2>
+  <p class="muted" style="margin-top:0;">
+    {% if order['source_youtube_id'] %}This order's video lives on YouTube - generating either of these
+    fetches it once, on demand, rather than at upload time.{% else %}Rendered from the uploaded video.{% endif %}
+  </p>
+  <div class="downloads">
+    {% if burned_ready %}
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/burned">Download burned captions</a>
+    {% else %}
+      <form method="post" action="/staff/orders/{{ order['id'] }}/render/burned">
+        <button type="submit" class="secondary">Generate burned-in captions</button>
+      </form>
+    {% endif %}
+    {% if dubbed_ready %}
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Download dubbed video</a>
+    {% else %}
+      <form method="post" action="/staff/orders/{{ order['id'] }}/render/dubbed">
+        <button type="submit" class="secondary">Generate dubbed video</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<details class="card message-collapsible" open>
+  <summary><h2 style="display:inline;">Client conversation ({{ client_messages|length }})</h2></summary>
+  <p class="muted" style="margin-top:8px;">Visible to the client. Sent as Kauli, not under your name.</p>
+  <div class="message-thread">
+    {% if not client_messages %}
+      <p class="muted">No messages yet.</p>
+    {% endif %}
+    {% for m in client_messages %}
+    <div class="message {{ 'message-me' if m['sender_role'] == 'staff' else 'message-them' }}">
+      <div class="message-meta">{{ 'Kauli' if m['sender_role'] == 'staff' else m['sender_name'] }}
+        &middot; {{ m['created_at']|int|timestamp_to_str }}</div>
+      <div class="message-body">{{ m['body'] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/staff/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
+    <input type="hidden" name="visibility" value="client">
+    <textarea name="body" rows="2" placeholder="Reply to client..." required></textarea>
+    <button type="submit">Send to client</button>
+  </form>
+</details>
+
+<details class="card internal-card message-collapsible" open>
+  <summary><h2 style="display:inline; color:var(--warn);">Internal notes ({{ internal_messages|length }})</h2></summary>
+  <p class="muted" style="margin-top:8px;">INTERNAL - the client will never see this.</p>
+  <div class="message-thread">
+    {% if not internal_messages %}
+      <p class="muted">No internal notes yet.</p>
+    {% endif %}
+    {% for m in internal_messages %}
+    <div class="message message-internal">
+      <div class="message-meta">{{ m['sender_name'] }} &middot; {{ m['created_at']|int|timestamp_to_str }}</div>
+      <div class="message-body">{{ m['body'] }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/staff/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
+    <input type="hidden" name="visibility" value="internal">
+    <textarea name="body" rows="2" placeholder="Internal note (staff only)..." required></textarea>
+    <button type="submit" class="secondary">Add internal note</button>
+  </form>
+</details>
+
+{% if job %}
+{% for seg in job.segments %}
+<div class="card segment {% if seg.review_flag %}flagged{% endif %}">
+  <div class="seg-head">
+    <strong>{{ seg.segment_id }}</strong>
+    <span>{{ (seg.start_ms / 1000)|round(1) }}s – {{ (seg.end_ms / 1000)|round(1) }}s</span>
+  </div>
+  <p class="source"><span class="lbl">{{ order['source_lang'] }}</span> {{ seg.source_transcript }}</p>
+  {% if seg.cultural_notes %}<p class="note">⚠ {{ seg.cultural_notes }}</p>{% endif %}
+
+  <form method="post" action="/staff/orders/{{ order['id'] }}/segments/{{ seg.segment_id }}">
+    <label>Final text (what gets spoken/subtitled - human edit always wins)
+      <textarea name="edited_text" rows="2">{{ seg.final_text }}</textarea>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" name="resynthesize"> Re-synthesize audio for this segment with the edited text
+    </label>
+    <button type="submit">Save</button>
+  </form>
+
+  {% if seg.review_flag %}
+  <details class="diagnostics">
+    <summary>{{ seg.review_reasons|length }} issue{{ 's' if seg.review_reasons|length != 1 else '' }} - fit {{ seg.fit_ratio }} ({{ seg.fit_status }})</summary>
+    <div class="flags">{% for r in seg.review_reasons %}<span class="flag">{{ r }}</span>{% endfor %}</div>
+  </details>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}{{ post['title'] }}{% endblock %}
+{% block head_extra %}
+{% if post['description'] %}<meta name="description" content="{{ post['description'] }}">{% endif %}
+<meta property="og:title" content="{{ post['title'] }}">
+{% if post['description'] %}<meta property="og:description" content="{{ post['description'] }}">{% endif %}
+<meta property="og:type" content="article">
+<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png">
+<link rel="icon" href="/static/kauli-icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ post['title']|replace('\\', '\\\\')|replace('"', '\\"') }}",
+  "author": { "@type": "Person", "name": "{{ author_name }}" },
+  "publisher": { "@type": "Organization", "name": "Forge Media Services" },
+  {% if published_at_iso %}"datePublished": "{{ published_at_iso }}",{% endif %}
+  "mainEntityOfPage": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}"
+}
+</script>
+{% endblock %}
+{% block content %}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="/blog">← All posts</a>
+  </div>
+</nav>
+
+<section class="m-section" style="padding-top:48px;">
+  <div class="m-inner narrow legal">
+    {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
+    <p class="muted" style="font-size:0.8rem; margin-top:10px;">{{ author_name }} &middot;
+       {{ post['published_at']|int|timestamp_to_str if post['published_at'] else 'Draft' }}</p>
+    <h1 class="m-h2" style="text-align:left;">{{ post['title'] }}</h1>
+
+    {% set post_url = request.url.scheme + '://' + request.url.netloc + '/blog/' + post['slug'] %}
+    <div class="m-share-row">
+      <span class="muted" style="font-size:0.78rem;">Share:</span>
+      <a href="https://twitter.com/intent/tweet?url={{ post_url|urlencode }}&text={{ post['title']|urlencode }}"
+         target="_blank" rel="noopener" aria-label="Share on X (Twitter)">X</a>
+      <a href="https://www.linkedin.com/sharing/share-offsite/?url={{ post_url|urlencode }}"
+         target="_blank" rel="noopener" aria-label="Share on LinkedIn">LinkedIn</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u={{ post_url|urlencode }}"
+         target="_blank" rel="noopener" aria-label="Share on Facebook">Facebook</a>
+      <a href="https://wa.me/?text={{ (post['title'] + ' - ' + post_url)|urlencode }}"
+         target="_blank" rel="noopener" aria-label="Share on WhatsApp">WhatsApp</a>
+      <button type="button" class="m-share-copy" data-copy-url="{{ post_url }}" aria-label="Copy link to this post">Copy link</button>
+    </div>
+
+    <details class="m-blog-toc" id="blog-toc" hidden>
+      <summary>Contents</summary>
+      <ol id="blog-toc-list"></ol>
+    </details>
+
+    <div class="m-blog-body" id="blog-body">{{ post['body_html']|safe }}</div>
+
+    {% if post['devto_url'] or post['medium_url'] %}
+    <p class="muted" style="font-size:0.82rem;">Also published on
+       {% if post['devto_url'] %}<a href="{{ post['devto_url'] }}" target="_blank" rel="noopener">DEV.to ↗</a>{% endif %}
+       {% if post['devto_url'] and post['medium_url'] %} &middot; {% endif %}
+       {% if post['medium_url'] %}<a href="{{ post['medium_url'] }}" target="_blank" rel="noopener">Medium ↗</a>{% endif %}</p>
+    {% endif %}
+
+    <div class="m-author-box">
+      {% if author and author['avatar_path'] %}
+      <img src="/avatar/{{ author['id'] }}" alt="" class="m-author-avatar">
+      {% else %}
+      <div class="m-author-avatar m-author-avatar-fallback">{{ author_name[0]|upper }}</div>
+      {% endif %}
+      <div>
+        <div class="m-author-name">{{ author_name }}</div>
+        <div class="m-author-role">{{ 'Founder' if author and author['is_admin'] else 'Team' }}, Forge Media Services</div>
+        <p class="m-author-bio">Kauli is built and operated directly by the Forge Media Services team -
+           real people reviewing every order, not an anonymous pipeline. Questions about this post or
+           about a real job? <a href="/#book">Get in touch</a>.</p>
+      </div>
+    </div>
+
+    <div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border-subtle);">
+      <a href="/login?mode=signup" class="btn cta-olive">Try Kauli free - first {{ free_minutes|int }} minutes on us →</a>
+    </div>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+<script>
+  (function () {
+    // Real TOC built from whatever h2s the post actually has - only shown
+    // for posts with enough of them to be worth it, not a fixed decoration.
+    var body = document.getElementById('blog-body');
+    var toc = document.getElementById('blog-toc');
+    var list = document.getElementById('blog-toc-list');
+    if (!body || !toc || !list) return;
+    var headings = body.querySelectorAll('h2');
+    if (headings.length < 3) return;
+    headings.forEach(function (h, i) {
+      if (!h.id) h.id = 'section-' + (i + 1);
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent;
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    toc.hidden = false;
+  })();
+</script>
+<script>
+  (function () {
+    var btn = document.querySelector('.m-share-copy');
+    if (!btn) return;
+    var defaultLabel = btn.textContent;
+    btn.addEventListener('click', function () {
+      var url = btn.getAttribute('data-copy-url');
+      function showCopied() {
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(function () { btn.textContent = defaultLabel; btn.classList.remove('copied'); }, 1800);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(showCopied, function () {
+          // Clipboard API blocked (e.g. insecure context) - fall back to a
+          // manual copy the user can still complete themselves.
+          window.prompt('Copy this link:', url);
+        });
+      } else {
+        window.prompt('Copy this link:', url);
+      }
+    });
+  })();
+</script>
+{% endblock %}

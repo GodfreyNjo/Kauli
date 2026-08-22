@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}Privacy Policy{% endblock %}
+{% block content %}
+<nav class="m-nav" id="m-nav">
+  <a href="/" class="m-nav-brand-link">
+    <picture>
+      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+    </picture>
+  </a>
+  <div class="m-nav-links">
+    <a href="/">← Back to Kauli</a>
+  </div>
+</nav>
+
+<section class="m-section" style="padding-top:48px;">
+  <div class="m-inner narrow legal">
+    <h1 class="m-h2" style="text-align:left;">Privacy Policy</h1>
+    <p class="muted" style="font-size:0.82rem;">Effective August 22, 2026. Kauli is a product of Forge Media
+       Services, operated by Godfrey Njoroge.</p>
+
+
+    <h2>1. What we collect</h2>
+    <ul>
+      <li><strong>Account info:</strong> your email, password (handled entirely by our authentication
+          provider, Supabase - we never see or store your raw password), display name, and an optional
+          profile photo.</li>
+      <li><strong>What you submit:</strong> the audio/video files or YouTube links you upload, plus the
+          transcripts, translations, subtitles and dubbed audio/video we generate from them.</li>
+      <li><strong>Payment metadata:</strong> which provider you paid with, the amount, and a transaction
+          reference. Card numbers and M-Pesa PINs go directly to Paystack or Safaricom - we never see or
+          store them.</li>
+      <li><strong>Technical logs:</strong> IP address and browser user-agent on file uploads (part of our
+          malware/abuse-prevention audit trail) and on login attempts (to rate-limit brute-force attempts).</li>
+      <li><strong>Usage data:</strong> your order history, minutes used, and plan.</li>
+    </ul>
+
+    <h2>2. How we use it</h2>
+    <p>To process your orders, bill you correctly, keep the service secure (malware scanning, abuse rate
+       limiting), and reach you about an order or your account. We don't sell your data, and we don't use
+       your uploaded content for anything beyond delivering the order you submitted it for.</p>
+
+    <h2>3. Who else sees it</h2>
+    <p>We use a small number of third-party services to actually run Kauli - each only sees what it needs to
+       do its job:</p>
+    <ul>
+      <li><strong>Supabase</strong> - authentication (your login credentials).</li>
+      <li><strong>Paystack</strong> and <strong>Safaricom M-Pesa</strong> - payment processing. They see your
+          payment details directly; we only see the result (paid/not paid) and a reference number.</li>
+      <li><strong>Anthropic (Claude)</strong> - only for orders using our Priority translation tier, when
+          that's connected. Anthropic processes the transcript text being translated, per their own privacy
+          terms.</li>
+      <li><strong>exchangerate-api.com</strong> - live USD→KES conversion for M-Pesa checkout amounts. No
+          personal data is sent, just a currency-conversion request.</li>
+    </ul>
+    <p>We don't share your data with anyone else, and we don't run ads or ad-tracking on this site.</p>
+
+    <h2 id="cookies">4. Cookies</h2>
+    <p>Kauli sets exactly one cookie: a signed, time-limited session cookie that keeps you logged in. It's
+       strictly necessary for the site to function (there's no way to use an account-based service like this
+       without one) - it doesn't track you across other sites, and we don't use it for analytics or
+       advertising.</p>
+    <p>We use <strong>Cloudflare Web Analytics</strong> to see aggregate traffic to this site (roughly how
+       many people visit, which pages, which country). It's cookieless by design - Cloudflare's own
+       description is that it doesn't use any client-side state (no cookies, no local storage, no
+       fingerprinting) and doesn't track you across other sites. We don't run Google Analytics, Meta Pixel,
+       or any other cookie-based analytics or advertising script on this site. If that ever changes, this
+       section will say so and we'll ask first where the law requires it.</p>
+
+    <h2>5. Security</h2>
+    <p>Every upload is checked against its real file signature (not just trusted by its filename), scanned
+       for malware, and validated as genuine audio/video before it's processed. Login sessions use signed,
+       time-limited cookies. Payments never touch our servers directly - they go straight to Paystack or
+       Safaricom.</p>
+
+    <h2>6. How long we keep it</h2>
+    <p><strong>Honestly:</strong> uploaded files and generated deliverables are currently kept on our servers
+       indefinitely - we don't yet have automatic deletion after a fixed period. If you'd like your files or
+       account data deleted, use the "Your data" section in Settings, or contact us and we'll do it by hand.
+       This is an area we intend to improve as the service grows; this policy will be updated when automatic
+       retention limits exist.</p>
+
+    <h2>7. Your rights</h2>
+    <p>Wherever you're located, you can ask us for a copy of the data we hold on your account, ask us to
+       correct it, or ask us to delete it, at any time. If you're in the EU/UK, the GDPR calls these the
+       rights of access, rectification, erasure, restriction and portability; if you're in Kenya, the Data
+       Protection Act, 2019 gives you the same substantive rights. We apply the same practice to every
+       request regardless of where it comes from, rather than offering a narrower version to people outside
+       any one jurisdiction.</p>
+    <p>To exercise any of these: sign in and use the "Your data" section under Settings to request deletion
+       directly, or email <a href="mailto:{{ email }}">{{ email }}</a> for anything else (a copy of your data,
+       a correction, a question). There's no self-service export button yet, so a data-copy request is
+       handled by us by hand; deletion requests go through Settings and are reviewed and actioned by us.</p>
+
+    <h2>8. International visitors and data transfers</h2>
+    <p>Kauli is operated from Kenya by Forge Media Services, and Kenyan law (the Data Protection Act, 2019)
+       governs how we handle your data. If you're contacting or using Kauli from outside Kenya - including
+       the EU, UK, or elsewhere - your data will be transferred to and processed in Kenya (and, via the
+       third-party processors listed in section 3, in whatever countries they operate their own
+       infrastructure in). By using Kauli, you understand and accept that transfer. If you're an EU/UK-based
+       organization that needs a formal data processing agreement or transfer safeguard in place before
+       sending us content, contact us and we'll work through what that looks like - we haven't needed to
+       build one yet since it hasn't come up, not because we'd refuse.</p>
+
+    <h2>9. Children</h2>
+    <p>Kauli isn't directed at children, and we don't knowingly collect data from anyone under 18.</p>
+
+    <h2>10. Changes to this policy</h2>
+    <p>We may update this policy as the service changes. Material changes will be posted here with a new
+       effective date.</p>
+
+    <h2>11. Contact</h2>
+    <p>Questions about this policy, or a data request: <a href="mailto:{{ email }}">{{ email }}</a> or
+       <a href="tel:{{ phone_tel }}">{{ phone_display }}</a>.</p>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

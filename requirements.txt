@@ -1,0 +1,59 @@
+# --- core (needed always) ---
+numpy>=1.24
+
+# --- free local stack: start here, costs nothing ---
+faster-whisper>=1.0.0        # local ASR, CPU-friendly
+piper-tts>=1.2.0             # local English TTS, free
+
+# --- quality translation (cents per audio-hour) ---
+anthropic>=0.40.0
+
+# --- free local MT placeholder (--mt local): no API key, weaker than Claude ---
+# transformers is pinned <5 because coqui-tts's bundled XTTS code (below)
+# imports a function transformers 5.x removed - if you ever drop XTTS you
+# can loosen this back to an open floor.
+transformers>=4.57,<5.0
+sentencepiece>=0.2.0
+
+# --- content-safety scan on video uploads (webapp/upload_security.py) ---
+# Real local NSFW image classifier (Falconsai/nsfw_image_detection via
+# transformers' image-classification pipeline, ~350MB on first use, cached
+# after). Needs CPU torch, same as XTTS below but without the CUDA-vs-CPU
+# install trap - a plain `pip install torch` pulls CPU wheels fine on a
+# machine with no CUDA toolkit visible. Real testing found this classifier
+# has meaningful false positives on medical/surgical footage - see that
+# module's docstring for why a flag holds an order for human review
+# instead of auto-rejecting the upload.
+torch>=2.0.0
+Pillow>=10.0.0
+
+# --- voice cloning (--tts xtts): clones the ACTUAL source speaker via
+# Coqui XTTS-v2. ONLY use on audio you have the speaker's consent to clone -
+# see the warning in kauli/providers/tts.py:XTTSCloneTTS. Ships under
+# Coqui's CPML license (commercial-use conditions) - read it before this
+# touches a real paying client's job.
+#
+# Install order matters and none of this is a normal `pip install -r`:
+#   1. CPU-only torch/torchaudio/torchcodec, or you pull in multi-GB CUDA
+#      libs you can't use (no GPU on this machine) and torchcodec will
+#      crash looking for libnvrtc.so:
+#        pip install torch torchaudio torchcodec --index-url https://download.pytorch.org/whl/cpu
+#   2. Then coqui-tts itself (~1.87GB XTTS-v2 model downloads on first use):
+#        pip install coqui-tts
+#   3. First run needs COQUI_TOS_AGREED=1 in the environment, or the CPML
+#      license prompt blocks non-interactive runs.
+# coqui-tts>=0.27.5
+
+# --- only if/when you move to cloud ---
+# boto3>=1.34.0              # AWS Transcribe / Translate
+# azure-cognitiveservices-speech>=1.40.0   # Swahili TTS for en->sw
+
+# --- local demo webapp (webapp/) - client upload -> staff review -> delivery
+# UI on top of the pipeline above. Auth is real (Supabase); everything else
+# (payments, deployment, multi-tenant) still isn't - see webapp/app.py.
+fastapi>=0.110.0
+uvicorn>=0.29.0
+jinja2>=3.1.0
+python-multipart>=0.0.9
+itsdangerous>=2.1.0          # required by Starlette's SessionMiddleware
+supabase>=2.0.0               # email/password auth - see webapp/supabase_auth.py

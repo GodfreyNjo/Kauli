@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Queue{% endblock %}
+{% block content %}
+<meta http-equiv="refresh" content="6">
+<h1>Orders</h1>
+<p class="muted" style="margin-top:0;">One staff role for now (contractor + QA + admin combined) - per the
+   roadmap, that's correct until there's a second person to split it across.</p>
+
+{% if orders %}
+{% set awaiting_n = orders | selectattr('status', 'equalto', 'awaiting_review') | list | length %}
+{% set processing_n = orders | selectattr('status', 'in', ['processing', 'queued']) | list | length %}
+{% set ops_n = orders | selectattr('status', 'equalto', 'editor_returned') | list | length %}
+{% set ready_n = orders | selectattr('status', 'equalto', 'ready_for_delivery') | list | length %}
+{% set delivered_n = orders | selectattr('status', 'equalto', 'delivered') | list | length %}
+<div class="filter-tabs" id="status-filter" style="margin-bottom:14px;">
+  <button type="button" class="active" data-filter="all">All <span class="tab-count">{{ orders|length }}</span></button>
+  <button type="button" data-filter="awaiting_review">In review <span class="tab-count">{{ awaiting_n }}</span></button>
+  <button type="button" data-filter="processing,queued">Processing <span class="tab-count">{{ processing_n }}</span></button>
+  <button type="button" data-filter="editor_returned">Needs ops decision <span class="tab-count">{{ ops_n }}</span></button>
+  <button type="button" data-filter="ready_for_delivery">Ready <span class="tab-count">{{ ready_n }}</span></button>
+  <button type="button" data-filter="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
+</div>
+{% endif %}
+
+<div class="card" style="padding:0;">
+  {% if not orders %}
+    <div class="empty-state">
+      <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="14" y="10" width="36" height="46" rx="3" stroke="currentColor" stroke-width="2"/>
+        <path d="M22 24h20M22 32h20M22 40h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <p>No orders yet.</p>
+    </div>
+  {% else %}
+  <table>
+    <thead><tr><th>Client</th><th>File</th><th>Route</th><th>Tier</th><th>Status</th><th>Deadline</th><th></th></tr></thead>
+    <tbody>
+      {% for o in orders %}
+      {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
+      <tr data-status="{{ o['status'] }}">
+        <td>{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
+        <td>{{ o['original_filename'] }}</td>
+        <td style="font-family: var(--font-mono); font-size: 0.82rem;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
+        <td>{{ o['tier'] }}</td>
+        <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+        <td>
+          {% if ts %}
+            <span class="deadline-pill deadline-{{ ts['level'] }}">
+              {% if ts['overdue'] %}Overdue{% else %}{{ o['internal_deadline_at']|int|timestamp_to_str }}{% endif %}
+            </span>
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-btn" title="Open">→</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+<script>
+  document.querySelectorAll('#status-filter button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      var wanted = btn.dataset.filter.split(',');
+      document.querySelectorAll('tbody tr').forEach(function (row) {
+        row.style.display = (wanted[0] === 'all' || wanted.includes(row.dataset.status)) ? '' : 'none';
+      });
+    });
+  });
+</script>
+{% endblock %}

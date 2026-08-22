@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% block title %}My orders{% endblock %}
+{% block content %}
+<div class="card wizard-card">
+  <h1>Submit a new order</h1>
+  {% if error %}
+    <p class="error">{{ error }}</p>
+    {% if exception_context %}
+      {% if request.query_params.get('exception_requested') %}
+        <p class="ok">✓ Sent - we'll follow up, and can lift this for your account if it makes sense.</p>
+      {% else %}
+        <details style="margin:-8px 0 12px;">
+          <summary style="cursor:pointer; font-size:0.85rem; color:var(--muted);">Think this is a mistake? Contact us</summary>
+          <form method="post" action="/client/request-exception" style="margin-top:10px;">
+            <input type="hidden" name="context" value="{{ exception_context }}">
+            <label>Tell us why we should lift this for your account
+              <textarea name="note" rows="2" placeholder="e.g. I'm a broadcaster with a real batch of videos to submit today"></textarea>
+            </label>
+            <button type="submit" class="secondary">Send request</button>
+          </form>
+        </details>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  <div class="wizard-steps" id="wizard-steps">
+    <div class="wizard-step active" data-step="1">
+      <span class="wizard-step-num">1</span><span class="wizard-step-label">Upload &amp; language</span>
+    </div>
+    <div class="wizard-step-line"></div>
+    <div class="wizard-step" data-step="2">
+      <span class="wizard-step-num">2</span><span class="wizard-step-label">Service &amp; pricing</span>
+    </div>
+    <div class="wizard-step-line"></div>
+    <div class="wizard-step" data-step="3">
+      <span class="wizard-step-num">3</span><span class="wizard-step-label">Details &amp; instructions</span>
+    </div>
+  </div>
+
+  <div id="pricing-data" hidden
+       data-discount="{{ plans[plan]['discount'] }}"
+       data-free-minutes="{{ free_minutes_remaining }}"
+       data-wallet-minutes="{{ wallet_minutes }}"
+       data-addon-rate="{{ addons['video_deliverables']['rate_per_min'] if 'video_deliverables' in addons else 0 }}"
+       data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"></div>
+
+  <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
+    <input type="hidden" name="idempotency_key" id="idempotency-key-field">
+
+    <div class="wizard-pane" data-pane="1">
+      <div class="step-switch" id="source-switch" style="margin-bottom:14px;">
+        <button type="button" class="{{ 'active' if not form_values.get('youtube_url') else '' }}" data-source="file">Upload a file</button>
+        <button type="button" class="{{ 'active' if form_values.get('youtube_url') else '' }}" data-source="youtube">From YouTube</button>
+      </div>
+
+      <div id="source-file" {% if form_values.get('youtube_url') %}hidden{% endif %}>
+        {% if error and not form_values.get('youtube_url') %}
+        <p class="muted" style="font-size:0.82rem; margin-top:0;">Everything else below was kept as you had it -
+           just re-choose your file, browsers don't let a page do that part for you.</p>
+        {% endif %}
+        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a file to upload">
+          <input type="file" name="audio" id="file-input" accept="audio/*,video/*" style="display:none;">
+          <svg class="dropzone-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M14 34a8 8 0 0 1-1-15.94A10 10 0 0 1 32.4 14.2 7.5 7.5 0 0 1 34 29H31" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M24 22v14m0-14 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <p class="dropzone-text" id="dropzone-text">Click to upload, or drag and drop your file here</p>
+          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">Audio or video, any common format</p>
+        </div>
+      </div>
+
+      <div id="source-youtube" {% if not form_values.get('youtube_url') %}hidden{% endif %}>
+        <label>YouTube link
+          <input type="url" name="youtube_url" id="youtube-url-input" placeholder="https://www.youtube.com/watch?v=..."
+                 value="{{ form_values.get('youtube_url', '') }}">
+        </label>
+        <p class="muted" style="margin-top:-8px;">Only submit videos you have the rights to use for dubbing.
+           Large videos can take several minutes to fetch before processing even starts.</p>
+      </div>
+
+      <div class="row" style="margin-top:16px;">
+        <label>From
+          <select name="source_lang" id="source-lang-select"
+                  data-manual-langs="{{ manual_transcription_languages|join(',') }}">
+            {% for code, label in source_languages.items() %}
+            <option value="{{ code }}" {% if code == form_values.get('source_lang', 'sw') %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>To
+          <select name="target_lang">
+            <option value="en" {% if form_values.get('target_lang', 'en') == 'en' %}selected{% endif %}>English</option>
+            <option value="sw" {% if form_values.get('target_lang') == 'sw' %}selected{% endif %}>Swahili</option>
+          </select>
+        </label>
+      </div>
+      <p class="muted" id="manual-transcription-note" hidden style="margin-top:8px; font-size:0.82rem;">
+         We don't have a speech-recognition model for this language, so one of our team transcribes it by
+         hand before translation starts. Same pipeline from there - just a bit more turnaround time on the
+         first step, and a +${{ "%.2f"|format(addons['manual_transcription']['rate_per_min']) }}/audio-minute
+         manual transcription charge on top of the service rate below.</p>
+    </div>
+
+    <div class="wizard-pane" data-pane="2" hidden>
+      <div class="wizard-grid">
+        <div>
+          <fieldset class="tiers" id="tier-fieldset">
+            <legend>What do you need?</legend>
+            {% for key, level in service_levels.items() %}
+            <label class="tier-option">
+              <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ level['rate_per_min'] }}"
+                     data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'dub') %}checked{% endif %}>
+              <div>
+                <strong>{{ level['name'] }}</strong>
+                <p>${{ "%.2f"|format(level['rate_per_min']) }}/audio-minute.</p>
+              </div>
+            </label>
+            {% endfor %}
+          </fieldset>
+
+          {% if not plans[plan]['video_deliverables'] %}
+          <label class="checkbox tier-option" style="margin-bottom:14px; align-items:center;">
+            <input type="checkbox" name="addon_video_deliverables" value="1" id="addon-checkbox"
+                   {% if form_values.get('addon_video_deliverables') %}checked{% endif %}>
+            <span>Add video deliverables - burned captions + dubbed video file
+            (+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}/audio-minute). Normally
+            {{ plans['premium']['name'] }} and up - add it to this one order without upgrading your plan.</span>
+          </label>
+          {% endif %}
+
+          <label class="checkbox tier-option" id="voice-clone-consent-field" hidden style="margin-bottom:14px; align-items:center;">
+            <input type="checkbox" name="voice_clone_consent" value="1" id="voice-clone-consent-checkbox"
+                   {% if form_values.get('voice_clone_consent') %}checked{% endif %}>
+            <span><strong>Optional:</strong> I confirm I hold the legal rights to, and consent to Kauli
+            cloning, any speaker's voice in this recording, if we use voice cloning on this order.
+            Leave unchecked if you're not sure - our team can only use a real voice clone on this order
+            once this is checked, and you can grant it later from the order page instead.</span>
+          </label>
+        </div>
+
+        <div class="pricing-summary" id="pricing-summary">
+          <h3 style="margin-top:0;">Estimated cost</h3>
+          <div class="pricing-row"><span>File length</span><span id="price-duration">—</span></div>
+          <div class="pricing-row"><span>Service</span><span id="price-service">Full dub</span></div>
+          <div class="pricing-row" id="price-addon-row" hidden><span>Video deliverables</span><span id="price-addon">—</span></div>
+          <div class="pricing-row" id="price-manual-row" hidden><span>Manual transcription</span><span id="price-manual">—</span></div>
+          <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
+          <div class="pricing-row" id="price-wallet-row" hidden><span>Wallet minutes applied</span><span id="price-wallet">—</span></div>
+          <div class="pricing-total"><span>Estimated total</span><span id="price-total">$0.00</span></div>
+          <p class="muted" style="font-size:0.76rem; margin-bottom:0;">
+             {{ "%.1f"|format(free_minutes_remaining)|replace('.0', '') }} free minute{{ '' if free_minutes_remaining == 1 else 's' }}
+             left this month are applied automatically. Final cost is confirmed once we've processed the file.
+             <a href="/client/billing">See your plan &amp; usage →</a></p>
+          <p class="muted" style="font-size:0.76rem; margin-top:8px;">
+             Free minutes only apply to <strong>Transcription only</strong> orders, and give you a preview of
+             the transcript on-screen - not a downloadable file. Translation and dub orders are billed at the
+             normal rate from the first minute either way. Submit a paid order any time to get the real,
+             downloadable deliverables.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="wizard-pane" data-pane="3" hidden>
+      <label>Project / folder (optional)
+        <input type="text" name="folder_name" list="folder-list" placeholder="e.g. Q3 campaign, NGO field reports"
+               value="{{ form_values.get('folder_name', '') }}">
+        <datalist id="folder-list">
+          {% for f in folders %}<option value="{{ f }}">{% endfor %}
+        </datalist>
+      </label>
+      <p class="muted" style="margin-top:-8px;">Group related orders together - pick an existing one or type a new
+         name. Shows up as a filter on your order list below.</p>
+
+      <label class="checkbox">
+        <input type="checkbox" name="instr_speaker_ids" value="1" {% if form_values.get('instr_speaker_ids') %}checked{% endif %}>
+        Label speakers in the transcript (e.g. "NARRATOR:", "SPEAKER 1:")
+      </label>
+
+      <fieldset class="tiers" style="margin-top:14px;">
+        <legend>How exact should the transcript be?</legend>
+        <label class="tier-option">
+          <input type="radio" name="instr_verbatim_level" value="clean_read" {% if form_values.get('instr_verbatim_level', 'clean_read') == 'clean_read' %}checked{% endif %}>
+          <div><strong>Clean read</strong><p>Fully cleaned up, grammatically readable text - the default, best for subtitles and dubbing.</p></div>
+        </label>
+        <label class="tier-option">
+          <input type="radio" name="instr_verbatim_level" value="verbatim_light" {% if form_values.get('instr_verbatim_level') == 'verbatim_light' %}checked{% endif %}>
+          <div><strong>Verbatim, lightly cleaned</strong><p>Keeps natural speech patterns, trims excessive filler words like "um".</p></div>
+        </label>
+        <label class="tier-option">
+          <input type="radio" name="instr_verbatim_level" value="verbatim" {% if form_values.get('instr_verbatim_level') == 'verbatim' %}checked{% endif %}>
+          <div><strong>Full verbatim</strong><p>Every false start, stutter and filler word, exactly as spoken - for legal/research use.</p></div>
+        </label>
+      </fieldset>
+
+      <details class="accordion" {% if form_values.get('instr_transcribe_lyrics') or form_values.get('instr_use_italics') or form_values.get('instr_existing_subs', 'ignore') != 'ignore' or form_values.get('instr_no_audio', 'tag') != 'tag' or form_values.get('instr_wrong_language', 'tag') != 'tag' or form_values.get('instr_instrumental_only', 'tag') != 'tag' or form_values.get('instr_notes') %}open{% endif %}>
+        <summary>+ Advanced settings (optional)</summary>
+        <div class="accordion-body">
+          <div class="row">
+            <label class="checkbox"><input type="checkbox" name="instr_transcribe_lyrics" value="1" {% if form_values.get('instr_transcribe_lyrics') %}checked{% endif %}> Transcribe song lyrics if any appear</label>
+            <label class="checkbox"><input type="checkbox" name="instr_use_italics" value="1" {% if form_values.get('instr_use_italics') %}checked{% endif %}> Use italics for on-screen text / off-screen narration</label>
+          </div>
+
+          <label style="margin-top:14px;">If the video already has burned-in captions
+            <select name="instr_existing_subs">
+              <option value="ignore" {% if form_values.get('instr_existing_subs', 'ignore') == 'ignore' %}selected{% endif %}>Ignore them - transcribe the audio fresh</option>
+              <option value="match_existing" {% if form_values.get('instr_existing_subs') == 'match_existing' %}selected{% endif %}>Try to match the existing wording</option>
+              <option value="flag_discrepancy" {% if form_values.get('instr_existing_subs') == 'flag_discrepancy' %}selected{% endif %}>Flag any place our transcript disagrees with them</option>
+            </select>
+          </label>
+
+          <div class="row" style="margin-top:4px;">
+            <label>If a file has no audio
+              <select name="instr_no_audio">
+                <option value="tag" {% if form_values.get('instr_no_audio', 'tag') == 'tag' %}selected{% endif %}>Tag it and continue with what's usable</option>
+                <option value="return" {% if form_values.get('instr_no_audio') == 'return' %}selected{% endif %}>Return it to me instead</option>
+              </select>
+            </label>
+            <label>If the language isn't what I selected above
+              <select name="instr_wrong_language">
+                <option value="tag" {% if form_values.get('instr_wrong_language', 'tag') == 'tag' %}selected{% endif %}>Tag it and continue</option>
+                <option value="return" {% if form_values.get('instr_wrong_language') == 'return' %}selected{% endif %}>Return it to me instead</option>
+              </select>
+            </label>
+          </div>
+          <label>If a file is instrumental music or sound effects only, with no speech
+            <select name="instr_instrumental_only">
+              <option value="tag" {% if form_values.get('instr_instrumental_only', 'tag') == 'tag' %}selected{% endif %}>Tag it and continue</option>
+              <option value="return" {% if form_values.get('instr_instrumental_only') == 'return' %}selected{% endif %}>Return it to me instead</option>
+            </select>
+          </label>
+
+          <label style="margin-top:4px;">Style guide or reference file (optional)
+            <input type="file" name="style_guide">
+          </label>
+          <p class="muted" style="margin-top:-8px;">Terminology, names, brand standards - anything that helps us transcribe and dub this more accurately.</p>
+
+          <label>Anything else we should know?
+            <textarea name="instr_notes" rows="2">{{ form_values.get('instr_notes', '') }}</textarea>
+          </label>
+        </div>
+      </details>
+    </div>
+
+    <div class="wizard-upload-progress" id="wizard-upload-progress" hidden>
+      <div class="wizard-upload-progress-label" id="wizard-upload-progress-label">Uploading… 0%</div>
+      <div class="wizard-upload-progress-bar"><div class="wizard-upload-progress-fill" id="wizard-upload-progress-fill"></div></div>
+    </div>
+    <div class="wizard-actions" id="wizard-actions">
+      <button type="button" class="secondary" id="wizard-back" hidden>&larr; Back</button>
+      <span class="muted wizard-actions-spacer" style="font-size:0.78rem;">First {{ free_minutes|int }} minutes
+         each month are free - you'll only be asked to pay for what goes beyond that.</span>
+      <button type="button" class="wizard-next" id="wizard-next">Next &rarr;</button>
+      <button type="submit" class="wizard-submit" id="wizard-submit" hidden>Submit order</button>
+    </div>
+  </form>
+</div>
+
+<script src="/static/client_wizard.js"></script>
+
+<div class="card" style="margin-top:32px;">
+  <h2 style="margin-top:0;">YouTube auto-import</h2>
+  <p class="muted" style="font-size:0.86rem;">Track a channel or playlist and we'll check it periodically for new
+     public uploads - they show up below to turn into an order with one click, instead of you having to go check
+     YouTube yourself. This only <em>detects</em> new videos; nothing is ever processed or billed until you
+     actually submit an order for one.</p>
+
+  {% if not youtube_polling_configured %}
+  <p class="muted" style="font-size:0.85rem;">Not set up yet on our end - ask us if you'd like this enabled for
+     your account.</p>
+  {% else %}
+    {% if request.query_params.get('yt_added') %}<p class="ok">✓ Now watching that channel.</p>{% endif %}
+    {% if request.query_params.get('yt_error') == 'unrecognized' %}<p class="error">Couldn't recognize that as a YouTube channel or playlist link.</p>{% endif %}
+    {% if request.query_params.get('yt_error') == 'resolve_failed' %}<p class="error">Couldn't find that channel on YouTube - double check the link.</p>{% endif %}
+
+    <form method="post" action="/client/youtube-watches" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+      <label style="flex:1; min-width:220px;">Channel or playlist URL
+        <input type="text" name="channel_url" placeholder="https://youtube.com/@yourchannel" required>
+      </label>
+      <label style="flex:1; min-width:160px;">Label (optional)
+        <input type="text" name="label" placeholder="Main channel">
+      </label>
+      <button type="submit">Add</button>
+    </form>
+
+    {% if youtube_watches %}
+    <div style="margin-top:16px; display:flex; flex-direction:column; gap:6px;">
+      {% for w in youtube_watches %}
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+        <span>{{ w['label'] or w['playlist_id'] }}
+          {% if w['last_error'] %}<span class="error" style="font-size:0.78rem;"> - last check failed: {{ w['last_error'] }}</span>{% endif %}
+        </span>
+        <form method="post" action="/client/youtube-watches/{{ w['id'] }}/remove">
+          <button type="submit" class="row-action-chip">Remove</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if youtube_pending_imports %}
+    <h3 style="margin:20px 0 10px; font-size:0.95rem;">New videos found</h3>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      {% for imp in youtube_pending_imports %}
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-top:1px solid var(--border-subtle);">
+        <div>
+          <div style="font-size:0.9rem; font-weight:600;">{{ imp['title'] }}</div>
+          <a href="https://www.youtube.com/watch?v={{ imp['video_id'] }}" target="_blank" rel="noopener"
+             style="font-size:0.8rem; color:var(--muted);">youtube.com/watch?v={{ imp['video_id'] }} ↗</a>
+        </div>
+        <div style="display:flex; gap:8px; flex-shrink:0;">
+          <button type="button" class="row-action-chip" onclick="document.querySelector('[data-source=&quot;youtube&quot;]').click(); var f = document.getElementById('youtube-url-input'); f.value='https://www.youtube.com/watch?v={{ imp['video_id'] }}'; f.scrollIntoView({behavior:'smooth', block:'center'}); f.focus();">Use in new order</button>
+          <form method="post" action="/client/youtube-imports/{{ imp['id'] }}/dismiss">
+            <button type="submit" class="row-action-chip">Dismiss</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<h2 style="margin-top:32px;">My orders</h2>
+{% if not orders %}
+  <div class="empty-state">
+    <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M32 8c-6 0-10 5-10 11v10a10 10 0 0 0 20 0V19c0-6-4-11-10-11Z" stroke="currentColor" stroke-width="2"/>
+      <path d="M18 28a14 14 0 0 0 28 0M32 42v8m-7 0h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <p>You haven't submitted any projects yet.</p>
+    <a href="#order-form" class="btn secondary" onclick="var dz = document.getElementById('dropzone'); if (dz) dz.focus();">+ Submit your first order</a>
+  </div>
+{% else %}
+{% if folders %}
+<div class="filter-tabs" id="folder-filter" style="margin-bottom:14px;">
+  <button type="button" class="active" data-folder="">All</button>
+  {% for f in folders %}
+  <button type="button" data-folder="{{ f }}">{{ f }}</button>
+  {% endfor %}
+</div>
+<script>
+  (function () {
+    var bar = document.getElementById('folder-filter');
+    if (!bar) return;
+    bar.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        bar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var wanted = btn.dataset.folder;
+        document.querySelectorAll('.project-card').forEach(function (card) {
+          card.style.display = (!wanted || card.dataset.folder === wanted) ? '' : 'none';
+        });
+      });
+    });
+  })();
+</script>
+{% endif %}
+<div class="project-cards">
+  {% for o in orders %}
+  <article class="project-card" data-folder="{{ o['folder_name'] or '' }}">
+    <div class="project-card-top">
+      <div class="project-card-name">
+        {{ o['original_filename'] }}
+        {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
+      </div>
+      <span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span>
+    </div>
+    <div class="project-card-bottom">
+      <div class="project-card-pills">
+        {% if o['folder_name'] %}<span class="meta-pill">{{ o['folder_name'] }}</span>{% endif %}
+        <span class="meta-pill">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</span>
+        {% if o['service_level'] %}
+        <span class="meta-pill">{{ service_levels[o['service_level']]['name'] if o['service_level'] in service_levels else o['service_level']|capitalize }}</span>
+        {% else %}
+        <span class="meta-pill pending">Analysis in progress&hellip;</span>
+        {% endif %}
+        <span class="meta-pill{{ ' cost-pill' if o['cost_usd'] else '' }}">
+          {% if o['status'] == 'pending_payment' %}
+            <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay now</a>
+          {% elif o['cost_usd'] %}
+            ${{ "%.2f"|format(o['cost_usd']) }}
+          {% else %}
+            Trial credit
+          {% endif %}
+        </span>
+        {% if o['difficulty_surcharge_status'] == 'pending_approval' %}
+        <span class="meta-pill">
+          <a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Additional charge pending</a>
+        </span>
+        {% endif %}
+        {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
+        {% if ts and o['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
+        <span class="deadline-pill deadline-{{ ts['level'] }}">
+          {% if ts['overdue'] %}Running behind{% else %}Due {{ o['deadline_at']|int|timestamp_to_date }}{% endif %}
+        </span>
+        {% endif %}
+      </div>
+      <a href="/client/orders/{{ o['id'] }}" class="row-action-btn" title="View">&rarr;</a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

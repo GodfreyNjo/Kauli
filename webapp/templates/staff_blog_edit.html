@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}{{ 'Edit post' if post else 'New post' }}{% endblock %}
+{% block content %}
+<a href="/staff/blog" class="breadcrumb">&larr; back to blog</a>
+<h1>{{ 'Edit post' if post else 'New post' }}</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if request.query_params.get('saved') %}<p class="ok">✓ Saved</p>{% endif %}
+
+<div class="card" style="max-width:760px;">
+  <details id="ai-assist-box" {% if not post %}open{% endif %}>
+    <summary style="cursor:pointer; font-weight:650;">✨ Draft with AI (optional - review everything before saving)</summary>
+    <div style="margin-top:14px;">
+      {% if ai_assist_configured %}
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Give it a real topic and any notes - a
+         client question, a lesson from a job, an internal framework. It drafts title, description and
+         body text below for you to edit and check, plus a tweet and a LinkedIn teaser you can paste
+         wherever you actually decide to share this - nothing here posts anywhere by itself.</p>
+      <label>Topic
+        <input type="text" id="ai-topic-input" placeholder="e.g. Why verbatim transcripts cost more than clean read">
+      </label>
+      <label>Notes (optional)
+        <textarea id="ai-notes-input" rows="2" placeholder="Any real angle, client question, or detail to ground this in"></textarea>
+      </label>
+      <button type="button" id="ai-draft-btn" class="secondary">Generate draft</button>
+      <span id="ai-draft-status" class="muted" style="font-size:0.82rem; margin-left:8px;"></span>
+
+      <div id="ai-teasers" hidden style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border-subtle);">
+        <label>Suggested tweet <button type="button" class="row-action-chip" data-copy-target="ai-tweet-text">Copy</button>
+          <textarea id="ai-tweet-text" rows="2" readonly style="font-size:0.85rem;"></textarea>
+        </label>
+        <label>Suggested LinkedIn post <button type="button" class="row-action-chip" data-copy-target="ai-linkedin-text">Copy</button>
+          <textarea id="ai-linkedin-text" rows="3" readonly style="font-size:0.85rem;"></textarea>
+        </label>
+      </div>
+      {% else %}
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Needs a real Anthropic API key -
+         set ANTHROPIC_API_KEY in .env to turn this on. Until then, just write the post below by hand.</p>
+      {% endif %}
+    </div>
+  </details>
+
+  <form method="post" action="{{ '/staff/blog/' + post['id'] + '/edit' if post else '/staff/blog/new' }}" style="margin-top:20px;">
+    <label>Title
+      <input type="text" name="title" id="blog-title-input" required value="{{ post['title'] if post else '' }}">
+    </label>
+    <label>Slug (URL) - leave blank to auto-generate from the title
+      <input type="text" name="slug" id="blog-slug-input" value="{{ post['slug'] if post else '' }}" placeholder="e.g. clean-read-vs-verbatim">
+    </label>
+    <label>Meta description (for search results and social previews, ~150 chars)
+      <input type="text" name="description" id="blog-description-input" value="{{ post['description'] if post else '' }}" maxlength="300">
+    </label>
+    <label>Category
+      <select name="category">
+        <option value="">No category</option>
+        {% for c in blog_categories %}
+        <option value="{{ c }}" {% if post and post['category'] == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Body (HTML - real formatting, use &lt;p&gt;, &lt;h2&gt;, &lt;ul&gt;/&lt;li&gt;, etc.)
+      <textarea name="body_html" id="blog-body-input" rows="18" required style="font-family:monospace; font-size:0.85rem;">{{ post['body_html'] if post else '' }}</textarea>
+    </label>
+    {% if not post %}
+    <label>Status
+      <select name="status">
+        <option value="draft" selected>Draft (not visible on the site yet)</option>
+        <option value="published">Published (live immediately)</option>
+      </select>
+    </label>
+    {% endif %}
+    <button type="submit">{{ 'Save changes' if post else 'Create post' }}</button>
+  </form>
+</div>
+<script>
+  (function () {
+    var titleEl = document.getElementById('blog-title-input');
+    var slugEl = document.getElementById('blog-slug-input');
+    if (titleEl && slugEl) {
+      var slugTouched = !!slugEl.value;
+      slugEl.addEventListener('input', function () { slugTouched = true; });
+      titleEl.addEventListener('input', function () {
+        if (slugTouched) return;
+        slugEl.value = titleEl.value.trim().toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      });
+    }
+
+    var draftBtn = document.getElementById('ai-draft-btn');
+    if (draftBtn) {
+      var statusEl = document.getElementById('ai-draft-status');
+      draftBtn.addEventListener('click', function () {
+        var topic = document.getElementById('ai-topic-input').value.trim();
+        if (!topic) { statusEl.textContent = 'Give it a topic first.'; return; }
+        draftBtn.disabled = true;
+        statusEl.textContent = 'Drafting…';
+        fetch('/staff/blog/ai-draft', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic: topic, notes: document.getElementById('ai-notes-input').value.trim() }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            draftBtn.disabled = false;
+            if (!data.ok) { statusEl.textContent = data.error || 'Something went wrong.'; return; }
+            statusEl.textContent = 'Drafted - review everything below before saving.';
+            document.getElementById('blog-title-input').value = data.title || '';
+            document.getElementById('blog-title-input').dispatchEvent(new Event('input'));
+            document.getElementById('blog-description-input').value = data.description || '';
+            document.getElementById('blog-body-input').value = data.body_html || '';
+            var teasers = document.getElementById('ai-teasers');
+            document.getElementById('ai-tweet-text').value = data.tweet_teaser || '';
+            document.getElementById('ai-linkedin-text').value = data.linkedin_teaser || '';
+            teasers.hidden = false;
+          })
+          .catch(function () {
+            draftBtn.disabled = false;
+            statusEl.textContent = 'Request failed - check your connection and try again.';
+          });
+      });
+    }
+
+    document.querySelectorAll('[data-copy-target]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var el = document.getElementById(btn.dataset.copyTarget);
+        el.select();
+        navigator.clipboard && navigator.clipboard.writeText(el.value);
+      });
+    });
+  })();
+</script>
+{% endblock %}

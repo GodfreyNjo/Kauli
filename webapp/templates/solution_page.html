@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}{{ page.title }}{% endblock %}
+{% block head_extra %}
+<meta name="description" content="{{ page.meta_description }}">
+<meta property="og:title" content="{{ page.title }}">
+<meta property="og:description" content="{{ page.meta_description }}">
+<meta property="og:type" content="website">
+<link rel="icon" href="/static/kauli-icon.png">
+{% endblock %}
+{% block content %}
+<div class="marketing-page">
+  {% include "_nav.html" %}
+
+  <section class="m-hero">
+    <a href="/" class="m-breadcrumb-back">← Back to Kauli overview</a>
+    <span class="kicker">{{ page.kicker }}</span>
+    <h1>{{ page.h1|safe }}</h1>
+    <p class="m-hero-sub">{{ page.intro }}</p>
+    <div class="m-hero-ctas">
+      <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
+      <a href="/#book" class="btn secondary">Book a call</a>
+    </div>
+    <p class="m-hero-note">No card required to try it. Pay only for what you process, when you're ready.</p>
+  </section>
+
+  <section class="m-section" id="why-you">
+    <div class="m-inner">
+      <h2 class="m-h2">{{ page.why_heading }}</h2>
+      <div class="m-features">
+        {% for point in page.points %}
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <div>
+            <h3>{{ point.title }}</h3>
+            <p>{{ point.body }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="m-section" id="pricing" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+    <div class="m-inner narrow">
+      <h2 class="m-h2">Transparent per-minute pricing</h2>
+      <p class="m-lede">No bundled credits, no opaque tiers - pay for what you actually process.</p>
+      <table>
+        <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+        <tbody>
+          {% for key, sl in service_levels.items() %}
+          <tr><td>{{ sl['name'] }}</td><td>${{ "%.2f"|format(sl['rate_per_min']) }} / audio-minute</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top:14px; font-size:0.85rem;">Your first {{ free_minutes|int }} minutes are free
+         to try, no card required. See the full breakdown, plans and add-ons on the <a href="/#pricing">main pricing
+         section →</a></p>
+    </div>
+  </section>
+
+  <section class="m-section" id="get-started">
+    <div class="m-inner narrow" style="text-align:center;">
+      <h2 class="m-h2">{{ page.cta_heading }}</h2>
+      <p class="m-lede">{{ page.cta_body }}</p>
+      <div class="m-hero-ctas" style="justify-content:center;">
+        <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
+        <a href="/#book" class="btn secondary">Book a call</a>
+      </div>
+    </div>
+  </section>
+
+  {% include "_footer.html" %}
+</div>
+{% endblock %}

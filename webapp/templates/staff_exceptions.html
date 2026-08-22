@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Account exception requests{% endblock %}
+{% block content %}
+<h1>Account exception requests</h1>
+<p class="muted" style="margin-top:0;">Clients pushing back on a limit their account hit - a rate limit, a plan
+   restriction - via "Think this is a mistake?" on the message itself. Granting an order-submission rate-limit
+   request raises that client's ceiling from 10 to 60 submissions/10min for 24 hours, not forever.</p>
+
+{% if not requests %}
+  <div class="empty-state">
+    <p>Nothing open right now.</p>
+  </div>
+{% else %}
+<table>
+  <thead><tr><th>Received</th><th>Client</th><th>Limit hit</th><th>Client's note</th><th>Action</th></tr></thead>
+  <tbody>
+    {% for r in requests %}
+    <tr>
+      <td>{{ r['created_at']|int|timestamp_to_str }}</td>
+      <td>{{ r['client_name'] }}<br><span class="muted" style="font-size:0.78rem;">{{ r['client_email'] }}</span></td>
+      <td>{{ r['context']|replace('_', ' ') }}</td>
+      <td style="max-width:320px;">{{ r['client_note'] or '-' }}</td>
+      <td>
+        <form method="post" action="/staff/exceptions/{{ r['id'] }}/grant" style="display:inline;">
+          <button type="submit" class="row-action-chip">Grant (24h)</button>
+        </form>
+        <form method="post" action="/staff/exceptions/{{ r['id'] }}/decline" style="display:inline;">
+          <button type="submit" class="row-action-chip">Decline</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

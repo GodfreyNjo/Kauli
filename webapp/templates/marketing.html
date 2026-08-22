@@ -1,0 +1,678 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}Kauli by Forge Media Services{% endblock %}
+{% block head_extra %}
+<meta name="description" content="Swahili and Kikuyu to English dubbing, translation and subtitles - AI-drafted in minutes, verified line-by-line by a human editor before delivery. Transparent per-minute pricing, no bundled credits, more Kenyan languages on the way.">
+<meta property="og:title" content="Kauli - Swahili, Kikuyu and English dubbing and translation">
+<meta property="og:description" content="AI-drafted, human-verified Swahili and Kikuyu to English dubbing, translation and subtitles. Transparent per-minute pricing.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/static/kauli-icon.png">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "Kauli by Forge Media Services",
+  "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/",
+  "logo": "{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png",
+  "email": "{{ email }}",
+  "telephone": "{{ phone_tel }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "Kauli",
+  "description": "AI-drafted, human-verified Swahili, Kikuyu and English dubbing, translation and subtitles, priced per audio-minute.",
+  "brand": { "@type": "Brand", "name": "Forge Media Services" },
+  "offers": [
+    {% for key, sl in service_levels.items() %}
+    { "@type": "Offer", "name": "{{ sl['name'] }}", "priceCurrency": "USD", "price": "{{ '%.2f'|format(sl['rate_per_min']) }}" }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for q in faq %}
+    { "@type": "Question", "name": {{ q.q|tojson }},
+      "acceptedAnswer": { "@type": "Answer", "text": {{ q.a|tojson }} } }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="marketing-page">
+
+  {% include "_nav.html" %}
+
+  <section class="m-hero">
+    <span class="kicker">AI-drafted, human-verified localization</span>
+    <h1>Swahili <span class="hero-arrow">↔</span> English dubbing and translation, without the six-week turnaround</h1>
+    <p class="m-hero-sub">
+      Kauli pairs fast AI transcription, translation and voice synthesis with a real human
+      editor on every order - so you get broadcast-ready subtitles, translated transcripts, or
+      a fully dubbed track, priced by the minute and reviewed before it ever reaches you.
+    </p>
+    <div class="m-hero-ctas">
+      <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
+      <a href="#book" class="btn secondary">Book a call</a>
+    </div>
+    <p class="m-hero-note">No card required to try it. Pay only for what you process, when you're ready.</p>
+
+    <!-- Real, true, already-substantiated claims - not aspirational badges.
+         Every line here is something the site can actually back up (see
+         "How it works" for the human-review step, the pricing page for
+         the published rate, the consent-gated-cloning card above). -->
+    <div class="m-hero-trust">
+      <span>✓ Every order human-reviewed before delivery</span>
+      <span>✓ Transparent per-minute pricing, published below</span>
+      <span>✓ Consent required before any voice is cloned</span>
+    </div>
+
+    <a href="#demo" class="m-hero-demo-link">▶ See a real example, with real audio</a>
+
+    <div class="m-hero-langs">
+      {% for code, label in source_languages.items() %}
+      <span class="m-lang-pill">{{ label }}</span>
+      {% endfor %}
+      <span class="m-lang-pill m-lang-more">+ more Kenyan languages coming</span>
+    </div>
+  </section>
+
+  <section class="m-section" id="how">
+    <div class="m-inner">
+      <h2 class="m-h2">How it works</h2>
+      <p class="m-lede">Every order follows the same four steps, whether it's a five-minute clip or a full episode.</p>
+      <div class="m-steps" id="how-steps">
+        <div class="m-steps-progress" id="how-steps-progress"></div>
+        <div class="m-step">
+          <div class="m-step-num">1</div>
+          <h3>Upload or link a video</h3>
+          <p>Drop an audio/video file, or paste a YouTube link - we pull the audio straight from
+             the source, no re-uploading a file you've already published.</p>
+          <div class="m-step-visual m-visual-upload" aria-hidden="true">
+            <div class="m-visual-upload-bar"><div class="m-visual-upload-fill"></div></div>
+          </div>
+        </div>
+        <div class="m-step">
+          <div class="m-step-num ai">2</div>
+          <h3>AI drafts it in minutes <span class="m-step-tag ai">AI</span></h3>
+          <p>Speech recognition, translation, and (if you've ordered a dub) voice synthesis
+             produce a first pass fast - usually before you've finished your coffee.</p>
+          <div class="m-step-visual m-visual-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="m-step">
+          <div class="m-step-num human">3</div>
+          <h3>Human verification on every single word <span class="m-step-tag human">HUMAN</span></h3>
+          <p>A real editor reviews and corrects the transcript and translation word-by-word
+             before anything is marked ready - AI drafts, people verify.</p>
+          <div class="m-step-visual m-visual-check" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 12.5l5 5L20 6" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" pathLength="1"/>
+            </svg>
+          </div>
+        </div>
+        <div class="m-step">
+          <div class="m-step-num">4</div>
+          <h3>You download, ready to publish</h3>
+          <p>Transcript, subtitles (SRT/VTT), translated text, or a dubbed audio/video track -
+             whichever you ordered, sized to your plan.</p>
+          <div class="m-step-visual m-visual-files" aria-hidden="true">
+            <span class="m-file-chip" style="animation-delay:0s">.SRT</span>
+            <span class="m-file-chip" style="animation-delay:0.15s">.VTT</span>
+            <span class="m-file-chip" style="animation-delay:0.3s">.MP3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    (function () {
+      var steps = document.getElementById('how-steps');
+      if (!steps) return;
+      var stepEls = steps.querySelectorAll('.m-step');
+      var progressEl = document.getElementById('how-steps-progress');
+      var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var activeIndex = 0;
+      var cycleTimer = null;
+
+      // Auto-cycles which step is "active" - a filled connector line and a
+      // highlighted circle sweep left to right, then loop. Purely decorative
+      // motion (illustrative, not a literal replay of a real job), so it's
+      // fine to loop indefinitely - skipped entirely under
+      // prefers-reduced-motion, same as the existing fade-in below.
+      function setActive(i) {
+        stepEls.forEach(function (el, idx) { el.classList.toggle('active', idx === i); });
+        if (progressEl) progressEl.style.width = (i / (stepEls.length - 1) * 100) + '%';
+      }
+      function startCycle() {
+        if (reduceMotion || cycleTimer) return;
+        setActive(0);
+        cycleTimer = setInterval(function () {
+          activeIndex = (activeIndex + 1) % stepEls.length;
+          setActive(activeIndex);
+        }, 2200);
+      }
+
+      if (!('IntersectionObserver' in window)) { startCycle(); return; }
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            steps.classList.add('in-view');
+            startCycle();
+            obs.disconnect();
+          }
+        });
+      }, { threshold: 0.3 });
+      obs.observe(steps);
+    })();
+  </script>
+
+  <section class="m-section" id="demo">
+    <div class="m-inner narrow">
+      <h2 class="m-h2">See it in action</h2>
+      <p class="m-lede">What happens after you upload, in about ten seconds.</p>
+
+      <div class="demo-player">
+        <div class="demo-player-chrome" aria-hidden="true">
+          <span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span>
+          <span class="demo-chrome-title">Kauli editor · live preview</span>
+          <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span>illustrative demo</span>
+        </div>
+        <div class="demo-waveform">
+          {% for i in range(28) %}<span></span>{% endfor %}
+        </div>
+        <div class="demo-line">
+          <span class="demo-lang-tag">SW</span>
+          <span class="demo-text" id="demo-text-sw"></span><span class="demo-cursor" id="demo-cursor"></span>
+        </div>
+        <div class="demo-line" id="demo-line-en" style="opacity:0;">
+          <span class="demo-lang-tag accent">EN</span>
+          <span class="demo-text" id="demo-text-en"></span>
+          <span class="demo-speaker" id="demo-speaker" aria-hidden="true">🔊</span>
+        </div>
+        <div class="demo-result" id="demo-result" style="opacity:0;">
+          <span class="demo-check">✓</span> Human-verified · ready to download
+        </div>
+        <audio id="demo-audio-en" src="/static/demo-en.wav" preload="auto"></audio>
+      </div>
+      <p class="demo-caption">Illustrative example with a synthesized voice on the English line - not a real
+         client recording. (We don't voice the Swahili line for real orders either - the original audio you
+         upload is the source; only the translated output ever gets synthesized.)</p>
+
+      <div style="text-align:center; margin-top:22px;">
+        <button type="button" class="btn secondary" id="demo-replay">↺ Replay</button>
+        <a href="/login?mode=signup" class="btn cta-olive" style="margin-left:10px;">Try it with your own audio →</a>
+      </div>
+    </div>
+  </section>
+  <script>
+    (function () {
+      var SW_TEXT = "Karibu kwenye huduma yetu ya utangazaji wa kisasa.";
+      var EN_TEXT = "Welcome to our modern broadcasting service.";
+      var swEl = document.getElementById('demo-text-sw');
+      var enEl = document.getElementById('demo-text-en');
+      var enLine = document.getElementById('demo-line-en');
+      var resultEl = document.getElementById('demo-result');
+      var replayBtn = document.getElementById('demo-replay');
+      var player = document.querySelector('.demo-player');
+      var enAudio = document.getElementById('demo-audio-en');
+      var speakerEl = document.getElementById('demo-speaker');
+      if (!swEl || !player) return;
+      var timers = [];
+
+      function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+      function typeInto(el, text, speed, cb) {
+        el.textContent = '';
+        var i = 0;
+        function step() {
+          if (i <= text.length) {
+            el.textContent = text.slice(0, i);
+            i++;
+            timers.push(setTimeout(step, speed));
+          } else if (cb) { cb(); }
+        }
+        step();
+      }
+
+      function runSequence() {
+        clearTimers();
+        swEl.textContent = ''; enEl.textContent = '';
+        enLine.style.opacity = 0; resultEl.style.opacity = 0;
+        if (speakerEl) speakerEl.classList.remove('playing');
+        if (enAudio) { enAudio.pause(); enAudio.currentTime = 0; }
+        timers.push(setTimeout(function () {
+          typeInto(swEl, SW_TEXT, 45, function () {
+            timers.push(setTimeout(function () {
+              enLine.style.opacity = 1;
+              // Real synthesized audio (Piper), not a stand-in - starts the
+              // instant the English line appears, same moment a real dubbed
+              // job's voice track would play against its subtitle.
+              if (enAudio) {
+                enAudio.currentTime = 0;
+                enAudio.play().catch(function () {}); // autoplay can be blocked before any user interaction - fails silently, text still plays
+                if (speakerEl) speakerEl.classList.add('playing');
+              }
+              typeInto(enEl, EN_TEXT, 40, function () {
+                timers.push(setTimeout(function () { resultEl.style.opacity = 1; }, 400));
+              });
+            }, 500));
+          });
+        }, 400));
+      }
+      if (enAudio) {
+        enAudio.addEventListener('ended', function () {
+          if (speakerEl) speakerEl.classList.remove('playing');
+        });
+      }
+
+      if (replayBtn) replayBtn.addEventListener('click', runSequence);
+
+      // Play once it actually scrolls into view, not immediately on load.
+      var started = false;
+      if ('IntersectionObserver' in window) {
+        var obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting && !started) {
+              started = true;
+              runSequence();
+            }
+          });
+        }, { threshold: 0.4 });
+        obs.observe(player);
+      } else {
+        runSequence();
+      }
+    })();
+  </script>
+
+  <section class="m-section" id="who" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+    <div class="m-inner">
+      <h2 class="m-h2" id="who-heading">Built for teams who publish across languages</h2>
+      <p class="m-lede" id="who-lede">If reaching a Swahili-, Kikuyu- or English-speaking audience is part of your workflow, Kauli slots in without you hiring for it.</p>
+      <div class="m-audience-grid">
+        <a class="m-audience" href="/solutions/youtubers" data-header="Built for creators who publish once and reach every audience." data-lede="Localize your whole channel without editing your timeline twice.">
+          <div class="m-audience-icon">{% include "_icon_creator.svg" %}</div>
+          <div class="m-audience-hook">Reach both audiences.</div>
+          <strong>Content creators &amp; YouTubers</strong>
+          <ul class="m-audience-bullets">
+            <li>Subtitles or a full dub from one upload</li>
+            <li>Paste a YouTube link - no re-exporting</li>
+            <li>Your original upload stays untouched</li>
+          </ul>
+          <span class="m-audience-link">Explore our YouTuber &amp; creator solutions →</span>
+        </a>
+        <a class="m-audience" href="/solutions/media-broadcast" data-header="Built for media teams who can't afford a six-week turnaround." data-lede="Interviews, news segments and documentaries, human-checked before they air.">
+          <div class="m-audience-icon">{% include "_icon_broadcast.svg" %}</div>
+          <div class="m-audience-hook">News without delays.</div>
+          <strong>Media &amp; broadcast</strong>
+          <ul class="m-audience-bullets">
+            <li>Turnaround in days, not weeks</li>
+            <li>A human editor on every line, not just the model</li>
+            <li>Handles accents, cross-talk and studio noise</li>
+          </ul>
+          <span class="m-audience-link">Explore our media &amp; broadcast solutions →</span>
+        </a>
+        <a class="m-audience" href="/solutions/ngos" data-header="Built for NGOs who need fast, accurate field reporting." data-lede="Training material and campaigns in the language your community actually speaks.">
+          <div class="m-audience-icon">{% include "_icon_globe.svg" %}</div>
+          <div class="m-audience-hook">Broadcast locally.</div>
+          <strong>NGOs &amp; development orgs</strong>
+          <ul class="m-audience-bullets">
+            <li>Accurate, field-ready terminology</li>
+            <li>Budget-friendly, per-minute pricing</li>
+            <li>Free minutes to test quality before you commit funds</li>
+          </ul>
+          <span class="m-audience-link">Explore our NGO solutions →</span>
+        </a>
+        <a class="m-audience" href="/solutions/e-learning" data-header="Built for training teams who reuse content across cohorts." data-lede="Consistent terminology from lesson one through the last one.">
+          <div class="m-audience-icon">{% include "_icon_grad.svg" %}</div>
+          <div class="m-audience-hook">Consistent, every lesson.</div>
+          <strong>E-learning &amp; training</strong>
+          <ul class="m-audience-bullets">
+            <li>Localize a course once, reuse it every cohort</li>
+            <li>Terminology stays consistent lesson to lesson</li>
+            <li>No drift the way a memory-less AI tool gets</li>
+          </ul>
+          <span class="m-audience-link">Explore our e-learning &amp; training solutions →</span>
+        </a>
+      </div>
+    </div>
+  </section>
+  <script>
+    (function () {
+      var heading = document.getElementById('who-heading');
+      var lede = document.getElementById('who-lede');
+      if (!heading || !lede) return;
+      var defaultHeading = heading.textContent;
+      var defaultLede = lede.textContent;
+      document.querySelectorAll('#who .m-audience').forEach(function (card) {
+        card.addEventListener('mouseenter', function () {
+          if (card.dataset.header) heading.textContent = card.dataset.header;
+          if (card.dataset.lede) lede.textContent = card.dataset.lede;
+        });
+        card.addEventListener('mouseleave', function () {
+          heading.textContent = defaultHeading;
+          lede.textContent = defaultLede;
+        });
+      });
+    })();
+  </script>
+
+  <section class="m-section" id="why">
+    <div class="m-inner">
+      <h2 class="m-h2">Why teams pick Kauli over a generic AI dubbing tool</h2>
+      <p class="m-lede">Speed alone isn't enough for anything you're willing to put your name on.</p>
+      <div class="m-grid-3">
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>AI speed, human accuracy</h3>
+          <ul class="m-feature-bullets">
+            <li>Every line human-checked, not just AI-drafted</li>
+            <li>Re-listened against the source audio</li>
+            <li>Catches names, idioms and context AI alone misses</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>Transparent per-minute pricing</h3>
+          <ul class="m-feature-bullets">
+            <li>Exact rate shown before you commit</li>
+            <li>No bundled "credits," no surprise invoice</li>
+            <li>Plan discount applied automatically at checkout</li>
+          </ul>
+        </div>
+        <div class="m-feature trust">
+          <div class="m-feature-icon shield">{% include "_icon_shield.svg" %}</div>
+          <h3>Consent-gated voice cloning</h3>
+          <ul class="m-feature-bullets">
+            <li>Required confirmation before any clone runs</li>
+            <li>Never done silently</li>
+            <li>Built in by design, not bolted on</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>YouTube-native ingestion</h3>
+          <ul class="m-feature-bullets">
+            <li>Paste a link - we pull the audio</li>
+            <li>No re-exporting or re-uploading</li>
+            <li>Full video only fetched if your order needs it</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>Scales with you</h3>
+          <ul class="m-feature-bullets">
+            <li>Free minutes to test quality first</li>
+            <li>Pay per minute as you grow</li>
+            <li>Discounted plans once volume justifies it</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>A real account manager for volume work</h3>
+          <ul class="m-feature-bullets">
+            <li>Dedicated contact, not a support queue</li>
+            <li>Bank-transfer billing available</li>
+            <li>Someone who already knows your account</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="m-compare m-compare-desktop">
+        <table>
+          <thead>
+            <tr><th></th><th>Generic AI tool</th><th>Traditional agency</th><th class="m-compare-us">Kauli</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Speed</td>
+              <td class="m-compare-ok">Minutes</td>
+              <td class="m-compare-bad">Often 1-2+ weeks</td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Minutes for the draft, human-checked after</span></td>
+            </tr>
+            <tr>
+              <td>Human review before delivery</td>
+              <td class="m-compare-bad">None. No human check.</td>
+              <td class="m-compare-neutral">Yes, but adds weeks to turnaround</td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Yes, every line</span></td>
+            </tr>
+            <tr>
+              <td>Pricing</td>
+              <td class="m-compare-neutral">Usually a subscription or credit bundle</td>
+              <td class="m-compare-bad">Custom quote, often opaque</td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Published per-minute rate</span></td>
+            </tr>
+            <tr>
+              <td>Consent-gated voice cloning</td>
+              <td class="m-compare-bad">Rarely enforced</td>
+              <td class="m-compare-neutral">Depends on the studio</td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Required before any clone runs</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mobile-only stacked cards - a table can't fit a 400px screen
+           without horizontal scrolling, and horizontal scrolling loses
+           people. Same four facts, read top to bottom instead. -->
+      <div class="m-compare-mobile">
+        <div class="m-compare-card winner">
+          <h4>Kauli</h4>
+          <div class="m-compare-card-row"><span>Speed</span><strong class="text-green">Minutes, human-checked</strong></div>
+          <div class="m-compare-card-row"><span>Human review</span><strong class="text-green">Yes, every line</strong></div>
+          <div class="m-compare-card-row"><span>Pricing</span><strong class="text-green">Published per-minute rate</strong></div>
+          <div class="m-compare-card-row"><span>Voice-clone consent</span><strong class="text-green">Required, every time</strong></div>
+        </div>
+        <div class="m-compare-card">
+          <h4>Generic AI tool</h4>
+          <div class="m-compare-card-row"><span>Speed</span><strong>Minutes</strong></div>
+          <div class="m-compare-card-row"><span>Human review</span><strong class="text-red">None. No human check.</strong></div>
+          <div class="m-compare-card-row"><span>Pricing</span><strong>Subscription / credits</strong></div>
+          <div class="m-compare-card-row"><span>Voice-clone consent</span><strong class="text-red">Rarely enforced</strong></div>
+        </div>
+        <div class="m-compare-card">
+          <h4>Traditional agency</h4>
+          <div class="m-compare-card-row"><span>Speed</span><strong class="text-red">1-2+ weeks</strong></div>
+          <div class="m-compare-card-row"><span>Human review</span><strong>Yes, but adds weeks</strong></div>
+          <div class="m-compare-card-row"><span>Pricing</span><strong class="text-red">Custom quote, opaque</strong></div>
+          <div class="m-compare-card-row"><span>Voice-clone consent</span><strong>Depends on the studio</strong></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="m-section" id="pricing" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+    <div class="m-inner">
+      <span class="m-payg-badge">Pay as you go</span>
+      <h2 class="m-h2">Simple, per-minute pricing</h2>
+      <p class="m-lede">No subscription required - pay only for the minutes you actually process. The first
+         {{ free_minutes|int }} minutes every month are free, on every plan, subscribed or not.</p>
+
+      <div class="m-pricing-unified">
+        <div class="m-rates-card">
+          <table>
+            <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+            <tbody>
+              {% for key, sl in service_levels.items() %}
+              <tr><td>{{ sl['name'] }}</td><td>${{ "%.2f"|format(sl['rate_per_min']) }} / audio-minute</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="m-calc">
+          <h3 style="margin-top:0;">Estimate your cost</h3>
+          <div class="m-calc-row">
+            <label>Length (minutes)
+              <input type="number" id="calc-minutes" min="0" step="1" value="10">
+            </label>
+            <label>Service
+              <select id="calc-service">
+                {% for key, sl in service_levels.items() %}
+                <option value="{{ sl['rate_per_min'] }}" {% if key == 'dub' %}selected{% endif %}>{{ sl['name'] }}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <div class="m-calc-result">
+            <span id="calc-total">$0.00</span>
+            <span class="muted" id="calc-note"></span>
+          </div>
+          <a href="{{ whatsapp_url }}" target="_blank" rel="noopener" id="calc-whatsapp" class="btn secondary m-calc-kes-btn">
+            Pay in KES or get volume discounts
+          </a>
+        </div>
+      </div>
+      <script>
+        (function () {
+          var minutesEl = document.getElementById('calc-minutes');
+          var serviceEl = document.getElementById('calc-service');
+          var totalEl = document.getElementById('calc-total');
+          var noteEl = document.getElementById('calc-note');
+          var waLink = document.getElementById('calc-whatsapp');
+          var waBase = "{{ whatsapp_url }}";
+          var freeMinutes = {{ free_minutes|int }};
+          if (!minutesEl) return;
+          function update() {
+            var minutes = Math.max(0, Number(minutesEl.value) || 0);
+            var rate = Number(serviceEl.value) || 0;
+            var serviceName = serviceEl.options[serviceEl.selectedIndex].text;
+            var freeApplied = Math.min(minutes, freeMinutes);
+            var billable = Math.max(0, minutes - freeApplied);
+            var total = billable * rate;
+            totalEl.textContent = '$' + total.toFixed(2);
+            noteEl.textContent = freeApplied > 0
+              ? ' (' + freeApplied.toFixed(0) + ' free minute' + (freeApplied === 1 ? '' : 's') + ' applied - a paid plan discounts the rest further)'
+              : ' (a paid plan discounts this further)';
+            if (waLink) {
+              var msg = "Hi, I'd like a KES quote (or volume discount) for " + minutes + " minutes of " +
+                serviceName + " - the USD estimate on your site is $" + total.toFixed(2) + ".";
+              waLink.href = waBase + '?text=' + encodeURIComponent(msg);
+            }
+          }
+          minutesEl.addEventListener('input', update);
+          serviceEl.addEventListener('change', update);
+          update();
+        })();
+      </script>
+
+      <div class="m-section-divider"></div>
+      <p class="m-lede" style="margin-bottom:24px;">Subscription plans - a discount on the usage rates above, plus better turnaround and delivery options. On top of usage, not instead of it.</p>
+
+      <div class="m-pricing-grid">
+        {% for key, p in plans.items() %}
+        <div class="m-plan{% if key == 'premium' %} featured{% endif %}">
+          <div class="m-plan-name">{{ p['name'] }}</div>
+          <div class="m-plan-price">
+            {% if p['price_usd'] %}${{ p['price_usd'] }}<small>/mo</small>{% else %}$0<small>/mo</small>{% endif %}
+          </div>
+          <div class="m-plan-blurb">{{ p['blurb'] }}</div>
+          {% if key == 'enterprise' %}
+            <a href="#book" class="btn secondary">Talk to us</a>
+          {% else %}
+            <a href="/login?mode=signup" class="btn secondary">Get started</a>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="m-section" id="book">
+    <div class="m-inner">
+      <div class="m-book-grid">
+        <div class="m-book-info">
+          <h2 class="m-h2">Talk to us before you commit</h2>
+          <p>Not sure which service level fits your workflow, or want to see a sample before sending
+             a real order? Book a short call below, or leave your number and we'll call you back -
+             usually the same day.</p>
+          <div class="m-contact-line">Call us: <a href="tel:{{ phone_tel }}">{{ phone_display }}</a></div>
+          <div class="m-contact-buttons">
+            <a href="mailto:{{ email }}" class="btn secondary">↗ Send us an email</a>
+            <a href="{{ whatsapp_url }}" target="_blank" rel="noopener" class="btn secondary">↗ WhatsApp us</a>
+          </div>
+
+          {% if calendly_url %}
+          <div class="m-calendly-embed">
+            <div class="calendly-inline-widget" data-url="{{ calendly_url }}" style="min-width:280px;height:480px;"></div>
+            <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="m-book-form">
+          {% if sent %}
+            <p class="ok">Thanks - we've got your request and will reach out shortly, usually the same day.</p>
+          {% endif %}
+          {% if lead_error %}
+            <p class="error">{{ lead_error }}</p>
+          {% endif %}
+          <h3 style="margin-top:0;">Request a callback</h3>
+          <form method="post" action="/contact/request-callback">
+            <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+              <label>Leave this field blank
+                <input type="text" name="website" tabindex="-1" autocomplete="off">
+              </label>
+            </div>
+            <label>Name
+              <input type="text" name="name" required>
+            </label>
+            <label>Email
+              <input type="email" name="email" required>
+            </label>
+            <label>Phone (optional)
+              <input type="tel" name="phone" placeholder="07XX XXX XXX">
+            </label>
+            <label>Estimated audio/video volume per month
+              <select name="volume_estimate" required>
+                <option value="">Select one...</option>
+                <option value="under_30min">Under 30 minutes</option>
+                <option value="30_100min">30-100 minutes</option>
+                <option value="100min_plus">100+ minutes</option>
+                <option value="not_sure">Not sure yet</option>
+              </select>
+            </label>
+            <label>What best describes your organization?
+              <select name="org_type" required>
+                <option value="">Select one...</option>
+                <option value="media_broadcast">Media / Broadcast</option>
+                <option value="ngo">NGO / Non-profit</option>
+                <option value="corporate">Corporate / Brand</option>
+                <option value="education">Education / E-learning</option>
+                <option value="individual">Individual creator</option>
+              </select>
+            </label>
+            <button type="submit" style="width:100%;">Request a callback</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="m-section" id="faq" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle);">
+    <div class="m-inner narrow">
+      <h2 class="m-h2">Frequently asked questions</h2>
+      <div class="m-faq-list">
+        {% for item in faq %}
+        <details class="m-faq-item">
+          <summary>{{ item.q }}</summary>
+          <p>{{ item.a }}</p>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  {% include "_footer.html" %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Blog{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+  <h1 style="margin:0;">Blog</h1>
+  <a href="/staff/blog/new" class="btn">+ New post</a>
+</div>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+{% if not devto_configured %}
+<p class="muted" style="font-size:0.82rem;">Cross-posting to DEV.to needs a real API key - free, no
+   waitlist: generate one from your own DEV.to account (Settings → Extensions → DEV API Keys) and set
+   DEV_TO_API_KEY in .env.</p>
+{% endif %}
+{% if not medium_configured %}
+<p class="muted" style="font-size:0.82rem;">Cross-posting to Medium needs a real Integration Token -
+   Medium's self-service token page wasn't available when we last checked, so this may not currently be
+   possible - DEV.to above is the reliable free option right now.</p>
+{% endif %}
+
+<div class="card" style="padding:0; margin-top:16px;">
+  <table>
+    <thead><tr><th>Title</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+    <tbody>
+      {% for post in posts %}
+      <tr>
+        <td>
+          <a href="/staff/blog/{{ post['id'] }}/edit">{{ post['title'] }}</a>
+          {% if post['devto_url'] %}<br><a href="{{ post['devto_url'] }}" target="_blank" rel="noopener" class="muted" style="font-size:0.76rem;">✓ On DEV.to →</a>{% endif %}
+          {% if post['medium_url'] %}<br><a href="{{ post['medium_url'] }}" target="_blank" rel="noopener" class="muted" style="font-size:0.76rem;">✓ On Medium →</a>{% endif %}
+        </td>
+        <td><span class="source-badge">{{ post['status'] }}</span></td>
+        <td class="muted">{{ post['updated_at']|int|timestamp_to_str }}</td>
+        <td style="display:flex; gap:6px; flex-wrap:wrap;">
+          {% if post['status'] == 'published' %}
+          <a href="/blog/{{ post['slug'] }}" target="_blank" rel="noopener" class="row-action-chip">View →</a>
+          <form method="post" action="/staff/blog/{{ post['id'] }}/unpublish">
+            <button type="submit" class="row-action-chip">Unpublish</button>
+          </form>
+          {% if devto_configured and not post['devto_url'] %}
+          <form method="post" action="/staff/blog/{{ post['id'] }}/publish-devto">
+            <button type="submit" class="row-action-chip" title="Cross-post with a link back to this page">Publish to DEV.to</button>
+          </form>
+          {% endif %}
+          {% if medium_configured and not post['medium_url'] %}
+          <form method="post" action="/staff/blog/{{ post['id'] }}/publish-medium">
+            <button type="submit" class="row-action-chip" title="Cross-post with a link back to this page">Publish to Medium</button>
+          </form>
+          {% endif %}
+          {% else %}
+          <form method="post" action="/staff/blog/{{ post['id'] }}/publish">
+            <button type="submit" class="row-action-chip">Publish</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/staff/blog/{{ post['id'] }}/delete"
+                onsubmit="return confirm('Delete this post permanently?');">
+            <button type="submit" class="row-action-chip">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="muted" style="padding:20px 24px;">No posts yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
