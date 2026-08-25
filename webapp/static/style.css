@@ -617,6 +617,12 @@ tbody tr:hover { background: var(--hover); }
 .status-editor_returned::before { background: var(--warn); }
 .status-returned_to_client { color: var(--err); background: var(--err-soft); }
 .status-returned_to_client::before { background: var(--err); }
+/* Real gap this closes: every other client-visible status had a color;
+   pending_payment (an order sitting on the CLIENT's own action, same as
+   returned_to_client) had none at all - it just fell back to the plain
+   grey base .status style, the one state most worth calling out. */
+.status-pending_payment { color: var(--err); background: var(--err-soft); }
+.status-pending_payment::before { background: var(--err); }
 
 /* lead pipeline stages (CRM) */
 .status-won { color: var(--ok); background: var(--ok-soft); }

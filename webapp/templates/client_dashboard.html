@@ -370,9 +370,13 @@
 {% endif %}
 <script>
   (function () {
-    var IN_PROGRESS = ['queued', 'processing', 'awaiting_review', 'editor_returned', 'pending_payment'];
+    // pending_payment lives in NEEDS_YOU, not IN_PROGRESS: it's sitting on
+    // the CLIENT's own action (same as returned_to_client), not on staff -
+    // lumping it in with active work buried the one status that's most
+    // actionable for the person actually looking at this list.
+    var IN_PROGRESS = ['queued', 'processing', 'awaiting_review', 'editor_returned'];
     var READY = ['ready_for_delivery', 'delivered'];
-    var NEEDS_YOU = ['returned_to_client'];
+    var NEEDS_YOU = ['returned_to_client', 'pending_payment'];
     var searchInput = document.getElementById('order-search');
     var statusBar = document.getElementById('order-status-filter');
     var folderBar = document.getElementById('folder-filter');

@@ -293,6 +293,18 @@ async def add_trace_id(request: Request, call_next):
 # connect-src ... Refused to connect"), not just inferred - curl doesn't
 # enforce CSP or CORS, so testing the presigned URL with curl alone missed
 # this entirely.
+#
+# https://checkout.paystack.com in form-action - a second, real, live-
+# reproduced instance of the exact same class of bug: order_pay.html's
+# <form> posts to this app's own /client/orders/{id}/pay ('self' - fine),
+# which then issues a real 303 redirect to Paystack's hosted checkout
+# page. Chrome enforces form-action against the FINAL destination after
+# a redirect, not just the form's own action URL - so every real payment
+# attempt was silently blocked, in every browser (including Incognito,
+# which ruled out an extension), even though the server-side redirect
+# itself was fast and correct every single time. Confirmed via the exact
+# console message: "Sending form data to 'https://checkout.paystack.com/
+# ...' violates ... form-action 'self'. The request has been blocked."
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com "
@@ -303,7 +315,8 @@ _CSP = (
     "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com "
     "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com; "
     "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com; "
-    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+    "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
+    "form-action 'self' https://checkout.paystack.com"
 )
 # 'unsafe-inline' on script-src is a real, known trade-off, not an
 # oversight: this app's templates use inline <script> blocks throughout
@@ -375,13 +388,31 @@ templates.env.globals["free_minutes"] = billing.FREE_MINUTES_PER_MONTH
 # computed once at request-handling time and threaded through every route
 # that shows an order - same reasoning as paystack_live_mode above.
 templates.env.globals["tat_status"] = tat.time_status
-# Client-facing status label - "ready_for_delivery" read literally as
-# "ready for delivery" (found via real client testing: it reads like
-# freight tracking, not "here's your thing"). Only this one status gets
-# an override; everything else keeps the existing plain
-# replace('_',' ') rendering, unchanged.
+# Client-facing status label - the raw underscore-replace fallback
+# ("editor_returned" -> "editor returned", "returned_to_client" ->
+# "returned to client") reads like an internal system log, not something
+# written for the person paying for this. Real gaps this closes:
+# "editor_returned" named a Kauli-internal role the client has no reason
+# to know about, and told them nothing about whether THEY need to do
+# anything; "returned_to_client" and "pending_payment" both mean "we're
+# waiting on you" but read as passive/administrative instead of
+# actionable. Every other status still needs a human label too, just one
+# that's less of a rewrite - this fully replaces the old single-status
+# override.
+_CLIENT_STATUS_LABELS = {
+    "pending_payment": "Awaiting your payment",
+    "queued": "Queued",
+    "processing": "In progress",
+    "awaiting_review": "In staff review",
+    "editor_returned": "Being revised",
+    "ready_for_delivery": "Your order is ready",
+    "delivered": "Delivered",
+    "returned_to_client": "Needs your input",
+    "failed": "Something went wrong - we're on it",
+    "dead_letter": "Something went wrong - we're on it",
+}
 templates.env.filters["client_status_label"] = (
-    lambda status: "Your order is ready" if status == "ready_for_delivery" else status.replace("_", " ")
+    lambda status: _CLIENT_STATUS_LABELS.get(status, status.replace("_", " "))
 )
 
 
