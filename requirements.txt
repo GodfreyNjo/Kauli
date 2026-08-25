@@ -1,5 +1,15 @@
 # --- core (needed always) ---
 numpy>=1.24
+# YouTube order intake (webapp/app.py's _download_youtube/fetch_youtube_video) -
+# was only ever installed by hand in the local dev venv, never actually
+# tracked here - a real gap caught by the container failing to import
+# webapp.app at all on first deploy.
+yt-dlp>=2024.1.1
+# Directly imported in webapp/billing.py, mailer.py, devto_publish.py,
+# medium_publish.py - was never listed here either, just riding along as
+# a transitive dep of supabase/fastapi. Explicit now so a future version
+# bump of either doesn't silently drop it and break these four modules.
+httpx>=0.27.0
 
 # --- free local stack: start here, costs nothing ---
 faster-whisper>=1.0.0        # local ASR, CPU-friendly
