@@ -881,7 +881,7 @@ MANUAL_TRANSCRIPTION_LANGUAGES = {"ki"}
 CONTACT_PHONE = "0712 531 841"
 CONTACT_PHONE_TEL = "+254712531841"  # tel: link needs the international form
 CONTACT_PHONE_WHATSAPP = "254712531841"  # wa.me links want the number with no "+" or leading 0
-CONTACT_EMAIL = "kahunyurogodfrey@gmail.com"
+CONTACT_EMAIL = "hello@kauli-forgemedia.com"
 # base.html's account menu (every authenticated page) needs a real contact
 # link without every single route threading it through by hand - same
 # reasoning as the other templates.env.globals assignments near the top
@@ -3018,8 +3018,8 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         return RedirectResponse(result["authorization_url"], status_code=303)
 
     if provider == "mpesa":
-        if not billing.mpesa_configured():
-            return RedirectResponse(f"{back_url}?error=M-Pesa+isn%27t+configured+yet.", status_code=303)
+        if not billing.mpesa_live():
+            return RedirectResponse(f"{back_url}?error=M-Pesa+direct+is+coming+soon+-+not+live+yet.", status_code=303)
         if not phone.strip():
             return RedirectResponse(f"{back_url}?error=Enter+the+M-Pesa+phone+number.", status_code=303)
         amount_kes, rate_source = billing.usd_to_kes(amount_usd)
@@ -3091,6 +3091,7 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
         "pending_retry_after_s": pending_retry_after_s,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
+        "mpesa_live": billing.mpesa_live(),
         "has_video_addon": db.order_has_addon(order, "video_deliverables"),
     })
 

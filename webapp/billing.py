@@ -453,6 +453,17 @@ def _mpesa_env() -> str:
     return os.environ.get("MPESA_ENV", "sandbox")
 
 
+def mpesa_live() -> bool:
+    """Real, not just configured - sandbox credentials are enough to
+    exercise the STK-push code path for testing, but a real client
+    submitting against Safaricom's sandbox endpoint gets a request that
+    silently goes nowhere real. This is the actual gate for whether a
+    real client should ever be allowed to pick M-Pesa direct at checkout
+    - see webapp/app.py's order_pay_checkout and order_pay_page, both of
+    which used to check mpesa_configured() alone."""
+    return mpesa_configured() and _mpesa_env() == "production"
+
+
 def _mpesa_access_token() -> str | None:
     key = os.environ.get("MPESA_CONSUMER_KEY")
     secret = os.environ.get("MPESA_CONSUMER_SECRET")

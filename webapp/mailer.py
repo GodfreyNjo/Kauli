@@ -99,7 +99,7 @@ def wrap_email_html(body_html: str, cta_text: str | None = None, cta_url: str | 
       {cta_html}
     </td></tr>
     <tr><td style="padding:20px 4px 0; font-size:12px; color:{BRAND_MUTED}; line-height:1.6;">
-      <p style="margin:0;"><em>Solutions for bold people like you, by people like you!</em> Forge Media Services &middot; Operated by Godfrey Njoroge</p>
+      <p style="margin:0;"><em>Solutions for bold people like you, by people like you!</em> Forge Media Services</p>
       {footer_extra}
       <p style="margin:10px 0 0;">Don't see this in your inbox next time? Check your spam/junk folder and
          mark it "Not spam" - that's what keeps future emails landing where you'll actually see them.</p>

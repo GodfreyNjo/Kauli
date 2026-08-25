@@ -21,7 +21,7 @@
       if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
     })();
   </script>
-  <title>{% block title %}Kauli{% endblock %} - Kauli (demo)</title>
+  <title>{% block title %}Kauli{% endblock %} - Kauli</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -32,13 +32,6 @@
   <!-- End Cloudflare Web Analytics -->
 </head>
 <body class="{% block body_class %}{% endblock %}">
-  {% if self.body_class() != 'auth-page' %}
-  {% if paystack_live_mode() %}
-  <div class="banner" style="background:var(--warn-soft); color:var(--warn);">Local prototype, not publicly launched yet - card payments via Paystack are real; M-Pesa and bank transfer are still test-only.</div>
-  {% else %}
-  <div class="banner" style="background:var(--warn-soft); color:var(--warn);">Local prototype, not publicly launched yet - no real payments.</div>
-  {% endif %}
-  {% endif %}
   {% if user %}
   <header class="topbar">
     <div class="topbar-brand">

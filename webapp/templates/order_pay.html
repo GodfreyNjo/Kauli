@@ -54,8 +54,8 @@
           <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>
             Card, M-Pesa or Airtel Money (via Paystack){% if not paystack_configured %} - unavailable{% endif %}
           </option>
-          <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>
-            M-Pesa direct (no card needed){% if not mpesa_configured %} - unavailable{% endif %}
+          <option value="mpesa" {% if not mpesa_live %}disabled{% endif %}>
+            M-Pesa direct (no card needed){% if not mpesa_live %} (coming){% endif %}
           </option>
           <option value="bank">Bank transfer</option>
         </select>
