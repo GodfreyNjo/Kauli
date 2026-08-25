@@ -39,9 +39,18 @@
       <li><strong>Supabase</strong> - authentication (your login credentials).</li>
       <li><strong>Paystack</strong> and <strong>Safaricom M-Pesa</strong> - payment processing. They see your
           payment details directly; we only see the result (paid/not paid) and a reference number.</li>
-      <li><strong>Anthropic (Claude)</strong> - only for orders using our Priority translation tier, when
-          that's connected. Anthropic processes the transcript text being translated, per their own privacy
-          terms.</li>
+      <li><strong>Anthropic (Claude)</strong> and <strong>Translated (Lara Translate)</strong> - translation
+          providers, used depending on which tier and language pair your order needs. They process the
+          transcript text being translated, per their own privacy terms.</li>
+      <li><strong>Transkriptor</strong> - our primary transcription provider for some orders. It processes the
+          actual audio being transcribed, per its own privacy terms; if it's unavailable, we fall back to our
+          own local transcription model, which never leaves our own infrastructure.</li>
+      <li><strong>Brevo</strong> - sends transactional email on our behalf (receipts, order-status updates,
+          voice-actor assignment notices). It sees the recipient's email address and the message content.</li>
+      <li><strong>Hetzner</strong> - hosts the server Kauli actually runs on. <strong>Cloudflare</strong> sits
+          in front of it (routing traffic, DNS, our website analytics) and also stores encrypted backups of
+          our database and delivered files. See section 8 for what this means for where your data physically
+          sits.</li>
       <li><strong>exchangerate-api.com</strong> - live USD→KES conversion for M-Pesa checkout amounts. No
           personal data is sent, just a currency-conversion request.</li>
     </ul>
@@ -85,14 +94,17 @@
        handled by us by hand; deletion requests go through Settings and are reviewed and actioned by us.</p>
 
     <h2>8. International visitors and data transfers</h2>
-    <p>Kauli is operated from Kenya by Forge Media Services, and Kenyan law (the Data Protection Act, 2019)
-       governs how we handle your data. If you're contacting or using Kauli from outside Kenya - including
-       the EU, UK, or elsewhere - your data will be transferred to and processed in Kenya (and, via the
-       third-party processors listed in section 3, in whatever countries they operate their own
-       infrastructure in). By using Kauli, you understand and accept that transfer. If you're an EU/UK-based
-       organization that needs a formal data processing agreement or transfer safeguard in place before
-       sending us content, contact us and we'll work through what that looks like - we haven't needed to
-       build one yet since it hasn't come up, not because we'd refuse.</p>
+    <p>Kauli is operated by Forge Media Services, a Kenyan business, and Kenyan law (the Data Protection Act,
+       2019) governs how we handle your data - <strong>but the server itself runs on infrastructure in
+       Germany</strong> (Hetzner), with encrypted backups stored via Cloudflare's network. This is a real,
+       deliberate choice for reliability and cost, not an oversight: wherever you're contacting us from -
+       Kenya, the EU, UK, or elsewhere - your data is transferred to and processed in Germany, and backed up
+       across whatever locations Cloudflare's storage network uses (it doesn't guarantee a single country for
+       this). It's also processed in whatever countries our other third-party providers (section 3) operate
+       their own infrastructure in. By using Kauli, you understand and accept that transfer. If you're an
+       EU/UK-based organization that needs a formal data processing agreement or transfer safeguard in place
+       before sending us content, contact us and we'll work through what that looks like - we haven't needed
+       to build one yet since it hasn't come up, not because we'd refuse.</p>
 
     <h2>9. Children</h2>
     <p>Kauli isn't directed at children, and we don't knowingly collect data from anyone under 18.</p>

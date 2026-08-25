@@ -1700,6 +1700,22 @@ def staff_guide(request: Request):
     })
 
 
+@app.get("/staff/handbook", response_class=HTMLResponse)
+def staff_handbook(request: Request):
+    """The whole-system reference, distinct from /staff/guide (which is
+    Ereri-editing-mechanics only) - what a brand new contractor needs to
+    understand roles, the real order lifecycle, billing, and common
+    troubleshooting without having to ask Godfrey every time. Written for
+    "a staff member who just joined us," per the actual real request that
+    created this page - not a generic onboarding template."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_handbook.html", {
+        "user": user, "theme": "dark",
+    })
+
+
 @app.get("/staff/voice-actors", response_class=HTMLResponse)
 def staff_voice_actors(request: Request, notice: str | None = None, error: str | None = None):
     """Voice-actor roster + payout ledger. Admin-gated, same reasoning as

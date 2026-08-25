@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Staff Handbook{% endblock %}
+{% block content %}
+<h1>Staff handbook</h1>
+<p class="muted" style="margin-top:0;">The whole-system reference - what a brand-new contractor needs to
+   understand how Kauli actually works, beyond just the mechanics of editing one job. If you're looking for
+   the step-by-step editing workflow instead, that's the <a href="/staff/guide">Editor guide</a> - this page
+   is everything around it.</p>
+
+<details class="m-blog-toc" open style="margin-bottom:20px;">
+  <summary>Contents</summary>
+  <ol>
+    <li><a href="#what">What Kauli actually does</a></li>
+    <li><a href="#roles">The three account roles</a></li>
+    <li><a href="#lifecycle">An order's real lifecycle, start to finish</a></li>
+    <li><a href="#editing">Editing work - Ereri</a></li>
+    <li><a href="#voice">Voice acting work</a></li>
+    <li><a href="#billing">Billing &amp; payments</a></li>
+    <li><a href="#trouble">Common situations &amp; how to actually handle them</a></li>
+    <li><a href="#infra">Where everything technically lives</a></li>
+    <li><a href="#who">Who to ask</a></li>
+  </ol>
+</details>
+
+<div class="card" id="what">
+  <h2>1. What Kauli actually does</h2>
+  <p>Kauli transcribes, translates, and optionally dubs audio/video between Swahili, English and Kikuyu.
+     The real pitch to a client: AI drafts it in minutes, a human edits every segment before it ships - never
+     AI-only, never fully manual either. Kikuyu specifically uses a human transcriber, not a speech-recognition
+     model, because no production-ready one exists yet for that language.</p>
+  <p>Three real service levels a client picks from: <strong>transcription</strong> (text only),
+     <strong>translation</strong> (transcript + translated text/subtitles, no spoken audio), and
+     <strong>dub</strong> (translation plus a synthesized or human-recorded voice track). Add-ons on top:
+     human voice-over (a real actor instead of AI TTS), video deliverables (burned captions or a fully muxed
+     dubbed video), rush turnaround.</p>
+</div>
+
+<div class="card" id="roles">
+  <h2>2. The three account roles</h2>
+  <dl>
+    <dt>Client</dt>
+    <dd>Places orders, pays, downloads deliverables, messages staff on an order thread. Never sees Ereri or
+        any other staff tooling.</dd>
+    <dt>Staff</dt>
+    <dd>Works the queue in Ereri, handles billing/CRM/exceptions. Two tiers: plain staff can do all real
+        order work; <strong>admin</strong> staff additionally manage the Voice Talent roster and the admin
+        panel (inviting new staff, promoting accounts). Being staff doesn't automatically mean admin - most
+        contractors doing pure editing work don't need admin access.</dd>
+    <dt>Voice actor</dt>
+    <dd>A real third role, separate from staff - self-service login at <code>/actor</code>, sees only the
+        orders they're personally assigned, can listen to the script and upload their finished recording.
+        Never sees Ereri, billing, or any other order's data.</dd>
+  </dl>
+</div>
+
+<div class="card" id="lifecycle">
+  <h2>3. An order's real lifecycle, start to finish</h2>
+  <ol>
+    <li><strong>pending_payment</strong> - client has configured the order but hasn't paid yet.</li>
+    <li><strong>queued</strong> → <strong>processing</strong> - the AI pipeline is running (transcription,
+        translation, and TTS if it's a dub order). This happens automatically once payment clears; no staff
+        action needed here.</li>
+    <li><strong>awaiting_review</strong> - the AI draft is done and sitting in the staff queue. This is where
+        Ereri work happens - every segment gets read and corrected by a human before it can ship.</li>
+    <li><strong>ready_for_delivery</strong> - a staff member hit "Finish job" in Ereri after every segment was
+        reviewed. The client can now see and download their real deliverables.</li>
+    <li><strong>editor_returned</strong> / <strong>returned_to_client</strong> - a job got sent back instead
+        of finished: <em>editor_returned</em> means an editor flagged it back to Ops (wrong language, no real
+        audio, instrumental-only, sound-effects-only, or something else worth a second look - see the return
+        reasons in the job-return form); <em>returned_to_client</em> means it went all the way back to the
+        client because of a real problem with what they submitted.</li>
+    <li><strong>dead_letter</strong> - the automated pipeline itself failed and gave up after retrying. This
+        needs a staff member to look at the real error and either retry it or investigate what actually broke
+        (see /staff/exceptions).</li>
+  </ol>
+  <p class="muted">A human always has the final say at every one of these steps - nothing ships to a client
+     without someone actually looking at it first, regardless of how clean the AI draft came out.</p>
+</div>
+
+<div class="card" id="editing">
+  <h2>4. Editing work - Ereri</h2>
+  <p>If your job is correcting transcripts/translations, everything you need is the
+     <a href="/staff/guide">Editor guide</a> - the two-step source/translation model, speaker tags, sound-tag
+     handling, timing/stretch flags, voice cloning consent, and the full keyboard shortcut list. Read that
+     page, not this section, for the actual mechanics of working a job.</p>
+</div>
+
+<div class="card" id="voice">
+  <h2>5. Voice acting work</h2>
+  <p>If you're a contracted voice actor: you log in at the same place staff and clients do, and land on
+     <code>/actor</code> - your own dashboard, showing only orders assigned to you. You'll see the real script
+     with timestamps, and an upload form for your finished recording. There's no automatic timeline-fitting -
+     getting your take synced to the source video is real editorial work you do with your own tools before
+     uploading; this is only where the finished result gets delivered from. Once uploaded, it becomes what the
+     client actually downloads, replacing whatever AI-rendered dub existed before.</p>
+</div>
+
+<div class="card" id="billing">
+  <h2>6. Billing &amp; payments</h2>
+  <p>Clients pay per audio-minute at published rates, plus any add-ons. Payment methods today:
+     <strong>Paystack</strong> (card, M-Pesa, or Airtel Money, all live and real) and a
+     <strong>direct M-Pesa STK-push</strong> option that's built but not yet live (shows as "coming" at
+     checkout - don't tell a client it's available). Bank transfer exists as a manual, non-automated option.</p>
+  <p>Some clients run on a <strong>prepaid wallet</strong> instead of paying per order - their balance shows
+     on their account, and a low-balance email goes out automatically once it drops under the threshold.
+     Receipts are auto-generated and emailed on every successful payment; if email delivery isn't configured
+     or fails, a receipt still exists and shows under "Receipts awaiting delivery" on /staff/billing for
+     someone to forward by hand.</p>
+</div>
+
+<div class="card" id="trouble">
+  <h2>7. Common situations &amp; how to actually handle them</h2>
+  <dl>
+    <dt>Client says our email landed in spam</dt>
+    <dd>Ask them to mark it "not spam" and check they're looking at the right inbox - our real sending address
+        is <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>, on our own authenticated domain, not
+        a personal Gmail. If it's a NEW kind of email bouncing or consistently misfiring, that's worth flagging
+        to Godfrey rather than guessing.</dd>
+    <dt>A YouTube-sourced order's embedded player shows "This content is blocked"</dt>
+    <dd>This is YouTube itself refusing the embed, not a bug in your correction work - Ereri has a real
+        "Open on YouTube ↗" fallback link right under the player for exactly this. Word-level timing stays
+        accurate either way, since it comes from the real audio, not the embedded player.</dd>
+    <dt>An order is stuck in "processing" for an unusually long time</dt>
+    <dd>Check /staff/exceptions - if it's genuinely failed, it'll show as dead_letter with a real error message,
+        and there's a retry button. A long-running dub with voice cloning can legitimately take several minutes
+        on this hardware - that alone isn't necessarily a problem.</dd>
+    <dt>A segment's translation looks wrong after correcting the Swahili</dt>
+    <dd>Hit Re-translate (Alt+R) - a source correction doesn't automatically retranslate if the English side
+        was already hand-edited, specifically so nobody's manual work gets silently overwritten. A dashed blue
+        outline on English text means it's now stale relative to a newer source correction.</dd>
+    <dt>A client wants a refund or says the order didn't meet what was promised</dt>
+    <dd>There's no automatic refund system - this is a real, case-by-case human decision (redo, credit, or
+        refund). Don't promise a specific outcome before checking with Godfrey on anything beyond a routine
+        redo.</dd>
+  </dl>
+</div>
+
+<div class="card" id="infra">
+  <h2>8. Where everything technically lives</h2>
+  <p class="muted">Only relevant if you're doing technical/ops work, not day-to-day editing.</p>
+  <ul>
+    <li><strong>Code:</strong> a private GitHub repo. Real changes get committed and pushed there, then pulled
+        onto the server.</li>
+    <li><strong>The app itself:</strong> runs in a Docker container on a Hetzner Cloud server. Nothing runs on
+        anyone's personal laptop any more.</li>
+    <li><strong>The public site:</strong> reached through a Cloudflare Tunnel, not a direct connection to the
+        server - there's no open port an outside attacker could even find.</li>
+    <li><strong>Backups:</strong> the database and every real client file sync to Cloudflare R2 storage
+        automatically every night.</li>
+  </ul>
+</div>
+
+<div class="card" id="who">
+  <h2>9. Who to ask</h2>
+  <p>For anything this page and the Editor guide don't cover: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+     or WhatsApp <a href="{{ contact_whatsapp_url }}">{{ contact_phone_tel }}</a>. If something feels like it
+     might be a real bug rather than something you're missing, say so plainly rather than guessing your way
+     around it - that's more useful to everyone than a workaround nobody else knows about.</p>
+</div>
+{% endblock %}

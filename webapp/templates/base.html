@@ -83,6 +83,7 @@
         <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}"><span class="icon">W</span><span class="label">Blog</span></a>
         <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}"><span class="icon">N</span><span class="label">Newsletter</span></a>
         <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Editor guide</span></a>
+        <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}"><span class="icon">H</span><span class="label">Handbook</span></a>
         <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}"><span class="icon">•</span><span class="label">Status</span></a>
         {% if user['is_admin'] %}
         <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}"><span class="icon">V</span><span class="label">Voice Talent</span></a>
