@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Resources{% endblock %}
+{% block content %}
+<h1>Resources</h1>
+<p class="muted" style="margin-top:0;">Reference material and standalone documents in one place - all staff-gated,
+   none of it meant to be publicly reachable the way the marketing site is.</p>
+
+<div class="card">
+  <h2>Day-to-day reference</h2>
+  <dl>
+    <dt><a href="/staff/guide">Editor guide</a></dt>
+    <dd>The long-form Ereri reference - the two-step editing model, sound tags, timing, voice cloning, shortcuts.</dd>
+    <dt><a href="/staff/handbook">Staff handbook</a></dt>
+    <dd>The whole-system reference - roles, the real order lifecycle, billing, and common troubleshooting.</dd>
+  </dl>
+</div>
+
+<div class="card">
+  <h2>Standalone documents</h2>
+  <dl>
+    <dt><a href="/staff/resources/technical-overview">Technical overview</a></dt>
+    <dd>How Kauli actually works end to end - the pipeline, data model, and infrastructure, with a real
+        architecture diagram. Opens in your browser.</dd>
+    <dt><a href="/staff/resources/pitch-deck">Pitch deck</a> <span class="muted" style="font-size:0.8rem;">(.pptx)</span></dt>
+    <dd>The service and system overview - problem, solution, how it works, business model, and where the
+        business is today. Downloads a real PowerPoint file.</dd>
+    <dt><a href="/staff/resources/contractor-agreement">Independent contractor agreement</a> <span class="muted" style="font-size:0.8rem;">(.docx)</span></dt>
+    <dd>A starting template for engaging editors and voice talent - <strong>read the disclaimer on its first
+        page</strong> before using it; it needs a licensed Kenyan advocate's review before anyone signs it.
+        Downloads a real Word file.</dd>
+  </dl>
+</div>
+{% endblock %}

@@ -1716,6 +1716,65 @@ def staff_handbook(request: Request):
     })
 
 
+STAFF_DOCS_DIR = WEBAPP_DIR / "staff_docs"
+
+
+@app.get("/staff/resources", response_class=HTMLResponse)
+def staff_resources(request: Request):
+    """One real entry point for everything a new contractor or an
+    investor conversation needs, instead of scattering links across the
+    sidebar - reference material (guide/handbook, already elsewhere in
+    the sidebar) plus the standalone documents built alongside this
+    system: a technical overview, the pitch deck, and the independent
+    contractor agreement template. All gated behind staff login - none
+    of this is meant to be publicly reachable, unlike webapp/static/."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_resources.html", {
+        "user": user, "theme": "dark",
+    })
+
+
+@app.get("/staff/resources/technical-overview", response_class=HTMLResponse)
+def staff_resources_technical_overview(request: Request):
+    """Served as its own real HTML file, not a Jinja template - it has a
+    complete, self-contained design of its own (not the app's chrome),
+    same content as the one published as a Claude artifact but hosted
+    here too so access never depends on that artifact's own sharing
+    settings - every staff login can always reach it, not just whoever
+    Godfrey has personally shared the artifact link with."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    html_path = STAFF_DOCS_DIR / "technical-overview.html"
+    if not html_path.exists():
+        return HTMLResponse("Not found.", status_code=404)
+    return HTMLResponse(html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/staff/resources/pitch-deck")
+def staff_resources_pitch_deck(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    path = STAFF_DOCS_DIR / "kauli-pitch-deck.pptx"
+    if not path.exists():
+        return HTMLResponse("Not found.", status_code=404)
+    return FileResponse(str(path), filename="Kauli Pitch Deck.pptx")
+
+
+@app.get("/staff/resources/contractor-agreement")
+def staff_resources_contractor_agreement(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    path = STAFF_DOCS_DIR / "kauli-independent-contractor-agreement.docx"
+    if not path.exists():
+        return HTMLResponse("Not found.", status_code=404)
+    return FileResponse(str(path), filename="Kauli Independent Contractor Agreement (template).docx")
+
+
 @app.get("/staff/voice-actors", response_class=HTMLResponse)
 def staff_voice_actors(request: Request, notice: str | None = None, error: str | None = None):
     """Voice-actor roster + payout ledger. Admin-gated, same reasoning as

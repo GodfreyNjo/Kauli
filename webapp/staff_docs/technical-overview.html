@@ -1,0 +1,216 @@
+<title>Kauli Technical Overview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  :root{
+    --paper:#f6f3ee; --paper-raised:#fffdfa; --ink:#211d1a; --muted:#736a5f; --faint:#948a7d;
+    --line:#ddd3c3; --line-strong:#c9bca6;
+    --accent:#a84e1c; --accent-ink:#5c2a10; --accent-soft:#f1e0d0;
+    --accent2:#2f6267; --accent2-soft:#dde9e9;
+    --good:#3f7a4a; --good-soft:#e1ecdf;
+    --warn:#a1691f; --warn-soft:#f4e6cf;
+    --code-bg:#efe8db;
+    --shadow: 0 1px 2px rgba(33,29,26,.06), 0 8px 24px -12px rgba(33,29,26,.15);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#16130f; --paper-raised:#1d1912; --ink:#f1e9db; --muted:#b3a793; --faint:#8c8272;
+      --line:#3a3225; --line-strong:#4c422f;
+      --accent:#e08a4a; --accent-ink:#ffd9b3; --accent-soft:#3a2718;
+      --accent2:#7fb3b3; --accent2-soft:#1e3232;
+      --good:#8fc796; --good-soft:#22321f; --warn:#e3b463; --warn-soft:#3a2c14;
+      --code-bg:#221d15; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#16130f; --paper-raised:#1d1912; --ink:#f1e9db; --muted:#b3a793; --faint:#8c8272;
+    --line:#3a3225; --line-strong:#4c422f;
+    --accent:#e08a4a; --accent-ink:#ffd9b3; --accent-soft:#3a2718;
+    --accent2:#7fb3b3; --accent2-soft:#1e3232;
+    --good:#8fc796; --good-soft:#22321f; --warn:#e3b463; --warn-soft:#3a2c14;
+    --code-bg:#221d15; --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--paper); color:var(--ink); font-family:"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased; }
+  ::selection{ background:var(--accent-soft); color:var(--accent-ink); }
+  .page{ max-width:840px; margin:0 auto; padding:64px 28px 120px; }
+  .eyebrow{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:12.5px; letter-spacing:.11em; text-transform:uppercase; color:var(--accent); font-weight:600; display:flex; align-items:center; gap:10px; }
+  .eyebrow::before{ content:""; width:22px; height:1px; background:var(--accent); display:inline-block; }
+  h1{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-weight:700; font-size:clamp(2rem, 4.6vw, 2.85rem); line-height:1.08; letter-spacing:-.01em; margin:14px 0 6px; text-wrap:balance; }
+  .dek{ font-size:1.09rem; color:var(--muted); max-width:62ch; margin:0 0 40px; }
+  .dek strong{ color:var(--ink); font-weight:600; }
+  h2{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:1.1rem; font-weight:600; letter-spacing:-.005em; margin:0 0 6px; padding-top:52px; border-top:1px solid var(--line); }
+  h2 + .lede{ color:var(--muted); font-size:.98rem; max-width:66ch; margin:0 0 22px; }
+  h3{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:.92rem; font-weight:600; margin:28px 0 10px; }
+  p{ margin:0 0 16px; max-width:70ch; }
+  a{ color:var(--accent); text-decoration-thickness:1px; text-underline-offset:2px; }
+  a:focus-visible, summary:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:2px; }
+  code, .mono{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:.86em; }
+  code{ background:var(--code-bg); padding:.14em .42em; border-radius:4px; color:var(--accent-ink); }
+  ul, ol{ padding-left:1.3em; max-width:66ch; }
+  li{ margin-bottom:6px; }
+
+  figure{ margin:22px 0 8px; }
+  figure svg{ max-width:100%; height:auto; display:block; margin:0 auto; }
+  figcaption{ text-align:center; color:var(--muted); font-size:.85rem; margin-top:10px; }
+
+  .card{ background:var(--paper-raised); border:1px solid var(--line); border-radius:10px; padding:20px 22px; margin:18px 0; box-shadow:var(--shadow); }
+  .card h4{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:.96rem; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  .card p:last-child{ margin-bottom:0; }
+  .card .why{ color:var(--muted); font-size:.92rem; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0; }
+  @media (max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+
+  .stack{ list-style:none; padding:0; margin:14px 0; border-top:1px solid var(--line); }
+  .stack li{ display:grid; grid-template-columns:150px 1fr; gap:16px; padding:12px 0; border-bottom:1px solid var(--line); font-size:.94rem; }
+  .stack .k{ font-family:"IBM Plex Mono", ui-monospace, monospace; color:var(--accent); font-size:.86rem; padding-top:2px; }
+  .stack .v{ color:var(--ink); }
+  .stack .v .sub{ color:var(--muted); display:block; font-size:.86rem; margin-top:2px; }
+
+  .table-wrap{ overflow-x:auto; margin:18px 0 8px; border:1px solid var(--line); border-radius:8px; }
+  table{ width:100%; border-collapse:collapse; font-size:.9rem; min-width:560px; }
+  thead th{ text-align:left; font-family:"IBM Plex Mono", ui-monospace, monospace; font-size:.72rem; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); font-weight:600; padding:11px 16px; background:var(--paper-raised); border-bottom:1px solid var(--line); }
+  tbody td{ padding:11px 16px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.item{ font-weight:500; }
+  td .note{ display:block; color:var(--muted); font-size:.82rem; margin-top:2px; }
+
+  .callout{ border-radius:8px; padding:16px 18px; margin:20px 0; font-size:.93rem; background:var(--accent2-soft); }
+  .callout .ctitle{ font-family:"IBM Plex Mono", ui-monospace, monospace; font-weight:600; font-size:.82rem; letter-spacing:.03em; text-transform:uppercase; margin-bottom:6px; display:block; color:var(--accent2); }
+  .callout p{ margin:0; max-width:none; }
+
+  .signoff{ margin-top:64px; padding-top:24px; border-top:1px solid var(--line); color:var(--faint); font-size:.85rem; font-family:"IBM Plex Mono", ui-monospace, monospace; }
+</style>
+
+<div class="page">
+
+  <div class="eyebrow">Forge Media Services / Kauli</div>
+  <h1>Technical overview</h1>
+  <p class="dek">How Kauli actually works, end to end — the pipeline, the data model, the infrastructure it runs on, and the real engineering decisions behind each, not a generic architecture template.</p>
+
+  <h2>System at a glance</h2>
+  <p class="lede">One request's real path through the system, and the one path that runs independently of it every night.</p>
+
+  <figure>
+    <svg viewBox="0 0 860 400" role="img" aria-label="A client's browser reaches the Kauli app through an outbound-only Cloudflare Tunnel to a single Hetzner VM running the app in Docker; the app calls out to ASR, MT and TTS providers and reads/writes a local SQLite database; separately, a nightly cron job backs up the database and client files to Cloudflare R2.">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="IBM Plex Mono, ui-monospace, monospace" font-size="12" fill="currentColor">
+
+        <rect x="20" y="24" width="140" height="52" rx="8" fill="none" stroke="currentColor"/>
+        <text x="90" y="55" text-anchor="middle">Client browser</text>
+
+        <line x1="160" y1="50" x2="248" y2="50" stroke="currentColor" marker-end="url(#arrow)"/>
+        <text x="204" y="40" text-anchor="middle" font-size="11" fill="currentColor">HTTPS</text>
+
+        <rect x="250" y="24" width="170" height="52" rx="8" fill="none" stroke="currentColor"/>
+        <text x="335" y="46" text-anchor="middle">Cloudflare Tunnel</text>
+        <text x="335" y="62" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.75">outbound-only · zero open ports</text>
+
+        <line x1="335" y1="76" x2="335" y2="118" stroke="currentColor" marker-end="url(#arrow)"/>
+
+        <rect x="180" y="120" width="310" height="220" rx="10" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="335" y="142" text-anchor="middle" font-weight="600">Hetzner VM (Falkenstein)</text>
+
+        <rect x="200" y="158" width="270" height="60" rx="7" fill="none" stroke="currentColor"/>
+        <text x="335" y="180" text-anchor="middle">Docker: kauli:latest</text>
+        <text x="335" y="196" text-anchor="middle" font-size="10.5" opacity="0.75">FastAPI + uvicorn, one instance</text>
+
+        <line x1="335" y1="218" x2="335" y2="248" stroke="currentColor" marker-end="url(#arrow)"/>
+        <text x="360" y="238" font-size="10.5">reads/writes</text>
+
+        <rect x="230" y="250" width="210" height="46" rx="7" fill="none" stroke="currentColor"/>
+        <text x="335" y="278" text-anchor="middle">SQLite (WAL mode)</text>
+
+        <rect x="200" y="304" width="270" height="30" rx="6" fill="none" stroke="currentColor" opacity="0.7"/>
+        <text x="335" y="324" text-anchor="middle" font-size="11">webapp/data/ — uploads + output</text>
+
+        <line x1="490" y1="150" x2="560" y2="150" stroke="currentColor" marker-end="url(#arrow)"/>
+        <line x1="490" y1="196" x2="560" y2="196" stroke="currentColor" marker-end="url(#arrow)"/>
+        <line x1="490" y1="242" x2="560" y2="242" stroke="currentColor" marker-end="url(#arrow)"/>
+
+        <rect x="562" y="126" width="150" height="48" rx="7" fill="none" stroke="currentColor"/>
+        <text x="637" y="146" text-anchor="middle">ASR</text>
+        <text x="637" y="162" text-anchor="middle" font-size="10.5" opacity="0.75">faster-whisper / Transkriptor</text>
+
+        <rect x="562" y="172" width="150" height="48" rx="7" fill="none" stroke="currentColor"/>
+        <text x="637" y="192" text-anchor="middle">MT</text>
+        <text x="637" y="208" text-anchor="middle" font-size="10.5" opacity="0.75">local / Claude / Lara</text>
+
+        <rect x="562" y="218" width="150" height="48" rx="7" fill="none" stroke="currentColor"/>
+        <text x="637" y="238" text-anchor="middle">TTS</text>
+        <text x="637" y="254" text-anchor="middle" font-size="10.5" opacity="0.75">Piper / XTTS clone</text>
+
+        <line x1="335" y1="334" x2="335" y2="366" stroke="currentColor" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+        <text x="360" y="356" font-size="10.5">nightly, 02:00</text>
+
+        <rect x="230" y="368" width="210" height="28" rx="14" fill="none" stroke="currentColor" stroke-width="1.4"/>
+        <text x="335" y="387" text-anchor="middle">Cloudflare R2 (backups)</text>
+
+      </g>
+    </svg>
+    <figcaption>One request's real path (solid) versus the independent nightly backup path (dashed) — the only two ways data moves in or out of the VM.</figcaption>
+  </figure>
+
+  <p>Deliberately one VM, one Docker container, one SQLite file. <code>webapp/worker.py</code> processes one background job at a time by design — there's no task queue yet, so a second app instance would let two jobs race each other writing to the same order. Scaling to more instances is a real, known future step (a real queue first), not an oversight.</p>
+
+  <h2>The pipeline</h2>
+  <p class="lede">Every order moves through the same three stages, each behind a provider interface so a "free" and a "paid" implementation are interchangeable at runtime, per order.</p>
+
+  <ul class="stack">
+    <li><span class="k">01 · ASR</span><span class="v">Speech → text.
+      <span class="sub"><code>faster-whisper</code> (free, local, CPU) is the default; <code>Transkriptor</code> (paid, real API) is the primary path for orders that request it, with automatic fallback to faster-whisper on any failure. Kikuyu has no viable ASR model at all yet — those orders route to a human transcriber from the start, not a bad transcript to correct.</span></span></li>
+    <li><span class="k">02 · MT</span><span class="v">Text → translated text, 4 candidates per segment (literal / spoken / shorter / longer) picked to fit the dubbed slot's real timing budget.
+      <span class="sub"><code>local</code> (MarianMT, free, weak — an explicit placeholder) / <code>Claude</code> / <code>Lara</code> (real adaptive NMT, small free tier). Speaker tags, bracket sound-cues (<code>[Applause]</code>) and paragraph breaks are swapped for placeholder tokens before the text ever reaches an MT provider, and restored after — never sent for "translation" in the first place.</span></span></li>
+    <li><span class="k">03 · TTS</span><span class="v">Translated text → dubbed audio, fitted to the segment's real time slot via a pitch-preserving ffmpeg stretch (never a pitch-shifting resample).
+      <span class="sub"><code>Piper</code> (free, local, five real voice presets) or <code>XTTS</code> (real voice cloning of the source speaker — gated server-side on the client's explicit consent, not just a UI checkbox). A non-speech gap (music, applause, laughter) is never synthesized — the real source audio for that exact window is carried straight through instead.</span></span></li>
+  </ul>
+
+  <div class="callout">
+    <span class="ctitle">The one rule everything else defers to</span>
+    <p>A human edit always wins, at every layer — a hand-corrected transcript, a hand-edited translation, a manually chosen voice. Nothing a later automated pass produces silently overwrites what a person already fixed. Every order also requires 100% of its segments reviewed before it can ship — flagged or not.</p>
+  </div>
+
+  <h2>Data model</h2>
+  <p class="lede">Two real dataclasses carry a job from upload to delivery; everything else (orders, users, billing, messages) lives in SQLite.</p>
+
+  <div class="grid2">
+    <div class="card">
+      <h4>Job</h4>
+      <p class="why">One real media file. Holds <code>segments</code> (below), the provider names actually used (not just requested — a real ASR fallback shows up here), <code>speaker_voices</code> (a speaker id → a consistent TTS voice, so the same character keeps the same voice across the whole file), and real cost tracking.</p>
+    </div>
+    <div class="card">
+      <h4>Segment</h4>
+      <p class="why">One real stretch of audio — either <code>speech</code> (source/target text, per-word timing, a chosen candidate, review flags) or <code>gap</code> (non-speech; carries the real source audio bed, never synthesized text). <code>final_text</code> always resolves a human edit over the AI draft.</p>
+    </div>
+  </div>
+
+  <h2>The web layer</h2>
+  <p class="lede">FastAPI + server-rendered Jinja2 — no separate frontend build, no API/SPA split.</p>
+  <table>
+    <thead><tr><th>Role</th><th>What it can reach</th></tr></thead>
+    <tbody>
+      <tr><td class="item">Client</td><td>Places orders, pays, downloads deliverables, messages staff on an order thread. Never sees staff tooling.</td></tr>
+      <tr><td class="item">Staff</td><td>The Ereri editor, CRM, billing, exceptions queue. Admin staff additionally manage the voice-actor roster and the admin panel.</td></tr>
+      <tr><td class="item">Voice actor</td><td>A real third role on the same Supabase-backed auth system — self-service login, sees only their own assigned orders, uploads a finished recording that becomes the delivered file directly.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Infrastructure &amp; ops</h2>
+  <ul class="stack">
+    <li><span class="k">Compute</span><span class="v">Hetzner Cloud, cx23 (2 vCPU / 4GB), Falkenstein, Germany.</span></li>
+    <li><span class="k">Ingress</span><span class="v">Named Cloudflare Tunnel — zero inbound ports open on the VM's firewall at all; the app never has a public IP to attack.</span></li>
+    <li><span class="k">Container</span><span class="v">One Docker image, CPU-only torch pinned explicitly (a plain install pulls multi-GB CUDA libraries no GPU-less VM will ever use).</span></li>
+    <li><span class="k">Backups</span><span class="v">Nightly, to Cloudflare R2 — a consistent SQLite snapshot via the database's own online-backup API (safe against a live, WAL-mode file), plus an incremental sync of every real client upload and delivered output.</span></li>
+    <li><span class="k">Security</span><span class="v">SSH key-only (no password auth), automatic OS security updates, secrets in a root-only <code>.env</code> file, never baked into the image.</span></li>
+  </ul>
+
+  <h2>Testing</h2>
+  <p>Real pipeline tests, not mocked-everything — including a stub-everything speed path (<code>StubMT</code>'s literal echo-back behavior is itself used as a real correctness harness: any leaked placeholder token proves the protect/restore mechanism broke) and tests that build real audio waveforms in numpy to prove the mixer never sums two overlapping segments into one clipped, distorted track. 24 tests, run before and after every deploy.</p>
+
+  <div class="signoff">kauli / forge media services — technical overview, 2026-08-25</div>
+
+</div>
