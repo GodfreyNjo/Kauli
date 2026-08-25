@@ -282,6 +282,17 @@ async def add_trace_id(request: Request, call_next):
 # Paystack needs no entry here at all: checkout is a server-side redirect
 # to Paystack's own hosted page (billing.py's authorization_url), never an
 # embedded script or iframe on this site.
+#
+# https://*.r2.cloudflarestorage.com in connect-src is for the direct-to-R2
+# upload flow (webapp/r2_uploads.py, client_wizard.js's bindUploadProgress) -
+# a real, live-reproduced bug the first time this shipped: the presigned PUT
+# itself was correctly signed and CORS was correctly configured on the
+# bucket, but the browser never even got that far - THIS app's own CSP
+# connect-src had no R2 entry at all, so it blocked the fetch before any
+# CORS check ran. Confirmed via a real browser console error ("violates ...
+# connect-src ... Refused to connect"), not just inferred - curl doesn't
+# enforce CSP or CORS, so testing the presigned URL with curl alone missed
+# this entirely.
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com "
@@ -290,7 +301,7 @@ _CSP = (
     "font-src 'self' https://fonts.gstatic.com; "
     "img-src 'self' data: https://i.ytimg.com; "
     "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com "
-    "https://calendly.com https://*.calendly.com; "
+    "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com; "
     "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com; "
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 )
