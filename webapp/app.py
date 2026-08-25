@@ -3222,6 +3222,13 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         if "error" in result:
             db.fail_payment(payment_id)
             return RedirectResponse(f"{back_url}?error={result['error']}", status_code=303)
+        # Stashed so a client who lands back on this page while this
+        # payment is still "pending" (see order_pay_page) gets a real
+        # "Resume payment" link straight back to the SAME Paystack page,
+        # not just a countdown telling them to wait - Paystack's checkout
+        # page for a given reference stays open well past our own 15-
+        # minute pending window, so re-using it is safe and correct.
+        db.update_payment_meta(payment_id, json.dumps({"kind": payment_kind, "authorization_url": result["authorization_url"]}))
         return RedirectResponse(result["authorization_url"], status_code=303)
 
     if provider == "mpesa":
@@ -3289,13 +3296,16 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
     # guard itself uses, not a client-side guess re-parsed out of the
     # error string.
     pending_retry_after_s = None
+    resume_url = None
     existing_payment = db.get_active_pending_payment_for_order(order_id)
     if existing_payment:
         pending_retry_after_s = max(0, round(
             db.PENDING_PAYMENT_MAX_AGE_S - (time.time() - existing_payment["created_at"])))
+        if existing_payment["provider"] == "paystack" and existing_payment["meta"]:
+            resume_url = json.loads(existing_payment["meta"]).get("authorization_url")
     return templates.TemplateResponse(request, "order_pay.html", {
         "user": user, "order": order, "notice": notice, "error": error,
-        "pending_retry_after_s": pending_retry_after_s,
+        "pending_retry_after_s": pending_retry_after_s, "resume_url": resume_url,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
         "mpesa_live": billing.mpesa_live(),
@@ -3328,13 +3338,16 @@ def order_surcharge_page(request: Request, order_id: str, notice: str | None = N
         return HTMLResponse("Order not found.", status_code=404)
     # Same real countdown as order_pay.html - see that route's comment.
     pending_retry_after_s = None
+    resume_url = None
     existing_payment = db.get_active_pending_payment_for_order(order_id)
     if existing_payment:
         pending_retry_after_s = max(0, round(
             db.PENDING_PAYMENT_MAX_AGE_S - (time.time() - existing_payment["created_at"])))
+        if existing_payment["provider"] == "paystack" and existing_payment["meta"]:
+            resume_url = json.loads(existing_payment["meta"]).get("authorization_url")
     return templates.TemplateResponse(request, "order_surcharge_pay.html", {
         "user": user, "order": order, "notice": notice, "error": error,
-        "pending_retry_after_s": pending_retry_after_s,
+        "pending_retry_after_s": pending_retry_after_s, "resume_url": resume_url,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
         "reason_label": db.EXTRA_CHARGE_REASONS.get(order["difficulty_surcharge_reason"], "Additional work"),

@@ -8,8 +8,12 @@
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if pending_retry_after_s is not none %}
+  {% if resume_url %}
+  <p class="muted">Still have that Paystack tab open? Finish there. Otherwise:
+     <a href="{{ resume_url }}">Resume payment</a> - takes you back to the same checkout page, no new charge started.</p>
+  {% endif %}
   <p class="muted" id="pending-payment-countdown" data-seconds="{{ pending_retry_after_s }}">
-    {% if pending_retry_after_s > 0 %}You can try again in <strong><span id="pending-countdown-value"></span></strong>.
+    {% if pending_retry_after_s > 0 %}{% if not resume_url %}You can try again in <strong><span id="pending-countdown-value"></span></strong>.{% endif %}
     {% else %}You can try again now - <a href="javascript:location.reload()">refresh this page</a>.{% endif %}
   </p>
   <script>
@@ -48,7 +52,7 @@
     {% endif %}
     <p class="muted" style="margin-top:-6px;">Processing starts the moment this is confirmed.</p>
 
-    <form method="post" action="/client/orders/{{ order['id'] }}/pay" style="margin-top:18px;">
+    <form method="post" action="/client/orders/{{ order['id'] }}/pay" style="margin-top:18px;" id="pay-form">
       <label>Pay with
         <select name="provider" id="provider-select">
           <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>
@@ -60,14 +64,14 @@
           <option value="bank">Bank transfer</option>
         </select>
       </label>
-      <p class="muted" id="paystack-note" hidden style="margin-top:-6px;">Opens Paystack's own checkout window,
-         where you can choose card, M-Pesa, M-Pesa Till, or Airtel Money.</p>
+      <p class="muted" id="paystack-note" hidden style="margin-top:-6px;">Takes you to Paystack's own checkout
+         page, where you can choose card, M-Pesa, M-Pesa Till, or Airtel Money.</p>
       <label id="phone-field" hidden>M-Pesa phone number
         <input type="tel" name="phone" placeholder="2547XXXXXXXX">
       </label>
       <p class="muted" id="bank-note" hidden>We'll email transfer instructions and confirm manually once
          it lands - usually within one business day.</p>
-      <button type="submit">Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
+      <button type="submit" id="pay-submit">Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
     </form>
   {% endif %}
 </div>
@@ -85,6 +89,25 @@
     }
     sel.addEventListener('change', update);
     update();
+  })();
+
+  // Real problem this fixes: paystack_initialize (webapp/billing.py) makes
+  // a real network call to Paystack's API before the redirect response
+  // comes back - a genuine few seconds, during which the button gave no
+  // feedback at all. That silence read as "nothing happened", so a client
+  // would click Pay again - and the SECOND click hit the server's
+  // already-in-progress guard (db.get_active_pending_payment_for_order),
+  // locking them out of a real retry for up to 15 minutes even though
+  // the first click was actually working correctly the whole time.
+  (function () {
+    var form = document.getElementById('pay-form');
+    var btn = document.getElementById('pay-submit');
+    if (!form || !btn) return;
+    form.addEventListener('submit', function () {
+      var sel = document.getElementById('provider-select');
+      btn.disabled = true;
+      btn.textContent = sel && sel.value === 'paystack' ? 'Taking you to Paystack…' : 'Processing…';
+    });
   })();
 </script>
 {% endblock %}

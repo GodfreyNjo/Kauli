@@ -22,6 +22,10 @@
     })();
   </script>
   <title>{% block title %}Kauli{% endblock %} - Kauli</title>
+  <!-- marketing.html already had this - base.html (every client/staff app
+       page) never did, which is why the app's own tabs showed a generic
+       icon while the marketing site showed the real one. -->
+  <link rel="icon" href="/static/kauli-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
