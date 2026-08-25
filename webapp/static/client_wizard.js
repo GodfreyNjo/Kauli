@@ -290,6 +290,21 @@
   // fetch happens server-side inside the same request/response cycle, so
   // there's no byte count to report yet - an honest "still working"
   // indicator beats a fake percentage we can't actually back up.
+  //
+  // A selected FILE (not a YouTube link) goes through two real requests,
+  // not one:
+  //   1. POST /client/orders/presign-upload - tiny JSON request/response,
+  //      goes through this app and the Tunnel same as always (no size
+  //      concern - it carries no file bytes).
+  //   2. PUT the raw file straight to the presigned R2 URL - never
+  //      touches this app or the Cloudflare Tunnel in front of it at
+  //      all, so the Tunnel's 100MB-per-request body cap (confirmed as
+  //      the real cause of big uploads stalling before ever reaching
+  //      this app) simply doesn't apply to this request.
+  // Only once that PUT succeeds does the real order-creation POST go out
+  // - carrying the R2 object's key instead of the file itself, so that
+  // request is small too. Same visible progress bar and same
+  // document.write full-page-swap finish as before either way.
   function bindUploadProgress() {
     const form = $("#order-form");
     const progressWrap = $("#wizard-upload-progress");
@@ -298,35 +313,9 @@
     const submitBtn = $("#wizard-submit");
     if (!form || !progressWrap || !window.XMLHttpRequest) return;
 
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const fileInput = $("#file-input");
-      const usingFile = fileInput && fileInput.files && fileInput.files.length > 0;
-      const formData = new FormData(form);
+    function finalizeOrder(formData) {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", form.action, true);
-
-      progressWrap.hidden = false;
-      progressFill.classList.remove("indeterminate");
-      progressFill.style.width = "0%";
-      if (submitBtn) submitBtn.disabled = true;
-
-      if (usingFile) {
-        xhr.upload.addEventListener("progress", function (ev) {
-          if (!ev.lengthComputable) return;
-          const pct = Math.round((ev.loaded / ev.total) * 100);
-          progressFill.style.width = pct + "%";
-          progressLabel.textContent = "Uploading… " + pct + "%";
-        });
-        xhr.upload.addEventListener("load", function () {
-          progressFill.style.width = "100%";
-          progressLabel.textContent = "Upload complete - processing your order…";
-        });
-      } else {
-        progressFill.classList.add("indeterminate");
-        progressLabel.textContent = "Fetching from YouTube… this can take a few minutes for longer videos, it hasn't hung.";
-      }
-
       xhr.onload = function () {
         // Same final HTML the server would have sent a normal form
         // submission to (the order page on success, the dashboard with a
@@ -343,6 +332,78 @@
         if (submitBtn) submitBtn.disabled = false;
       };
       xhr.send(formData);
+    }
+
+    function uploadFileDirectToR2(file, formData) {
+      const presignBody = new FormData();
+      presignBody.append("filename", file.name);
+      presignBody.append("content_type", file.type || "application/octet-stream");
+      const presignXhr = new XMLHttpRequest();
+      presignXhr.open("POST", "/client/orders/presign-upload", true);
+      presignXhr.onload = function () {
+        let data;
+        try {
+          data = JSON.parse(presignXhr.responseText);
+        } catch (err) {
+          data = null;
+        }
+        if (presignXhr.status !== 200 || !data || !data.put_url) {
+          progressLabel.textContent = (data && data.error) || "Couldn't prepare the upload - please try again.";
+          if (submitBtn) submitBtn.disabled = false;
+          return;
+        }
+        const putXhr = new XMLHttpRequest();
+        putXhr.open("PUT", data.put_url, true);
+        putXhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+        putXhr.upload.addEventListener("progress", function (ev) {
+          if (!ev.lengthComputable) return;
+          const pct = Math.round((ev.loaded / ev.total) * 100);
+          progressFill.style.width = pct + "%";
+          progressLabel.textContent = "Uploading… " + pct + "%";
+        });
+        putXhr.onload = function () {
+          if (putXhr.status < 200 || putXhr.status >= 300) {
+            progressLabel.textContent = "Upload failed - please try again.";
+            if (submitBtn) submitBtn.disabled = false;
+            return;
+          }
+          progressFill.style.width = "100%";
+          progressLabel.textContent = "Upload complete - processing your order…";
+          formData.delete("audio");
+          formData.set("upload_key", data.upload_key);
+          finalizeOrder(formData);
+        };
+        putXhr.onerror = function () {
+          progressLabel.textContent = "Upload failed - please try again.";
+          if (submitBtn) submitBtn.disabled = false;
+        };
+        putXhr.send(file);
+      };
+      presignXhr.onerror = function () {
+        progressLabel.textContent = "Couldn't prepare the upload - please try again.";
+        if (submitBtn) submitBtn.disabled = false;
+      };
+      presignXhr.send(presignBody);
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const fileInput = $("#file-input");
+      const usingFile = fileInput && fileInput.files && fileInput.files.length > 0;
+      const formData = new FormData(form);
+
+      progressWrap.hidden = false;
+      progressFill.classList.remove("indeterminate");
+      progressFill.style.width = "0%";
+      if (submitBtn) submitBtn.disabled = true;
+
+      if (usingFile) {
+        uploadFileDirectToR2(fileInput.files[0], formData);
+      } else {
+        progressFill.classList.add("indeterminate");
+        progressLabel.textContent = "Fetching from YouTube… this can take a few minutes for longer videos, it hasn't hung.";
+        finalizeOrder(formData);
+      }
     });
   }
 

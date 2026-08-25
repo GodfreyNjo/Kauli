@@ -34,7 +34,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, time_stretch  # noqa: E402
@@ -2358,10 +2358,92 @@ def client_dismiss_youtube_import(request: Request, import_id: str):
     return RedirectResponse("/client", status_code=303)
 
 
+class _LocalFileAdapter:
+    """Makes an already-downloaded local file (one that arrived via a
+    presigned direct-to-R2 upload, see r2_uploads.py) look enough like a
+    FastAPI UploadFile that it passes straight into
+    upload_security.validate_media_upload/stream_save_with_limits
+    unchanged - only `.file` and `.filename` are ever touched by that
+    pipeline. This is deliberate: an R2-sourced upload gets the EXACT
+    same 7-step validation (extension check, size cap, magic-byte sniff,
+    ffprobe, ClamAV, content-safety scan, metadata strip) as one posted
+    straight to this app - never a second, parallel, potentially
+    drifting copy of that logic for the R2 path."""
+
+    def __init__(self, path: Path, filename: str):
+        self.file = open(path, "rb")
+        self.filename = filename
+
+
+@app.post("/client/orders/presign-upload")
+def client_presign_upload(request: Request, filename: str = Form(...), content_type: str = Form("")):
+    """Step 1 of the direct-to-R2 upload flow: issue a short-lived,
+    write-only URL for exactly one new object key, so the client's
+    browser can PUT the raw file straight to R2 - never through this
+    app, never through the Cloudflare Tunnel it sits behind. That
+    matters because Cloudflare's own documented limit for a
+    Tunnel-proxied hostname is 100MB per request body (Free/Pro plan);
+    a bigger file posted the old way could stall before ever reaching
+    this app at all (confirmed live against a real stuck client
+    upload). The extension is checked here, before any URL is handed
+    out - the size itself still gets the real, authoritative check
+    later, once the file is actually on disk (see create_order /
+    client_resume_order), because R2 has no way to enforce our app's
+    byte cap on the client's raw PUT."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    if not r2_uploads.r2_configured():
+        return JSONResponse({"error": "Direct upload isn't configured on this server yet."}, status_code=503)
+    ext = Path(filename or "").suffix.lower()
+    if ext not in upload_security.ALLOWED_MEDIA_EXTENSIONS:
+        allowed = ", ".join(sorted(upload_security.ALLOWED_MEDIA_EXTENSIONS))
+        return JSONResponse({"error": f"That file type isn't accepted. Allowed: {allowed}"}, status_code=400)
+    key = r2_uploads.new_upload_key(filename)
+    put_url = r2_uploads.generate_presigned_put(key, content_type)
+    if not put_url:
+        return JSONResponse({"error": "Couldn't prepare the upload right now - try again shortly."}, status_code=502)
+    return JSONResponse({"upload_key": key, "put_url": put_url})
+
+
+def _resolve_uploaded_audio(upload_key: str, order_upload_dir: Path):
+    """Step 2: the file the client already PUT to R2 gets pulled down to
+    local disk and run through the real validation pipeline - see
+    _LocalFileAdapter. Always deletes the R2 staging object afterward
+    (success or failure) - it's transient staging, not permanent
+    storage; the real, permanent copy is the local file, same as any
+    other order's audio_path. Raises upload_security.UploadRejected on
+    any hard failure, exactly like the direct-upload path does."""
+    size = r2_uploads.head_object_size(upload_key)
+    if size is None:
+        raise upload_security.UploadRejected(
+            "That upload wasn't found - it may have expired. Please try uploading again.")
+    if size > upload_security.MAX_UPLOAD_BYTES:
+        r2_uploads.delete_object(upload_key)
+        raise upload_security.UploadRejected(
+            f"File is larger than the {upload_security.MAX_UPLOAD_BYTES // (1024 * 1024 * 1024)}GB limit.")
+    original_filename = upload_key.rsplit("/", 1)[-1]
+    staged_path = order_upload_dir / f"_r2_staged_{uuid.uuid4().hex}{Path(original_filename).suffix}"
+    if not r2_uploads.download_object(upload_key, staged_path):
+        raise upload_security.UploadRejected(
+            "Couldn't retrieve that upload - please try again.")
+    try:
+        adapter = _LocalFileAdapter(staged_path, original_filename)
+        try:
+            audit = upload_security.validate_media_upload(adapter, order_upload_dir / "placeholder", original_filename)
+        finally:
+            adapter.file.close()
+        return audit, original_filename
+    finally:
+        staged_path.unlink(missing_ok=True)
+        r2_uploads.delete_object(upload_key)
+
+
 @app.post("/client/orders")
 def create_order(
     request: Request,
     audio: UploadFile | None = File(None),
+    upload_key: str = Form(""),
     youtube_url: str = Form(""),
     source_lang: str = Form("sw"),
     target_lang: str = Form("en"),
@@ -2493,6 +2575,23 @@ def create_order(
         db.log_upload_audit(user["id"], None, audit, client_ip, user_agent)
         audio_path = Path(audit["final_path"])
         original_filename = audio.filename
+        content_safety_flagged = bool(audit.get("content_safety_flagged"))
+        content_safety_detail = audit.get("content_safety_detail")
+    elif upload_key.strip():
+        # The file already landed in R2 via a presigned PUT (see
+        # client_presign_upload) - this app never saw the raw bytes go
+        # by, so the Cloudflare Tunnel's 100MB body cap never applied.
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
+        try:
+            audit, original_filename = _resolve_uploaded_audio(upload_key.strip(), order_upload_dir)
+        except upload_security.UploadRejected as exc:
+            db.log_upload_audit(user["id"], None,
+                                 {"original_filename": upload_key.strip(), "rejected": True, "reject_reason": str(exc)},
+                                 client_ip, user_agent)
+            return _client_dashboard_error(request, user, str(exc), form_values=form_values)
+        db.log_upload_audit(user["id"], None, audit, client_ip, user_agent)
+        audio_path = Path(audit["final_path"])
         content_safety_flagged = bool(audit.get("content_safety_flagged"))
         content_safety_detail = audit.get("content_safety_detail")
     else:
@@ -2730,7 +2829,8 @@ def client_send_message(request: Request, order_id: str, body: str = Form(...)):
 
 
 @app.post("/client/orders/{order_id}/resume")
-def client_resume_order(request: Request, order_id: str, audio: UploadFile | None = File(None)):
+def client_resume_order(request: Request, order_id: str, audio: UploadFile | None = File(None),
+                         upload_key: str = Form("")):
     """The other way a returned order gets moving again - no brand-new
     order, no second payment. Most returns just need the client's reply
     on the message thread above (already handled by client_send_message);
@@ -2761,6 +2861,27 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
         db.log_upload_audit(user["id"], order_id, audit, client_ip, user_agent)
         new_audio_path = audit["final_path"]
         new_original_filename = audio.filename
+        if audit.get("content_safety_flagged"):
+            db.set_order_content_safety_flag(order_id, True, audit.get("content_safety_detail"))
+        try:
+            new_duration = probe_duration_minutes(new_audio_path)
+        except Exception:
+            return RedirectResponse(
+                f"/client/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
+                status_code=303)
+    elif upload_key.strip():
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
+        order_upload_dir = UPLOAD_DIR / order_id
+        try:
+            audit, new_original_filename = _resolve_uploaded_audio(upload_key.strip(), order_upload_dir)
+        except upload_security.UploadRejected as exc:
+            db.log_upload_audit(user["id"], order_id,
+                                 {"original_filename": upload_key.strip(), "rejected": True, "reject_reason": str(exc)},
+                                 client_ip, user_agent)
+            return RedirectResponse(f"/client/orders/{order_id}?error={quote(str(exc))}", status_code=303)
+        db.log_upload_audit(user["id"], order_id, audit, client_ip, user_agent)
+        new_audio_path = audit["final_path"]
         if audit.get("content_safety_flagged"):
             db.set_order_content_safety_flag(order_id, True, audit.get("content_safety_detail"))
         try:

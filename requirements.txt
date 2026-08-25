@@ -70,8 +70,17 @@ Pillow>=10.0.0
 #      license prompt blocks non-interactive runs.
 # coqui-tts>=0.27.5
 
+# --- direct-to-R2 client uploads (webapp/r2_uploads.py) ---
+# R2 is S3-compatible - boto3 generates real presigned PUT/GET URLs and
+# downloads objects server-side, no hand-rolled AWS SigV4 signing. Needed
+# because Cloudflare's own documented limit for a Tunnel-proxied hostname
+# is 100MB per request body (Free/Pro plan) - a large upload routed
+# through this app's own POST handler can stall before ever reaching it.
+# Confirmed live: a real client's stuck upload never appeared in this
+# app's logs at all. Presigned R2 uploads bypass the Tunnel entirely.
+boto3>=1.34.0
+
 # --- only if/when you move to cloud ---
-# boto3>=1.34.0              # AWS Transcribe / Translate
 # azure-cognitiveservices-speech>=1.40.0   # Swahili TTS for en->sw
 
 # --- local demo webapp (webapp/) - client upload -> staff review -> delivery
