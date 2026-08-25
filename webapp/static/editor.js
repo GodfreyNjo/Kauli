@@ -34,6 +34,19 @@
   // this metadata map for anything that isn't in the DOM anymore (flag
   // reasons, fit score, cultural notes, MT confidence).
   let segmentMeta = {}; // segmentId -> {review_flag, review_reasons, fit_ratio, fit_status, cultural_notes, translation_confidence}
+  // The raw array handed to initKauliEditor, kept live (not just its
+  // page-load snapshot) - bindPreviewCaptions/onTimeUpdate-for-preview
+  // reads straight off this on every tick, so updatePreviewSegment (called
+  // after every save/retranslate) is what keeps the Preview tab's caption
+  // bar showing what's actually in the English transcript right now,
+  // instead of whatever it was when the page first loaded.
+  let previewSegments = [];
+  function updatePreviewSegment(segmentId, wrappedCaption, displayEndMs) {
+    const seg = previewSegments.find((s) => s.segment_id === segmentId);
+    if (!seg) return;
+    if (wrappedCaption !== undefined) seg.wrapped_caption = wrappedCaption;
+    if (displayEndMs !== undefined) seg.display_end_ms = displayEndMs;
+  }
   const AUTOSAVE_DELAY_MS = 1800;
   let pendingSaveTimers = {}; // `${segmentId}:${step}` -> timeout id
   let dirtySegments = new Set();
@@ -95,6 +108,8 @@
             `+ tag (${(c.start_ms / 1000).toFixed(1)}–${(c.end_ms / 1000).toFixed(1)}s)`;
         } else {
           cell.className = kind === "source" ? "wordcell" : "wordcell approx";
+          if (c.speaker_tag) cell.classList.add("speaker-tag-cell");
+          if (c.bracket_tag) cell.classList.add("bracket-tag-cell");
           cell.textContent = c.text + " ";
           if (kind === "source" && typeof c.confidence === "number") {
             cell.style.opacity = String(Math.max(0.45, Math.min(1, c.confidence)));
@@ -109,6 +124,17 @@
           if (i === 0) cell.title = staleTitle;
         }
         if (bookmarkedCells.has(cellKey(cell))) cell.classList.add("bookmarked");
+        if (c.para_start) {
+          // Mirrors insertParagraphBreak's own DOM shape (real <br> sibling
+          // + dataset.paraStart + .para-start class) so a paragraph break
+          // saved earlier renders identically on reload, not just live -
+          // this is what makes it durable instead of disappearing the
+          // moment cells get rebuilt from saved text (see the
+          // _tokenize_with_speaker_tag docstring in webapp/app.py).
+          container.appendChild(document.createElement("br"));
+          cell.dataset.paraStart = "true";
+          cell.classList.add("para-start");
+        }
         container.appendChild(cell);
         allCells.push({ el: cell, startMs: c.start_ms, endMs: c.end_ms });
       });
@@ -188,7 +214,8 @@
         review_flag: seg.review_flag, review_reasons: seg.review_reasons,
         fit_ratio: seg.fit_ratio, fit_status: seg.fit_status,
         cultural_notes: seg.cultural_notes, translation_confidence: seg.translation_confidence,
-        translation_stale: seg.translation_stale,
+        translation_stale: seg.translation_stale, speaker_id: seg.speaker_id,
+        manual_pace_pct: seg.manual_pace_pct, spell_out: seg.spell_out,
       };
       const title = buildFlagTitle(segmentMeta[seg.segment_id]);
       buildCells(sourceFlow, seg.source_cells, seg.segment_id, seg.source_final_text, "source", title);
@@ -404,14 +431,31 @@
   // underneath it in sync - what the client actually gets, not an
   // approximation of it. Reuses the exact same segment data (start_ms/
   // end_ms/final_text) already passed into initKauliEditor.
-  function bindPreviewCaptions(segments) {
+  // Mirrors what the delivered .srt/.vtt actually shows, not the raw
+  // segment text - display_end_ms (from kauli.subtitles'
+  // MAX_CAPTION_DISPLAY_MS) is the caption's real on-screen WINDOW, which
+  // can be shorter than the segment's own real end_ms (a long gap/sound-
+  // tag segment gets capped so it doesn't linger on screen for an entire
+  // musical interlude - see that module's own comment). Using the raw
+  // end_ms here used to make this preview quietly lie about how long a
+  // caption actually stays up, and showed the un-wrapped text instead of
+  // the real, line-wrapped caption a client's file actually contains.
+  function bindPreviewCaptions() {
     const previewAudio = $("#preview-audio");
     const captionEl = $("#preview-caption");
+    const flagNote = $("#preview-flag-note");
     if (!previewAudio || !captionEl) return;
     previewAudio.addEventListener("timeupdate", () => {
       const t = previewAudio.currentTime * 1000;
-      const seg = segments.find((s) => t >= s.start_ms && t < s.end_ms);
-      captionEl.textContent = seg && seg.final_text ? seg.final_text : " ";
+      const seg = previewSegments.find((s) => t >= s.start_ms && t < (s.display_end_ms || s.end_ms));
+      captionEl.textContent = seg && seg.wrapped_caption ? seg.wrapped_caption : " ";
+      if (!flagNote) return;
+      if (seg && seg.review_flag) {
+        flagNote.hidden = false;
+        flagNote.textContent = `⚠ This segment is still flagged: ${(seg.review_reasons || []).join(", ")}`;
+      } else {
+        flagNote.hidden = true;
+      }
     });
   }
 
@@ -485,6 +529,7 @@
         segmentMeta[segmentId] = Object.assign({}, segmentMeta[segmentId], { translation_stale: false });
         applyStaleTranslationUI(segmentId, false);
       }
+      updatePreviewSegment(segmentId, data.wrapped_caption, data.display_end_ms);
       dirtySegments.delete(segmentId);
       updateGlobalSaveState(dirtySegments.size ? "dirty" : "saved", resynthesize ? "(+ re-synthesized)" : "");
     } catch (err) {
@@ -520,6 +565,7 @@
       buildCells(frag, data.target_cells, segmentId, data.final_text, "target",
                  buildFlagTitle(segmentMeta[segmentId]), staleTranslationTitle(segmentMeta[segmentId]));
       parent.insertBefore(frag, insertBefore);
+      updatePreviewSegment(segmentId, data.wrapped_caption, data.display_end_ms);
     } catch (err) {
       alert("Re-translate failed: " + err.message);
       oldCells.forEach((el) => el.classList.remove("retranslating"));
@@ -557,6 +603,32 @@
     updateFlagUI(segmentId, data.review_flag, data.review_reasons);
   }
 
+  // Manual speaker tag/correction for one segment - see
+  // webapp/app.py's editor_set_segment_speaker. A real page reload
+  // (plain form submit), not a fetch+in-place update like toggleFlag -
+  // this is a rare, deliberate action (tagging who's speaking, once,
+  // during an initial listen-through), not something worth a second
+  // JSON-returning route just to avoid a reload for it. Once a speaker
+  // is tagged, assign it a voice from the Job tab's Speakers panel.
+  function setSpeakerForFocused(cell) {
+    const segmentId = cell && cell.dataset.segmentId;
+    if (!segmentId) return;
+    const current = (segmentMeta[segmentId] && segmentMeta[segmentId].speaker_id) || "";
+    const label = prompt(
+      'Speaker for this segment (e.g. "Man", "Woman", "Child 1") - blank to clear:', current);
+    if (label === null) return; // cancelled
+    const form = document.createElement("form");
+    form.method = "post";
+    form.action = `/staff/orders/${ORDER_ID}/segments/${segmentId}/set-speaker`;
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "speaker_id";
+    input.value = label;
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+  }
+
   // --------------------------------------------------------- cell merge ----
   // Ctrl+M: the focused cell absorbs the NEXT cell in the same step - for
   // when ASR (or translation) splits one real word across two cells.
@@ -577,7 +649,12 @@
     if (idx === -1 || idx === siblings.length - 1) return; // nothing after it
     const next = siblings[idx + 1];
 
-    const merged = cell.textContent.trim() + (separator || "") + next.textContent.trim();
+    // Default separator is a real space - two words merged with nothing
+    // between them ran together into one unreadable word ("RigathiNa"
+    // instead of "Rigathi na"), a real grammar/readability regression.
+    // Alt+H (hyphenate) explicitly passes "-" instead, which stays exactly
+    // as tight as a real hyphenated compound should be.
+    const merged = cell.textContent.trim() + (separator != null ? separator : " ") + next.textContent.trim();
     cell.textContent = merged + " ";
     cell.dataset.endMs = next.dataset.endMs;
     if (cell.classList.contains("gapcell") && merged) {
@@ -585,6 +662,14 @@
       cell.className = "wordcell";
     }
 
+    // If `next` was a paragraph start, its <br> marker would otherwise be
+    // orphaned once `next` itself is removed below - real DOM litter, not
+    // just a cosmetic leftover (an empty line where nothing's left to
+    // start).
+    if (next.dataset.paraStart === "true") {
+      const prevBr = next.previousElementSibling;
+      if (prevBr && prevBr.tagName === "BR") prevBr.remove();
+    }
     allCells = allCells.filter((c) => c.el !== next);
     next.remove();
 
@@ -598,40 +683,48 @@
   // Ten reusable text snippets (speaker IDs, common tags, ...), bound to
   // ctrl+1..ctrl+9 and ctrl+0, inserted at the cursor in whatever cell is
   // focused. Saved per-order in this browser (not synced to the server -
-  // it's an editing convenience, not job data). Each macro also carries a
-  // paragraphBreak flag: true starts a new paragraph when it's inserted
-  // (a speaker-change macro like "NARRATOR: "), false doesn't (a sound tag
-  // like "[MUSIC PLAYING]" belongs inline, not as its own paragraph).
+  // it's an editing convenience, not job data).
   function macroStorageKey() { return `kauli_macros_${ORDER_ID}`; }
-  function emptyMacro() { return { text: "", paragraphBreak: false, speaker: false }; }
+  // Just a text snippet now - no speaker/paragraph flag. A speaker tag
+  // typed or inserted this way still gets merged into its own cell and
+  // kept out of the spoken audio automatically (server-side pattern
+  // detection, not anything macro-specific) - see insertMacroAtCursor.
+  function emptyMacro() { return { text: "" }; }
 
   function loadMacros() {
     try {
       const raw = localStorage.getItem(macroStorageKey());
       if (raw) {
         const parsed = JSON.parse(raw);
-        // Migrate the old format (array of plain strings) transparently -
-        // existing macros keep working, just default to no paragraph break
-        // / not a speaker tag. Also fills in `speaker` on macros saved
-        // before that field existed.
+        // Migrate older formats transparently - a plain string, or an
+        // older macro object that also carried paragraphBreak/speaker
+        // flags, both collapse to just the text.
         macros = Array.isArray(parsed)
-          ? parsed.map((m) => (typeof m === "string"
-              ? { text: m, paragraphBreak: false, speaker: false }
-              : { paragraphBreak: false, speaker: false, ...m }))
+          ? parsed.map((m) => ({ text: typeof m === "string" ? m : (m.text || "") }))
           : null;
       }
     } catch (e) { /* corrupt/blocked storage - just use defaults */ }
     if (!Array.isArray(macros) || macros.length !== 10) macros = new Array(10).fill(null).map(emptyMacro);
   }
 
+  let macroSaveTimer = null;
   function persistMacros() {
     macros = $all(".macro-row").map((row) => ({
       text: row.querySelector(".macro-input").value,
-      paragraphBreak: row.querySelector(".macro-para-toggle").checked,
-      speaker: row.querySelector(".macro-speaker-toggle").checked,
     }));
     try { localStorage.setItem(macroStorageKey(), JSON.stringify(macros)); } catch (e) { /* ignore */ }
-    $("#macro-save-state").textContent = "saved";
+    const state = $("#macro-save-state");
+    if (state) state.textContent = "saved";
+  }
+
+  // Autosaves like the transcript does - no button, just a short debounce
+  // after the last change so rapid typing/clicking doesn't write on every
+  // keystroke.
+  function scheduleMacroSave() {
+    const state = $("#macro-save-state");
+    if (state) state.textContent = "saving…";
+    if (macroSaveTimer) clearTimeout(macroSaveTimer);
+    macroSaveTimer = setTimeout(persistMacros, AUTOSAVE_DELAY_MS);
   }
 
   function renderMacroTable() {
@@ -645,12 +738,10 @@
       const row = document.createElement("div");
       row.className = "macro-row";
       row.innerHTML =
-        `<kbd>${label}</kbd><input type="text" class="macro-input" placeholder="e.g. NARRATOR: ">` +
-        `<label class="checkbox macro-para-label"><input type="checkbox" class="macro-para-toggle"> New paragraph</label>` +
-        `<label class="checkbox macro-para-label"><input type="checkbox" class="macro-speaker-toggle"> Speaker ID</label>`;
+        `<kbd>Macro ${i + 1}</kbd><span class="macro-key-hint">${label}</span>` +
+        `<input type="text" class="macro-input" placeholder="e.g. RIGATHI GACHAGUA: or [MUSIC PLAYING]">`;
       row.querySelector(".macro-input").value = macro.text || "";
-      row.querySelector(".macro-para-toggle").checked = !!macro.paragraphBreak;
-      row.querySelector(".macro-speaker-toggle").checked = !!macro.speaker;
+      row.querySelector(".macro-input").addEventListener("input", scheduleMacroSave);
       body.appendChild(row);
     });
   }
@@ -677,27 +768,17 @@
     return cell;
   }
 
+  // Plain text insertion, always - a macro is just a reusable snippet now,
+  // nothing more. A speaker tag typed or inserted this way ("RIGATHI
+  // GACHAGUA: ") still ends up correctly merged into its own cell and
+  // excluded from the spoken audio - that's handled automatically by the
+  // server's own pattern detection (kauli.models.split_off_speaker_tag)
+  // the next time this segment's cells are rebuilt from saved text, not
+  // by anything macro-specific here. Use Ctrl+Enter separately if this
+  // insertion should also start a new paragraph.
   function insertMacroAtCursor(cell, macro) {
     if (!macro || !macro.text) return;
-    if (macro.speaker) {
-      // A speaker tag doesn't belong merged into the word it's labeling -
-      // give it its own cell right before the focused one instead, so
-      // "RIGATHI:" and "Haya." stay two normal-sized cells rather than
-      // one stretched, run-together block.
-      const segmentId = cell.dataset.segmentId;
-      const startMs = Number(cell.dataset.startMs);
-      const endMs = Number(cell.dataset.endMs);
-      const speakerText = macro.text.endsWith(" ") ? macro.text : macro.text + " ";
-      const speakerCell = createWordCell(speakerText, startMs, endMs, segmentId, cell.className.includes("approx") ? "approx" : "");
-      cell.parentNode.insertBefore(speakerCell, cell);
-      allCells.push({ el: speakerCell, startMs, endMs });
-      if (macro.paragraphBreak) insertParagraphBreak(speakerCell);
-      markDirty(segmentId);
-      cell.focus(); // stay on the original word, not the tag just inserted
-      return;
-    }
     document.execCommand("insertText", false, macro.text);
-    if (macro.paragraphBreak) insertParagraphBreak(cell);
   }
 
   // -------------------------------------------------------- paragraphs ----
@@ -712,6 +793,15 @@
     if (!already) {
       const m = cell.textContent.match(/^(\s*)(.)(.*)$/s);
       if (m) cell.textContent = m[1] + m[2].toUpperCase() + m[3];
+      // A real <br> forces the actual line break in normal inline flow -
+      // the cell itself stays a normal inline-block (see .para-start's
+      // CSS comment), so every word after it keeps flowing on that same
+      // new line, wrapping naturally, instead of each one getting pushed
+      // onto a line of its own.
+      cell.insertAdjacentElement("beforebegin", document.createElement("br"));
+    } else {
+      const prev = cell.previousElementSibling;
+      if (prev && prev.tagName === "BR") prev.remove();
     }
     markDirty(cell.dataset.segmentId);
   }
@@ -720,6 +810,8 @@
     if (cell.dataset.paraStart !== "true") return;
     cell.dataset.paraStart = "";
     cell.classList.remove("para-start");
+    const prev = cell.previousElementSibling;
+    if (prev && prev.tagName === "BR") prev.remove();
     markDirty(cell.dataset.segmentId);
   }
 
@@ -941,6 +1033,57 @@
     markDirty(segmentId);
   }
 
+  // Ctrl+K: splits a multi-word cell into one cell per word - e.g. a
+  // "RIGATHI GACHAGUA:" speaker tag, or any phrase that ended up merged
+  // into one cell, back into individual word cells. Timing divided
+  // proportionally by character count across however many words there
+  // are, same estimate-by-character-share approach splitCellAtCursor
+  // above already uses for a 2-way split. Refuses on a gap cell (nothing
+  // to split - it's a sound tag, not transcript words) and no-ops if
+  // there's only one word already.
+  function splitCellIntoWords(cell) {
+    if (!cell.classList.contains("wordcell")) return;
+    const words = cell.textContent.trim().split(/\s+/).filter(Boolean);
+    if (words.length < 2) return;
+
+    const startMs = Number(cell.dataset.startMs);
+    const endMs = Number(cell.dataset.endMs);
+    const duration = Math.max(1, endMs - startMs);
+    const segmentId = cell.dataset.segmentId;
+    const totalChars = words.reduce((sum, w) => sum + w.length, 0) || 1;
+    const baseClassName = cell.className.replace(/\b(speaker|bracket)-tag-cell\b/g, "").trim();
+
+    const entry = allCells.find((c) => c.el === cell);
+    let t = startMs;
+    let lastNewCell = cell;
+    words.forEach((word, i) => {
+      const wordMs = Math.round(duration * (word.length / totalChars));
+      const wordEnd = i === words.length - 1 ? endMs : t + wordMs;
+      if (i === 0) {
+        cell.textContent = word + " ";
+        cell.className = baseClassName;
+        cell.dataset.endMs = String(wordEnd);
+        if (entry) entry.endMs = wordEnd;
+      } else {
+        const newCell = document.createElement("span");
+        newCell.contentEditable = "true";
+        newCell.tabIndex = 0;
+        newCell.className = baseClassName;
+        newCell.dataset.segmentId = segmentId;
+        newCell.dataset.startMs = t;
+        newCell.dataset.endMs = wordEnd;
+        newCell.textContent = word + " ";
+        newCell.addEventListener("focus", () => seekTo(t, false));
+        newCell.addEventListener("input", () => { markDirty(segmentId); autoCapitalizeNextAfterSentenceEnd(newCell); });
+        lastNewCell.insertAdjacentElement("afterend", newCell);
+        allCells.push({ el: newCell, startMs: t, endMs: wordEnd });
+        lastNewCell = newCell;
+      }
+      t = wordEnd;
+    });
+    markDirty(segmentId);
+  }
+
   // ------------------------------------------------------- navigation ----
   // Alt+Up/Down: jump between flagged segments specifically (review triage).
   function navigateFlagged(direction) {
@@ -1023,6 +1166,77 @@
     if (!modal) return;
     $("#job-return-cancel").addEventListener("click", closeJobReturnModal);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeJobReturnModal(); });
+  }
+
+  // ------------------------------------------------- voice direction ----
+  // Alt+V on a focused segment: direct how ITS audio gets spoken - slower/
+  // faster than the automatic fit-to-slot pace, or spelled out letter-by-
+  // letter (an acronym or name a voice keeps misreading as a word). See
+  // webapp/app.py's /voice-direction route - this only fires the fetch and
+  // reflects the result; the actual re-render happens server-side.
+  let voiceDirectionSegmentId = null;
+  function openVoiceDirectionModal(segmentId) {
+    const modal = $("#voice-direction-modal");
+    if (!modal) return;
+    voiceDirectionSegmentId = segmentId;
+    const meta = segmentMeta[segmentId] || {};
+    const paceSelect = modal.querySelector("select[name=pace_pct]");
+    const spellCheckbox = modal.querySelector("input[name=spell_out]");
+    if (paceSelect) paceSelect.value = String(meta.manual_pace_pct || 0);
+    if (spellCheckbox) spellCheckbox.checked = !!meta.spell_out;
+    const status = $("#voice-direction-status");
+    if (status) status.textContent = "";
+    modal.hidden = false;
+    if (paceSelect) paceSelect.focus();
+  }
+  function closeVoiceDirectionModal() {
+    const modal = $("#voice-direction-modal");
+    if (modal) modal.hidden = true;
+  }
+  async function applyVoiceDirection() {
+    const modal = $("#voice-direction-modal");
+    if (!modal || !voiceDirectionSegmentId) return;
+    const segmentId = voiceDirectionSegmentId;
+    const paceSelect = modal.querySelector("select[name=pace_pct]");
+    const spellCheckbox = modal.querySelector("input[name=spell_out]");
+    const status = $("#voice-direction-status");
+    const applyBtn = $("#voice-direction-apply");
+    const body = {
+      pace_pct: paceSelect ? Number(paceSelect.value) : 0,
+      spell_out: spellCheckbox ? spellCheckbox.checked : false,
+    };
+    if (status) status.textContent = "Re-rendering…";
+    if (applyBtn) applyBtn.disabled = true;
+    try {
+      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/voice-direction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "voice direction failed");
+      segmentMeta[segmentId] = Object.assign({}, segmentMeta[segmentId], {
+        manual_pace_pct: data.manual_pace_pct, spell_out: data.spell_out,
+        review_flag: data.review_flag, review_reasons: data.review_reasons,
+      });
+      if (data.dub_voice === "human") {
+        if (status) status.textContent = "Saved - but this order's dub is currently the voice actor's " +
+          "own recording, so no AI audio was re-rendered.";
+      } else {
+        closeVoiceDirectionModal();
+      }
+    } catch (err) {
+      if (status) status.textContent = "Failed: " + err.message;
+    } finally {
+      if (applyBtn) applyBtn.disabled = false;
+    }
+  }
+  function bindVoiceDirectionModal() {
+    const modal = $("#voice-direction-modal");
+    if (!modal) return;
+    $("#voice-direction-cancel").addEventListener("click", closeVoiceDirectionModal);
+    $("#voice-direction-apply").addEventListener("click", applyVoiceDirection);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeVoiceDirectionModal(); });
   }
 
   // ---------------------------------------------------- approve split-button ----
@@ -1185,21 +1399,49 @@
     hideSpellPopover();
   }
 
+  // "Replace all" - the same suggestion applied to every OTHER cell still
+  // flagged with the identical misspelled word (case-insensitive), not
+  // just the one that was clicked - for a name or term that's wrong the
+  // same way in several places, so it's not a click-per-instance chore.
+  function applySpellSuggestionAll(word, suggestion) {
+    const target = (word || "").toLowerCase();
+    if (!target) return;
+    $all("#flow-target .wordcell.spell-flag").forEach((cell) => {
+      if (coreWord(cell.textContent).toLowerCase() === target) {
+        applySpellSuggestion(cell, suggestion);
+      }
+    });
+  }
+
   function showSpellPopover(cell) {
     const pop = $("#spell-popover");
     if (!pop) return;
     spellPopoverCell = cell;
     const word = coreWord(cell.textContent);
     const suggestions = suggestWords(word, 5);
+    const matchCount = $all("#flow-target .wordcell.spell-flag")
+      .filter((c) => coreWord(c.textContent).toLowerCase() === word.toLowerCase()).length;
     pop.innerHTML = "";
     if (suggestions.length) {
       suggestions.forEach((s) => {
+        const row = document.createElement("div");
+        row.className = "spell-suggestion-row";
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "spell-suggestion";
         btn.textContent = s;
         btn.addEventListener("mousedown", (e) => { e.preventDefault(); applySpellSuggestion(cell, s); });
-        pop.appendChild(btn);
+        row.appendChild(btn);
+        if (matchCount > 1) {
+          const allBtn = document.createElement("button");
+          allBtn.type = "button";
+          allBtn.className = "spell-suggestion-all";
+          allBtn.title = `Replace all ${matchCount} occurrences of "${word}" with "${s}"`;
+          allBtn.textContent = `Replace all (${matchCount})`;
+          allBtn.addEventListener("mousedown", (e) => { e.preventDefault(); applySpellSuggestionAll(word, s); });
+          row.appendChild(allBtn);
+        }
+        pop.appendChild(row);
       });
     } else {
       const none = document.createElement("div");
@@ -1302,10 +1544,21 @@
         if (segmentId) toggleFlag(segmentId);
         return;
       }
+      if (e.altKey && key === "s") {
+        e.preventDefault();
+        setSpeakerForFocused(active);
+        return;
+      }
       if (e.altKey && key === "r") {
         e.preventDefault();
         const segmentId = active && active.dataset.segmentId;
         if (segmentId) retranslate(segmentId);
+        return;
+      }
+      if (e.altKey && key === "v") {
+        e.preventDefault();
+        const segmentId = active && active.dataset.segmentId;
+        if (segmentId) openVoiceDirectionModal(segmentId);
         return;
       }
       if (e.altKey && key === "arrowdown") {
@@ -1346,6 +1599,15 @@
           return;
         }
         if (e.altKey && e.key === "Backspace") {
+          e.preventDefault();
+          removeParagraphBreak(active);
+          return;
+        }
+        // Ctrl+Backspace does the same thing, but only when the focused
+        // cell actually IS a paragraph start - otherwise it falls through
+        // to the browser's own native "delete previous word", which is
+        // what most people expect Ctrl+Backspace to do everywhere else.
+        if (e.ctrlKey && e.key === "Backspace" && active.dataset.paraStart === "true") {
           e.preventDefault();
           removeParagraphBreak(active);
           return;
@@ -1427,6 +1689,11 @@
         if (e.altKey && key === "k") {
           e.preventDefault();
           splitCellAtCursor(active);
+          return;
+        }
+        if (e.ctrlKey && key === "k") {
+          e.preventDefault();
+          splitCellIntoWords(active);
           return;
         }
         // e.code (the physical key) rather than e.key here: Shift changes
@@ -1613,6 +1880,7 @@
   // -------------------------------------------------------------- init ----
   window.initKauliEditor = function (orderId, segments, youtubeVideoId) {
     ORDER_ID = orderId;
+    previewSegments = segments; // kept live from here on - see updatePreviewSegment
     loadBookmarks(); // before renderAllSegments/buildCells so bookmarked cells render marked from the start
     audio = youtubeVideoId
       ? createYouTubeAdapter("editor-media", youtubeVideoId)
@@ -1631,7 +1899,7 @@
       audio.addEventListener("click", () => { audio.paused ? audio.play() : audio.pause(); });
     }
     bindCustomControls();
-    bindPreviewCaptions(segments);
+    bindPreviewCaptions();
 
     // The voice track is a fully separate, independently-controlled
     // element (native browser controls, not the custom bar) - it only
@@ -1646,7 +1914,6 @@
 
     loadMacros();
     renderMacroTable();
-    $("#macro-save-btn").addEventListener("click", persistMacros);
 
     bindTabs();
     bindStepSwitch();
@@ -1654,6 +1921,7 @@
     bindSpellCheck();
     loadDictionary();
     bindJobReturnModal();
+    bindVoiceDirectionModal();
     bindApproveSplitButton();
     bindVoicePicker();
     bindShortcuts();

@@ -2,11 +2,14 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Review {{ order['id'] }}{% endblock %}
 {% block content %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
 <div class="card">
   <a href="/staff" class="breadcrumb">&larr; back to queue</a>
-  <h1>{{ order['original_filename'] }}</h1>
+  <h1>{% if order['is_rush'] %}⚡ {% endif %}{{ order['original_filename'] }}</h1>
   <p>
      <span class="status status-{{ order['status'] }}">{{ order['status'].replace('_', ' ') }}</span>
+     {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush - paid priority</span>{% endif %}
      &middot; {{ order['source_lang'] }} → {{ order['target_lang'] }} &middot; {{ order['tier'] }} tier</p>
 
   {% if order['content_safety_flagged'] %}
@@ -152,6 +155,20 @@
 </div>
 {% endif %}
 
+{% if order['status'] == 'returned_to_client' %}
+<div class="card internal-card">
+  <h2 style="margin-top:0;">Returned to client - waiting on them</h2>
+  <p class="muted" style="margin-top:0;">Reason:
+     <strong>{{ order['return_reason']|replace('_', ' ') }}</strong>{% if order['return_note'] %} - {{ order['return_note'] }}{% endif %}</p>
+  <p class="muted" style="font-size:0.85rem;">The client can resume this same order themselves once they've
+     replied or attached a corrected file - no new order or payment needed. If they've clarified things over
+     WhatsApp or email instead, pick it back up here.</p>
+  <form method="post" action="/staff/orders/{{ order['id'] }}/resume">
+    <button type="submit" class="secondary">Resume processing</button>
+  </form>
+</div>
+{% endif %}
+
 {% if job and has_video_source %}
 <div class="card">
   <h2>Video deliverables</h2>
@@ -175,6 +192,66 @@
       </form>
     {% endif %}
   </div>
+</div>
+{% endif %}
+
+{% if order['wants_human_voice_over'] %}
+<div class="card">
+  <h2 style="margin-top:0;">Human voice-over</h2>
+  <p class="muted" style="margin-top:0;">The client paid for a real human actor's voice instead of the AI
+     dub - the AI dub still gets made and delivered as normal until this is done, so nothing's blocked
+     waiting on casting.</p>
+
+  <form method="post" action="/staff/orders/{{ order['id'] }}/assign-actor" style="margin-bottom:12px;">
+    <label>Assigned actor
+      <select name="actor_id">
+        <option value="">- none assigned -</option>
+        {% for a in voice_actors %}
+        <option value="{{ a['id'] }}" {% if assigned_actor and assigned_actor['id'] == a['id'] %}selected{% endif %}>
+          {{ a['name'] }} ({{ a['languages'] }}){% if a['rate_per_min_usd'] %} - ${{ "%.2f"|format(a['rate_per_min_usd']) }}/min{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="secondary">Save</button>
+    <span class="muted" style="font-size:0.8rem;">Manage the roster on <a href="/staff/voice-actors">Voice Talent</a>.</span>
+  </form>
+
+  {% if assigned_actor %}
+  <form method="post" action="/staff/orders/{{ order['id'] }}/human-voice-upload"
+        enctype="multipart/form-data" style="margin-bottom:12px;">
+    <label>Upload {{ assigned_actor['name'] }}'s finished recording (already synced to the video/audio -
+       see the Ereri guide's overlap section for why no auto-sync is attempted here)
+      <input type="file" name="recording" accept="audio/*" required>
+    </label>
+    <button type="submit" class="secondary">Upload &amp; deliver</button>
+  </form>
+
+  <form method="post" action="/staff/orders/{{ order['id'] }}/create-payout">
+    <button type="submit" class="secondary">Record payout owed to {{ assigned_actor['name'] }}</button>
+    <span class="muted" style="font-size:0.8rem;">
+      {% if order['duration_minutes'] and assigned_actor['rate_per_min_usd'] %}
+      ≈ ${{ "%.2f"|format(order['duration_minutes'] * assigned_actor['rate_per_min_usd']) }}
+      ({{ "%.1f"|format(order['duration_minutes']) }} min × ${{ "%.2f"|format(assigned_actor['rate_per_min_usd']) }}/min)
+      {% else %}set a rate for this actor first{% endif %}
+    </span>
+  </form>
+  {% endif %}
+
+  {% if order_payouts %}
+  <table style="margin-top:12px;">
+    <thead><tr><th style="text-align:left;">Amount</th><th style="text-align:left;">Status</th><th style="text-align:left;">Reference</th></tr></thead>
+    <tbody>
+      {% for p in order_payouts %}
+      <tr>
+        <td>${{ "%.2f"|format(p['amount_usd']) }}</td>
+        <td>{{ p['status'] }}</td>
+        <td>{{ p['paid_reference'] or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </div>
 {% endif %}
 

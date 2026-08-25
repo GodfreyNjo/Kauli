@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ static_version('style.css') }}">
   {% block head_extra %}{% endblock %}
   <!-- Cloudflare Web Analytics - cookieless, no personal data, see Privacy Policy -->
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "7d7177ddf4eb4c22ab931af3ffa28bef"}'></script>
@@ -64,6 +64,11 @@
           <span class="icon">T</span><span id="theme-toggle-label">Switch theme</span>
         </button>
         <a href="/settings" class="account-menu-item"><span class="icon">S</span>Settings</a>
+        {% if user['role'] == 'client' %}
+        <a href="/help" class="account-menu-item"><span class="icon">?</span>Help &amp; troubleshooting</a>
+        <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="account-menu-item"><span class="icon">W</span>WhatsApp us</a>
+        <a href="mailto:{{ contact_email }}" class="account-menu-item"><span class="icon">@</span>Email us</a>
+        {% endif %}
         <a href="/logout" class="account-menu-item account-menu-item-danger"><span class="icon">O</span>Sign out</a>
       </div>
     </div>
@@ -83,13 +88,29 @@
         <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}"><span class="icon">E</span><span class="label">Exceptions</span></a>
         <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
         <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}"><span class="icon">W</span><span class="label">Blog</span></a>
+        <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}"><span class="icon">N</span><span class="label">Newsletter</span></a>
+        <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Editor guide</span></a>
         <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}"><span class="icon">•</span><span class="label">Status</span></a>
         {% if user['is_admin'] %}
+        <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}"><span class="icon">V</span><span class="label">Voice Talent</span></a>
         <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}"><span class="icon">A</span><span class="label">Admin</span></a>
         {% endif %}
+        {% elif user['role'] == 'voice_actor' %}
+        <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}"><span class="icon">J</span><span class="label">My jobs</span></a>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-contact-row">
+          <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" title="WhatsApp us"><span class="icon">W</span><span class="label" style="font-size:0.76rem;">WhatsApp</span></a>
+          <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
+        </div>
         {% else %}
         <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}"><span class="icon">D</span><span class="label">Dashboard</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Help &amp; troubleshooting</span></a>
+        <div class="sidebar-contact-row">
+          <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" title="WhatsApp us"><span class="icon">W</span><span class="label" style="font-size:0.76rem;">WhatsApp</span></a>
+          <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
+        </div>
         {% endif %}
         <a href="/settings" class="{{ 'active' if request.url.path == '/settings' else '' }}"><span class="icon">S</span><span class="label">Settings</span></a>
       </nav>

@@ -1,0 +1,23 @@
+# Real client data - uploads, generated dubs, the SQLite db itself. This
+# is a VOLUME at runtime (see Dockerfile), never image content - without
+# this line, `COPY webapp/ webapp/` would bake ~1.9GB of real order data
+# straight into the image (and, worse, into any registry it gets pushed
+# to).
+webapp/data/
+
+.git/
+.gitignore
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.env.example
+data/voices/
+data/audio/
+*.wav
+*.mp3
+!webapp/static/*.wav
+.DS_Store
+tests/

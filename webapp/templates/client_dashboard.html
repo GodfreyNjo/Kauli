@@ -40,9 +40,11 @@
   <div id="pricing-data" hidden
        data-discount="{{ plans[plan]['discount'] }}"
        data-free-minutes="{{ free_minutes_remaining }}"
-       data-wallet-minutes="{{ wallet_minutes }}"
+       data-wallet-credits="{{ wallet_credits }}"
        data-addon-rate="{{ addons['video_deliverables']['rate_per_min'] if 'video_deliverables' in addons else 0 }}"
-       data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"></div>
+       data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"
+       data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
+       data-rush-pct="{{ rush_surcharge_pct }}"></div>
 
   <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
     <input type="hidden" name="idempotency_key" id="idempotency-key-field">
@@ -109,7 +111,7 @@
             {% for key, level in service_levels.items() %}
             <label class="tier-option">
               <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ level['rate_per_min'] }}"
-                     data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'dub') %}checked{% endif %}>
+                     data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'transcribe') %}checked{% endif %}>
               <div>
                 <strong>{{ level['name'] }}</strong>
                 <p>${{ "%.2f"|format(level['rate_per_min']) }}/audio-minute.</p>
@@ -128,6 +130,15 @@
           </label>
           {% endif %}
 
+          <label class="checkbox tier-option" id="human-voice-field" hidden style="margin-bottom:14px; align-items:center;">
+            <input type="checkbox" name="addon_human_voice_over" value="1" id="human-voice-checkbox"
+                   {% if form_values.get('addon_human_voice_over') %}checked{% endif %}>
+            <span>Add a real human voice actor (instead of an AI dub voice)
+            (+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }}/audio-minute). The AI dub
+            still gets made either way - our team casts and delivers the human version separately once it's
+            ready, which takes longer than the automated dub.</span>
+          </label>
+
           <label class="checkbox tier-option" id="voice-clone-consent-field" hidden style="margin-bottom:14px; align-items:center;">
             <input type="checkbox" name="voice_clone_consent" value="1" id="voice-clone-consent-checkbox"
                    {% if form_values.get('voice_clone_consent') %}checked{% endif %}>
@@ -135,6 +146,14 @@
             cloning, any speaker's voice in this recording, if we use voice cloning on this order.
             Leave unchecked if you're not sure - our team can only use a real voice clone on this order
             once this is checked, and you can grant it later from the order page instead.</span>
+          </label>
+
+          <label class="checkbox tier-option" style="margin-bottom:14px; align-items:center;">
+            <input type="checkbox" name="rush" value="1" id="rush-checkbox"
+                   {% if form_values.get('rush') %}checked{% endif %}>
+            <span><strong>Rush this order</strong> (+{{ (rush_surcharge_pct * 100)|round|int }}%) - real,
+            manual priority in the review queue. Only for a genuine deadline - it's not a faster pipeline,
+            it's Godfrey picking this one up and working it first.</span>
           </label>
         </div>
 
@@ -144,8 +163,10 @@
           <div class="pricing-row"><span>Service</span><span id="price-service">Full dub</span></div>
           <div class="pricing-row" id="price-addon-row" hidden><span>Video deliverables</span><span id="price-addon">—</span></div>
           <div class="pricing-row" id="price-manual-row" hidden><span>Manual transcription</span><span id="price-manual">—</span></div>
+          <div class="pricing-row" id="price-human-voice-row" hidden><span>Human voice actor</span><span id="price-human-voice">—</span></div>
           <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
-          <div class="pricing-row" id="price-wallet-row" hidden><span>Wallet minutes applied</span><span id="price-wallet">—</span></div>
+          <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
+          <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>
           <div class="pricing-total"><span>Estimated total</span><span id="price-total">$0.00</span></div>
           <p class="muted" style="font-size:0.76rem; margin-bottom:0;">
              {{ "%.1f"|format(free_minutes_remaining)|replace('.0', '') }} free minute{{ '' if free_minutes_remaining == 1 else 's' }}
@@ -255,7 +276,7 @@
   </form>
 </div>
 
-<script src="/static/client_wizard.js"></script>
+<script src="/static/client_wizard.js?v={{ static_version('client_wizard.js') }}"></script>
 
 <div class="card" style="margin-top:32px;">
   <h2 style="margin-top:0;">YouTube auto-import</h2>
@@ -331,39 +352,82 @@
     <a href="#order-form" class="btn secondary" onclick="var dz = document.getElementById('dropzone'); if (dz) dz.focus();">+ Submit your first order</a>
   </div>
 {% else %}
+<input type="search" id="order-search" placeholder="Search your orders by filename or folder..."
+       style="margin-bottom:14px;" aria-label="Search your orders">
+<div class="filter-tabs" id="order-status-filter" style="margin-bottom:8px;">
+  <button type="button" class="active" data-bucket="">All</button>
+  <button type="button" data-bucket="in_progress">In progress</button>
+  <button type="button" data-bucket="ready">Ready to download</button>
+  <button type="button" data-bucket="needs_you">Needs your input</button>
+</div>
 {% if folders %}
 <div class="filter-tabs" id="folder-filter" style="margin-bottom:14px;">
-  <button type="button" class="active" data-folder="">All</button>
+  <button type="button" class="active" data-folder="">All folders</button>
   {% for f in folders %}
   <button type="button" data-folder="{{ f }}">{{ f }}</button>
   {% endfor %}
 </div>
+{% endif %}
 <script>
   (function () {
-    var bar = document.getElementById('folder-filter');
-    if (!bar) return;
-    bar.querySelectorAll('button').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        bar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        var wanted = btn.dataset.folder;
-        document.querySelectorAll('.project-card').forEach(function (card) {
-          card.style.display = (!wanted || card.dataset.folder === wanted) ? '' : 'none';
+    var IN_PROGRESS = ['queued', 'processing', 'awaiting_review', 'editor_returned', 'pending_payment'];
+    var READY = ['ready_for_delivery', 'delivered'];
+    var NEEDS_YOU = ['returned_to_client'];
+    var searchInput = document.getElementById('order-search');
+    var statusBar = document.getElementById('order-status-filter');
+    var folderBar = document.getElementById('folder-filter');
+    var wantedBucket = '';
+    var wantedFolder = '';
+
+    function matchesBucket(status) {
+      if (!wantedBucket) return true;
+      if (wantedBucket === 'in_progress') return IN_PROGRESS.includes(status);
+      if (wantedBucket === 'ready') return READY.includes(status);
+      if (wantedBucket === 'needs_you') return NEEDS_YOU.includes(status);
+      return true;
+    }
+    function applyFilters() {
+      var q = (searchInput.value || '').trim().toLowerCase();
+      document.querySelectorAll('.project-card').forEach(function (card) {
+        var folderOk = !wantedFolder || card.dataset.folder === wantedFolder;
+        var bucketOk = matchesBucket(card.dataset.status);
+        var searchOk = !q || card.dataset.searchText.includes(q);
+        card.style.display = (folderOk && bucketOk && searchOk) ? '' : 'none';
+      });
+    }
+    if (searchInput) searchInput.addEventListener('input', applyFilters);
+    if (statusBar) {
+      statusBar.querySelectorAll('button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          statusBar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          wantedBucket = btn.dataset.bucket;
+          applyFilters();
         });
       });
-    });
+    }
+    if (folderBar) {
+      folderBar.querySelectorAll('button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          folderBar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+          wantedFolder = btn.dataset.folder;
+          applyFilters();
+        });
+      });
+    }
   })();
 </script>
-{% endif %}
 <div class="project-cards">
   {% for o in orders %}
-  <article class="project-card" data-folder="{{ o['folder_name'] or '' }}">
+  <article class="project-card" data-folder="{{ o['folder_name'] or '' }}" data-status="{{ o['status'] }}"
+            data-search-text="{{ (o['original_filename'] ~ ' ' ~ (o['folder_name'] or ''))|lower }}">
     <div class="project-card-top">
       <div class="project-card-name">
         {{ o['original_filename'] }}
         {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
       </div>
-      <span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span>
+      <span class="status status-{{ o['status'] }}">{{ o['status']|client_status_label }}</span>
     </div>
     <div class="project-card-bottom">
       <div class="project-card-pills">

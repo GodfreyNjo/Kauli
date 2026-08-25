@@ -6,14 +6,58 @@ half-finished job to the review editor. Don't add a database until this hurts.
 from __future__ import annotations
 
 import os
+import re
+import subprocess
+import uuid
 import wave
 from pathlib import Path
 
 from . import timing
-from .models import Job
-from .mixer import build_timeline, extract_reference_clip, time_stretch, write_wav_mono
+from .models import Job, Segment, split_off_speaker_tag
+from .mixer import build_timeline, extract_audio_window, extract_reference_clip, time_stretch, write_wav_mono
 from .providers import get_asr, get_mt, get_tts
 from .subtitles import to_srt, to_vtt
+
+# A full second or more of no detected speech at all gets its own real,
+# taggable segment in Ereri - matches webapp/app.py's GAP_THRESHOLD_MS
+# (the same idea, applied between segments here instead of between words
+# within one). Kept as a separate constant rather than imported - webapp
+# imports kauli, not the other way around.
+GAP_THRESHOLD_MS = 1000
+
+
+def _insert_non_speech_segments(segments: list[Segment], total_duration_ms: int) -> list[Segment]:
+    """Real Segment objects for any stretch with no detected speech at all -
+    before the first segment, between two segments, or after the last one.
+    Each one has an empty words list, which means webapp/app.py's
+    _find_gaps already renders its whole span as a single taggable
+    gap-cell in Ereri - the same mechanism already used for a silent
+    pause within a segment, just given something to attach to here.
+    Without this, a stretch of music/laughter/sound-effect-only audio
+    between two speech segments simply had no cell at all - not
+    editable, not even visible as a gap - because no Segment existed for
+    that time range in the first place."""
+    ordered = sorted(segments, key=lambda s: s.start_ms)
+    filled: list[Segment] = []
+    cursor = 0
+    for seg in ordered:
+        if seg.start_ms - cursor >= GAP_THRESHOLD_MS:
+            filled.append(Segment(
+                segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0,
+                start_ms=cursor, end_ms=seg.start_ms, segment_type="gap",
+                source_confidence=1.0,  # genuinely no speech here, not a low-confidence ASR guess
+            ))
+        filled.append(seg)
+        cursor = max(cursor, seg.end_ms)
+    if total_duration_ms - cursor >= GAP_THRESHOLD_MS:
+        filled.append(Segment(
+            segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0,
+            start_ms=cursor, end_ms=total_duration_ms, segment_type="gap",
+            source_confidence=1.0,
+        ))
+    for i, seg in enumerate(filled):
+        seg.index = i
+    return filled
 
 FLAG_CONF_ASR = 0.85     # below this, a human looks at it
 FLAG_CONF_MT = 0.80
@@ -43,6 +87,30 @@ def contains_explicit_content_keywords(text: str) -> bool:
 
 
 def probe_duration_ms(path: str) -> int:
+    """Real duration via ffprobe, not just a WAV header read - a client's
+    real upload is mp3/mp4/m4a/whatever just as often as WAV, and this
+    value becomes job.source_duration_ms, which build_timeline uses as
+    the delivered dub's EXACT length (see kauli/mixer.py). Reading only
+    WAV headers silently returned 0 for anything else, which fell back to
+    the last segment's end_ms - almost always a bit SHORTER than the real
+    file (there's normally a little trailing audio after the last
+    detected segment), so the delivered dub quietly ran short of the
+    client's actual upload. webapp/app.py's probe_duration_minutes (used
+    for billing) already worked this exact way - this just brings the
+    pipeline's own copy in line with it instead of leaving a second,
+    weaker implementation to drift.
+    Falls back to the plain WAV reader only if ffprobe itself isn't
+    available or the file genuinely can't be read - never silently 0
+    without at least trying the reliable path first."""
+    try:
+        result = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=noprint_wrappers=1:nokey=1", path],
+            capture_output=True, text=True, check=True, timeout=30,
+        )
+        return int(float(result.stdout.strip()) * 1000)
+    except Exception:
+        pass
     try:
         with wave.open(path, "rb") as w:
             return int(w.getnframes() / w.getframerate() * 1000)
@@ -50,26 +118,286 @@ def probe_duration_ms(path: str) -> int:
         return 0
 
 
-def translate_segment(seg, mt_provider, source_lang: str, target_lang: str, cps: float) -> None:
+def _borrowed_budget_ms(seg, all_segments) -> int:
+    """seg's own [start,end) slot, extended into a directly-following
+    silent gap if there is one - see timing.GAP_BORROW_MIN_KEEP_MS. Looks
+    the segment up by id rather than trusting object identity/equality,
+    since callers may be re-translating a segment loaded fresh from a
+    saved manifest rather than the exact same object holding all_segments.
+    Returns seg.duration_ms unchanged if all_segments isn't given, or no
+    gap immediately follows."""
+    if not all_segments:
+        return seg.duration_ms
+    for i, s in enumerate(all_segments):
+        if s.segment_id == seg.segment_id:
+            if i + 1 < len(all_segments):
+                nxt = all_segments[i + 1]
+                if nxt.segment_type == "gap" and nxt.start_ms == seg.end_ms:
+                    borrow = max(0, nxt.duration_ms - timing.GAP_BORROW_MIN_KEEP_MS)
+                    return seg.duration_ms + borrow
+            break
+    return seg.duration_ms
+
+
+def resolve_voice_for_segment(job, seg, default_voice_id, tts_provider_name: str | None = None):
+    """The actual multi-speaker guarantee: if this segment has a
+    speaker_id AND that speaker has an assigned voice (job.speaker_voices -
+    see Job's own comment on where speaker_id/speaker_voices come from),
+    that voice wins over the order's single default voice. A segment with
+    no speaker_id, or a speaker nobody's assigned a voice to yet, falls
+    back to default_voice_id exactly like before this existed - zero
+    behavior change for any order that isn't using per-speaker voices.
+
+    tts_provider_name guards a real crash this caught in testing:
+    job.speaker_voices values are always Piper voice-model paths (see
+    webapp/app.py's editor_assign_speaker_voice, Piper-only on purpose).
+    Handing one of those to a DIFFERENT provider - e.g. this segment gets
+    re-rendered through the order's own xtts voice-clone route, which
+    passes its own reference_speaker.wav as default_voice_id - makes XTTS
+    try to load a .onnx model file as if it were reference speaker AUDIO,
+    which crashes deep in torchcodec's decoder instead of failing
+    cleanly. So the speaker override only ever applies when the caller is
+    actually about to synthesize through Piper; anything else falls back
+    to default_voice_id, same as a segment with no speaker assignment at
+    all - the segment simply speaks in the order's own default voice
+    until it's re-rendered through Piper again."""
+    if (seg.speaker_id and job.speaker_voices.get(seg.speaker_id)
+            and (tts_provider_name is None or tts_provider_name == "piper")):
+        return job.speaker_voices[seg.speaker_id]
+    return default_voice_id
+
+
+def render_gap_audio(seg, source_audio_path: str, segments_dir: Path, sample_rate: int) -> bool:
+    """Fills a non-speech gap segment's audio_path with the REAL original
+    audio for its exact time window, instead of the digital silence
+    mixer.build_timeline used to leave there (a segment with no
+    audio_path contributes nothing at all - see that function's own
+    docstring). Music, applause, laughter, an instrument break: none of
+    it is speech that needs replacing, so there's nothing to translate or
+    synthesize - the original bed is simply carried straight through,
+    the same way a professional dub leaves the M&E (music & effects)
+    stem alone and only ever replaces the dialogue.
+
+    Shared by kauli.pipeline.run's own TTS loop and webapp/app.py's
+    _render_segment_audio (single-segment/editor-triggered resynthesis) -
+    same reasoning apply_stretch_fit's docstring gives for being shared
+    rather than two drifting copies.
+
+    Returns True if it actually wrote real audio (ffmpeg available, a
+    genuine >0ms window) - False leaves seg.audio_path unset, the exact
+    same silent fallback this always had, so a machine without ffmpeg
+    degrades exactly like before rather than crashing."""
+    out_path = segments_dir / f"{seg.segment_id}.wav"
+    if not extract_audio_window(source_audio_path, seg.start_ms, seg.end_ms, str(out_path), sample_rate):
+        return False
+    seg.audio_path = str(out_path)
+    seg.rendered_duration_ms = seg.end_ms - seg.start_ms
+    return True
+
+
+def strip_bracket_tags_for_tts(text: str) -> str:
+    """Removes inline [bracket] sound/caption tags - "[Applause]",
+    "[MUZIKI YACHEZA]" - before text reaches the TTS engine. These are
+    caption metadata (to_srt/to_vtt still show them, completely untouched
+    - see _protect_untranslatable for the parallel guarantee on the
+    translation side), never something a voice should actually read out
+    loud - a TTS engine saying "music playing" out loud is exactly the
+    "silent stitch" bug render_gap_audio (above) and this function
+    together fix.
+
+    A real, separate gap segment (see _insert_non_speech_segments) never
+    reaches this at all - render_gap_audio handles those. This is for a
+    bracket tag typed INLINE inside an otherwise-spoken segment's text,
+    e.g. "Welcome back to the show. [Applause]"."""
+    stripped = re.sub(r"\[[^\]]*\]", " ", text)
+    return re.sub(r"\s+", " ", stripped).strip()
+
+
+def apply_stretch_fit(seg, raw_path: Path, rendered_ms: int, segments_dir: Path,
+                       warnings: list | None = None) -> tuple[Path, int]:
+    """Fits one segment's freshly-synthesized audio to its budget_ms slot,
+    mutating seg's timing/review fields in place and returning the
+    (possibly stretched) path and final rendered duration to use. Shared
+    by kauli.pipeline.run's own TTS loop and webapp/app.py's
+    _render_segment_audio (single-segment/editor-triggered resynthesis) -
+    these used to be two separately-drifting copies of the same logic.
+
+    Two tiers, both using ffmpeg's pitch-preserving atempo filter (see
+    mixer.time_stretch) - never a pitch-shifting resample:
+      1. Up to timing.MAX_STRETCH_PCT: applied silently. This is the
+         "sounds completely natural" range - no flag, nothing for a human
+         to look at.
+      2. Up to timing.EMERGENCY_STRETCH_PCT: applied as a last resort
+         instead of leaving the segment unfittable, but flagged
+         "emergency_stretch_applied" so an editor knows the pace was
+         pushed and should give it a listen.
+    Beyond that, the audio is left as rendered (no stretch applied) and
+    flagged "stretch_cap_exceeded" - mixer.build_timeline's own
+    non-overlap guarantee is what keeps this from ever audibly overlapping
+    the next segment; the flag plus Ereri's 100%-edited shipping gate is
+    what keeps a silently-clipped segment from ever reaching a client
+    without a human having looked at it first."""
+    need = timing.required_stretch_pct(rendered_ms, seg.budget_ms)
+    raw, rendered = raw_path, rendered_ms
+    if abs(need) <= 1.0:
+        return raw, rendered
+    if abs(need) <= timing.MAX_STRETCH_PCT or abs(need) <= timing.EMERGENCY_STRETCH_PCT:
+        factor = rendered / seg.budget_ms
+        fixed = segments_dir / f"{seg.segment_id}_fit.wav"
+        if time_stretch(str(raw), str(fixed), factor):
+            raw = fixed
+            rendered = seg.budget_ms
+            seg.time_stretch_pct = round(need, 2)
+            if abs(need) > timing.MAX_STRETCH_PCT:
+                seg.review_flag = True
+                if "emergency_stretch_applied" not in seg.review_reasons:
+                    seg.review_reasons.append("emergency_stretch_applied")
+        elif warnings is not None:
+            warnings.append("ffmpeg not found - segments not time-fitted")
+    else:
+        seg.review_flag = True
+        if "stretch_cap_exceeded" not in seg.review_reasons:
+            seg.review_reasons.append("stretch_cap_exceeded")
+    return raw, rendered
+
+
+def spell_out_text(text: str) -> str:
+    """Forces a TTS engine to read text letter-by-letter instead of as a
+    word - a real, standard workaround for engines with no SSML
+    <say-as interpret-as="characters"> support. Neither Piper nor XTTS
+    (the two providers actually wired into this pipeline's real orders -
+    see providers/tts.py) understand SSML at all, so this is the honest
+    lever actually available: spacing every character out reliably breaks
+    a neural TTS model's word-level pronunciation and falls back to
+    naming each character instead.
+
+    Applies to the WHOLE string handed in - see Segment.spell_out's own
+    docstring for why that means this only makes sense on a segment
+    that's mostly just the name/acronym in question, not a full sentence
+    with one troublesome word buried in it (this pipeline renders and
+    times audio per-segment, not per-word)."""
+    out = []
+    for ch in text:
+        if ch.isspace():
+            out.append(". ")  # a firmer break where the original had a word boundary
+        else:
+            out.append(ch + " ")
+    return "".join(out).strip()
+
+
+def _protect_untranslatable(text: str) -> tuple[str, dict[str, str]]:
+    """Swaps out everything that must survive translation completely
+    unchanged - real paragraph breaks, a leading speaker tag on any
+    paragraph, and bracket sound/caption tags like "[MUSIC]" - for plain,
+    translation-safe placeholder tokens before the text ever reaches an
+    MT provider. Restore with _restore_untranslatable afterward.
+
+    The real problem this fixes: asking a translator to "translate" an
+    already-English (or already-fine-as-is) bracket tag or a speaker's
+    own name routinely mangled or reworded them - a caption tag and a
+    proper noun aren't Swahili content to translate, they're labels that
+    need to come out the other side byte-for-byte identical. A literal
+    blank line between paragraphs had no such guarantee either - nothing
+    stopped a translation model from reformatting or merging paragraphs,
+    quietly losing structure a human had already corrected.
+
+    Placeholders are plain, spaceless, all-caps alphanumeric tokens - the
+    form both a real NMT engine (Lara) and a real LLM (Claude) are most
+    likely to carry straight through untouched, the same trick real
+    translation pipelines use to protect variables/tags from translation.
+    LocalMT (a small, closed-vocabulary NMT with no instruction-following
+    ability - see its own docstring) is the one real provider that can
+    still subtly mangle a token like this in production - see
+    _restore_untranslatable's fuzzy-match fallback for how that's
+    recovered from rather than silently leaking garbage into final text.
+    """
+    placeholders: dict[str, str] = {}
+
+    def _swap(real_value: str) -> str:
+        token = f"QQTAG{len(placeholders)}QQ"
+        placeholders[token] = real_value
+        return token
+
+    paragraphs = re.split(r"\n\n+", text)
+    protected_paragraphs = []
+    for para in paragraphs:
+        tag, remainder = split_off_speaker_tag(para.strip())
+        piece = (_swap(tag) + " ") if tag else ""
+        piece += re.sub(r"\[[^\]]*\]", lambda m: _swap(m.group(0)), remainder)
+        protected_paragraphs.append(piece)
+    protected_text = (" " + _swap("\n\n") + " ").join(protected_paragraphs)
+    return protected_text, placeholders
+
+
+def _restore_untranslatable(text: str | None, placeholders: dict[str, str]) -> str:
+    text = text or ""
+    for token, real_value in placeholders.items():
+        text = text.replace(token, real_value)
+    if not placeholders or "QQ" not in text:
+        return text
+    # Real bug caught in production: LocalMT (MarianMT - a small, closed-
+    # vocabulary NMT with no instruction-following ability, unlike
+    # Lara/Claude - see LocalMT's own docstring) can subtly mangle an
+    # opaque placeholder during its own subword tokenize/generate
+    # round-trip. Observed live: "QQTAG0QQ" came back as "QQAG0QQ" - one
+    # character dropped - so the exact .replace() above silently left that
+    # garbage sitting in the final text instead of the real content it
+    # stood for. Recovery falls back to matching on the token's own
+    # embedded index digit (the part that DIDN'T get mangled here, not a
+    # coincidence - it's a single short digit run, the least likely part
+    # of the token for subword tokenization to touch) rather than
+    # requiring an exact spelling match.
+    remaining = [(tok, val) for tok, val in placeholders.items() if tok not in text]
+
+    def _fuzzy_sub(m: re.Match) -> str:
+        chunk_digits = re.search(r"\d+", m.group(0))
+        if chunk_digits:
+            for tok, val in list(remaining):
+                tok_digits = re.search(r"\d+", tok)
+                if tok_digits and tok_digits.group(0) == chunk_digits.group(0):
+                    remaining.remove((tok, val))
+                    return val
+        return m.group(0)  # genuinely unmatched - leave it rather than guess wrong
+
+    return re.sub(r"QQ\w*QQ", _fuzzy_sub, text)
+
+
+def translate_segment(seg, mt_provider, source_lang: str, target_lang: str, cps: float,
+                       all_segments: list | None = None) -> None:
     """Translate one segment and pick the best-fitting candidate, mutating
     it in place. Pulled out of run()'s main loop so the webapp editor's
     "re-translate from corrected Swahili" action can call the exact same
     logic (via seg.source_final_text, which picks up a staff correction to
-    the source transcript) instead of a second copy of it drifting apart."""
+    the source transcript) instead of a second copy of it drifting apart.
+
+    all_segments (the job's full, ordered segment list) is optional only
+    for backward compatibility - pass it whenever you have it, so a
+    translation that's merely a little too long for its own slot gets a
+    real chance to fit into a directly-following silent gap instead of
+    being flagged or clipped unnecessarily (see _borrowed_budget_ms)."""
     seg.target_language = target_lang
-    seg.budget_ms = seg.duration_ms
+    seg.budget_ms = _borrowed_budget_ms(seg, all_segments)
     target_chars = max(10, int(seg.budget_ms / 1000 * cps))
 
-    r = mt_provider.translate(seg.source_final_text, target_chars, source_lang, target_lang)
-    seg.literal = r.get("literal") or ""
+    # Protect paragraph breaks / speaker tags / bracket caption tags from
+    # the translator itself before it ever sees them - see
+    # _protect_untranslatable's own docstring for the real bug this
+    # closes. Restored in every candidate the provider returns, not just
+    # whichever one ends up chosen, so an edit that changes which
+    # candidate fits best never re-exposes an un-restored placeholder.
+    protected_text, placeholders = _protect_untranslatable(seg.source_final_text)
+    r = mt_provider.translate(protected_text, target_chars, source_lang, target_lang)
+    seg.literal = _restore_untranslatable(r.get("literal"), placeholders)
     seg.translation_confidence = float(r.get("confidence") or 0.0)
     seg.cultural_notes = r.get("notes")
 
     candidates = [
-        {"text": r.get("spoken"), "similarity": 0.97, "variant": "spoken"},
-        {"text": r.get("shorter"), "similarity": 0.90, "variant": "shorter"},
-        {"text": r.get("longer"), "similarity": 0.95, "variant": "longer"},
-        {"text": r.get("literal"), "similarity": 1.00, "variant": "literal"},
+        {"text": _restore_untranslatable(r.get("spoken"), placeholders), "similarity": 0.97, "variant": "spoken"},
+        {"text": _restore_untranslatable(r.get("shorter"), placeholders) if r.get("shorter") else None,
+         "similarity": 0.90, "variant": "shorter"},
+        {"text": _restore_untranslatable(r.get("longer"), placeholders) if r.get("longer") else None,
+         "similarity": 0.95, "variant": "longer"},
+        {"text": seg.literal, "similarity": 1.00, "variant": "literal"},
     ]
     chosen, scored = timing.choose_candidate(candidates, seg.budget_ms, target_lang, cps)
 
@@ -152,10 +480,24 @@ def run(
     # ---------- 1. ASR ----------
     log(f"[1/5] Transcribing with {asr} ...")
     job.status = "transcribing"
-    job.segments = get_asr(asr).transcribe(audio_path, language=source_lang)
+    asr_provider = get_asr(asr)
+    job.segments = asr_provider.transcribe(audio_path, language=source_lang)
+    # TranskriptorASR (and any future provider with a real fallback) sets
+    # these on itself rather than raising - the manifest's own
+    # providers["asr"] must reflect what actually ran, not what was asked
+    # for, or an editor/client checking the job's real provenance would be
+    # misled about which transcriber actually produced this text.
+    if getattr(asr_provider, "fallback_used", False):
+        job.providers["asr"] = "faster-whisper"
+        reason = getattr(asr_provider, "fallback_reason", None)
+        if reason:
+            job.warnings.append(reason)
+        log(f"      {reason or 'ASR fell back to faster-whisper'}")
     if not job.source_duration_ms and job.segments:
         job.source_duration_ms = job.segments[-1].end_ms
-    log(f"      {len(job.segments)} segments, {job.source_duration_ms/1000:.1f}s")
+    job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
+    n_gaps = sum(1 for s in job.segments if s.segment_type == "gap")
+    log(f"      {len(job.segments)} segments ({n_gaps} non-speech), {job.source_duration_ms/1000:.1f}s")
     job.save(out / "manifest.json")
 
     # ---------- 2. Translate + fit ----------
@@ -165,7 +507,9 @@ def run(
     cps = timing.DEFAULT_CPS.get(target_lang, 14.0)
 
     for seg in job.segments:
-        translate_segment(seg, mt_provider, source_lang, target_lang, cps)
+        if seg.segment_type == "gap":
+            continue  # nothing to translate - a human tags these manually in Ereri
+        translate_segment(seg, mt_provider, source_lang, target_lang, cps, all_segments=job.segments)
 
     # Real dollar cost of this job's MT calls, when the provider tracks one
     # (ClaudeMT does; local/stub/AWS providers don't accrue a real per-call
@@ -190,8 +534,12 @@ def run(
         # see the warning in providers/tts.py:XTTSCloneTTS. Single-speaker
         # assumption: takes the longest segment as the cleanest sample.
         # Multi-speaker sources need diarization (not built yet - roadmap).
-        if tts == "xtts" and not voice_id and job.segments:
-            ref_seg = max(job.segments, key=lambda s: s.duration_ms)
+        # Speech segments only - a long music/silence gap could easily be
+        # the single longest segment in the file, which would extract a
+        # "voice" reference clip containing no voice at all.
+        speech_segments = [s for s in job.segments if s.segment_type != "gap"]
+        if tts == "xtts" and not voice_id and speech_segments:
+            ref_seg = max(speech_segments, key=lambda s: s.duration_ms)
             ref_end = min(ref_seg.end_ms, ref_seg.start_ms + 20_000)
             ref_path = out / "reference_speaker.wav"
             if extract_reference_clip(audio_path, ref_seg.start_ms, ref_end, str(ref_path)):
@@ -206,31 +554,37 @@ def run(
                 job.warnings.append("ffmpeg not found - could not extract voice-clone reference")
 
         for seg in job.segments:
-            text = seg.final_text.strip()
+            if seg.segment_type == "gap":
+                # Real music/applause/laughter/SFX bed from the source,
+                # not silence - see render_gap_audio's own docstring.
+                if not render_gap_audio(seg, audio_path, out / "segments", tts_provider.sample_rate):
+                    job.warnings.append(
+                        f"ffmpeg not found - {seg.segment_id} (non-speech) rendered as silence")
+                continue
+            # A leading speaker tag ("RIGATHI GACHAGUA:") is caption
+            # metadata, not a line to speak aloud - a real voice actor
+            # reading a transcript doesn't say the character's name before
+            # their own line either. Stripped only for what's SYNTHESIZED;
+            # to_srt/to_vtt still caption the full text, tag included.
+            _tag, text = split_off_speaker_tag(seg.final_text.strip())
+            text = text.strip()
+            # Same reasoning, for an inline [Applause]/[MUZIKI YACHEZA]
+            # sound tag typed into an otherwise-spoken segment's text - the
+            # voice reads the real words, never the bracket tag itself.
+            text = strip_bracket_tags_for_tts(text)
             if not text:
                 continue
             raw = out / "segments" / f"{seg.segment_id}.wav"
-            rendered = tts_provider.synthesize(text, str(raw), voice_id=voice_id)
-
-            # Only stretch if we must, and never beyond the cap.
-            need = timing.required_stretch_pct(rendered, seg.budget_ms)
-            if abs(need) > 1.0 and abs(need) <= timing.MAX_STRETCH_PCT:
-                factor = rendered / seg.budget_ms
-                fixed = out / "segments" / f"{seg.segment_id}_fit.wav"
-                if time_stretch(str(raw), str(fixed), factor):
-                    raw = fixed
-                    rendered = seg.budget_ms
-                    seg.time_stretch_pct = round(need, 2)
-                else:
-                    job.warnings.append("ffmpeg not found - segments not time-fitted")
-            elif abs(need) > timing.MAX_STRETCH_PCT:
-                seg.review_flag = True
-                if "stretch_cap_exceeded" not in seg.review_reasons:
-                    seg.review_reasons.append("stretch_cap_exceeded")
+            # Multi-speaker consistency: a segment whose speaker has an
+            # assigned voice (job.speaker_voices) uses THAT instead of the
+            # order's single default - see resolve_voice_for_segment.
+            seg_voice_id = resolve_voice_for_segment(job, seg, voice_id, tts)
+            rendered = tts_provider.synthesize(text, str(raw), voice_id=seg_voice_id)
+            raw, rendered = apply_stretch_fit(seg, raw, rendered, out / "segments", job.warnings)
 
             seg.audio_path = str(raw)
             seg.rendered_duration_ms = rendered
-            seg.voice_id = voice_id or tts_provider.name
+            seg.voice_id = seg_voice_id or tts_provider.name
 
         # ---------- 4. Mix ----------
         log("[4/5] Mixing timeline ...")

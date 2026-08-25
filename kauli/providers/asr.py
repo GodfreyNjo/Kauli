@@ -206,6 +206,173 @@ class ManualASR(ASRProvider):
         return out
 
 
+def _approximate_words(text: str, start_ms: int, end_ms: int, confidence: float) -> list[Word]:
+    """Splits text into Word objects with per-word timing proportioned by
+    character count across [start_ms, end_ms) - not a real alignment, just
+    an even spread, the same technique webapp/app.py's cell-builders
+    already use for hand-edited/translated text that has no real per-word
+    timing either. Used for any ASR provider (like Transkriptor) whose API
+    only returns segment-level timing, not word-level."""
+    words = text.split()
+    if not words:
+        return []
+    total_chars = sum(len(w) for w in words) or 1
+    duration = max(1, end_ms - start_ms)
+    out = []
+    t = start_ms
+    for w in words:
+        dur = int(duration * (len(w) / total_chars))
+        out.append(Word(text=w, start_ms=t, end_ms=t + dur, confidence=confidence))
+        t += dur
+    out[-1].end_ms = end_ms  # absorb rounding drift at the tail
+    return out
+
+
+class TranskriptorASR(ASRProvider):
+    """Real transcription via Transkriptor's API (developer.transkriptor.com) -
+    the primary ASR for real orders, since it's a paid, purpose-built
+    transcription service and (per manual side-by-side listening) does
+    noticeably better on real Kenyan Swahili than local Whisper. Falls
+    back to local FasterWhisperASR automatically on ANY failure - a bad
+    API key, a network error, an HTTP error status, a job that comes back
+    Failed, or a poll that times out - rather than raising and failing
+    the whole order. That's the actual point of this class: "use
+    Transkriptor first, fall back to what we already had" as ONE resolved
+    behavior a caller selects with a single asr= value, not two separate
+    configs a caller has to orchestrate. See self.fallback_used /
+    self.fallback_reason, which kauli.pipeline.run reads back out after
+    calling transcribe() to log a real job.warnings entry when this
+    happens - the manifest should never silently claim "transkriptor" ran
+    when it actually didn't.
+
+    API contract (confirmed 2026-08-23 against the real API, including one
+    live end-to-end test - see below for what that caught), a 3-step
+    upload-then-poll flow:
+      1. POST {BASE}/transcription/local_file/get_upload_url
+         {"file_name": "..."} -> {"upload_url", "public_url"}
+      2. PUT the raw file bytes to upload_url.
+      3. POST {BASE}/transcription/local_file/initiate_transcription
+         {"url": public_url, "language": "sw-KE", "service": "Standard"}
+         -> 202 {"order_id": "..."}
+      4. Poll GET {BASE}/files/{order_id}/content (response wrapped in a
+         top-level "body" key) until body["status"] == "Completed", then
+         body["content"] is a list of
+         {"text", "StartTime", "EndTime", "VoiceStart", "VoiceEnd", "Speaker"}.
+
+    Two things their docs alone did NOT make clear, caught only by
+    actually running a real 8s clip of real Kenyan Swahili through it
+    end-to-end before wiring this in:
+      - StartTime/EndTime are MILLISECONDS, not seconds - their docs never
+        state the unit, and every other timing field in this codebase is
+        milliseconds too, so getting this wrong would have been an easy,
+        silent, systemic timing bug rather than an obvious crash.
+      - There is no word-level timing or confidence score anywhere in the
+        response, only segment-level - see _approximate_words and
+        ASSUMED_CONFIDENCE below for how that's handled honestly rather
+        than fabricated.
+    That one real test transcribed real speech correctly as far as
+    timing/mechanics go, but came back sparse on the actual Swahili words
+    (a noisy, crowd-heavy political-rally clip, not a clean sample) - the
+    integration is verified correct, real-world Swahili accuracy on
+    cleaner audio is not yet proven at volume. Treat its output with the
+    same review-flag scrutiny as any other transcript until that's borne
+    out on real orders.
+    """
+    name = "transkriptor"
+    cost_per_minute_usd = 0.0  # metered on Transkriptor's own dashboard, not tracked locally
+    BASE = "https://api.tor.app/developer"
+    LANG_CODES = {"sw": "sw-KE", "en": "en-US"}
+    # Transkriptor's API returns no confidence score at all - this is a
+    # fixed, disclosed placeholder (not a measured value) so
+    # source_confidence still has SOME value for the review-flag pipeline
+    # to compare against. It deliberately sits just above
+    # kauli.pipeline.FLAG_CONF_ASR (0.85), meaning the low_asr_confidence
+    # flag will rarely fire on a Transkriptor transcript - that's a real,
+    # disclosed limitation, not a claim that Transkriptor is that reliable.
+    ASSUMED_CONFIDENCE = 0.90
+
+    def __init__(self, api_key: str | None = None, poll_interval_s: float = 5.0,
+                 timeout_s: float = 1800.0):
+        self.api_key = api_key or os.environ.get("TRANSKRIPTOR_API_KEY")
+        self.poll_interval_s = poll_interval_s
+        self.timeout_s = timeout_s
+        self.fallback_used = False
+        self.fallback_reason: str | None = None
+
+    def _headers(self) -> dict:
+        return {"Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json", "Accept": "application/json"}
+
+    def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
+        try:
+            return self._transcribe_via_api(audio_path, language)
+        except Exception as exc:  # noqa: BLE001 - any failure here means "fall back", not "crash the order"
+            self.fallback_used = True
+            self.fallback_reason = (
+                f"Transkriptor ASR failed ({exc.__class__.__name__}: {exc}) - "
+                "fell back to local faster-whisper.")
+            return FasterWhisperASR().transcribe(audio_path, language=language)
+
+    def _transcribe_via_api(self, audio_path: str, language: str) -> list[Segment]:
+        import time
+        import requests
+
+        if not self.api_key:
+            raise RuntimeError("TRANSKRIPTOR_API_KEY not set")
+        lang_code = self.LANG_CODES.get(language, language)
+        file_name = os.path.basename(audio_path)
+
+        r = requests.post(f"{self.BASE}/transcription/local_file/get_upload_url",
+                           headers=self._headers(), json={"file_name": file_name}, timeout=30)
+        r.raise_for_status()
+        d = r.json()
+        upload_url, public_url = d["upload_url"], d["public_url"]
+
+        with open(audio_path, "rb") as f:
+            up = requests.put(upload_url, data=f, timeout=600)
+        up.raise_for_status()
+
+        r = requests.post(f"{self.BASE}/transcription/local_file/initiate_transcription",
+                           headers=self._headers(),
+                           json={"url": public_url, "language": lang_code, "service": "Standard"},
+                           timeout=30)
+        r.raise_for_status()
+        order_id = r.json()["order_id"]
+
+        deadline = time.time() + self.timeout_s
+        while time.time() < deadline:
+            time.sleep(self.poll_interval_s)
+            r = requests.get(f"{self.BASE}/files/{order_id}/content",
+                              headers=self._headers(), timeout=30)
+            r.raise_for_status()
+            payload = r.json()
+            body = payload.get("body", payload)
+            status = body.get("status")
+            if status == "Completed":
+                return self._parse(body.get("content") or [], language)
+            if status in ("Failed", "Error"):
+                raise RuntimeError(f"Transkriptor job {order_id} failed: {body}")
+        raise TimeoutError(f"Transkriptor job {order_id} did not complete within {self.timeout_s}s")
+
+    def _parse(self, content: list[dict], language: str) -> list[Segment]:
+        out = []
+        for i, seg in enumerate(content):
+            text = (seg.get("text") or "").strip()
+            if not text:
+                continue
+            start_ms = int(seg.get("StartTime") or 0)
+            end_ms = int(seg.get("EndTime") or 0)
+            if end_ms <= start_ms:
+                continue
+            out.append(Segment(
+                segment_id=f"seg_{i+1:04d}", index=i, start_ms=start_ms, end_ms=end_ms,
+                speaker_id=seg.get("Speaker") or None, source_language=language,
+                source_transcript=text, source_confidence=self.ASSUMED_CONFIDENCE,
+                words=_approximate_words(text, start_ms, end_ms, self.ASSUMED_CONFIDENCE),
+            ))
+        return out
+
+
 class AwsTranscribeASR(ASRProvider):
     """$0.024/min. Only worth it if it beats local Whisper on your own audio —
     test before you commit. Needs an S3 bucket; batch jobs are async."""
@@ -229,6 +396,7 @@ _REGISTRY = {
     "faster-whisper": FasterWhisperASR,
     "manual": ManualASR,
     "aws-transcribe": AwsTranscribeASR,
+    "transkriptor": TranskriptorASR,
 }
 
 

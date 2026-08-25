@@ -106,81 +106,182 @@ ADDONS = {
         "rate_per_min": 1.50,
         "included_in": (),
     },
+    # A real professional human voice actor records the dub, instead of
+    # (or as well as - the AI dub still gets made either way, see
+    # webapp/app.py's create_order) synthetic TTS. Only offered on the
+    # "dub" service level - nothing to voice on transcription/translation.
+    #
+    # $2.50/audio-minute is a STARTING PROPOSAL, not an observed market
+    # rate - there is no real cost data yet (see PENDING note below), only
+    # the same reasoning manual_transcription above used: professional
+    # voice-over on international freelance platforms commonly runs
+    # $2.50-$6.50/finished-minute, East African rates for Swahili/Kikuyu
+    # talent are meaningfully lower than that range but not reliably
+    # documented anywhere Kauli can cite - this sits at the low end of the
+    # international range as a safe starting point. Revisit the moment you
+    # have a real quoted rate from an actual actor - see
+    # voice_actors.rate_per_min_usd, which is what ACTUAL payouts are
+    # computed from per actor, not this flat number. This is only the
+    # client-facing asking price before an actor is even cast.
+    "human_voice_over": {
+        "name": "Real human voice actor (instead of AI dub voice)",
+        "rate_per_min": 2.50,
+        "included_in": (),
+    },
 }
+
+# Rush processing: a client-chosen surcharge on a single order in exchange
+# for real, manual priority in the review queue - Godfrey picking it up and
+# working it first, not a faster pipeline (there's still one operator and
+# one background worker thread, see worker.py). Previously left
+# undecided/declined (see tat.py's older docstring) since there was no real
+# rush-pricing decision to build against; there is now. A flat percentage
+# of the order's full (undiscounted) service value, not a per-minute
+# ADDONS-style rate - the "sacrifice" scales with how much real work is
+# being reprioritized, same reasoning as the plan discount already being a
+# percentage rather than a flat amount. Applies even to a free-trial
+# preview's minutes (see order_cost_usd) - jumping the queue is a real ask
+# whether or not the underlying minutes were free.
+RUSH_SURCHARGE_PCT = 0.50
+
+# Enterprise SLA credit: if an order's real, client-facing promise
+# (tat.py's deadline_at - already includes a 20% buffer specifically so a
+# normal day delivers early, not exactly on time) passes with the order
+# still not delivered, the client gets this fraction of what they paid
+# for that order back as wallet credit, automatically - see
+# webapp/app.py's _deadline_watch_once, which already detects a missed
+# deadline for the staff alert and now also triggers this. Only
+# "enterprise" tier - the plan whose whole pitch is dedicated turnaround
+# and a "real account manager", so a broken promise there is the one that
+# most needs a real, unprompted remedy rather than waiting for the client
+# to notice and complain. 10% sits at the generous end of the 5-10% range
+# real SLA credit policies commonly use - a broken promise to your
+# highest-tier client is worth erring toward generous, not the minimum
+# defensible number. Revisit once you have real missed-deadline data to
+# weigh against actual margin impact.
+ENTERPRISE_SLA_CREDIT_PCT = 0.10
+
+
+# Credits: a fixed, tier-agnostic unit of prepaid value - 1 credit = $0.10,
+# chosen because every current SERVICE_LEVELS/ADDONS rate divides into it
+# as a whole number (transcribe 4/min, translate 9/min, dub 15/min, video
+# deliverables 3/min, manual transcription 15/min), so "how far will my
+# credits go" is always a clean number regardless of which tier they're
+# spent on. Replaces the old "wallet minutes" - those were purchased at a
+# price benchmarked off the dub rate but then spent minute-for-minute on
+# ANY tier including much cheaper ones, letting a client extract far more
+# real service value than they paid for (100 minutes bought at dub pricing
+# spent entirely on transcribe-tier orders, which cost less than a third as
+# much per minute). A credit's dollar value doesn't change with what it's
+# spent on, so that mismatch can't happen.
+CREDITS_PER_DOLLAR = 10
+
+
+def usd_to_credits(usd: float) -> float:
+    return usd * CREDITS_PER_DOLLAR
+
+
+def credits_to_usd(credits: float) -> float:
+    return credits / CREDITS_PER_DOLLAR
 
 
 def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_available: float,
-                    addons: list[str] | None = None, wallet_minutes_available: float = 0.0) -> dict:
+                    addons: list[str] | None = None, wallet_credits_available: float = 0.0,
+                    rush: bool = False) -> dict:
     """The actual per-order charge: apply whatever's left of the free
-    monthly allowance first, then whatever's left of any prepaid wallet
-    balance (bought in bulk, see WALLET_PACKAGES - already paid for, so it
-    reduces this order's bill the same way free minutes do), discount
-    whatever's still unpaid by the client's plan, price it at the chosen
-    service level's rate, then add any paid add-ons on top (add-ons are
-    priced against the FULL minute count, not reduced by free/wallet
-    minutes or the plan discount - they're an upgrade on top of the base
-    service, not part of what those cover). Returns a full breakdown, not
-    just a number, so the checkout page can show its work rather than
-    asking someone to trust a single figure."""
+    monthly allowance first (in minutes - the trial is always denominated
+    in minutes of transcription, see FREE_MINUTES_SERVICE_LEVEL), discount
+    whatever's still unpaid by the client's plan, then apply whatever's
+    left of any prepaid credit balance as real dollar value against that
+    discounted base cost (never against add-ons or the rush surcharge -
+    those are upgrades on top of the base service, not part of what a
+    credit balance covers, matching the plan discount's own scope). Add-ons
+    and the rush surcharge are priced against the FULL minute count/value,
+    not reduced by free minutes or the plan discount. Returns a full
+    breakdown, not just a number, so the checkout page can show its work
+    rather than asking someone to trust a single figure."""
     addons = [a for a in (addons or []) if a in ADDONS and plan not in ADDONS[a]["included_in"]]
     rate = SERVICE_LEVELS[service_level]["rate_per_min"]
     discount = PLANS[plan]["discount"]
+
     free_applied = min(minutes, max(0.0, free_minutes_available))
-    after_free = max(0.0, minutes - free_applied)
-    wallet_applied = min(after_free, max(0.0, wallet_minutes_available))
-    billable_minutes = max(0.0, after_free - wallet_applied)
+    billable_minutes = max(0.0, minutes - free_applied)
     gross = round(billable_minutes * rate, 2)
     discount_amount = round(gross * discount, 2)
+    after_discount = round(gross - discount_amount, 2)
+
+    credits_value_usd = credits_to_usd(max(0.0, wallet_credits_available))
+    credits_applied_usd = round(min(after_discount, credits_value_usd), 2)
+    credits_applied = round(usd_to_credits(credits_applied_usd), 2)
+
     addon_lines = [{"key": a, "name": ADDONS[a]["name"], "rate_per_min": ADDONS[a]["rate_per_min"],
                      "cost_usd": round(ADDONS[a]["rate_per_min"] * minutes, 2)} for a in addons]
     addon_cost = round(sum(line["cost_usd"] for line in addon_lines), 2)
-    total = round(gross - discount_amount + addon_cost, 2)
+
+    # See RUSH_SURCHARGE_PCT's comment - a % of the FULL, undiscounted
+    # service value, applied even on minutes free/credits would otherwise
+    # cover (real prioritization work, not a discount-eligible line item).
+    full_service_value = round(minutes * rate, 2)
+    rush_surcharge_usd = round(full_service_value * RUSH_SURCHARGE_PCT, 2) if rush else 0.0
+
+    total = round(after_discount - credits_applied_usd + addon_cost + rush_surcharge_usd, 2)
     return {
         "minutes": round(minutes, 2), "rate_per_min": rate,
         "free_minutes_applied": round(free_applied, 2),
-        "wallet_minutes_applied": round(wallet_applied, 2),
         "billable_minutes": round(billable_minutes, 2),
         "gross_usd": gross, "discount_pct": discount, "discount_usd": discount_amount,
+        "credits_applied": credits_applied, "credits_applied_usd": credits_applied_usd,
         "addons": addon_lines, "addon_cost_usd": addon_cost,
+        "rush": rush, "rush_surcharge_usd": rush_surcharge_usd,
         "total_usd": total,
     }
 
 
-# Bulk minute packages, purchased once via the same Paystack/M-Pesa/bank
-# checkout as everything else - priced at a modest discount off the "dub"
-# service level's rate (the most expensive/common tier) as the bulk-buy
-# incentive, never expire, and stack with (get applied after) the monthly
-# free allowance on every order until used up.
-WALLET_PACKAGES = {
-    "30": {"minutes": 30, "price_usd": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.90, 2)},
-    "60": {"minutes": 60, "price_usd": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.85, 2)},
-    "150": {"minutes": 150, "price_usd": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.80, 2)},
+# Bulk credit packages, purchased once via the same Paystack/M-Pesa/bank
+# checkout as everything else - never expire, and stack with (get applied
+# after) the monthly free minutes allowance on every order until used up.
+# Same $ prices as the old fixed minute packages (30/60/150 min "at dub
+# pricing, 10/15/20% off"); credits here are just that same real dollar
+# value re-expressed in the new tier-agnostic unit (minutes * dub rate *
+# CREDITS_PER_DOLLAR) - nobody who already bought one of these gets less
+# than they paid for, they can just now spend it honestly at any tier.
+CREDIT_PACKAGES = {
+    "30": {"credits": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
+           "price_usd": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.90, 2)},
+    "60": {"credits": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
+           "price_usd": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.85, 2)},
+    "150": {"credits": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
+            "price_usd": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.80, 2)},
 }
 
 # Same discount schedule as the fixed packages above, generalized to any
-# client-chosen amount - the tier boundaries and discounts match the 30/60/
-# 150 packages exactly (10%/15%/20%), just not limited to those three exact
-# numbers. Below 30 minutes: no discount, same as buying at the normal rate.
-WALLET_CUSTOM_MIN_MINUTES = 5
-WALLET_CUSTOM_MAX_MINUTES = 2000
-_WALLET_DISCOUNT_TIERS = [(150, 0.20), (60, 0.15), (30, 0.10), (0, 0.0)]
+# client-chosen dollar amount - the tier boundaries and discounts match the
+# fixed packages exactly (10%/15%/20%, at 30/60/150 minutes-of-dub-value
+# equivalent spend), just not limited to those three exact amounts.
+CREDIT_CUSTOM_MIN_MINUTES_EQUIV = 5
+CREDIT_CUSTOM_MAX_MINUTES_EQUIV = 2000
+_CREDIT_DISCOUNT_TIERS = [(150, 0.20), (60, 0.15), (30, 0.10), (0, 0.0)]
 
 
-def wallet_discount_pct(minutes: float) -> float:
-    for threshold, pct in _WALLET_DISCOUNT_TIERS:
-        if minutes >= threshold:
+def credit_discount_pct(minutes_equiv: float) -> float:
+    for threshold, pct in _CREDIT_DISCOUNT_TIERS:
+        if minutes_equiv >= threshold:
             return pct
     return 0.0
 
 
-def wallet_custom_price(minutes: float) -> dict:
-    """Same math as the fixed WALLET_PACKAGES, just for a client-typed
-    amount instead of one of three preset ones."""
-    discount = wallet_discount_pct(minutes)
-    base = minutes * SERVICE_LEVELS["dub"]["rate_per_min"]
-    price = round(base * (1 - discount), 2)
-    return {"minutes": minutes, "discount_pct": discount, "price_usd": price,
-            "you_save_usd": round(base - price, 2)}
+def custom_credit_price(minutes_equiv: float) -> dict:
+    """Same math as the fixed CREDIT_PACKAGES, just for a client-typed
+    spend amount instead of one of three preset ones - minutes_equiv is
+    "how many dub-rate minutes of value is this", the same reference point
+    the fixed packages use, purely to keep one familiar discount ladder;
+    the actual balance credited is always in real credits."""
+    discount = credit_discount_pct(minutes_equiv)
+    base_usd = minutes_equiv * SERVICE_LEVELS["dub"]["rate_per_min"]
+    price = round(base_usd * (1 - discount), 2)
+    credits = round(minutes_equiv * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR)
+    return {"credits": credits, "discount_pct": discount, "price_usd": price,
+            "you_save_usd": round(base_usd - price, 2)}
 
 # --------------------------------------------------------- cost estimates ----
 # For the internal margin dashboard (staff/ops) only - never shown to

@@ -218,6 +218,38 @@ CREATE TABLE IF NOT EXISTS receipts (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 
+-- A one-click satisfaction rating from an email link (see app.py's
+-- _queue_first_payment_message) - real, low-stakes, not signed/tokenized
+-- the way a payment or auth action would be (same trust level as an
+-- order ID or receipt ID elsewhere in this app: a real, non-sequential
+-- id in the URL, not a security boundary). 'needs_work' notifies staff
+-- immediately - this is the churn-risk signal worth acting on same-day.
+CREATE TABLE IF NOT EXISTS client_feedback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    context TEXT NOT NULL,        -- e.g. 'first_payment'
+    rating TEXT NOT NULL,         -- 'great' | 'good' | 'needs_work'
+    created_at REAL NOT NULL
+);
+
+-- A real, staff-composed newsletter (see app.py's /staff/newsletter) -
+-- every field here is content a staff member actually typed or picked,
+-- not AI-generated and auto-sent. Kept as a real record for the same
+-- reason receipts/onboarding_messages are: an audit trail of what
+-- actually went out and to how many people, not just a fire-and-forget
+-- action with no history.
+CREATE TABLE IF NOT EXISTS newsletters (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    blog_post_id TEXT,             -- the "Signal-First" highlight, if one was picked
+    feature_update TEXT,           -- the "Kauli Scoop" - real, staff-written text
+    industry_trend_text TEXT,
+    industry_trend_url TEXT,
+    sent_by TEXT NOT NULL,
+    recipient_count INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL
+);
+
 -- A client pushing back on a limit the system applied to their account
 -- (a rate limit, a plan restriction) - "Think this is a mistake?" on the
 -- error/limit message itself, not a generic contact form. 'open' ->
@@ -295,6 +327,53 @@ CREATE TABLE IF NOT EXISTS onboarding_messages (
 -- Immutable trail of every upload attempt (accepted or rejected) - see
 -- webapp/upload_security.py. Not editable from anywhere in the app on
 -- purpose; this is the audit record, not a working table.
+-- Human voice-over talent roster. Staff-managed for now, by design - see
+-- webapp/app.py's staff_voice_actors routes. No self-service actor
+-- login/portal exists yet because there are no real actors onboarded to
+-- build one around; add that the moment recruiting produces real people
+-- who'd actually use it, not speculatively ahead of them.
+CREATE TABLE IF NOT EXISTS voice_actors (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,                -- for arranging the real payout, not stored as a payment credential
+    languages TEXT NOT NULL,   -- comma-separated, e.g. "sw,en" - matches order source/target_lang values
+    bio TEXT,
+    rate_per_min_usd REAL,     -- negotiated per actor - see billing.ADDONS['human_voice_over']'s own
+                                -- comment on why this is NOT a single platform-wide rate
+    status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'inactive'
+    notes TEXT,                -- internal only, staff-visible
+    created_at REAL NOT NULL,
+    user_id TEXT                -- linked once this actor actually signs up (see is_invited_voice_actor /
+                                 -- link_voice_actor_user) - NULL means staff added them to the roster but
+                                 -- they haven't created a real login yet.
+);
+
+-- What's owed/paid to a voice actor for one order's work - a real ledger
+-- staff maintains by hand, not something a payment API writes to. No
+-- M-Pesa/Paystack Transfer integration exists here on purpose (moving
+-- real money to a third party needs a human to actually send it and a
+-- real payout-capable account, neither of which this build has) - a row
+-- here is created once an actor's work on an order is ready to be paid
+-- for, and marked 'paid' once staff has actually sent that real transfer
+-- outside this system. See webapp/app.py's create_payout / mark_payout_paid.
+CREATE TABLE IF NOT EXISTS voice_actor_payouts (
+    id TEXT PRIMARY KEY,
+    actor_id TEXT NOT NULL,
+    order_id TEXT NOT NULL,
+    minutes REAL NOT NULL,
+    rate_per_min_usd REAL NOT NULL,
+    amount_usd REAL NOT NULL,
+    status TEXT NOT NULL DEFAULT 'owed',  -- 'owed' | 'paid'
+    paid_at REAL,
+    paid_by TEXT,               -- staff user id who confirmed the real transfer was sent
+    paid_reference TEXT,        -- e.g. an M-Pesa transaction code, for their own records
+    created_at REAL NOT NULL,
+    FOREIGN KEY (actor_id) REFERENCES voice_actors(id),
+    FOREIGN KEY (order_id) REFERENCES orders(id),
+    FOREIGN KEY (paid_by) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS upload_audit_log (
     id TEXT PRIMARY KEY,
     user_id TEXT,
@@ -330,6 +409,15 @@ def get_conn() -> sqlite3.Connection:
     # get real ones - a real migration tool's job, not a quick patch here,
     # so this only starts enforcing what's already declared.
     conn.execute("PRAGMA foreign_keys = ON")
+    # WAL (write-ahead log) instead of SQLite's default rollback journal -
+    # readers no longer block behind a writer (or vice versa), which
+    # matters the moment this is a real deployment with a client browsing
+    # their order while staff corrects a segment in Ereri, instead of one
+    # person on one laptop. A real, persistent, file-level setting (not
+    # per-connection like foreign_keys above) - this line just makes sure
+    # it's actually on rather than assuming a prior connection already set
+    # it. Free, no schema change, safe to flip any time.
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -407,6 +495,29 @@ def init_db() -> None:
     env_staff = {e.strip().lower() for e in os.environ.get("KAULI_STAFF_EMAILS", "").split(",") if e.strip()}
     for email in env_staff:
         conn.execute("UPDATE users SET is_admin = 1 WHERE lower(email) = ?", (email,))
+    # Backfill for clients who signed up BEFORE the auto-add-to-CRM logic
+    # above existed - same "reconcile on every startup" reasoning as the
+    # staff-promotion block above it: idempotent (WHERE NOT EXISTS means a
+    # client only ever gets backfilled once), and self-heals if this ever
+    # needs to run again for any reason.
+    old_clients_missing_leads = conn.execute(
+        """SELECT id, email, display_name, created_at FROM users
+           WHERE role = 'client' AND NOT EXISTS (
+               SELECT 1 FROM leads WHERE lower(leads.email) = lower(users.email)
+           )"""
+    ).fetchall()
+    for u in old_clients_missing_leads:
+        new_lead_id = uuid.uuid4().hex[:12]
+        conn.execute(
+            "INSERT INTO leads (id, name, email, status, source, converted_user_id, created_at) "
+            "VALUES (?, ?, ?, 'won', 'signup', ?, ?)",
+            (new_lead_id, u["display_name"] or u["email"].split("@")[0], u["email"], u["id"], u["created_at"]),
+        )
+        conn.execute(
+            "INSERT INTO lead_notes (id, lead_id, author_id, body, created_at) VALUES (?, ?, NULL, ?, ?)",
+            (uuid.uuid4().hex[:12], new_lead_id,
+             "Backfilled - this account existed before clients were auto-added to the CRM.", time.time()),
+        )
     existing_blog_cols = {row["name"] for row in conn.execute("PRAGMA table_info(blog_posts)")}
     if "medium_url" not in existing_blog_cols:
         conn.execute("ALTER TABLE blog_posts ADD COLUMN medium_url TEXT")
@@ -594,6 +705,57 @@ def init_db() -> None:
         # flat "Order <id> - <plan> plan" figure, without recomputing
         # against whatever the client's plan/rates happen to be later.
         conn.execute("ALTER TABLE orders ADD COLUMN cost_breakdown_json TEXT")
+    if "is_rush" not in existing_order_cols:
+        # A client-chosen surcharge for real, manual queue priority - see
+        # billing.RUSH_SURCHARGE_PCT and tat.RUSH_TAT_MULTIPLIER. Frozen at
+        # order-creation time same as the rest of the billing snapshot
+        # above; also what gates the client-facing "Call us" phone option
+        # on a rush order that's actually in trouble (see order_detail.html).
+        conn.execute("ALTER TABLE orders ADD COLUMN is_rush INTEGER NOT NULL DEFAULT 0")
+    if "status_changed_at" not in existing_order_cols:
+        # When the order LAST actually changed status, not just any field -
+        # set alongside status in every one of the few places that assign
+        # it (update_order_status, flag_order_for_return,
+        # resume_returned_order). Powers the staff queue's "time in stage"
+        # column (see staff_dashboard.html) - the real bottleneck signal
+        # updated_at alone can't give you, since that also bumps on a
+        # message reply or a segment edit that never changed the status at
+        # all. Backfilled to created_at for existing rows - the honest
+        # "we don't actually know when it last changed, so treat it as
+        # since creation" default, not a fabricated timestamp.
+        conn.execute("ALTER TABLE orders ADD COLUMN status_changed_at REAL")
+        conn.execute("UPDATE orders SET status_changed_at = created_at WHERE status_changed_at IS NULL")
+    if "sla_credit_issued_at" not in existing_order_cols:
+        # Dedupe flag for billing.ENTERPRISE_SLA_CREDIT_PCT (see
+        # webapp/app.py's _deadline_watch_once) - same pattern as
+        # deadline_missed_alert_sent_at, just for "already credited",
+        # not "already alerted staff" - the two are independent so an
+        # order can't get double-credited on a later sweep.
+        conn.execute("ALTER TABLE orders ADD COLUMN sla_credit_issued_at REAL")
+    if "wants_human_voice_over" not in existing_order_cols:
+        # Client-selected addon (billing.ADDONS['human_voice_over']) - the
+        # AI dub still gets made regardless (nothing about the pipeline
+        # changes), this just marks that staff should also cast and
+        # deliver a real human voice-over for it. See voice_actor_id below
+        # for who's actually doing it.
+        conn.execute("ALTER TABLE orders ADD COLUMN wants_human_voice_over INTEGER NOT NULL DEFAULT 0")
+    if "voice_actor_id" not in existing_order_cols:
+        conn.execute("ALTER TABLE orders ADD COLUMN voice_actor_id TEXT")
+    existing_actor_cols = {row["name"] for row in conn.execute("PRAGMA table_info(voice_actors)")}
+    if existing_actor_cols and "user_id" not in existing_actor_cols:
+        # existing_actor_cols is empty only on a genuinely fresh DB where
+        # the CREATE TABLE above (which already includes user_id) just
+        # ran for the first time - PRAGMA table_info on a table that
+        # doesn't exist yet returns no rows, not an error, so this guard
+        # skips the redundant ALTER rather than running it against a
+        # table that already has the column.
+        conn.execute("ALTER TABLE voice_actors ADD COLUMN user_id TEXT")
+    if "orders_status_idx" not in {row["name"] for row in conn.execute("PRAGMA index_list(orders)")}:
+        # The staff queue's filter tabs, list_orders_needing_ops_triage,
+        # list_orders_needing_deadline_check, and failure_rate all filter
+        # by status - a real, cheap win once order volume grows past what
+        # a full table scan handles instantly.
+        conn.execute("CREATE INDEX orders_status_idx ON orders(status)")
     existing_sub_cols = {row["name"] for row in conn.execute("PRAGMA table_info(subscriptions)")}
     if "wallet_minutes" not in existing_sub_cols:
         # A prepaid balance, bought in bulk via the SAME Paystack/M-Pesa/bank
@@ -602,10 +764,22 @@ def init_db() -> None:
         # order_cost_usd's waterfall right after free minutes and before
         # anything gets billed at the per-minute rate.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN wallet_minutes REAL NOT NULL DEFAULT 0")
+    if "wallet_credits" not in existing_sub_cols:
+        # Replaces wallet_minutes (kept, unused, rather than dropped -
+        # SQLite column drops are a heavier migration than this needs) -
+        # see billing.py's CREDITS_PER_DOLLAR comment for why raw minutes
+        # was the wrong unit to track a prepaid balance in. One-time
+        # migration below converts any real existing balance to its true
+        # dollar-equivalent credits (it was purchased at the dub rate, see
+        # the old WALLET_PACKAGES) rather than just zeroing it out - 15 =
+        # dub's $1.50/min * CREDITS_PER_DOLLAR's 10, hardcoded rather than
+        # imported from billing.py to keep this file a pure data layer.
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN wallet_credits REAL NOT NULL DEFAULT 0")
+        conn.execute("UPDATE subscriptions SET wallet_credits = wallet_minutes * 15 WHERE wallet_minutes > 0")
     if "wallet_low_alert_sent_at" not in existing_sub_cols:
         # Dedupes the low-balance email (see app.py's create_order) so it
         # fires once when the balance actually crosses the threshold, not
-        # again on every order after - add_wallet_minutes clears this on
+        # again on every order after - add_wallet_credits clears this on
         # any real top-up, so the next time it drops low again, it alerts
         # again.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN wallet_low_alert_sent_at REAL")
@@ -732,6 +906,26 @@ def get_or_create_user(user_id: str, email: str, default_role: str, display_name
             conn.execute(
                 "INSERT INTO lead_notes (id, lead_id, author_id, body, created_at) VALUES (?, ?, NULL, ?, ?)",
                 (uuid.uuid4().hex[:12], lead["id"], "Automatically marked won - this email signed up for an account.", now),
+            )
+        # No tracked lead ever matched this email - most real signups won't
+        # have come through a tracked lead-gen channel at all, and staff
+        # need a full, real client list in the CRM, not just the subset
+        # that happened to arrive via a form. Only for client accounts -
+        # a staff account isn't a CRM contact. source='signup' keeps this
+        # visibly distinct from an actual marketing-sourced lead in the
+        # "by source" breakdown, rather than silently inflating some
+        # other channel's numbers.
+        if not matching_leads and default_role == "client":
+            new_lead_id = uuid.uuid4().hex[:12]
+            conn.execute(
+                "INSERT INTO leads (id, name, email, status, source, converted_user_id, created_at) "
+                "VALUES (?, ?, ?, 'won', 'signup', ?, ?)",
+                (new_lead_id, display_name or email.split("@")[0], email, user_id, now),
+            )
+            conn.execute(
+                "INSERT INTO lead_notes (id, lead_id, author_id, body, created_at) VALUES (?, ?, NULL, ?, ?)",
+                (uuid.uuid4().hex[:12], new_lead_id,
+                 "Auto-added - this account signed up directly, no tracked lead existed for this email.", now),
             )
         conn.commit()
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -1017,7 +1211,7 @@ def create_order(order_id: str, client_id: str, original_filename: str, audio_pa
                   source_lang: str, target_lang: str, tier: str,
                   asr: str, mt: str, tts: str, outdir: str,
                   source_youtube_id: str | None = None, idempotency_key: str | None = None,
-                  folder_name: str | None = None) -> str:
+                  folder_name: str | None = None, wants_human_voice_over: bool = False) -> str:
     # order_id is passed in (not generated here) so it matches the caller's
     # upload/output directory names and worker.submit_job() lookup - it used
     # to be generated independently here, which meant the DB row's id never
@@ -1029,11 +1223,11 @@ def create_order(order_id: str, client_id: str, original_filename: str, audio_pa
         """INSERT INTO orders
            (id, client_id, original_filename, audio_path, source_lang, target_lang,
             tier, asr, mt, tts, outdir, status, error, created_at, updated_at, source_youtube_id,
-            idempotency_key, folder_name)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', NULL, ?, ?, ?, ?, ?)""",
+            idempotency_key, folder_name, wants_human_voice_over)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', NULL, ?, ?, ?, ?, ?, ?)""",
         (order_id, client_id, original_filename, audio_path, source_lang, target_lang,
          tier, asr, mt, tts, outdir, now, now, source_youtube_id, idempotency_key,
-         (folder_name or "").strip() or None),
+         (folder_name or "").strip() or None, int(wants_human_voice_over)),
     )
     conn.commit()
     conn.close()
@@ -1048,6 +1242,22 @@ def list_folders_for_client(client_id: str) -> list[str]:
     ).fetchall()
     conn.close()
     return [r["folder_name"] for r in rows]
+
+
+def set_order_folder(order_id: str, client_id: str, folder_name: str | None) -> None:
+    """Re-files an EXISTING order into a folder, or clears it - folder_name
+    was previously only ever set once, at submission (see create_order's
+    folder_name param). client_id is checked in the same UPDATE, not as a
+    separate SELECT first - the caller passes the order_id from the
+    client's OWN order list, but this is the real ownership guard, not
+    just the query the route already ran."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE orders SET folder_name = ? WHERE id = ? AND client_id = ?",
+        ((folder_name or "").strip() or None, order_id, client_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def get_order_by_idempotency_key(client_id: str, idempotency_key: str):
@@ -1088,10 +1298,11 @@ def ai_spend_since(since_ts: float) -> float:
 
 
 def update_order_status(order_id: str, status: str, error: str | None = None) -> None:
+    now = time.time()
     conn = get_conn()
     conn.execute(
-        "UPDATE orders SET status = ?, error = ?, updated_at = ? WHERE id = ?",
-        (status, error, time.time(), order_id),
+        "UPDATE orders SET status = ?, error = ?, updated_at = ?, status_changed_at = ? WHERE id = ?",
+        (status, error, now, now, order_id),
     )
     conn.commit()
     conn.close()
@@ -1229,8 +1440,16 @@ def mark_deadline_missed_alert_sent(order_id: str) -> None:
     conn.close()
 
 
+def mark_sla_credit_issued(order_id: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE orders SET sla_credit_issued_at = ? WHERE id = ?", (time.time(), order_id))
+    conn.commit()
+    conn.close()
+
+
 def set_order_billing(order_id: str, service_level: str, duration_minutes: float, cost_usd: float,
-                       addons: list[str] | None = None, cost_breakdown: dict | None = None) -> None:
+                       addons: list[str] | None = None, cost_breakdown: dict | None = None,
+                       is_rush: bool = False) -> None:
     """Frozen at order-creation time (see billing.order_cost_usd) - a price
     change later must never retroactively change what an existing order
     owes or already paid. addons is stored as a small JSON list (e.g.
@@ -1241,9 +1460,9 @@ def set_order_billing(order_id: str, service_level: str, duration_minutes: float
     conn = get_conn()
     conn.execute(
         "UPDATE orders SET service_level = ?, duration_minutes = ?, cost_usd = ?, addons = ?, "
-        "cost_breakdown_json = ? WHERE id = ?",
+        "cost_breakdown_json = ?, is_rush = ? WHERE id = ?",
         (service_level, duration_minutes, cost_usd, json.dumps(addons or []),
-         json.dumps(cost_breakdown) if cost_breakdown else None, order_id),
+         json.dumps(cost_breakdown) if cost_breakdown else None, int(is_rush), order_id),
     )
     conn.commit()
     conn.close()
@@ -1330,11 +1549,39 @@ EXTRA_CHARGE_REASONS = {
 
 def flag_order_for_return(order_id: str, reason: str, note: str | None) -> None:
     assert reason in RETURN_REASONS
+    now = time.time()
     conn = get_conn()
     conn.execute(
-        "UPDATE orders SET status = 'editor_returned', return_reason = ?, return_note = ?, updated_at = ? WHERE id = ?",
-        (reason, note, time.time(), order_id),
+        """UPDATE orders SET status = 'editor_returned', return_reason = ?, return_note = ?,
+           updated_at = ?, status_changed_at = ? WHERE id = ?""",
+        (reason, note, now, now, order_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def resume_returned_order(order_id: str, new_audio_path: str | None = None,
+                           new_original_filename: str | None = None,
+                           new_duration_minutes: float | None = None) -> None:
+    """Puts a returned_to_client order back into real processing on the
+    SAME order - no second payment, no brand-new order row. Most returns
+    only need the client's reply on the message thread (nothing here
+    needed changing); a replacement file is only passed when the return
+    reason actually required one (e.g. no_audio) - see the
+    /client/orders/{id}/resume and /staff/orders/{id}/resume routes."""
+    now = time.time()
+    conn = get_conn()
+    if new_audio_path:
+        conn.execute(
+            """UPDATE orders SET audio_path = ?, original_filename = ?, duration_minutes = ?,
+               status = 'queued', updated_at = ?, status_changed_at = ? WHERE id = ?""",
+            (new_audio_path, new_original_filename, new_duration_minutes, now, now, order_id),
+        )
+    else:
+        conn.execute(
+            "UPDATE orders SET status = 'queued', updated_at = ?, status_changed_at = ? WHERE id = ?",
+            (now, now, order_id),
+        )
     conn.commit()
     conn.close()
 
@@ -1562,45 +1809,127 @@ def add_usage_minutes(user_id: str, minutes: float) -> None:
     conn.close()
 
 
-def wallet_minutes_remaining(user_id: str) -> float:
+def reserve_free_minutes(user_id: str, minutes_requested: float, cap: float) -> float:
+    """Atomically grants up to `minutes_requested` of this period's free
+    allowance and marks it used in the same step, returning how much was
+    actually granted (0 if none left). A plain read-then-later-write (the
+    old create_order flow: read free_minutes_remaining, decide the price,
+    only call add_usage_minutes afterwards) is a real double-spend window -
+    two submissions in quick succession can both read the same "5.0
+    remaining" snapshot and each get charged as if the full amount were
+    free, handing out more than one month's trial allowance. The
+    UPDATE...WHERE guard below only commits if minutes_used_this_period
+    still matches what we just read; if a concurrent request already
+    changed it, this retries against the fresh value instead of
+    overwriting it - a small, real compare-and-swap, not a fresh table
+    lock (SQLite's writer lock would serialize this fine too, but this
+    stays correct even against a future move to a real concurrent DB)."""
     conn = get_conn()
-    row = conn.execute("SELECT wallet_minutes FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
+    for _ in range(5):
+        row = conn.execute(
+            "SELECT minutes_used_this_period FROM subscriptions WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        used = (row["minutes_used_this_period"] or 0.0) if row else 0.0
+        remaining = max(0.0, cap - used)
+        grant = round(min(max(0.0, minutes_requested), remaining), 4)
+        if grant <= 0:
+            conn.close()
+            return 0.0
+        cur = conn.execute(
+            "UPDATE subscriptions SET minutes_used_this_period = minutes_used_this_period + ? "
+            "WHERE user_id = ? AND minutes_used_this_period = ?",
+            (grant, user_id, used),
+        )
+        conn.commit()
+        if cur.rowcount == 1:
+            conn.close()
+            return grant
+        # Lost the race against a concurrent request - loop and retry
+        # against the now-current value rather than granting on stale data.
     conn.close()
-    return max(0.0, row["wallet_minutes"]) if row else 0.0
+    return 0.0  # gave up after retries - safe default is to bill it, not free it
 
 
-def add_wallet_minutes(user_id: str, minutes: float) -> None:
+def wallet_credits_remaining(user_id: str) -> float:
+    conn = get_conn()
+    row = conn.execute("SELECT wallet_credits FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return max(0.0, row["wallet_credits"]) if row else 0.0
+
+
+def reserve_wallet_credits(user_id: str, credits_ceiling: float) -> float:
+    """Same compare-and-swap shape as reserve_free_minutes, for the same
+    reason: two near-simultaneous orders both reading the same "$X of
+    credits available" snapshot would each get the full discount applied
+    to their own total, over-crediting the account across the two (the
+    persisted balance still floors at 0 either way, but by then both
+    orders have already been billed as if that value covered each of them
+    individually - a real, if narrow, way to extract more discount than
+    the balance actually contains). credits_ceiling is the caller's own
+    cap - the real dollar value of the order's base cost, converted to
+    credits - never more than that gets reserved even if the balance is
+    bigger."""
+    conn = get_conn()
+    for _ in range(5):
+        row = conn.execute(
+            "SELECT wallet_credits FROM subscriptions WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        balance = (row["wallet_credits"] or 0.0) if row else 0.0
+        grant = round(min(max(0.0, credits_ceiling), max(0.0, balance)), 4)
+        if grant <= 0:
+            conn.close()
+            return 0.0
+        cur = conn.execute(
+            "UPDATE subscriptions SET wallet_credits = wallet_credits - ? "
+            "WHERE user_id = ? AND wallet_credits = ?",
+            (grant, user_id, balance),
+        )
+        conn.commit()
+        if cur.rowcount == 1:
+            conn.close()
+            return grant
+    conn.close()
+    return 0.0  # gave up after retries - safe default is to bill it, not credit it
+
+
+def add_wallet_credits(user_id: str, credits: float) -> None:
     """Credits a purchased top-up - called once the payment for it
-    actually completes (see app.py's _activate_payment, kind='wallet_topup').
+    actually completes (see app.py's _activate_payment, kind='credits_topup').
     Clears wallet_low_alert_sent_at too - a fresh top-up means the next
     time the balance actually drops low again, it's worth a new email,
     not silence because one fired once months ago."""
     conn = get_conn()
     conn.execute(
-        "UPDATE subscriptions SET wallet_minutes = wallet_minutes + ?, wallet_low_alert_sent_at = NULL "
+        "UPDATE subscriptions SET wallet_credits = wallet_credits + ?, wallet_low_alert_sent_at = NULL "
         "WHERE user_id = ?",
-        (minutes, user_id),
+        (credits, user_id),
     )
     conn.commit()
     conn.close()
 
 
-WALLET_LOW_THRESHOLD_MINUTES = 10.0
+# 75 credits = $7.50 of value at CREDITS_PER_DOLLAR=10 - the same real
+# dollar threshold the old WALLET_LOW_THRESHOLD_MINUTES=10 minutes
+# represented at the dub rate (10 * $1.50 = $15... actually kept
+# proportionate to a "worth topping up soon" balance rather than an exact
+# carry-over of the old number, since the old number was itself only ever
+# a round starting guess, not observed data).
+WALLET_LOW_THRESHOLD_CREDITS = 75.0
 
 
 def wallet_low_alert_needed(user_id: str) -> bool:
     """True once, the moment the balance is actually low and no alert has
     fired since the last top-up (or ever) - see wallet_low_alert_sent_at
-    above. Doesn't fire for an account that's simply never bought minutes
-    (wallet_minutes = 0 from day one isn't "running low", it's just unused)."""
+    above. Doesn't fire for an account that's simply never bought credits
+    (wallet_credits = 0 from day one isn't "running low", it's just unused)."""
     conn = get_conn()
     row = conn.execute(
-        "SELECT wallet_minutes, wallet_low_alert_sent_at FROM subscriptions WHERE user_id = ?", (user_id,)
+        "SELECT wallet_credits, wallet_low_alert_sent_at FROM subscriptions WHERE user_id = ?", (user_id,)
     ).fetchone()
     conn.close()
     if not row or row["wallet_low_alert_sent_at"]:
         return False
-    return 0 < row["wallet_minutes"] < WALLET_LOW_THRESHOLD_MINUTES
+    return 0 < row["wallet_credits"] < WALLET_LOW_THRESHOLD_CREDITS
 
 
 def mark_wallet_low_alert_sent(user_id: str) -> None:
@@ -1611,16 +1940,17 @@ def mark_wallet_low_alert_sent(user_id: str) -> None:
     conn.close()
 
 
-def consume_wallet_minutes(user_id: str, minutes: float) -> None:
-    """Called once per order, for whatever portion of it the wallet
-    actually covered (see billing.order_cost_usd's wallet_minutes_applied) -
-    never goes negative even if called with more than the balance."""
-    if minutes <= 0:
+def consume_wallet_credits(user_id: str, credits: float) -> None:
+    """Called once per order, for whatever portion of it the credit
+    balance actually covered (see billing.order_cost_usd's
+    credits_applied) - never goes negative even if called with more than
+    the balance."""
+    if credits <= 0:
         return
     conn = get_conn()
     conn.execute(
-        "UPDATE subscriptions SET wallet_minutes = MAX(0, wallet_minutes - ?) WHERE user_id = ?",
-        (minutes, user_id),
+        "UPDATE subscriptions SET wallet_credits = MAX(0, wallet_credits - ?) WHERE user_id = ?",
+        (credits, user_id),
     )
     conn.commit()
     conn.close()
@@ -1697,7 +2027,10 @@ def set_payment_receipt(payment_id: str, receipt_path: str | None, staff_note: s
     conn.close()
 
 
-def get_active_pending_payment_for_order(order_id: str, max_age_s: float = 900):
+PENDING_PAYMENT_MAX_AGE_S = 900  # named so the client-facing countdown (order_pay.html) can't drift from this
+
+
+def get_active_pending_payment_for_order(order_id: str, max_age_s: float = PENDING_PAYMENT_MAX_AGE_S):
     """Most recent still-fresh 'pending' payment for this order, if any.
     Real double-payment risk this closes: _checkout() used to create a
     brand-new payment record every time it was called, with nothing
@@ -1787,6 +2120,62 @@ def find_pending_mpesa_payment(checkout_request_id: str):
     ).fetchone()
     conn.close()
     return row
+
+
+# -------------------------------------------------------- client feedback ----
+def record_client_feedback(user_id: str, context: str, rating: str) -> str:
+    assert rating in ("great", "good", "needs_work")
+    feedback_id = uuid.uuid4().hex[:12]
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO client_feedback (id, user_id, context, rating, created_at) VALUES (?, ?, ?, ?, ?)",
+        (feedback_id, user_id, context, rating, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return feedback_id
+
+
+# ------------------------------------------------------------ newsletters ----
+def list_marketing_opted_in_clients():
+    """The real, only source of truth for who gets a newsletter - no
+    separate 'Brevo Newsletter List' to keep in sync with this by hand;
+    marketing_consent here IS the list."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT id, email, display_name FROM users WHERE role = 'client' AND marketing_consent = 1"
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def create_newsletter_record(subject: str, blog_post_id: str | None, feature_update: str,
+                              industry_trend_text: str, industry_trend_url: str,
+                              sent_by: str, recipient_count: int) -> str:
+    newsletter_id = uuid.uuid4().hex[:12]
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO newsletters (id, subject, blog_post_id, feature_update, industry_trend_text,
+           industry_trend_url, sent_by, recipient_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (newsletter_id, subject, blog_post_id, feature_update, industry_trend_text,
+         industry_trend_url, sent_by, recipient_count, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return newsletter_id
+
+
+def list_newsletters():
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT newsletters.*, users.display_name AS sent_by_name, blog_posts.title AS blog_post_title
+           FROM newsletters
+           LEFT JOIN users ON users.id = newsletters.sent_by
+           LEFT JOIN blog_posts ON blog_posts.id = newsletters.blog_post_id
+           ORDER BY newsletters.created_at DESC"""
+    ).fetchall()
+    conn.close()
+    return rows
 
 
 # ------------------------------------------------------ limit exceptions ----
@@ -2530,3 +2919,173 @@ def margin_summary(days: int = 30):
         "total_est_ai_cost_usd": round(total_cost, 4),
         "total_est_margin_usd": round(total_revenue - total_cost, 2),
     }
+
+
+# --------------------------------------------------- voice actors & payouts ----
+# Staff-managed human voice-over talent (see SCHEMA's voice_actors /
+# voice_actor_payouts comments for why there's no self-service actor
+# portal or automated payout rail here yet). Everything below is a plain
+# CRUD + ledger layer - no matching/casting/escrow logic, because there
+# are no real actors yet to match against.
+
+def create_voice_actor(name: str, languages: list[str], email: str | None = None,
+                        phone: str | None = None, bio: str | None = None,
+                        rate_per_min_usd: float | None = None, notes: str | None = None) -> str:
+    actor_id = uuid.uuid4().hex[:12]
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO voice_actors (id, name, email, phone, languages, bio, rate_per_min_usd,
+                                      status, notes, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)""",
+        (actor_id, name.strip(), (email or "").strip().lower() or None, (phone or "").strip() or None,
+         ",".join(languages), (bio or "").strip() or None, rate_per_min_usd,
+         (notes or "").strip() or None, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return actor_id
+
+
+def list_voice_actors(status: str | None = None) -> list[dict]:
+    conn = get_conn()
+    if status:
+        rows = conn.execute("SELECT * FROM voice_actors WHERE status = ? ORDER BY name",
+                             (status,)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM voice_actors ORDER BY name").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_voice_actor(actor_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM voice_actors WHERE id = ?", (actor_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_voice_actor(actor_id: str, name: str, languages: list[str], email: str | None,
+                        phone: str | None, bio: str | None, rate_per_min_usd: float | None,
+                        notes: str | None) -> None:
+    conn = get_conn()
+    conn.execute(
+        """UPDATE voice_actors SET name = ?, email = ?, phone = ?, languages = ?, bio = ?,
+                                    rate_per_min_usd = ?, notes = ? WHERE id = ?""",
+        (name.strip(), (email or "").strip().lower() or None, (phone or "").strip() or None,
+         ",".join(languages), (bio or "").strip() or None, rate_per_min_usd,
+         (notes or "").strip() or None, actor_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_voice_actor_status(actor_id: str, status: str) -> None:
+    assert status in ("active", "inactive")
+    conn = get_conn()
+    conn.execute("UPDATE voice_actors SET status = ? WHERE id = ?", (status, actor_id))
+    conn.commit()
+    conn.close()
+
+
+def assign_voice_actor(order_id: str, actor_id: str | None) -> None:
+    """actor_id=None un-assigns - a staff member re-casting the order."""
+    conn = get_conn()
+    conn.execute("UPDATE orders SET voice_actor_id = ?, updated_at = ? WHERE id = ?",
+                 (actor_id, time.time(), order_id))
+    conn.commit()
+    conn.close()
+
+
+def is_invited_voice_actor(email: str) -> bool:
+    """The voice-actor equivalent of is_invited_staff - except there's no
+    separate invites table: the voice_actors roster row itself IS the
+    invite, staff already created it with a real email (see
+    staff_voice_actors_create). user_id IS NULL means nobody's actually
+    signed up under this email yet - once they do, link_voice_actor_user
+    fills it in, and this stops matching (correctly - a returning actor
+    signing in again should just log in as themselves, not be treated as
+    a fresh, unlinked invite)."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT 1 FROM voice_actors WHERE email = ? AND user_id IS NULL", (email.strip().lower(),)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
+def link_voice_actor_user(email: str, user_id: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE voice_actors SET user_id = ? WHERE email = ? AND user_id IS NULL",
+                 (user_id, email.strip().lower()))
+    conn.commit()
+    conn.close()
+
+
+def get_voice_actor_by_user_id(user_id: str) -> dict | None:
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM voice_actors WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def list_orders_for_voice_actor(actor_id: str):
+    """Every order actually cast to this actor - their real job list, most
+    recently assigned first. No status filter: a finished/delivered order
+    stays visible (their own record of past work), not just active ones."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM orders WHERE voice_actor_id = ? ORDER BY updated_at DESC", (actor_id,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def create_payout(actor_id: str, order_id: str, minutes: float, rate_per_min_usd: float) -> str:
+    """Records what's owed - does not move any real money. See
+    mark_payout_paid for the only state change after this: a staff member
+    confirming they actually sent it, outside this system."""
+    payout_id = uuid.uuid4().hex[:12]
+    amount = round(minutes * rate_per_min_usd, 2)
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO voice_actor_payouts
+           (id, actor_id, order_id, minutes, rate_per_min_usd, amount_usd, status, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, 'owed', ?)""",
+        (payout_id, actor_id, order_id, round(minutes, 2), rate_per_min_usd, amount, time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return payout_id
+
+
+def list_payouts(status: str | None = None) -> list[dict]:
+    """Joined with the actor's name/order's client-facing filename so a
+    payouts list is actually readable without a second lookup per row."""
+    conn = get_conn()
+    q = """SELECT p.*, a.name AS actor_name, o.original_filename AS order_filename
+           FROM voice_actor_payouts p
+           JOIN voice_actors a ON a.id = p.actor_id
+           JOIN orders o ON o.id = p.order_id"""
+    params: tuple = ()
+    if status:
+        q += " WHERE p.status = ?"
+        params = (status,)
+    q += " ORDER BY p.created_at DESC"
+    rows = conn.execute(q, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def mark_payout_paid(payout_id: str, paid_by_user_id: str, reference: str | None = None) -> None:
+    """The one action that means a real transfer actually happened -
+    staff confirming it themselves, not this system triggering anything.
+    See voice_actor_payouts' own comment on why there's no payment-API
+    integration here."""
+    conn = get_conn()
+    conn.execute(
+        """UPDATE voice_actor_payouts SET status = 'paid', paid_at = ?, paid_by = ?, paid_reference = ?
+           WHERE id = ? AND status = 'owed'""",
+        (time.time(), paid_by_user_id, (reference or "").strip() or None, payout_id),
+    )
+    conn.commit()
+    conn.close()

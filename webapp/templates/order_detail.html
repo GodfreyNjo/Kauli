@@ -7,11 +7,30 @@
 
 <div class="card">
   <a href="/client" class="breadcrumb">&larr; back to my orders</a>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   <h1>{{ order['original_filename'] }}</h1>
-  <p><span class="status status-{{ order['status'] }}">{{ order['status'].replace('_', ' ') }}</span>
+  <p><span class="status status-{{ order['status'] }}">{{ order['status']|client_status_label }}</span>
+     {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush</span>{% endif %}
      &middot; {{ order['source_lang'] }} → {{ order['target_lang'] }}
      &middot; {{ order['tier']|capitalize }} plan
      {% if receipt %}&middot; <a href="/receipts/{{ receipt['id'] }}">View receipt ({{ receipt['receipt_number'] }}) →</a>{% endif %}</p>
+
+  <details style="margin-top:6px;">
+    <summary class="muted" style="cursor:pointer; font-size:0.85rem; display:inline-block;">
+      {% if order['folder_name'] %}Folder: <strong>{{ order['folder_name'] }}</strong>{% else %}Not in a folder{% endif %} - move &raquo;
+    </summary>
+    <form method="post" action="/client/orders/{{ order['id'] }}/folder" style="margin-top:8px; max-width:320px;">
+      <label style="font-size:0.78rem;">Move to folder <span class="muted">(leave blank to remove from folders)</span>
+        <input type="text" name="folder_name" list="order-folder-list" value="{{ order['folder_name'] or '' }}"
+               placeholder="e.g. Q3 campaign, NGO field reports">
+        <datalist id="order-folder-list">
+          {% for f in folders %}<option value="{{ f }}">{% endfor %}
+        </datalist>
+      </label>
+      <button type="submit" class="secondary">Save</button>
+    </form>
+  </details>
 
   {% set ts = tat_status(order['tat_start_at'], order['deadline_at']) %}
   {% if ts and order['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
@@ -25,6 +44,14 @@
     <div class="deadline-bar-track">
       <div class="deadline-bar-fill deadline-{{ ts['level'] }}" style="width:{{ ts['pct_remaining'] }}%;"></div>
     </div>
+  </div>
+  {% endif %}
+
+  {% if order['is_rush'] and (order['status'] in ('failed', 'dead_letter') or (ts and ts['overdue'])) %}
+  <div class="modal-warning" style="margin-top:14px;">
+    This is a rush order and something's actually gone wrong or run late - for exactly this situation, you
+    can call us directly: <a href="tel:{{ contact_phone_tel }}">{{ contact_phone_display }}</a>. For anything
+    else, WhatsApp or email still gets a real person fastest.
   </div>
   {% endif %}
 
@@ -67,8 +94,17 @@
     <p class="muted">Our team flagged something on this order and is looking into it - we'll be in touch
        shortly, either here or by message below.</p>
   {% elif order['status'] == 'returned_to_client' %}
-    <p class="error">This order was returned without completing - see the message thread below for why.
-       Submit a new order once it's ready to go again.</p>
+    <p class="error">This order was returned without completing - see the message thread below for why.</p>
+    <div class="modal-warning" style="font-size:0.85rem;">
+      No need to submit a new order or pay again - reply on the message thread below and, if we need a
+      corrected file, attach it here. We'll pick this same order back up as soon as it's sorted.
+      <form method="post" action="/client/orders/{{ order['id'] }}/resume" enctype="multipart/form-data" style="margin-top:10px;">
+        <label>Replace the file <span class="muted">(only if we asked for one)</span>
+          <input type="file" name="audio" accept="audio/*,video/*">
+        </label>
+        <button type="submit" class="secondary" style="margin-top:8px;">Resume this order</button>
+      </form>
+    </div>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order['difficulty_surcharge_status'] == 'pending_approval' %}
     <div class="modal-warning">
       Your delivery is ready, but this order needed additional work beyond what was originally covered - a

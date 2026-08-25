@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}My jobs{% endblock %}
+{% block content %}
+<h1>Welcome, {{ actor['name'] }}</h1>
+<p class="muted" style="margin-top:0;">Every job cast to you, most recent first. Read the script, record it
+   synced to the source video/audio, then upload the finished file - that becomes what the client
+   downloads, replacing the AI dub automatically.</p>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0;">Your profile</h2>
+  <dl>
+    <dt>Languages</dt><dd>{{ actor['languages'] }}</dd>
+    <dt>Rate</dt><dd>{{ '$%.2f/finished minute'|format(actor['rate_per_min_usd']) if actor['rate_per_min_usd'] else 'not set yet - contact us' }}</dd>
+    <dt>Status</dt><dd>{{ actor['status'] }}</dd>
+  </dl>
+  <p class="muted" style="font-size:0.82rem;">Rate or contact details wrong? Just reply to the job email or
+     WhatsApp us - we'll update it on our side.</p>
+</div>
+
+{% if not orders %}
+<div class="card">
+  <p class="muted">No jobs cast to you yet - you'll get an email the moment one is.</p>
+</div>
+{% else %}
+{% for order in orders %}
+<div class="card">
+  <h2 style="margin-top:0;">{{ order['original_filename'] }}</h2>
+  <p class="muted" style="margin-top:0;">
+    {{ "%.1f"|format(order['duration_minutes'] or 0) }} minutes &middot; {{ order['source_lang'] }} → {{ order['target_lang'] }}
+    &middot; status: {{ order['status']|replace('_', ' ') }}
+  </p>
+
+  <details style="margin-bottom:14px;">
+    <summary style="cursor:pointer; font-weight:650;">View script</summary>
+    <div style="margin-top:10px; max-height:340px; overflow-y:auto; padding:12px; background:var(--panel); border-radius:var(--radius);">
+      {% set job = jobs.get(order['id']) %}
+      {% if not job %}
+        <p class="muted">Script isn't ready yet - check back soon.</p>
+      {% else %}
+        {% for seg in job.segments %}
+          {% if seg.segment_type != 'gap' and seg.final_text.strip() %}
+            <p style="margin:0 0 12px;"><span class="muted" style="font-size:0.75rem;">{{ (seg.start_ms / 1000)|round(1) }}s</span><br>{{ seg.final_text }}</p>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
+  </details>
+
+  <form method="post" action="/actor/orders/{{ order['id'] }}/upload" enctype="multipart/form-data">
+    <label>Upload your finished, synced recording
+      <input type="file" name="recording" accept="audio/*" required>
+    </label>
+    <button type="submit">Upload &amp; deliver</button>
+  </form>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

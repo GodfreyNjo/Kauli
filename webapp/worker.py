@@ -39,10 +39,13 @@ RETRY_BACKOFF_S = (5, 20)  # delay before retry attempt 1, then attempt 2
 # says to log in instead - never a fabricated/broken URL.
 PUBLIC_BASE_URL = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/")
 
-# Same number app.py's onboarding messages already link to - duplicated
-# here rather than imported (app.py imports this module, so the reverse
-# would be circular), not a second real number to keep in sync by hand.
+# Same contact details app.py's onboarding messages already use -
+# duplicated here rather than imported (app.py imports this module, so
+# the reverse would be circular), not second real values to keep in sync
+# by hand.
 CONTACT_PHONE_WHATSAPP = "254712531841"
+CONTACT_EMAIL = "kahunyurogodfrey@gmail.com"
+FOUNDER_NAME = "Godfrey Njoroge"
 
 
 def notify_client_order_ready(order, base_url: str | None = None) -> None:
@@ -62,12 +65,22 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
     body = (
         f"Hi {name},\n\n"
         f"Your order ({order['original_filename']}) is ready.\n\n"
-        + (f"View and download it here: {link}\n\n" if link
-           else "Log in to your Kauli dashboard to view and download it.\n\n")
+        + ("" if link else "Log in to your Kauli dashboard to view and download it.\n\n")
         + f"Questions? Reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
-        + "Forge Media Services"
+        + f"Talk soon,\n{FOUNDER_NAME}\n(Forge Media Services)"
     )
-    html = "".join(f"<p>{part}</p>" for part in body.split("\n\n") if part.strip())
+    log_in_note = "" if link else '<p style="margin:0 0 14px;">Log in to your Kauli dashboard to view and download it.</p>'
+    inner = (
+        f'<p style="margin:0 0 14px;">Hi {name},</p>'
+        f'<p style="margin:0 0 14px;">Your order ({order["original_filename"]}) is ready.</p>'
+        f'{log_in_note}'
+        f'<p style="margin:0 0 14px;">Questions? '
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply</a> here or message me on '
+        f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+    )
+    html = mailer.wrap_email_html(inner, cta_text="View & download your files" if link else None,
+                                   cta_url=link, base_url=link_base)
     mailer.send_email(client["email"], "Your Kauli order is ready", html, body)
 
 
@@ -108,25 +121,25 @@ def _run_job(order_id: str) -> None:
         )
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))
-        # No flags at all -> nothing for staff to look at, goes straight to
-        # ready for delivery. Otherwise it waits in the staff review queue -
-        # content_safety_flagged (see upload_security.py) forces this even
-        # when every segment individually looks fine, since that's a
-        # different kind of signal than transcript/translation confidence
-        # and needs a human's eyes on the actual video regardless.
-        final_status = ("ready_for_delivery"
-                         if job.flagged_count == 0 and not order["content_safety_flagged"]
-                         else "awaiting_review")
+        # Every order waits for an explicit staff sign-off in Ereri
+        # ("Approve & mark ready for delivery") before a client ever sees
+        # it as ready - no auto-bypass, even when the AI drafted it with
+        # zero flagged segments. This used to skip straight to
+        # ready_for_delivery when flagged_count was 0, which meant some
+        # orders reached the client without a real human ever looking at
+        # them - directly contradicting "every order human-reviewed"
+        # everywhere that's said (the FAQ, the blog, the marketing site).
+        # flagged_count/content_safety_flagged still matter for how the
+        # order is presented in the review queue, just not for whether
+        # review happens at all.
+        final_status = "awaiting_review"
         db.update_order_status(order_id, final_status)
         db.set_order_ai_cost(order_id, job.cost_usd)
         log.info("job finished", extra={"job_id": order_id, "user_id": order["client_id"],
                                          "final_status": final_status, "flagged_count": job.flagged_count,
                                          "ai_cost_usd": job.cost_usd})
         order = db.get_order(order_id)  # re-fetch: status/ai_cost above are now current
-        if final_status == "ready_for_delivery":
-            notify_client_order_ready(order)
-        else:
-            notify_staff_needs_review(order)
+        notify_staff_needs_review(order)
     except Exception as exc:  # noqa: BLE001 - surface it to the client/staff UI
         retry_count = db.increment_retry_count(order_id)
         if retry_count <= MAX_RETRIES:

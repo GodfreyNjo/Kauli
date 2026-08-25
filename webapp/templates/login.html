@@ -19,6 +19,7 @@
           {% if mode == 'signin' and error %}<p class="error">{{ error }}</p>{% endif %}
           {% if mode == 'signin' and notice %}<p class="ok">{{ notice }}</p>{% endif %}
           <form method="post" action="/login">
+            <input type="hidden" name="next" value="{{ next or '' }}">
             <label>Email
               <input type="email" name="email" required {% if mode != 'signup' %}autofocus{% endif %}>
             </label>
@@ -37,16 +38,23 @@
           <h1>Create your account</h1>
           <p class="auth-sub">Get access to your Kauli workspace.</p>
           {% if mode == 'signup' and error %}<p class="error">{{ error }}</p>{% endif %}
-          <form method="post" action="/signup">
+          <form method="post" action="/signup" id="signup-form">
+            <input type="hidden" name="next" value="{{ next or '' }}">
             <label>Email
-              <input type="email" name="email" required {% if mode == 'signup' %}autofocus{% endif %}>
+              <input type="email" name="email" value="{{ email or '' }}" required {% if mode == 'signup' %}autofocus{% endif %}>
             </label>
             <label>Password
-              <input type="password" name="password" required minlength="{{ password_min_length }}">
+              <input type="password" name="password" id="signup-password" required minlength="{{ password_min_length }}">
             </label>
-            <p class="muted" style="margin-top:-8px; font-size:0.78rem;">{{ password_policy_hint }}</p>
+            <ul class="password-checklist" id="signup-password-checklist">
+              <li data-rule="length">At least {{ password_min_length }} characters</li>
+              <li data-rule="lower">A lowercase letter</li>
+              <li data-rule="upper">An uppercase letter</li>
+              <li data-rule="digit">A number</li>
+              <li data-rule="symbol">A symbol (e.g. ! @ # $ %)</li>
+            </ul>
             <label class="auth-checkbox-row">
-              <input type="checkbox" name="marketing_consent" value="1">
+              <input type="checkbox" name="marketing_consent" value="1" {% if marketing_consent %}checked{% endif %}>
               <span>Also send me occasional Kauli tips and updates. Unsubscribe anytime.</span>
             </label>
             <button type="submit">Create account</button>
@@ -81,5 +89,37 @@
       document.getElementById('panel-signup').hidden = a.dataset.show !== 'panel-signup';
     });
   });
+
+  // Live password checklist - mirrors supabase_auth.password_policy_errors'
+  // length/case/digit/symbol rules exactly (the "common password" and
+  // "contains your email" checks stay server-side only - duplicating that
+  // list here would just drift out of sync with the real one over time).
+  // This is a UX aid, never the actual gate: the server re-checks
+  // everything regardless of what this shows.
+  (function () {
+    var pw = document.getElementById('signup-password');
+    var list = document.getElementById('signup-password-checklist');
+    if (!pw || !list) return;
+    var minLen = {{ password_min_length }};
+    var rules = {
+      length: function (v) { return v.length >= minLen; },
+      lower: function (v) { return /[a-z]/.test(v); },
+      upper: function (v) { return /[A-Z]/.test(v); },
+      digit: function (v) { return /\d/.test(v); },
+      symbol: function (v) { return /[^\w\s]/.test(v); },
+    };
+    var items = {};
+    list.querySelectorAll('li[data-rule]').forEach(function (li) { items[li.dataset.rule] = li; });
+    function paint() {
+      var v = pw.value;
+      Object.keys(rules).forEach(function (key) {
+        var ok = rules[key](v);
+        items[key].classList.toggle('met', ok);
+        items[key].classList.toggle('unmet', !ok && v.length > 0);
+      });
+    }
+    pw.addEventListener('input', paint);
+    paint();
+  })();
 </script>
 {% endblock %}

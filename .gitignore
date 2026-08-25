@@ -19,3 +19,10 @@ venv/
 # client audio / test data, never commit
 webapp/data/
 
+# Defensive: a stray sqlite3.connect() on a wrong/typo'd path silently
+# CREATES an empty db file there instead of erroring - happened for real
+# this session (kauli.db, webapp/kauli.db, both 0 bytes, neither the real
+# db at webapp/data/kauli_demo.db). Catches any future repeat before it
+# ever reaches a commit.
+*.db
+

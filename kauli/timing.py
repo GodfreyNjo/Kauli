@@ -16,6 +16,24 @@ FIT_MIN = 0.90
 FIT_MAX = 1.10
 MAX_STRETCH_PCT = 8.0
 
+# A second, wider tier used only as a last resort before a segment gets
+# flagged unfittable and risks losing audio in the final mix (see
+# kauli.pipeline's TTS loop). ffmpeg's atempo filter (the same one
+# MAX_STRETCH_PCT already uses) stays intelligible well past 8%, it just
+# stops sounding fully natural - so a segment that would otherwise be
+# unfittable gets one more real chance at fitting cleanly, flagged
+# "emergency_stretch_applied" so an editor knows to sanity-check the pace,
+# rather than being silently clipped by the mixer's non-overlap guarantee.
+EMERGENCY_STRETCH_PCT = 25.0
+
+# When a speech segment is immediately followed by a real silent gap (see
+# kauli.pipeline._insert_non_speech_segments), its translation is allowed
+# to run into that silence rather than being confined to its own original
+# slot - that's real dead air nobody would otherwise hear speech in, not
+# time stolen from anything. This is always left un-borrowed at the tail
+# end so some natural pause still plays, even in the extreme case.
+GAP_BORROW_MIN_KEEP_MS = 200
+
 
 def estimate_duration_ms(text: str, lang: str = "en", cps: float | None = None) -> int:
     rate = cps or DEFAULT_CPS.get(lang, 14.0)

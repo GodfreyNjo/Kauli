@@ -2,6 +2,7 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Ereri - {{ order['id'] }}{% endblock %}
 {% block content %}
+{% if notice %}<p class="ok" style="margin:0 0 8px;">{{ notice }}</p>{% endif %}
 <div class="editor-shell">
   <div class="editor-topbar" id="editor-topbar">
     <button type="button" id="topbar-collapse-btn" class="topbar-collapse-btn" title="Collapse this bar">&#9662;</button>
@@ -50,11 +51,51 @@
   </div>
   {% endif %}
 
+  {% if order['tts'] != 'stub' %}
+  <div class="modal-overlay" id="voice-direction-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="voice-direction-title">
+      <h2 id="voice-direction-title">Voice direction</h2>
+      <p class="muted" style="margin-top:0;">Directs how THIS segment's dub audio gets rendered - not
+         the text, just the way it's spoken. Re-renders that segment (and rebuilds the mixed dub track)
+         as soon as you apply.</p>
+      <label>Pace
+        <select name="pace_pct">
+          <option value="0">Normal - automatic fit-to-slot pace</option>
+          <option value="-20">20% faster</option>
+          <option value="-10">10% faster</option>
+          <option value="10">10% slower</option>
+          <option value="20">20% slower</option>
+          <option value="30">30% slower</option>
+        </select>
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+        <input type="checkbox" name="spell_out" style="width:auto;">
+        Read as spelled out, letter-by-letter (for a name or acronym the voice keeps
+        misreading as a word - works best when this segment IS just that word, not a
+        full sentence around it)
+      </label>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="voice-direction-cancel">Cancel</button>
+        <button type="button" class="approve" id="voice-direction-apply">Apply &amp; re-render</button>
+      </div>
+      <span id="voice-direction-status" class="muted" style="font-size:0.78rem;"></span>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="editor-left">
     <div class="player-card">
       <div class="media-wrap">
         {% if youtube_video_id %}
         <div id="editor-media"></div>
+        <details class="muted" style="font-size:0.78rem; margin:6px 0 0;">
+          <summary style="cursor:pointer;">Player blocked or blank? <a href="https://www.youtube.com/watch?v={{ youtube_video_id }}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Open on YouTube ↗</a></summary>
+          <p style="margin:4px 0 0;">
+            That's YouTube itself refusing the embed (not something wrong with your correction work).
+            Word-level cell timing below is still accurate either way - it comes from the real audio,
+            not the embedded player.
+          </p>
+        </details>
         {% elif is_video %}
         <video id="editor-media" src="/staff/orders/{{ order['id'] }}/source-audio" playsinline></video>
         {% else %}
@@ -96,6 +137,11 @@
                     {% if not order['voice_clone_consent_given_at'] %}disabled{% endif %}>
               Clone the actual speaker's voice (slow - several minutes){% if not order['voice_clone_consent_given_at'] %} - client hasn't granted consent yet{% endif %}
             </option>
+            {% if order['wants_human_voice_over'] and human_recording_available %}
+            <option value="human" {% if order['dub_voice'] == 'human' %}selected{% endif %}>
+              Voice actor's recording (uploaded, ready to use)
+            </option>
+            {% endif %}
           </select>
           <button type="submit" class="secondary" id="voice-picker-apply">Apply &amp; re-render dub</button>
         </form>
@@ -113,10 +159,10 @@
       <div class="info-tabs">
         <button type="button" class="active" data-pane="pane-instructions">Guide</button>
         <button type="button" data-pane="pane-brief">Client brief</button>
+        <button type="button" data-pane="pane-macros">Macros</button>
         <button type="button" data-pane="pane-preview">Preview</button>
         <button type="button" data-pane="pane-job">Job</button>
         <button type="button" data-pane="pane-shortcuts">Shortcuts</button>
-        <button type="button" data-pane="pane-macros">Macros</button>
       </div>
 
       <div class="info-pane" id="pane-instructions">
@@ -151,6 +197,9 @@
            a word to start a new paragraph where it makes sense.</p>
         <p>When every flagged segment looks right, use "Approve &amp; mark ready
            for delivery" above to release it to the client.</p>
+        <p><a href="/staff/guide" target="_blank" rel="noopener">Full editor guide &amp; style guide →</a>
+           <span class="muted">- flag glossary, timing/overlap explainer, caption style rules, all in one
+           page, opens in a new tab.</span></p>
         <p>The <strong>Spell check</strong> button (step 2 only) flags possibly-misspelled words in
            red - click a flagged cell for suggestions, click one to replace it, "Ignore" to dismiss,
            or just type over it yourself. It's spelling only, not grammar - there's no free grammar
@@ -187,26 +236,92 @@
       <div class="info-pane" id="pane-preview" hidden>
         {% if dub_audio_ready %}
         <p class="muted" style="margin-top:0;">The actual dubbed voice track, with the exact captions the
-           client will get streaming underneath it as it plays - not the source Swahili audio above.</p>
+           client will get streaming underneath it as it plays (real line-wrapping and the 6s on-screen cap
+           included - this is what the delivered .srt/.vtt actually contain, not the raw text) - not the
+           source Swahili audio above.</p>
         <audio id="preview-audio" controls style="width:100%;" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
         <div class="preview-caption" id="preview-caption">&nbsp;</div>
+        <p class="preview-flag-note muted" id="preview-flag-note" hidden></p>
         {% elif order['tts'] == 'stub' %}
         <p class="muted" style="margin-top:0;">This job's service level doesn't include a dubbed voice
            track (transcription or translation only) - nothing to preview here.</p>
         {% else %}
         <p class="muted" style="margin-top:0;">No dubbed audio has been generated yet for this order.</p>
         {% endif %}
+
+        <details class="diagnostics" style="margin-top:18px;">
+          <summary>Raw deliverable files (what a client's download actually contains)</summary>
+          <p class="muted" style="font-size:0.8rem; margin:8px 0;">Catch a real formatting or timestamp
+             problem here before it ships - a codec-breaking stray character, a missing blank line, a
+             timestamp that doesn't parse.</p>
+          <label style="font-size:0.82rem; font-weight:650;">English captions (.srt)
+            <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ target_srt }}</textarea>
+          </label>
+          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">English captions (.vtt)
+            <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ target_vtt }}</textarea>
+          </label>
+          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">Swahili transcript (.srt)
+            <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ source_srt }}</textarea>
+          </label>
+        </details>
       </div>
 
       <div class="info-pane" id="pane-job" hidden>
         <dl>
           <dt>Route</dt><dd>{{ order['source_lang'] }} → {{ order['target_lang'] }} · {{ order['tier'] }} tier</dd>
           <dt>Providers</dt><dd>asr={{ order['asr'] }} · mt={{ order['mt'] }} · tts={{ order['tts'] }}</dd>
-          <dt>Segments</dt><dd>{{ job.segments|length }}</dd>
+          <dt>Segments</dt><dd>{{ job.segments|length }} ({{ job.segments|selectattr('segment_type', 'equalto', 'gap')|list|length }} gap)</dd>
           <dt>Fit rate</dt><dd>{{ (job.fit_rate * 100)|round|int }}%</dd>
           <dt>Flagged</dt><dd>{{ job.flagged_count }} / {{ job.segments|length }}</dd>
           <dt>Source file</dt><dd>{{ order['original_filename'] }}</dd>
         </dl>
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Speakers</p>
+        {% if not distinct_speakers %}
+        <p class="muted" style="font-size:0.8rem;">No speakers tagged yet. Press <kbd>alt</kbd>+<kbd>s</kbd>
+           on a cell to tag who's speaking (Transkriptor-transcribed orders often already have this from
+           real diarization) - once tagged, assign each one its own voice below so the same character
+           keeps the same voice throughout, not a different one per segment.</p>
+        {% else %}
+        <p class="muted" style="font-size:0.78rem; margin-top:0;">Press <kbd>alt</kbd>+<kbd>s</kbd> on a
+           cell to tag or correct who's speaking.</p>
+        {% for spk in distinct_speakers %}
+        <form method="post" action="/staff/orders/{{ order['id'] }}/assign-speaker-voice" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">
+          <input type="hidden" name="speaker_id" value="{{ spk }}">
+          <strong style="font-size:0.85rem; min-width:90px;">{{ spk }}</strong>
+          <select name="voice_key" style="flex:1;">
+            {% for key, v in piper_voices.items() %}
+            <option value="{{ key }}"
+              {% if speaker_voices.get(spk) and speaker_voices[spk].endswith(v['path'].split('/')[-1]) %}selected{% endif %}>
+              {{ v['label'] }}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="secondary" style="font-size:0.78rem; padding:5px 10px;">Assign</button>
+        </form>
+        {% endfor %}
+        {% if not piper_voices %}
+        <p class="muted" style="font-size:0.76rem;">No Piper voice models are downloaded on this machine yet -
+           see requirements.txt/.env.example for how to add one.</p>
+        {% endif %}
+        {% endif %}
+
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Bulk actions</p>
+        <form method="post" action="/staff/orders/{{ order['id'] }}/detect-gaps" style="margin-bottom:8px;">
+          <button type="submit" class="secondary">Detect non-speech gaps</button>
+          <p class="muted" style="font-size:0.76rem; margin:4px 0 0;">Adds real, taggable gap cells for any
+             ≥1s stretch with no detected speech that doesn't already have one - for an order processed
+             before this existed. Never touches an existing segment or correction.</p>
+        </form>
+        <form method="post" action="/staff/orders/{{ order['id'] }}/retranslate-all">
+          <button type="submit" class="secondary"
+                  onclick="return confirm('Re-translate every segment that has not been hand-finalized on the English side, from its current source text?');">
+            Re-translate all (from corrected source)
+          </button>
+          <p class="muted" style="font-size:0.76rem; margin:4px 0 0;">Re-runs MT + re-renders audio for every
+             segment you (or a colleague) haven't already reviewed/edited directly on the English side -
+             for fixing a whole order after a source correction pass or an MT provider upgrade.</p>
+        </form>
       </div>
 
       <div class="info-pane" id="pane-shortcuts" hidden>
@@ -227,11 +342,13 @@
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>s</kbd><span>Save focused segment now (autosave also fires ~2s after you stop typing)</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd><span>Save + re-synthesize audio for this segment (target step)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate the focused segment from its (corrected) source</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>v</kbd><span>Voice direction - slow down/speed up or spell out this segment's dub audio</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>p</kbd><span>Toggle prose preview of the current step</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>/</kbd><span>Show this shortcuts panel</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>f</kbd><span>Find / replace in the current step</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>z</kbd><span>Open the job return form</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>f</kbd><span>Toggle flag on the focused segment</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>s</kbd><span>Tag/correct who's speaking on this segment - assign each speaker their own voice on the Job tab</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd><span>Jump to previous / next flagged segment</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd><span>Move to previous / next cell</span></div>
 
@@ -239,8 +356,9 @@
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>m</kbd><span>Merge focused cell with the next one</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>h</kbd><span>Hyphenate - merge with next, joined by "-"</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>k</kbd><span>Split cell at the text cursor (refuses to split inside a [tag])</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>k</kbd><span>Split a multi-word cell into one cell per word</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>enter</kbd><span>Start a new paragraph at the focused word</span></div>
-        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>⌫</kbd><span>Remove that paragraph break</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>⌫</kbd> / <kbd>ctrl</kbd>+<kbd>⌫</kbd><span>Remove that paragraph break (Ctrl+Backspace only acts on an actual paragraph-start cell - otherwise it's the browser's normal delete-previous-word)</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd>,<kbd>0</kbd><span>Insert macro 1–10 at the cursor</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>b</kbd><span>Bookmark this cell (personal marker, not shared)</span></div>
 
@@ -273,18 +391,8 @@
       </div>
 
       <div class="info-pane" id="pane-macros" hidden>
-        <p class="muted">Text snippets bound to <kbd>ctrl</kbd>+<kbd>1</kbd>…<kbd>0</kbd>, inserted at
-           your cursor - handy for speaker IDs and sound tags. Saved in this browser, per job.</p>
-        <p class="muted">Check "New paragraph" on a macro to have it also start a new paragraph when
-           inserted - useful for a speaker-change macro. Leave it unchecked for something that belongs
-           inline, like a <code>[MUSIC PLAYING]</code> sound tag.</p>
-        <p class="muted">Check "Speaker ID" on a macro that names a speaker (e.g. <code>NARRATOR:</code>).
-           Inserting it then gives the tag its own cell instead of merging into whatever word your
-           cursor is on - so "RIGATHI:" and "Haya." stay two normal cells, not one stretched-together
-           block. Combine it with "New paragraph" to have the speaker tag start the new line too.</p>
         <div id="macro-table-body"></div>
-        <button type="button" id="macro-save-btn" style="margin-top:8px;">Save macros</button>
-        <span id="macro-save-state" class="save-state" style="margin-left:8px;"></span>
+        <span id="macro-save-state" class="save-state"></span>
       </div>
     </div>
   </div>
@@ -371,7 +479,7 @@
   </div>
 </div>
 
-<script src="/static/editor.js"></script>
+<script src="/static/editor.js?v={{ static_version('editor.js') }}"></script>
 <script>
   initKauliEditor("{{ order['id'] }}", {{ segments_json|safe }}, {{ youtube_video_id_json|safe }});
 

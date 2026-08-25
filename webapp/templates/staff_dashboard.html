@@ -13,13 +13,21 @@
 {% set ops_n = orders | selectattr('status', 'equalto', 'editor_returned') | list | length %}
 {% set ready_n = orders | selectattr('status', 'equalto', 'ready_for_delivery') | list | length %}
 {% set delivered_n = orders | selectattr('status', 'equalto', 'delivered') | list | length %}
-<div class="filter-tabs" id="status-filter" style="margin-bottom:14px;">
+{% set holds_n = orders | selectattr('status', 'in', ['pending_payment', 'returned_to_client', 'failed', 'dead_letter']) | list | length %}
+<div class="filter-tabs" id="status-filter" style="margin-bottom:8px;">
   <button type="button" class="active" data-filter="all">All <span class="tab-count">{{ orders|length }}</span></button>
   <button type="button" data-filter="awaiting_review">In review <span class="tab-count">{{ awaiting_n }}</span></button>
   <button type="button" data-filter="processing,queued">Processing <span class="tab-count">{{ processing_n }}</span></button>
   <button type="button" data-filter="editor_returned">Needs ops decision <span class="tab-count">{{ ops_n }}</span></button>
   <button type="button" data-filter="ready_for_delivery">Ready <span class="tab-count">{{ ready_n }}</span></button>
   <button type="button" data-filter="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
+  <button type="button" data-filter="pending_payment,returned_to_client,failed,dead_letter">Holds &amp; exceptions <span class="tab-count">{{ holds_n }}</span></button>
+</div>
+<div class="filter-tabs" id="service-filter" style="margin-bottom:14px;">
+  <button type="button" class="active" data-service="all">All services</button>
+  <button type="button" data-service="transcribe">Transcription</button>
+  <button type="button" data-service="translate">Translation</button>
+  <button type="button" data-service="dub">Dubbing</button>
 </div>
 {% endif %}
 
@@ -34,16 +42,33 @@
     </div>
   {% else %}
   <table>
-    <thead><tr><th>Client</th><th>File</th><th>Route</th><th>Tier</th><th>Status</th><th>Deadline</th><th></th></tr></thead>
+    <thead><tr><th>Client</th><th>File</th><th>Route</th><th>Tier</th><th>Status</th><th>% Edited</th><th>Time in stage</th><th>Deadline</th></tr></thead>
     <tbody>
       {% for o in orders %}
       {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
-      <tr data-status="{{ o['status'] }}">
+      {% set stage_seconds = now_ts - (o['status_changed_at'] or o['created_at']) %}
+      {% set stage_stuck = o['status'] in ('queued', 'processing', 'awaiting_review', 'editor_returned') and stage_seconds > stuck_threshold_seconds %}
+      {% set pct = edited_pct.get(o['id']) %}
+      <tr data-status="{{ o['status'] }}" data-service="{{ o['service_level'] or '' }}"
+          class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
         <td>{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
-        <td>{{ o['original_filename'] }}</td>
+        <td>{% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
         <td style="font-family: var(--font-mono); font-size: 0.82rem;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
         <td>{{ o['tier'] }}</td>
         <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+        <td>
+          {% if pct is not none %}
+            <span class="edited-pct-pill {{ 'edited-pct-done' if pct == 100 else ('edited-pct-mid' if pct >= 50 else 'edited-pct-low') }}">{{ pct }}%</span>
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="{{ 'stage-age-stuck' if stage_stuck else 'muted' }}" style="font-size:0.82rem;"
+                title="{% if stage_stuck %}Longer than expected in this stage - worth a look{% endif %}">
+            {{ stage_seconds|duration_short }}{% if stage_stuck %} ⚠{% endif %}
+          </span>
+        </td>
         <td>
           {% if ts %}
             <span class="deadline-pill deadline-{{ ts['level'] }}">
@@ -53,7 +78,6 @@
             <span class="muted">-</span>
           {% endif %}
         </td>
-        <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-btn" title="Open">→</a></td>
       </tr>
       {% endfor %}
     </tbody>
@@ -62,15 +86,45 @@
 </div>
 
 <script>
-  document.querySelectorAll('#status-filter button').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var wanted = btn.dataset.filter.split(',');
+  (function () {
+    var statusWanted = ['all'];
+    var serviceWanted = 'all';
+    function applyFilters() {
       document.querySelectorAll('tbody tr').forEach(function (row) {
-        row.style.display = (wanted[0] === 'all' || wanted.includes(row.dataset.status)) ? '' : 'none';
+        var statusOk = statusWanted[0] === 'all' || statusWanted.includes(row.dataset.status);
+        var serviceOk = serviceWanted === 'all' || row.dataset.service === serviceWanted;
+        row.style.display = (statusOk && serviceOk) ? '' : 'none';
+      });
+    }
+    document.querySelectorAll('#status-filter button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        statusWanted = btn.dataset.filter.split(',');
+        applyFilters();
       });
     });
-  });
+    document.querySelectorAll('#service-filter button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#service-filter button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        serviceWanted = btn.dataset.service;
+        applyFilters();
+      });
+    });
+
+    // Whole row opens the order - no separate "open" button needed.
+    // Middle-click / Ctrl/Cmd+click still opens in a new tab, same as a
+    // real link, since this is a real navigation, not a JS-only trick.
+    document.querySelectorAll('tr.clickable-row').forEach(function (row) {
+      row.addEventListener('click', function () { window.location.href = row.dataset.href; });
+      row.addEventListener('auxclick', function (e) {
+        if (e.button === 1) window.open(row.dataset.href, '_blank');
+      });
+      row.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') window.location.href = row.dataset.href;
+      });
+    });
+  })();
 </script>
 {% endblock %}

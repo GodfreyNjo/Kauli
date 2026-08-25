@@ -141,9 +141,12 @@
     if (!data) return;
     const discount = Number(data.dataset.discount) || 0;
     const freeMinutes = Number(data.dataset.freeMinutes) || 0;
-    const walletMinutes = Number(data.dataset.walletMinutes) || 0;
+    const walletCredits = Number(data.dataset.walletCredits) || 0;
     const addonRate = Number(data.dataset.addonRate) || 0;
     const manualRate = Number(data.dataset.manualTranscriptionRate) || 0;
+    const humanVoiceRate = Number(data.dataset.humanVoiceRate) || 0;
+    const rushPct = Number(data.dataset.rushPct) || 0;
+    const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
     const selected = $('input[name="service_level"]:checked');
     const rate = selected ? Number(selected.dataset.rate) : 0;
@@ -158,6 +161,14 @@
     // cloning consent on a transcription/translation-only order.
     const consentField = $("#voice-clone-consent-field");
     if (consentField) consentField.hidden = !(selected && selected.value === "dub");
+
+    // Same reasoning - a human voice actor only makes sense on a full dub.
+    const humanVoiceField = $("#human-voice-field");
+    const isDub = !!(selected && selected.value === "dub");
+    if (humanVoiceField) humanVoiceField.hidden = !isDub;
+    const humanVoiceBox = $("#human-voice-checkbox");
+    const humanVoiceChecked = isDub && humanVoiceBox && humanVoiceBox.checked;
+    $("#price-human-voice-row").hidden = !humanVoiceChecked;
 
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
     const durationEl = $("#price-duration");
@@ -180,40 +191,59 @@
     const isManual = langSelect && manualLangs.includes(langSelect.value);
     $("#price-manual-row").hidden = !isManual;
 
+    const rushBox = $("#rush-checkbox");
+    const rushChecked = rushBox && rushBox.checked;
+    $("#price-rush-row").hidden = !rushChecked;
+
     if (fileDurationMinutes == null || usingYoutube) {
       // No real duration yet - show the rate itself so the page isn't
       // just blank, but don't pretend to total something unknown. Still
       // has to fold in any addon/surcharge that's already known to apply
-      // (checked video add-on, or a manual-transcription language) -
+      // (checked video add-on, manual-transcription language, or rush) -
       // showing just the bare service rate here understates the real
-      // per-minute cost the moment either one is active.
+      // per-minute cost the moment any of those is active.
       $("#price-free").textContent = "-";
-      const perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0);
+      let perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0)
+        + (humanVoiceChecked ? humanVoiceRate : 0);
+      if (rushChecked) perMinExtras += rate * rushPct;
       $("#price-total").textContent = formatMoney(rate + perMinExtras) + "/min";
       if (addonChecked) $("#price-addon").textContent = formatMoney(addonRate) + "/min";
       if (isManual) $("#price-manual").textContent = formatMoney(manualRate) + "/min";
+      if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceRate) + "/min";
+      if (rushChecked) $("#price-rush").textContent = formatMoney(rate * rushPct) + "/min";
       return;
     }
 
+    // Mirrors billing.order_cost_usd's real waterfall: free minutes first,
+    // then the plan discount, THEN prepaid credits as real dollar value
+    // against that discounted base (never against add-ons or rush - those
+    // are priced on the full minute count/value, matching the server).
     const freeApplied = freeMinutesEligible ? Math.min(fileDurationMinutes, Math.max(0, freeMinutes)) : 0;
-    const afterFree = Math.max(0, fileDurationMinutes - freeApplied);
-    const walletApplied = Math.min(afterFree, Math.max(0, walletMinutes));
-    const billable = Math.max(0, afterFree - walletApplied);
-    const gross = billable * rate;
+    const billableMinutes = Math.max(0, fileDurationMinutes - freeApplied);
+    const gross = billableMinutes * rate;
     const discountAmount = gross * discount;
+    const afterDiscount = gross - discountAmount;
+    const creditsValueUsd = Math.max(0, walletCredits) / CREDITS_PER_DOLLAR;
+    const creditsAppliedUsd = Math.min(afterDiscount, creditsValueUsd);
     const addonCost = addonChecked ? addonRate * fileDurationMinutes : 0;
     // Manual-transcription surcharge, like video_deliverables, is priced
     // against the FULL minute count - see billing.order_cost_usd's own
-    // comment on why add-ons aren't reduced by free/wallet minutes.
+    // comment on why add-ons aren't reduced by free minutes/credits.
     const manualCost = isManual ? manualRate * fileDurationMinutes : 0;
-    const total = gross - discountAmount + addonCost + manualCost;
+    const humanVoiceCost = humanVoiceChecked ? humanVoiceRate * fileDurationMinutes : 0;
+    const rushSurcharge = rushChecked ? (fileDurationMinutes * rate) * rushPct : 0;
+    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
       : (freeMinutesEligible ? "none applied" : "not eligible (transcription-only)");
-    $("#price-wallet-row").hidden = walletApplied <= 0;
-    if (walletApplied > 0) $("#price-wallet").textContent = walletApplied.toFixed(1) + " min";
+    $("#price-wallet-row").hidden = creditsAppliedUsd <= 0;
+    if (creditsAppliedUsd > 0) {
+      $("#price-wallet").textContent = Math.round(creditsAppliedUsd * CREDITS_PER_DOLLAR) + " credits (" + formatMoney(creditsAppliedUsd) + ")";
+    }
     if (addonChecked) $("#price-addon").textContent = formatMoney(addonCost);
     if (isManual) $("#price-manual").textContent = formatMoney(manualCost);
+    if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceCost);
+    if (rushChecked) $("#price-rush").textContent = formatMoney(rushSurcharge);
     $("#price-total").textContent = formatMoney(Math.max(0, total));
   }
 
@@ -221,6 +251,10 @@
     $all('input[name="service_level"]').forEach((r) => r.addEventListener("change", updatePricing));
     const addonBox = $("#addon-checkbox");
     if (addonBox) addonBox.addEventListener("change", updatePricing);
+    const humanVoiceBoxEl = $("#human-voice-checkbox");
+    if (humanVoiceBoxEl) humanVoiceBoxEl.addEventListener("change", updatePricing);
+    const rushBox = $("#rush-checkbox");
+    if (rushBox) rushBox.addEventListener("change", updatePricing);
     const langSelect = $("#source-lang-select");
     if (langSelect) langSelect.addEventListener("change", updatePricing);
   }

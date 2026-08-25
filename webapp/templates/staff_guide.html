@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Ereri Guide &amp; Style Guide{% endblock %}
+{% block content %}
+<h1>Ereri guide &amp; style guide</h1>
+<p class="muted" style="margin-top:0;">Everything an editor needs to work a job in Ereri end to end and ship
+   something a client is happy to pay for. This is the long-form reference - the <strong>Guide</strong> tab
+   inside Ereri itself is the quick version for while you're actually working. Open this in its own tab and
+   keep it up alongside a real job the first few times through.</p>
+
+<details class="m-blog-toc" open style="margin-bottom:20px;">
+  <summary>Contents</summary>
+  <ol>
+    <li><a href="#model">The two-step model</a></li>
+    <li><a href="#before">Before you touch a segment</a></li>
+    <li><a href="#step1">Step 1 - the Swahili source</a></li>
+    <li><a href="#step2">Step 2 - the English translation</a></li>
+    <li><a href="#gaps">Gaps, sound tags &amp; paragraph breaks</a></li>
+    <li><a href="#speakers">Speaker tags</a></li>
+    <li><a href="#tools">Macros, spell check &amp; find/replace</a></li>
+    <li><a href="#flags">The flag glossary - what each one means and what to do</a></li>
+    <li><a href="#overlap">Timing, stretching &amp; why a dub used to overlap itself</a></li>
+    <li><a href="#voice">Voice cloning &amp; consent</a></li>
+    <li><a href="#style">Caption &amp; transcript style rules</a></li>
+    <li><a href="#shipping">Saving, approving &amp; the 100%-edited gate</a></li>
+    <li><a href="#shortcuts">Keyboard shortcuts, condensed</a></li>
+    <li><a href="#trouble">If Ereri seems broken</a></li>
+    <li><a href="#contact">Who to ask</a></li>
+  </ol>
+</details>
+
+<div class="card" id="model">
+  <h2>1. The two-step model</h2>
+  <p>Every job is two passes over the same audio, read as one continuous document rather than a stack of
+     separate clips:</p>
+  <dl>
+    <dt>Step 1 - Swahili source</dt>
+    <dd>The ASR transcript (faster-whisper), corrected against what's actually said. Timing here is real -
+        click any word and the player jumps to that exact moment.</dd>
+    <dt>Step 2 - English translation</dt>
+    <dd>The text that actually gets spoken (by the dubbed voice) and captioned. Word timing here is
+        <em>estimated</em> - proportioned across the segment by character count, since there's no real
+        per-word alignment for translated text. That's what the dashed underline under a word means.</dd>
+  </dl>
+  <p class="muted">A human edit always wins over whatever the AI produced, at every layer - a hand-corrected
+     source, a hand-edited translation, a manually chosen voice. Nothing you type is ever silently
+     overwritten by a later automated pass.</p>
+</div>
+
+<div class="card" id="before">
+  <h2>2. Before you touch a segment</h2>
+  <p>Two tabs on the left are worth reading before you start editing, not after:</p>
+  <ul>
+    <li><strong>Client brief</strong> - what this specific client actually asked for: speaker IDs on or off,
+        verbatim vs. clean read, whether to transcribe song lyrics, how to handle existing burned-in subs,
+        and what to do about no-audio / wrong-language / instrumental-only content (tag and continue, or
+        return the order to the client). If the brief says "return", use
+        <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>z</kbd> rather than guessing your way through it.</li>
+    <li><strong>Job</strong> - the route, providers, segment/fit-rate/flag counts, and two bulk actions
+        (detect non-speech gaps; re-translate everything not yet hand-finalized). Use these for a whole-order
+        fix, not a one-off manual edit.</li>
+  </ul>
+</div>
+
+<div class="card" id="step1">
+  <h2>3. Step 1 - the Swahili source</h2>
+  <p>Fix the ASR transcript against what's actually said, not against what you'd expect someone to say.
+     Low-opacity words are ones the model was less confident about - saving a correction for that segment
+     brings its words back to full opacity, so a glance at the page tells you what's actually been read
+     versus what's still an unverified guess.</p>
+  <p>A correction here doesn't automatically retranslate itself - the English in step 2 keeps whatever it
+     already had until you either hit <strong>Re-translate from corrected source</strong>
+     (<kbd>alt</kbd>+<kbd>r</kbd>) or edit the English by hand. A translation that's fallen behind a later
+     source correction gets a dashed blue outline automatically in step 2, so you don't have to remember
+     which segments you touched.</p>
+  <p><strong>A known failure pattern to watch for: code-switched audio.</strong> A speaker mixing Swahili
+     and English mid-sentence (common in real Kenyan speech) is a genuine, unsolved limitation of the
+     current transcription engines - they commit to one language for a stretch of audio, so an English
+     word dropped into a Swahili sentence often comes back transliterated as if it were Swahili (or vice
+     versa), not flagged as wrong, just quietly mangled. It usually (not always) trips
+     <code>low_asr_confidence</code>, but don't rely on the flag alone - if you hear a speaker switch
+     languages, read that word extra carefully against the audio and correct it by ear.</p>
+</div>
+
+<div class="card" id="step2">
+  <h2>4. Step 2 - the English translation</h2>
+  <p>Correct the text that actually gets spoken and captioned. This is where most of an editor's real
+     judgment call lives: does the AI's translation say what was actually meant, does it read naturally in
+     English, and - critically, see section 9 - does it fit the time it has to be spoken in.</p>
+  <p>If you fixed the Swahili first, re-translate before hand-editing the English, so you're correcting a
+     fresh translation of the right text instead of patching a translation of the old, wrong one.</p>
+</div>
+
+<div class="card" id="gaps">
+  <h2>5. Gaps, sound tags &amp; paragraph breaks</h2>
+  <p>The empty dashed boxes in either step are real gaps - a full second or more of detected non-speech
+     (silence, music, crowd noise, laughter). Type a tag like <code>[MUSIC]</code>, <code>[LAUGHTER]</code>
+     or <code>[APPLAUSE]</code> into one if it needs a caption note; leave it empty if it doesn't. A gap is
+     never spoken by the dubbed voice - it's caption metadata only.</p>
+  <p>Use <kbd>ctrl</kbd>+<kbd>enter</kbd> on a word to start a new paragraph there - the word (and everything
+     after it, up to the next break) drops to a new line and stays there, on every future reload, not just
+     while you're looking at it. <kbd>ctrl</kbd>+<kbd>⌫</kbd> on a paragraph-start word removes that break.
+     Reach for a paragraph break wherever a new sentence genuinely reads as a new thought, or wherever a new
+     speaker starts talking (see the next section) - not after every sentence, or the transcript stops
+     reading as prose.</p>
+</div>
+
+<div class="card" id="speakers">
+  <h2>6. Speaker tags</h2>
+  <p>If the client brief asks for speaker IDs, type the name in caps followed by a colon at the start of a
+     line - e.g. <code>RIGATHI GACHAGUA:</code> - the same way you'd label a speaker in any transcript. Ereri
+     recognizes that pattern automatically: it stays one bold cell instead of splitting into separate words,
+     it's never read aloud by the dubbed voice (a real voice actor doesn't say a character's name before
+     their own line either), and captions still show it in full. You don't need a separate control for
+     this - just type it as you would on paper, on its own line.</p>
+</div>
+
+<div class="card" id="tools">
+  <h2>7. Macros, spell check &amp; find/replace</h2>
+  <p><strong>Macros</strong> (Macros tab) are ten reusable snippets bound to <kbd>ctrl</kbd>+<kbd>1</kbd>
+     through <kbd>ctrl</kbd>+<kbd>0</kbd>, inserted at your cursor - good for a recurring phrase, tag, or
+     disclaimer specific to a client. They save themselves as you type them, same as the transcript.</p>
+  <p><strong>Spell check</strong> (step 2 only) flags possibly-misspelled words in red. Click a flagged cell
+     for suggestions - "Replace all" fixes every matching occurrence in the segment at once, or click a
+     single suggestion to fix just that one, or "Ignore" to dismiss it if it's actually correct (a name, a
+     brand, deliberate slang). It checks spelling only, not grammar - read your own sentences back.</p>
+  <p><strong>Find/replace</strong> (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>f</kbd>) works across the whole
+     current step - useful for a name that came back misspelled the same way in twelve different
+     segments.</p>
+</div>
+
+<div class="card" id="flags">
+  <h2>8. The flag glossary</h2>
+  <p>A flagged segment gets a dotted underline instead of a callout box - hover it, or press
+     <kbd>alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd> to jump between flagged spots, to see why. The tooltip shows the
+     raw reason code(s) below, joined together exactly as the system recorded them - here's what each one
+     actually means and what to do about it.</p>
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th style="text-align:left;">Reason code</th><th style="text-align:left;">What it means</th><th style="text-align:left;">What to do</th></tr></thead>
+    <tbody>
+      <tr><td><code>low_asr_confidence</code></td><td>The Swahili transcript itself is a shaky guess.</td>
+          <td>Listen to the source audio and correct step 1 against what's actually said.</td></tr>
+      <tr><td><code>empty_transcript</code></td><td>The model heard nothing at all for a segment longer than
+          1.5s - more serious than a shaky guess, there's no draft to proofread.</td>
+          <td>Transcribe it from scratch by ear.</td></tr>
+      <tr><td><code>low_mt_confidence</code></td><td>The translation itself is a low-confidence guess.</td>
+          <td>Read it against the (corrected) Swahili and fix anything that's wrong or unnatural.</td></tr>
+      <tr><td><code>mt:sheng</code>, <code>mt:unclear</code>, <code>mt:numbers</code>,
+          <code>mt:time_expression</code></td>
+          <td>The translator itself flagged something specific: slang it wasn't fully sure of, an
+          ambiguous phrase, a number, or - the highest-stakes one in Kenyan content - a time expression
+          (East Africa often runs on "swahili time", offset from the 12-hour clock a literal translation
+          would produce).</td>
+          <td>Double-check that exact word or phrase by ear against the source.</td></tr>
+      <tr><td><code>explicit_content_flagged</code></td><td>A coarse keyword match against known explicit
+          terms - not a reliable detector on its own, legitimate content (medical, news reporting on
+          assault) can trip it too.</td>
+          <td>Use your judgment on whether it's actually a problem; this exists so a human decides, not so
+          anything gets auto-rejected.</td></tr>
+      <tr><td><code>duration_overflow</code></td><td>The translation is a bit too long or short for its
+          slot (needs_shortening / needs_lengthening) but a normal-sounding time-stretch could plausibly
+          fix it.</td>
+          <td>Usually resolves itself once you save - see section 9. If it doesn't, tighten or pad the
+          English text.</td></tr>
+      <tr><td><code>unfittable</code></td><td>The translation is too long or short for even an emergency
+          stretch to rescue.</td>
+          <td>Rewrite the English shorter (or, rarely, longer) - see section 9's playbook.</td></tr>
+      <tr><td><code>stretch_cap_exceeded</code></td><td>The audio was synthesized but left un-stretched -
+          it didn't fit in its own real estate even at the emergency stretch ceiling.</td>
+          <td>This is the one that used to risk an audible overlap before the mixer fix below - it no
+          longer can, but the segment's audio may now be cut short in the delivered mix. Rewrite the
+          English shorter and re-synthesize (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd>).</td></tr>
+      <tr><td><code>emergency_stretch_applied</code></td><td>The audio needed more than the normal, fully
+          natural-sounding stretch to fit - it was stretched anyway, up to a harder ceiling, rather than
+          being left unfittable.</td>
+          <td>Give it a listen. If the pace sounds pushed, shortening the English is still the better fix
+          than leaving it stretched.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="card" id="overlap">
+  <h2>9. Timing, stretching &amp; why a dub used to overlap itself</h2>
+  <p><strong>What was happening:</strong> every segment's dubbed voice only ever gets its own original
+     time slot in the source audio to work with. When a translation was too long to fit even after
+     stretching, the mixer used to just play the next segment's audio on top of whatever was still
+     playing from the one before it - two voices summed together, audibly talking over each other,
+     occasionally loud enough to clip. That was a real bug in the mixer, not an inherent limit of dubbing,
+     and it's fixed now: <strong>the mixer physically cannot place two segments' audio in the same moment
+     any more</strong> - a segment that runs long gets its tail cut cleanly at the point the next one
+     starts, never summed on top of it. You will never hear one voice on top of another in a delivered
+     file again.</p>
+  <p>That fix alone trades "audible overlap" for "silently cut short", which is why the rest of this system
+     exists - to make that cut as rare as possible, and to make sure a human always catches the segments
+     where it still happens, before anything ships:</p>
+  <ol>
+    <li><strong>Borrowed silence.</strong> If a segment is directly followed by a real silent gap, its
+        translation is now allowed to run into that silence (minus a always-kept 200ms pause) instead of
+        being confined to its own original slot. That's real dead air nobody would otherwise hear speech
+        in - not time taken from anywhere. This alone fixes most "just a bit too long" cases for free.</li>
+    <li><strong>Normal time-stretch, up to 8%.</strong> Applied silently, no flag - this range sounds
+        completely natural (pitch-preserving, not a chipmunk effect).</li>
+    <li><strong>Emergency stretch, up to 25%.</strong> A last resort before a segment is left unfittable -
+        applied and flagged <code>emergency_stretch_applied</code> so you know to sanity-check the pace.</li>
+    <li><strong>Still too long: flagged, not overlapped.</strong> Flagged <code>stretch_cap_exceeded</code> /
+        <code>unfittable</code>, audio placed at its natural length and hard-clipped at the mix stage if it
+        would otherwise reach the next segment. This is exactly the worklist Ereri's flags exist for.</li>
+  </ol>
+  <p><strong>The actual playbook for an unfittable segment:</strong> the fix is almost always a shorter
+     English sentence, not a timing trick - shorter synonyms ("about" instead of "regarding"), dropping
+     filler words, cutting a subordinate clause that doesn't change the meaning, or splitting one long
+     sentence across this segment and a directly-following one if the source audio actually has a pause
+     there. Rewrite, save, and check the flag clears (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd>
+     re-synthesizes and re-times that one segment immediately, so you don't have to wait for a full
+     re-render to see whether your rewrite actually fixed it).</p>
+  <p class="muted">Two things this system deliberately does <strong>not</strong> attempt, so you know what
+     not to expect from it: it doesn't duck a background track under the dubbed voice (the delivered dub is
+     a single voice track, not a voice-over-original mix, so there's no second track to duck), and it
+     doesn't do visual AI lip-sync (matching the video's mouth movements to the new audio) - that's a
+     genuinely different, GPU-heavy capability this platform doesn't have built, not a setting you're
+     missing.</p>
+</div>
+
+<div class="card" id="voice">
+  <h2>10. Voice cloning &amp; consent</h2>
+  <p>A cloned voice (matching the original speaker's actual voice, rather than a standard TTS voice) only
+     ever gets used with a real, logged consent - if that hasn't been granted, don't propose cloning as a
+     way to fix a timing or quality issue. The reference clip is auto-extracted from the source audio's
+     longest real speech segment, 6-20 seconds - if a job's warnings mention a short reference clip, expect
+     a less reliable clone and say so if a client asks.</p>
+</div>
+
+<div class="card" id="style">
+  <h2>11. Caption &amp; transcript style rules</h2>
+  <dl>
+    <dt>Verbatim vs. clean read</dt>
+    <dd>Follow whatever the client brief specifies (Client brief tab). Clean read smooths filler words and
+        false starts for readability; full verbatim keeps every "um", repetition and false start. When in
+        doubt, clean read is the safer default for a general audience.</dd>
+    <dt>Captions on screen</dt>
+    <dd>Capped automatically at 6 seconds on screen and wrapped at 32 characters per line - you don't need
+        to manage this by hand, it's applied when subtitles are generated.</dd>
+    <dt>Cut-off speech</dt>
+    <dd>Add a trailing <code>--</code> (<kbd>alt</kbd>+<kbd>d</kbd>) rather than trailing off with an
+        ellipsis or guessing the rest of the sentence.</dd>
+    <dt>Inaudible speech</dt>
+    <dd>Tag with <code>[inaudible]</code> (<kbd>alt</kbd>+<kbd>n</kbd>) rather than guessing at words you
+        genuinely can't make out.</dd>
+    <dt>Crosstalk / interposing voices</dt>
+    <dd>Prefix with <code>&gt;&gt;</code> (<kbd>alt</kbd>+<kbd>l</kbd>).</dd>
+    <dt>Italics</dt>
+    <dd>Only if the client brief asks for it (on-screen text or narration) - real markup that carries into
+        the delivered SRT/VTT, not just a visual toggle in the editor.</dd>
+  </dl>
+</div>
+
+<div class="card" id="shipping">
+  <h2>12. Saving, approving &amp; the 100%-edited gate</h2>
+  <p>Everything saves itself - a segment autosaves a couple of seconds after you stop typing, and the topbar
+     always shows whether everything's saved. <kbd>ctrl</kbd>+<kbd>s</kbd> forces it immediately;
+     <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd> also re-renders that segment's audio.</p>
+  <p><strong>"Approve &amp; mark ready for delivery" is a hard gate, not a suggestion:</strong> an order
+     cannot ship until every real speech segment (gaps don't count) has been saved at least once in step 2 -
+     even a segment that needed no changes has to be touched once so it registers as reviewed. The staff
+     queue's "% Edited" column tracks this in real time; the approve action itself will refuse and tell you
+     exactly what's still outstanding if you try before it hits 100%. There is no way to bypass this from
+     the editor - it's the platform's actual promise that nothing ships un-reviewed.</p>
+</div>
+
+<div class="card" id="shortcuts">
+  <h2>13. Keyboard shortcuts, condensed</h2>
+  <p class="muted" style="margin-top:0;">The full, current list - with the reasoning for anything that isn't
+     on the key you'd expect - always lives in the <strong>Shortcuts</strong> tab inside Ereri itself, since
+     that one's guaranteed to match whatever's actually bound. The ones worth having memorized:</p>
+  <div class="shortcut-row"><kbd>space</kbd><span>Play / pause</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>s</kbd><span>Save now</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd><span>Save + re-synthesize audio</span></div>
+  <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate from corrected source</span></div>
+  <div class="shortcut-row"><kbd>alt</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd><span>Jump between flagged segments</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>enter</kbd><span>New paragraph</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>m</kbd><span>Merge cell with the next</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>f</kbd><span>Find / replace</span></div>
+  <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>z</kbd><span>Return this order to the client</span></div>
+</div>
+
+<div class="card" id="trouble">
+  <h2>14. If Ereri seems broken</h2>
+  <p>Tabs not switching, macros not responding, shortcuts not firing - almost always a stale cached copy of
+     the editor's script fighting a newer page underneath it. <strong>Hard refresh first</strong>
+     (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>r</kbd>, or <kbd>ctrl</kbd>+<kbd>F5</kbd>) before assuming
+     something's actually broken - it fixes the large majority of "nothing's responding" reports.</p>
+  <p>If a hard refresh doesn't fix it, or something looks genuinely wrong with the data (missing audio, a
+     translation that doesn't match the source, a flag that doesn't clear after a real fix), say so
+     directly rather than working around it - see below.</p>
+</div>
+
+<div class="card" id="contact" style="text-align:center;">
+  <h2>15. Who to ask</h2>
+  <p class="muted">A real person reads these, not a support queue.</p>
+  <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+    <a href="mailto:{{ contact_email }}" class="btn secondary">Email</a>
+    <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="btn cta-olive">WhatsApp</a>
+  </div>
+</div>
+{% endblock %}

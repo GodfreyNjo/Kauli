@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Voice Talent{% endblock %}
+{% block content %}
+<h1>Voice talent</h1>
+<p class="muted" style="margin-top:0;">The human-voice-actor roster and payout ledger for orders where a
+   client paid for a real human voice-over instead of the AI dub. Casting an actor onto a specific order
+   happens on that order's page, not here - see its "Human voice-over" card once
+   <code>billing.ADDONS['human_voice_over']</code> has been selected on an order. No self-service actor
+   login exists yet - see this list's own comment in webapp/db.py for why not.</p>
+
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+
+<div class="card">
+  <h2 style="margin-top:0;">Add a voice actor</h2>
+  <form method="post" action="/staff/voice-actors">
+    <div class="row">
+      <label>Name <input type="text" name="name" required></label>
+      <label>Languages
+        <select name="languages" multiple required style="min-height:70px;">
+          {% for code, label in source_languages.items() %}
+          <option value="{{ code }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Email <input type="email" name="email"></label>
+      <label>Phone <input type="text" name="phone" placeholder="For arranging payout - e.g. M-Pesa number"></label>
+    </div>
+    <label>Rate ($/finished minute)
+      <input type="number" name="rate_per_min_usd" step="0.01" min="0"
+             placeholder="Leave blank until negotiated - can be added later">
+    </label>
+    <label>Bio / notes on their voice <textarea name="bio" rows="2"></textarea></label>
+    <label>Internal notes (staff only) <textarea name="notes" rows="2"></textarea></label>
+    <button type="submit">Add actor</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Roster ({{ actors|length }})</h2>
+  {% if not actors %}
+  <p class="muted">No actors added yet.</p>
+  {% else %}
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th style="text-align:left;">Name</th><th style="text-align:left;">Languages</th>
+      <th style="text-align:left;">Rate</th><th style="text-align:left;">Contact</th>
+      <th style="text-align:left;">Status</th><th></th></tr></thead>
+    <tbody>
+      {% for a in actors %}
+      <tr>
+        <td>{{ a['name'] }}{% if a['bio'] %}<br><span class="muted" style="font-size:0.78rem;">{{ a['bio'] }}</span>{% endif %}</td>
+        <td>{{ a['languages'] }}</td>
+        <td>{{ '$%.2f/min'|format(a['rate_per_min_usd']) if a['rate_per_min_usd'] else 'not set' }}</td>
+        <td style="font-size:0.82rem;">{{ a['email'] or '-' }}{% if a['phone'] %}<br>{{ a['phone'] }}{% endif %}</td>
+        <td>{{ a['status'] }}</td>
+        <td>
+          <form method="post" action="/staff/voice-actors/{{ a['id'] }}/status" style="display:inline;">
+            <input type="hidden" name="status" value="{{ 'inactive' if a['status'] == 'active' else 'active' }}">
+            <button type="submit" class="secondary" style="font-size:0.78rem; padding:4px 8px;">
+              {{ 'Deactivate' if a['status'] == 'active' else 'Reactivate' }}
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Owed ({{ payouts_owed|length }})</h2>
+  <p class="muted" style="margin-top:0;">Marking one paid is a record, not a transfer - send the real
+     M-Pesa/bank payment yourself first, then mark it here.</p>
+  {% if not payouts_owed %}
+  <p class="muted">Nothing outstanding.</p>
+  {% else %}
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th style="text-align:left;">Actor</th><th style="text-align:left;">Order</th>
+      <th style="text-align:left;">Amount</th><th></th></tr></thead>
+    <tbody>
+      {% for p in payouts_owed %}
+      <tr>
+        <td>{{ p['actor_name'] }}</td>
+        <td>{{ p['order_filename'] }}</td>
+        <td>${{ "%.2f"|format(p['amount_usd']) }} ({{ "%.1f"|format(p['minutes']) }} min × ${{ "%.2f"|format(p['rate_per_min_usd']) }}/min)</td>
+        <td>
+          <form method="post" action="/staff/payouts/{{ p['id'] }}/mark-paid" style="display:flex; gap:6px;">
+            <input type="text" name="reference" placeholder="M-Pesa/transfer reference (optional)" style="font-size:0.8rem;">
+            <button type="submit" class="secondary" style="font-size:0.78rem; padding:4px 8px;">Mark paid</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Recently paid</h2>
+  {% if not payouts_paid %}
+  <p class="muted">None yet.</p>
+  {% else %}
+  <div style="overflow-x:auto;">
+  <table>
+    <thead><tr><th style="text-align:left;">Actor</th><th style="text-align:left;">Order</th>
+      <th style="text-align:left;">Amount</th><th style="text-align:left;">Reference</th></tr></thead>
+    <tbody>
+      {% for p in payouts_paid %}
+      <tr>
+        <td>{{ p['actor_name'] }}</td>
+        <td>{{ p['order_filename'] }}</td>
+        <td>${{ "%.2f"|format(p['amount_usd']) }}</td>
+        <td>{{ p['paid_reference'] or '-' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

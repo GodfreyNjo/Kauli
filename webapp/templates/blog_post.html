@@ -14,31 +14,23 @@
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "{{ post['title']|replace('\\', '\\\\')|replace('"', '\\"') }}",
-  "author": { "@type": "Person", "name": "{{ author_name }}" },
+  "author": { "@type": "Person", "name": "{{ author_name }}",
+              "worksFor": { "@type": "Organization", "name": "Forge Media Services" } },
   "publisher": { "@type": "Organization", "name": "Forge Media Services" },
   {% if published_at_iso %}"datePublished": "{{ published_at_iso }}",{% endif %}
+  {% if updated_at_iso %}"dateModified": "{{ updated_at_iso }}",{% endif %}
   "mainEntityOfPage": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}"
 }
 </script>
 {% endblock %}
 {% block content %}
-<nav class="m-nav" id="m-nav">
-  <a href="/" class="m-nav-brand-link">
-    <picture>
-      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
-      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
-    </picture>
-  </a>
-  <div class="m-nav-links">
-    <a href="/blog">← All posts</a>
-  </div>
-</nav>
+{% include "_nav.html" %}
 
-<section class="m-section" style="padding-top:48px;">
+<article class="m-section" style="padding-top:48px;">
   <div class="m-inner narrow legal">
     {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
     <p class="muted" style="font-size:0.8rem; margin-top:10px;">{{ author_name }} &middot;
-       {{ post['published_at']|int|timestamp_to_str if post['published_at'] else 'Draft' }}</p>
+       {% if post['published_at'] %}<time datetime="{{ published_at_iso }}">{{ post['published_at']|int|timestamp_to_str }}</time>{% else %}Draft{% endif %}</p>
     <h1 class="m-h2" style="text-align:left;">{{ post['title'] }}</h1>
 
     {% set post_url = request.url.scheme + '://' + request.url.netloc + '/blog/' + post['slug'] %}
@@ -88,7 +80,7 @@
       <a href="/login?mode=signup" class="btn cta-olive">Try Kauli free - first {{ free_minutes|int }} minutes on us →</a>
     </div>
   </div>
-</section>
+</article>
 
 {% include "_footer.html" %}
 <script>

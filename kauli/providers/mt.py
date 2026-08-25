@@ -194,6 +194,65 @@ class AwsTranslateMT(MTProvider):
                 "notes": None, "confidence": 0.7, "flags": []}
 
 
+class LaraMT(MTProvider):
+    """Free-tier option: Lara Translate, by Translated (the company behind
+    MyMemory and 25+ years of professional MT). Real adaptive NMT across
+    200+ language pairs including Swahili - meaningfully better than
+    LocalMT below, though not as good as ClaudeMT at Sheng/register/
+    length-targeted paraphrase. 10,000 characters/month free, no credit
+    card - see developers.laratranslate.com to sign up and
+    support.laratranslate.com/en/api-key-for-laras-api to generate a key
+    pair (Dashboard -> API credentials -> Create new credentials -> Download
+    Credentials immediately, it's only shown once).
+
+    Set LARA_ACCESS_KEY_ID and LARA_ACCESS_KEY_SECRET. Requires the
+    lara-sdk package (pip install lara-sdk).
+
+    Like AwsTranslateMT, this returns ONE translation, not four
+    length-targeted candidates - duration fitting only ever has
+    'literal'/'spoken' (identical here) to work with. The 10k/month quota
+    is small: budget roughly a handful of dub orders a month before
+    hitting it, not real production volume - a genuine stopgap until a
+    paid provider makes sense, not a long-term default."""
+    name = "lara"
+
+    # Lara wants full BCP-47-ish codes, not the bare "sw"/"en" this app
+    # uses everywhere else - mapped here only, never renamed system-wide.
+    # Kikuyu deliberately has no entry - app.py's create_order already
+    # refuses a Kikuyu order any MT provider but Claude (see
+    # MANUAL_TRANSCRIPTION_LANGUAGES), so this never needs to guess at one.
+    LANG_CODES = {"sw": "sw-KE", "en": "en-US"}
+
+    def __init__(self):
+        self._client = None
+        self.total_chars_used = 0  # against the real 10,000/month free quota - track it,
+        # don't just assume it's fine (see the class docstring on how little that actually covers)
+
+    def _c(self):
+        if self._client is None:
+            from lara_sdk import Translator, Credentials
+            creds = Credentials(
+                access_key_id=os.environ["LARA_ACCESS_KEY_ID"],
+                access_key_secret=os.environ["LARA_ACCESS_KEY_SECRET"],
+            )
+            self._client = Translator(creds)
+        return self._client
+
+    def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
+        src = self.LANG_CODES.get(source_lang, source_lang)
+        tgt = self.LANG_CODES.get(target_lang, target_lang)
+        res = self._c().translate(text, source=src, target=tgt)
+        out = (res.translation or "").strip()
+        self.total_chars_used += len(text)
+        return {
+            "literal": out, "spoken": out, "shorter": None, "longer": None,
+            "notes": "Lara (free tier): one translation, no length-targeted paraphrase - "
+                     "duration fitting only has this one candidate to work with.",
+            "confidence": 0.75 if out else 0.0,
+            "flags": [] if out else ["unclear"],
+        }
+
+
 class LocalMT(MTProvider):
     """PLACEHOLDER - free, local, offline via HuggingFace transformers
     (Helsinki-NLP/opus-mt-swc-en, MarianMT). No API key, no cost, no network
@@ -225,7 +284,21 @@ class LocalMT(MTProvider):
         if self._model is None:
             from transformers import MarianMTModel, MarianTokenizer
             self._tokenizer = MarianTokenizer.from_pretrained(self.MODEL_NAME)
-            self._model = MarianMTModel.from_pretrained(self.MODEL_NAME)
+            # low_cpu_mem_usage=False is deliberate, not a default left in
+            # place: newer transformers versions build the model on a
+            # "meta" device first (shape/dtype only, no real data) as a
+            # memory-saving fast-init path, then materialize real weights
+            # afterward. MarianMT's tied embeddings (shared.weight /
+            # encoder.embed_tokens.weight / decoder.embed_tokens.weight /
+            # lm_head.weight all alias each other) can come out of that
+            # path with one alias still stuck on meta - real, this is
+            # exactly the "Tensor.item() cannot be called on meta tensors"
+            # error a real re-translate hit in production. This ~300MB
+            # model has no real memory pressure to save by using the fast
+            # path anyway - forcing the old, fully-materialized-on-CPU-
+            # from-the-start load path is strictly safer here, not slower
+            # in any way that matters.
+            self._model = MarianMTModel.from_pretrained(self.MODEL_NAME, low_cpu_mem_usage=False)
         return self._tokenizer, self._model
 
     def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
@@ -244,7 +317,7 @@ class LocalMT(MTProvider):
 
 _REGISTRY = {
     "stub": StubMT, "claude": ClaudeMT, "aws-translate": AwsTranslateMT,
-    "local": LocalMT,
+    "local": LocalMT, "lara": LaraMT,
 }
 
 

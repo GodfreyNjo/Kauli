@@ -22,6 +22,7 @@ import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 import yt_dlp
 from fastapi import Body, FastAPI, Request, UploadFile, Form, File
@@ -35,12 +36,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat  # noqa: E402
 from kauli import timing  # noqa: E402
-from kauli.models import Job  # noqa: E402
-from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip  # noqa: E402
-from kauli.pipeline import translate_segment  # noqa: E402
+from kauli.models import Job, split_off_speaker_tag  # noqa: E402
+from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, time_stretch  # noqa: E402
+from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
 from kauli.providers import get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
-from kauli.subtitles import to_srt, to_vtt  # noqa: E402
+from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
 UPLOAD_DIR = WEBAPP_DIR / "data" / "uploads"
@@ -70,6 +71,25 @@ def probe_duration_minutes(path: str) -> float:
     return float(result.stdout.strip()) / 60.0
 
 
+# YouTube increasingly blocks yt-dlp's normal (web-client) requests with
+# "Sign in to confirm you're not a bot" - a real, live problem, confirmed
+# 2026-08-23 against a real video a client hit this on. Already-current
+# yt-dlp alone doesn't fix it (checked - no newer release existed). The
+# real, officially-supported fix yt-dlp ships for this is requesting
+# through the ANDROID app's API surface instead of the web player's -
+# not a login bypass or a scraping trick, just a different first-party
+# client YouTube itself still serves without this particular check.
+# Verified working against the exact video that failed. Falls back to
+# "web" if the android client doesn't have what's needed for a given
+# video (occasionally offers fewer/lower-quality formats than web does
+# when unblocked) - real cookies (--cookies-from-browser upstream calls
+# this) are the other documented option, but that needs an actual signed-
+# in browser session's cookies handed to this server, which is a real
+# account-security tradeoff to make deliberately, not something to wire
+# in silently.
+YT_DLP_EXTRACTOR_ARGS = {"extractor_args": {"youtube": {"player_client": ["android", "web"]}}}
+
+
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
     """Downloads AUDIO ONLY - the pipeline (ASR/MT/TTS) only ever needs
     audio samples, and audio-only is a fraction of the size/time of the
@@ -88,6 +108,7 @@ def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
         "no_warnings": True,
         "noplaylist": True,
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "m4a"}],
+        **YT_DLP_EXTRACTOR_ARGS,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -118,6 +139,7 @@ def fetch_youtube_video(video_id: str, dest_dir: Path) -> Path:
         "no_warnings": True,
         "merge_output_format": "mp4",
         "noplaylist": True,
+        **YT_DLP_EXTRACTOR_ARGS,
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
@@ -248,20 +270,28 @@ async def add_trace_id(request: Request, call_next):
 
 # Real third-party origins this site actually loads, checked directly
 # rather than guessed: Google Fonts (base.html), Cloudflare Web Analytics
-# (base.html's beacon script + its RUM endpoint), and Calendly's widget
-# (marketing.html - script tag + the iframe/API calls it makes on its own).
+# (base.html's beacon script + its RUM endpoint), Calendly's widget
+# (marketing.html - script tag + the iframe/API calls it makes on its own),
+# and the YouTube IFrame API (Ereri's editor - a youtube-sourced order
+# embeds the real source video for editing context via editor.js's
+# createYouTubeAdapter). Missing the YouTube origins here was a real bug:
+# the player never loaded at all for any youtube-sourced order, silently
+# blocked by this exact header - script-src blocked the iframe_api script
+# itself, and frame-src (default-src's fallback, since frame-src wasn't
+# set at all) blocked the actual embedded player iframe it creates.
 # Paystack needs no entry here at all: checkout is a server-side redirect
 # to Paystack's own hosted page (billing.py's authorization_url), never an
 # embedded script or iframe on this site.
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com; "
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com "
+    "https://www.youtube.com; "
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
     "font-src 'self' https://fonts.gstatic.com; "
-    "img-src 'self' data:; "
+    "img-src 'self' data: https://i.ytimg.com; "
     "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com "
     "https://calendly.com https://*.calendly.com; "
-    "frame-src https://calendly.com https://*.calendly.com; "
+    "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com; "
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 )
 # 'unsafe-inline' on script-src is a real, known trade-off, not an
@@ -294,6 +324,27 @@ async def add_security_headers(request: Request, call_next):
 
 app.mount("/static", StaticFiles(directory=str(WEBAPP_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(WEBAPP_DIR / "templates"))
+
+
+def _static_version(filename: str) -> int:
+    """The file's own real last-modified time, as a cache-busting ?v=
+    query string on every <script src>/<link href> - a stale cached
+    editor.js was a real, confirmed bug: this session edited that file
+    many times, and a browser that kept an old cached copy while
+    editor.html (a different file, fetched fresh) moved on could end up
+    with mismatched JS and HTML - e.g. old JS trying to bind a click
+    handler to a button a newer template had already removed, throwing
+    partway through initialization and silently killing every handler
+    meant to register AFTER it (tab switching, shortcuts, all of it).
+    Falls back to a fixed number rather than crashing if the file's
+    somehow missing - a bad cache-buster is still better than a 500."""
+    try:
+        return int((WEBAPP_DIR / "static" / filename).stat().st_mtime)
+    except OSError:
+        return 0
+
+
+templates.env.globals["static_version"] = _static_version
 templates.env.filters["timestamp_to_str"] = lambda ts: datetime.fromtimestamp(ts).strftime("%b %d, %H:%M")
 # Unambiguous long form for formal documents (receipts, invoices) - "Aug 22,
 # 15:48" is fine for an activity feed, not for something someone might file
@@ -313,6 +364,32 @@ templates.env.globals["free_minutes"] = billing.FREE_MINUTES_PER_MONTH
 # computed once at request-handling time and threaded through every route
 # that shows an order - same reasoning as paystack_live_mode above.
 templates.env.globals["tat_status"] = tat.time_status
+# Client-facing status label - "ready_for_delivery" read literally as
+# "ready for delivery" (found via real client testing: it reads like
+# freight tracking, not "here's your thing"). Only this one status gets
+# an override; everything else keeps the existing plain
+# replace('_',' ') rendering, unchanged.
+templates.env.filters["client_status_label"] = (
+    lambda status: "Your order is ready" if status == "ready_for_delivery" else status.replace("_", " ")
+)
+
+
+def _duration_short(seconds) -> str:
+    """"2h 15m" / "45m" / "3d 2h" - the staff queue's "time in stage"
+    column (see staff_dashboard.html). Real elapsed time since
+    status_changed_at, not an estimate."""
+    seconds = max(0, int(seconds or 0))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    if days:
+        return f"{days}d {hours}h"
+    if hours:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+templates.env.filters["duration_short"] = _duration_short
 
 
 def current_user(request: Request):
@@ -341,12 +418,21 @@ def _resolve_role_and_admin(email: str) -> tuple[str, bool]:
     through here, it flips the role on an existing row). Only used at
     account-CREATION time (get_or_create_user's was_new branch) - an
     existing account's role is whatever's in the users table, not
-    recomputed from this on every login."""
+    recomputed from this on every login.
+
+    A fourth way lands as 'voice_actor' instead: staff already added this
+    email to the voice_actors roster (see staff_voice_actors_create) with
+    no account linked to it yet - db.is_invited_voice_actor is the exact
+    same "not consumed yet" check is_invited_staff does, just against
+    that table instead of a separate invites one, since the roster row
+    itself already IS the invite (see that function's own comment)."""
     is_env_staff = supabase_auth.role_for_email(email) == "staff"
     if is_env_staff:
         return "staff", True
     if db.is_invited_staff(email):
         return "staff", False
+    if db.is_invited_voice_actor(email):
+        return "voice_actor", False
     return "client", False
 
 
@@ -442,6 +528,46 @@ def _find_gaps(seg) -> list[tuple[int, int]]:
     return gaps
 
 
+def _tokenize_with_speaker_tag(text: str) -> list[dict]:
+    """Splits text into word tokens for the cell-builders below - a
+    leading speaker tag ("RIGATHI GACHAGUA:") stays ONE token instead of
+    being split on its internal space like an ordinary two-word phrase
+    would be, everything after it splits normally. See
+    kauli.models.split_off_speaker_tag for the shared detection rule.
+    Without this, a speaker tag typed or macro-inserted as one unit still
+    split back into separate word-cells the next time cells were rebuilt
+    from the saved text (every reload, every save) - the client-side
+    macro trick that merged it into one cell was never durable past that.
+
+    Also real paragraph breaks: editor.js's insertParagraphBreak
+    (Ctrl+Enter) writes a real "\\n\\n" into the saved text (see its own
+    cellsText()), but this function used to just .split() on ALL
+    whitespace, silently discarding that marker - a paragraph break looked
+    fine in the browser until the next reload or autosave-triggered cell
+    rebuild, at which point it simply vanished, no error, just gone.
+    Each paragraph after the first gets its leading token flagged
+    para_start=True, which buildCells (editor.js) turns back into a real
+    line break the same way a live Ctrl+Enter does.
+
+    A bracket tag like "[MUZIKI YACHEZA]" gets the same one-token
+    treatment as a speaker tag, for the same reason: plain .split() broke
+    a multi-word tag across separate cells ("[MUZIKI" / "YACHEZA]"), so
+    editing one half left the brackets themselves mismatched, and nothing
+    about the cell UI signalled that a "word" here was actually one
+    indivisible caption tag."""
+    tokens = []
+    paragraphs = [p for p in re.split(r"\n\n+", text) if p.strip()]
+    for p_idx, para in enumerate(paragraphs):
+        tag, remainder = split_off_speaker_tag(para.strip())
+        para_tokens = ([{"text": tag, "speaker_tag": True, "bracket_tag": False}] if tag else [])
+        for w in re.findall(r"\[[^\]]*\]|\S+", remainder):
+            para_tokens.append({"text": w, "speaker_tag": False, "bracket_tag": w.startswith("[")})
+        for t_idx, tok in enumerate(para_tokens):
+            tok["para_start"] = p_idx > 0 and t_idx == 0
+        tokens += para_tokens
+    return tokens
+
+
 def _build_source_cells(seg) -> list[dict]:
     """Step 1 of the editor: the Swahili ASR transcript. Real per-word
     timing and confidence, straight from faster-whisper - this is the most
@@ -461,14 +587,16 @@ def _build_source_cells(seg) -> list[dict]:
     reason: there's no real per-word alignment for hand-edited text).
     """
     if seg.source_edited_transcript:
-        words = seg.source_edited_transcript.split()
-        total_chars = sum(len(w) for w in words) or 1
+        tokens = _tokenize_with_speaker_tag(seg.source_edited_transcript)
+        total_chars = sum(len(tok["text"]) for tok in tokens) or 1
         duration = max(1, seg.end_ms - seg.start_ms)
         cells = []
         t = seg.start_ms
-        for w in words:
-            dur = int(duration * (len(w) / total_chars))
-            cells.append({"type": "word", "text": w, "start_ms": t, "end_ms": t + dur, "confidence": 1.0, "approx": True})
+        for tok in tokens:
+            dur = int(duration * (len(tok["text"]) / total_chars))
+            cells.append({"type": "word", "text": tok["text"], "start_ms": t, "end_ms": t + dur,
+                          "confidence": 1.0, "approx": True, "speaker_tag": tok["speaker_tag"],
+                          "para_start": tok["para_start"], "bracket_tag": tok["bracket_tag"]})
             t += dur
         if cells:
             cells[-1]["end_ms"] = seg.end_ms  # absorb rounding drift at the tail
@@ -494,14 +622,16 @@ def _build_target_cells(seg) -> list[dict]:
     GAP cells at the same real silence intervals as the source. Gap cells
     start empty - an editor can type a sound tag like [MUSIC] into one.
     """
-    target_words = seg.final_text.split()
-    total_chars = sum(len(w) for w in target_words) or 1
+    tokens = _tokenize_with_speaker_tag(seg.final_text)
+    total_chars = sum(len(tok["text"]) for tok in tokens) or 1
     duration = max(1, seg.end_ms - seg.start_ms)
     cells = []
     t = seg.start_ms
-    for w in target_words:
-        dur = int(duration * (len(w) / total_chars))
-        cells.append({"type": "word", "text": w, "start_ms": t, "end_ms": t + dur})
+    for tok in tokens:
+        dur = int(duration * (len(tok["text"]) / total_chars))
+        cells.append({"type": "word", "text": tok["text"], "start_ms": t, "end_ms": t + dur,
+                      "speaker_tag": tok["speaker_tag"], "para_start": tok["para_start"],
+                      "bracket_tag": tok["bracket_tag"]})
         t += dur
     if cells:
         cells[-1]["end_ms"] = seg.end_ms  # absorb rounding drift at the tail
@@ -511,20 +641,98 @@ def _build_target_cells(seg) -> list[dict]:
     return cells
 
 
-def _resynthesize_full_dub(order, job: Job, tts_name: str, voice_id: str | None) -> None:
+def _render_segment_audio(order, job: Job, seg, tts_provider, voice_id) -> None:
+    """Synthesizes ONE segment's audio and applies the real time-stretch-
+    fit logic (the same kauli.pipeline.run's own TTS loop uses) - mutates
+    seg in place, doesn't touch the timeline or write any deliverable
+    file (callers do that once, not per segment). Skips a gap segment or
+    one with no real text - speaking either aloud makes no sense, and
+    calling synthesize("") is what crashed a real voice-clone run on this
+    exact codebase the first time an order had gap segments: coqui-tts's
+    synthesizer only assigns its internal `sens` list `if text:`, so an
+    empty string with a real speaker_wav present (voice cloning) skips
+    both that assignment AND the library's own "nothing to do" guard,
+    and crashes with an UnboundLocalError deep inside its code instead.
+    Same guard kauli.pipeline.run's own TTS loop already had - this just
+    brings both editor-side render paths in line with it.
+
+    voice_id is the order's own default/single voice - a segment whose
+    speaker has its OWN assigned voice (job.speaker_voices) uses that
+    instead, same resolve_voice_for_segment kauli.pipeline.run's TTS loop
+    uses, so a multi-speaker order stays consistent regardless of which
+    render path touched a given segment."""
+    if getattr(seg, "segment_type", "speech") == "gap":
+        # Real music/applause/laughter/SFX bed from the source, not
+        # silence - see kauli.pipeline.render_gap_audio's own docstring.
+        # Covers the editor-triggered re-render paths (staff_set_dub_voice,
+        # editor_retranslate_all's full rebuild) the same way the main
+        # pipeline run already does.
+        render_gap_audio(seg, order["audio_path"], Path(order["outdir"]) / "segments", tts_provider.sample_rate)
+        return
+    # A leading speaker tag ("RIGATHI GACHAGUA:") is caption metadata, not
+    # a line to speak aloud - see kauli.pipeline.run's identical stripping
+    # in the main pipeline's own TTS loop. subs_*.srt/vtt still caption the
+    # full text, tag included - only what's actually synthesized changes.
+    _tag, text = split_off_speaker_tag(seg.final_text.strip())
+    text = text.strip()
+    # Same reasoning, for an inline [Applause]/[MUZIKI YACHEZA] sound tag
+    # typed into an otherwise-spoken segment's text - the voice reads the
+    # real words, never the bracket tag itself.
+    text = strip_bracket_tags_for_tts(text)
+    if not text:
+        return
+    if seg.spell_out:
+        text = spell_out_text(text)
+    raw = Path(order["outdir"]) / "segments" / f"{seg.segment_id}.wav"
+    seg_voice_id = resolve_voice_for_segment(job, seg, voice_id, tts_provider.name)
+    rendered = tts_provider.synthesize(text, str(raw), voice_id=seg_voice_id)
+
+    seg.time_stretch_pct = 0.0
+    raw, rendered = apply_stretch_fit(seg, raw, rendered, Path(order["outdir"]) / "segments")
+
+    # A human editor's own deliberate pace override (see the voice-direction
+    # route), layered ON TOP of whatever the automatic fit-to-slot above
+    # already did - same time_stretch (pitch-preserving ffmpeg atempo) tool,
+    # just a second pass. Deliberately does NOT try to re-fit back into
+    # budget_ms afterward: an editor asking for "20% slower" is explicitly
+    # choosing to run past the original slot, and mixer.build_timeline's own
+    # non-overlap guarantee (hard-clip at the next segment's start) is what
+    # keeps that from ever audibly colliding with what comes after.
+    if seg.manual_pace_pct:
+        factor = 1.0 / (1.0 + seg.manual_pace_pct / 100.0)
+        paced = Path(order["outdir"]) / "segments" / f"{seg.segment_id}_paced.wav"
+        if time_stretch(str(raw), str(paced), factor):
+            raw = paced
+            rendered = int(round(rendered / factor))
+            if "manual_pace_override" not in seg.review_reasons:
+                seg.review_reasons.append("manual_pace_override")
+            seg.review_flag = True
+
+    seg.audio_path = str(raw)
+    seg.rendered_duration_ms = rendered
+    seg.voice_id = seg_voice_id or tts_provider.name
+
+
+def _resynthesize_full_dub(order, job: Job, tts_name: str, voice_id: str | None,
+                            only_speaker_id: str | None = None) -> None:
     """Re-render every segment's audio with a specific provider/voice and
     rebuild the mixed dub track - what a voice change needs that a single
     corrected segment (see _apply_segment_edit) doesn't: every segment has
     to move to the new voice together, or the dub would switch voices
     mid-file. Text itself is untouched (whatever's already in
-    seg.final_text, edits included) - only who's saying it changes."""
+    seg.final_text, edits included) - only who's saying it changes.
+
+    only_speaker_id restricts the re-render to just that speaker's
+    segments (see editor_assign_speaker_voice) - assigning ONE character a
+    voice shouldn't re-synthesize every other speaker's already-fine
+    audio too. voice_id still only applies to the matching segments;
+    resolve_voice_for_segment (inside _render_segment_audio) is what
+    actually picks it up per-speaker either way."""
     tts_provider = get_tts(tts_name)
     for seg in job.segments:
-        raw = Path(order["outdir"]) / "segments" / f"{seg.segment_id}.wav"
-        rendered = tts_provider.synthesize(seg.final_text.strip(), str(raw), voice_id=voice_id)
-        seg.audio_path = str(raw)
-        seg.rendered_duration_ms = rendered
-        seg.time_stretch_pct = 0.0
+        if only_speaker_id and seg.speaker_id != only_speaker_id:
+            continue
+        _render_segment_audio(order, job, seg, tts_provider, voice_id)
 
     sr = tts_provider.sample_rate
     track = build_timeline(
@@ -553,9 +761,17 @@ def _run_xtts_clone_job(order_id: str) -> None:
         return
     try:
         ref_path = Path(order["outdir"]) / "reference_speaker.wav"
-        if not job.segments:
-            raise RuntimeError("No segments to clone a reference from.")
-        ref_seg = max(job.segments, key=lambda s: s.end_ms - s.start_ms)
+        # Speech segments only - same reasoning as kauli/pipeline.py's own
+        # reference-clip selection: a long music/silence gap segment could
+        # easily be the single longest segment in the file, which would
+        # extract a "voice" reference containing no voice at all. This
+        # entry point re-clones an ALREADY-processed order (the pipeline's
+        # own selection only runs once, at first processing), so it needs
+        # the same filter independently.
+        speech_segments = [s for s in job.segments if getattr(s, "segment_type", "speech") != "gap"]
+        if not speech_segments:
+            raise RuntimeError("No speech segments to clone a reference from.")
+        ref_seg = max(speech_segments, key=lambda s: s.end_ms - s.start_ms)
         ref_end = min(ref_seg.end_ms, ref_seg.start_ms + 20_000)  # XTTS wants 6-20s
         if not extract_reference_clip(order["audio_path"], ref_seg.start_ms, ref_end, str(ref_path)):
             raise RuntimeError("Couldn't extract a reference clip (ffmpeg missing?).")
@@ -564,6 +780,55 @@ def _run_xtts_clone_job(order_id: str) -> None:
     except Exception as exc:  # noqa: BLE001 - surface it to the editor UI
         traceback.print_exc()
         db.set_dub_voice_job_status(order_id, f"failed:{exc}")
+
+
+def _current_tts_route(order) -> tuple[str, str | None]:
+    """Whatever voice the dub is CURRENTLY using (see the dub-voice picker)
+    - a per-segment or bulk re-render should always match it, never
+    silently fall back to a provider's default and give one segment (or
+    one retranslated batch) a different voice than everything around it."""
+    dub_voice = order["dub_voice"]
+    if dub_voice == "xtts":
+        ref_path = Path(order["outdir"]) / "reference_speaker.wav"
+        if ref_path.exists():
+            return "xtts", str(ref_path)
+    elif dub_voice and dub_voice.startswith("piper:") and dub_voice[6:] in PIPER_VOICES:
+        return "piper", str(PROJECT_ROOT / PIPER_VOICES[dub_voice[6:]]["path"])
+    return order["tts"], None
+
+
+def _resynthesize_one_segment(order, job: Job, seg) -> None:
+    """Re-render exactly one segment's audio from its CURRENT seg.final_text
+    (whatever that is right now - a fresh translation, a hand-edit, or
+    both), in the dub's current voice, then rebuild the mixed timeline so
+    the delivered dub_<lang>.wav reflects it. Never called for a gap
+    segment - see the callers' own guards (a sound tag an editor types,
+    e.g. "[music playing]", belongs in the captions, not spoken aloud).
+    Applies the SAME real time-stretch-fit logic kauli.pipeline.run() uses
+    (not a simplified copy) so a segment fixed here ends up fitted to its
+    slot exactly like one that was right the first time, instead of
+    silently skipping the fit step a fresh pipeline run always applies.
+
+    A no-op whenever the dub's current voice is "human" (see
+    _activate_human_recording): the delivered dub_<lang> file is then a
+    real actor's full take, not a per-segment mix - re-rendering just this
+    one segment with the AI TTS provider and folding it back into the
+    timeline would silently splice an AI voice into the middle of a human
+    recording. The text correction itself (seg.final_text) still saves
+    either way; only the audio re-render is skipped."""
+    if order["dub_voice"] == "human":
+        return
+    tts_name, voice_id = _current_tts_route(order)
+    tts_provider = get_tts(tts_name)
+    _render_segment_audio(order, job, seg, tts_provider, voice_id)
+
+    sr = tts_provider.sample_rate
+    track = build_timeline(
+        [(s.start_ms, s.audio_path) for s in job.segments],
+        job.source_duration_ms or (job.segments[-1].end_ms if job.segments else 0),
+        sample_rate=sr,
+    )
+    write_wav_mono(str(Path(order["outdir"]) / f"dub_{order['target_lang']}.wav"), track, sr)
 
 
 def _apply_segment_edit(order, job: Job, seg, text: str, resynthesize: bool) -> None:
@@ -575,35 +840,14 @@ def _apply_segment_edit(order, job: Job, seg, text: str, resynthesize: bool) -> 
     seg.translation_stale = False  # a human just hand-edited this English text themselves -
     # whether or not they clicked Re-translate, they've now dealt with it directly
 
-    if resynthesize and order["tts"] != "stub":
-        # A per-segment fix should render in whatever voice the rest of the
-        # dub is currently using (see the dub-voice picker), not silently
-        # fall back to the provider's own default and give this one
-        # segment a different voice than everything around it.
-        dub_voice = order["dub_voice"]
-        voice_id = None
-        tts_name = order["tts"]
-        if dub_voice == "xtts":
-            ref_path = Path(order["outdir"]) / "reference_speaker.wav"
-            if ref_path.exists():
-                tts_name, voice_id = "xtts", str(ref_path)
-        elif dub_voice and dub_voice.startswith("piper:") and dub_voice[6:] in PIPER_VOICES:
-            tts_name, voice_id = "piper", str(PROJECT_ROOT / PIPER_VOICES[dub_voice[6:]]["path"])
-
-        tts_provider = get_tts(tts_name)
-        raw = Path(order["outdir"]) / "segments" / f"{seg.segment_id}.wav"
-        rendered = tts_provider.synthesize(seg.final_text.strip(), str(raw), voice_id=voice_id)
-        seg.audio_path = str(raw)
-        seg.rendered_duration_ms = rendered
-        seg.time_stretch_pct = 0.0
-
-        sr = tts_provider.sample_rate
-        track = build_timeline(
-            [(s.start_ms, s.audio_path) for s in job.segments],
-            job.source_duration_ms or (job.segments[-1].end_ms if job.segments else 0),
-            sample_rate=sr,
-        )
-        write_wav_mono(str(Path(order["outdir"]) / f"dub_{order['target_lang']}.wav"), track, sr)
+    # Never true speech synthesis for a gap segment, even if resynthesize
+    # is requested - a sound tag an editor types ("[music playing]") is
+    # meant to appear in the delivered captions, not get spoken aloud by
+    # the TTS voice. It still shows up in subs_*.srt/vtt below exactly
+    # like any other segment's text - only the actual audio render is
+    # skipped here.
+    if resynthesize and order["tts"] != "stub" and getattr(seg, "segment_type", "speech") != "gap":
+        _resynthesize_one_segment(order, job, seg)
 
     manifest_path = Path(order["outdir"]) / "manifest.json"
     (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
@@ -638,6 +882,14 @@ CONTACT_PHONE = "0712 531 841"
 CONTACT_PHONE_TEL = "+254712531841"  # tel: link needs the international form
 CONTACT_PHONE_WHATSAPP = "254712531841"  # wa.me links want the number with no "+" or leading 0
 CONTACT_EMAIL = "kahunyurogodfrey@gmail.com"
+# base.html's account menu (every authenticated page) needs a real contact
+# link without every single route threading it through by hand - same
+# reasoning as the other templates.env.globals assignments near the top
+# of this file (tat_status, free_minutes, etc).
+templates.env.globals["contact_email"] = CONTACT_EMAIL
+templates.env.globals["contact_whatsapp_url"] = f"https://wa.me/{CONTACT_PHONE_WHATSAPP}"
+templates.env.globals["contact_phone_tel"] = CONTACT_PHONE_TEL
+templates.env.globals["contact_phone_display"] = CONTACT_PHONE
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -679,6 +931,17 @@ MARKETING_FAQ = [
           "as everything else, it just costs a bit more per minute to cover that step. We only add a "
           "language once we've verified the pipeline actually works on it, not on request alone - if "
           "you need one we don't list yet, tell us and we'll look into it."},
+    {"q": "Can I get a real human voice actor instead of an AI-synthesized voice?",
+     "a": f"Yes - add it to any full dub order for an extra "
+          f"${billing.ADDONS['human_voice_over']['rate_per_min']:.2f} per audio-minute. The AI dub still "
+          "gets made and delivered right away either way; our team casts and delivers the human "
+          "version separately once it's ready, which takes longer than the automated dub."},
+    {"q": "Can you dub a video with multiple speakers - a man, a woman, children?",
+     "a": "Yes. Each speaker gets tagged (automatically when the transcription provider detects distinct "
+          "speakers, or by a human editor listening to the audio) and then assigned their own consistent "
+          "voice, so the same character keeps the same voice for the whole video instead of one generic "
+          "voice reading every line. It's a real editorial step our team handles as part of every dub, not "
+          "an extra you have to request."},
 ]
 
 
@@ -817,7 +1080,8 @@ def solution_page(request: Request, slug: str):
         return HTMLResponse("Page not found.", status_code=404)
     user = current_user(request)
     if user:
-        return RedirectResponse("/staff" if user["role"] == "staff" else "/client")
+        return RedirectResponse(
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client")
     return templates.TemplateResponse(request, "solution_page.html",
         {**_marketing_context(home="/"), "page": page})
 
@@ -831,6 +1095,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
     return {
         "user": None, "home": home,
         "plans": billing.PLANS, "service_levels": billing.SERVICE_LEVELS,
+        "addons": billing.ADDONS,
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
         "phone_display": CONTACT_PHONE, "phone_tel": CONTACT_PHONE_TEL,
         "email": CONTACT_EMAIL,
@@ -855,25 +1120,30 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
 FOUNDER_NAME = "Godfrey Njoroge"
 
 
-def _queue_and_send(user, kind: str, subject: str, body: str) -> None:
+def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = "",
+                     cta_text: str | None = None, cta_url: str | None = None,
+                     html_inner: str | None = None) -> None:
     """Writes the message to onboarding_messages (the honest, always-there
     record) and, if a real mailer is configured, immediately attempts to
     actually send it - same "create the real record first, then try to
     deliver it, fall back gracefully" pattern as _activate_payment's
-    receipt email. body is plain text; a minimal HTML version is derived
-    from it (paragraph breaks only, no template/branding beyond that -
-    these are meant to read like a real person's email, not a marketing
-    template)."""
+    receipt email. body is plain text (Godfrey's real voice, unchanged) -
+    always the text_body fallback, and the HTML source too unless
+    html_inner is given (a caller-built version with real <a> links on
+    "reply"/"WhatsApp" and a properly line-broken signature - see
+    mailer.text_to_html_paragraphs's docstring for why the mechanical
+    version couldn't do that on its own)."""
     message_id = db.queue_onboarding_message(user["id"], kind, subject, body)
     if mailer.email_configured():
-        html = "".join(f"<p>{part}</p>" for part in body.split("\n\n") if part.strip())
+        inner = html_inner if html_inner is not None else mailer.text_to_html_paragraphs(body)
+        html = mailer.wrap_email_html(inner, cta_text=cta_text, cta_url=cta_url, base_url=base_url)
         ok, detail = mailer.send_email(user["email"], subject, html, body)
         db.set_onboarding_message_email_result(message_id, ok, detail)
 
 
 
 
-def _queue_welcome_message(user) -> None:
+def _queue_welcome_message(user, base_url: str = "") -> None:
     if db.has_onboarding_message(user["id"], "welcome"):
         return  # already queued once for this account - don't duplicate on a second login
     name = (user["display_name"] or user["email"].split("@")[0]).strip()
@@ -889,24 +1159,71 @@ def _queue_welcome_message(user) -> None:
         f"message me directly on WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
         f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
     )
-    _queue_and_send(user, "welcome", subject, body)
+    cta_url = f"{base_url.rstrip('/')}/client" if base_url else "/client"
+    html_inner = (
+        f'<p style="margin:0 0 14px;">Hi {name},</p>'
+        f'<p style="margin:0 0 14px;">I\'m {FOUNDER_NAME.split()[0]} - I actually run Kauli day to day '
+        f'at Forge Media Services, so this is genuinely from me, not an automated "team".</p>'
+        f'<p style="margin:0 0 14px;">Your account has {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes '
+        f'loaded already - upload a real clip whenever you\'re ready and see the AI-drafted, '
+        f'human-checked result for yourself before you spend anything.</p>'
+        f'<p style="margin:0 0 14px;">If anything\'s unclear, or you\'d rather just talk it through, '
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email '
+        f'or message me directly on <a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+    )
+    _queue_and_send(user, "welcome", subject, body, base_url=base_url,
+                     cta_text="Upload your first order for free", cta_url=cta_url, html_inner=html_inner)
 
 
-def _queue_first_payment_message(user) -> None:
+def _queue_first_payment_message(user, base_url: str = "") -> None:
     if db.has_onboarding_message(user["id"], "first_payment"):
         return
     name = (user["display_name"] or user["email"].split("@")[0]).strip()
-    subject = "Thanks for trusting Kauli with a real order"
+    subject = "Thanks for trusting Kauli with your first order"
     body = (
         f"Hi {name},\n\n"
-        "Thanks for the vote of confidence - that's your first paid order with Kauli, and I don't "
-        "take that lightly this early on.\n\n"
+        "Thanks for the vote of confidence - that's your first paid order with Kauli, and we don't "
+        "take that lightly at this stage.\n\n"
         "I'll be keeping an eye on this one personally. If the turnaround or the quality isn't "
         f"what you expected, tell me directly - reply here or WhatsApp me: "
-        f"https://wa.me/{CONTACT_PHONE_WHATSAPP} - and I'll make it right.\n\n"
-        f"Thanks again,\n{FOUNDER_NAME}\nForge Media Services"
+        f"https://wa.me/{CONTACT_PHONE_WHATSAPP} - and we'll make it right.\n\n"
+        "One honest ask: how's it going so far?"
     )
-    _queue_and_send(user, "first_payment", subject, body)
+    feedback_base = f"{base_url.rstrip('/')}" if base_url else ""
+    rating_row = (
+        f'<p style="margin:18px 0 0;">'
+        f'<a href="{feedback_base}/feedback/first_payment/{user["id"]}/great" style="color:{mailer.BRAND_ACCENT}; font-weight:600; text-decoration:none;">Great</a>'
+        f' &nbsp;&middot;&nbsp; '
+        f'<a href="{feedback_base}/feedback/first_payment/{user["id"]}/good" style="color:{mailer.BRAND_MUTED}; font-weight:600; text-decoration:none;">Good</a>'
+        f' &nbsp;&middot;&nbsp; '
+        f'<a href="{feedback_base}/feedback/first_payment/{user["id"]}/needs_work" style="color:{mailer.BRAND_MUTED}; font-weight:600; text-decoration:none;">Needs work</a>'
+        f'</p>'
+    )
+    message_id = db.queue_onboarding_message(
+        user["id"], "first_payment", subject,
+        body + f"\n\n{FOUNDER_NAME}\nForge Media Services")
+    if mailer.email_configured():
+        html_body = (
+            f'Thanks for the vote of confidence - that\'s your first paid order with Kauli, and we '
+            f'don\'t take that lightly at this stage.\n\n'
+            f'I\'ll be keeping an eye on this one personally. If the turnaround or the quality isn\'t '
+            f'what you expected, tell me directly.'
+        )
+        inner = (
+            f'<p style="margin:0 0 14px;">Hi {name},</p>'
+            + mailer.text_to_html_paragraphs(html_body)
+            + f'<p style="margin:0 0 14px;">Tell me directly - '
+              f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
+              f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a> '
+              f'- and we\'ll make it right.</p>'
+            f'<p style="margin:0 0 14px;">One honest ask: how\'s it going so far?</p>'
+        )
+        inner += rating_row
+        inner += f'<p style="margin:20px 0 0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        html = mailer.wrap_email_html(inner, base_url=base_url)
+        ok, detail = mailer.send_email(user["email"], subject, html, body)
+        db.set_onboarding_message_email_result(message_id, ok, detail)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -917,19 +1234,20 @@ def index(request: Request):
     # front door, not the app itself.
     user = current_user(request)
     if user:
-        return RedirectResponse("/staff" if user["role"] == "staff" else "/client")
+        return RedirectResponse(
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client")
     return templates.TemplateResponse(request, "marketing.html",
         _marketing_context(sent=request.query_params.get("sent") == "1"))
 
 
 @app.get("/terms", response_class=HTMLResponse)
 def terms_page(request: Request):
-    return templates.TemplateResponse(request, "terms.html", _marketing_context())
+    return templates.TemplateResponse(request, "terms.html", _marketing_context(home="/"))
 
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
-    return templates.TemplateResponse(request, "privacy.html", _marketing_context())
+    return templates.TemplateResponse(request, "privacy.html", _marketing_context(home="/"))
 
 
 # ------------------------------------------------------------ lead qual ----
@@ -958,7 +1276,7 @@ def _slugify(text: str) -> str:
 @app.get("/blog", response_class=HTMLResponse)
 def blog_index(request: Request):
     return templates.TemplateResponse(request, "blog_index.html", {
-        **_marketing_context(),
+        **_marketing_context(home="/"),
         "posts": db.list_blog_posts(published_only=True),
     })
 
@@ -970,23 +1288,114 @@ def blog_post(request: Request, slug: str):
         return HTMLResponse("Post not found.", status_code=404)
     author = db.get_user(post["author_id"]) if post["author_id"] else None
     return templates.TemplateResponse(request, "blog_post.html", {
-        **_marketing_context(),
+        **_marketing_context(home="/"),
         "post": post,
         "author": author,
         "author_name": author["display_name"] if author else "Kauli",
         "published_at_iso": datetime.fromtimestamp(post["published_at"]).isoformat() if post["published_at"] else None,
+        "updated_at_iso": datetime.fromtimestamp(post["updated_at"]).isoformat() if post["updated_at"] else None,
     })
 
 
 @app.get("/sitemap.xml")
 def sitemap(request: Request):
+    """<lastmod> only where a real modification timestamp exists (blog
+    posts have one - updated_at) - the static marketing/solution pages
+    don't have real per-page change tracking, so they're listed without
+    one rather than a fabricated date that would just be a guess."""
     base = f"{request.url.scheme}://{request.url.netloc}"
-    urls = [f"{base}/", f"{base}/terms", f"{base}/privacy", f"{base}/blog"]
-    urls += [f"{base}/solutions/{slug}" for slug in SOLUTION_PAGES]
-    urls += [f"{base}/blog/{p['slug']}" for p in db.list_blog_posts(published_only=True)]
-    body = "\n".join(f"  <url><loc>{u}</loc></url>" for u in urls)
-    xml = f'<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n{body}\n</urlset>'
+    static_urls = [f"{base}/", f"{base}/terms", f"{base}/privacy", f"{base}/blog"]
+    static_urls += [f"{base}/solutions/{slug}" for slug in SOLUTION_PAGES]
+    entries = [f"  <url><loc>{u}</loc></url>" for u in static_urls]
+    for p in db.list_blog_posts(published_only=True):
+        loc = f"{base}/blog/{p['slug']}"
+        lastmod = datetime.fromtimestamp(p["updated_at"]).strftime("%Y-%m-%d") if p["updated_at"] else None
+        entries.append(f"  <url><loc>{loc}</loc>{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}</url>")
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+           + "\n".join(entries) + "\n</urlset>")
     return Response(content=xml, media_type="application/xml")
+
+
+@app.get("/robots.txt")
+def robots_txt(request: Request):
+    """Real disallow list matching this app's actual private routes (not a
+    generic template) - /client, /staff, /settings, /receipts, /avatar,
+    /status all require login, so a crawler has no legitimate reason to be
+    pointed at them. Explicitly allows the AI crawlers actually worth
+    naming today (OpenAI, Anthropic, Perplexity, Google's AI-training
+    signal) - real user-agent strings, not invented ones."""
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    body = f"""User-agent: *
+Allow: /
+Disallow: /client
+Disallow: /staff
+Disallow: /settings
+Disallow: /receipts/
+Disallow: /avatar/
+Disallow: /status
+Disallow: /webhooks/
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: {base}/sitemap.xml
+"""
+    return Response(content=body, media_type="text/plain")
+
+
+@app.get("/llms.txt")
+def llms_txt(request: Request):
+    """Emerging, not-yet-universal convention (see chat) - a plain-text map
+    of the site for an LLM to read directly, same spirit as robots.txt/
+    sitemap.xml but aimed at an AI reader rather than a crawler or a
+    search engine. Every line here is a real, existing page and a real,
+    already-published fact (pricing, languages, contact) - nothing
+    invented for this file specifically."""
+    base = f"{request.url.scheme}://{request.url.netloc}"
+    rates = "\n".join(f"- {sl['name']}: ${sl['rate_per_min']:.2f} per audio-minute"
+                       for sl in billing.SERVICE_LEVELS.values())
+    posts = db.list_blog_posts(published_only=True)
+    post_lines = "\n".join(f"- [{p['title']}]({base}/blog/{p['slug']})" for p in posts[:20])
+    body = f"""# Kauli
+
+> AI-drafted, human-verified transcription, translation and dubbing between
+> Swahili, Kikuyu and English, operated by Forge Media Services. Every order
+> is checked line-by-line by a real editor against the source audio before
+> delivery; nothing ships on AI output alone.
+
+## Pricing
+Per audio-minute, no bundled credits:
+{rates}
+First {billing.FREE_MINUTES_PER_MONTH:.0f} minutes free to try, no card required.
+
+## Languages
+Source: {', '.join(SOURCE_LANGUAGES.values())}. Translates into English or Swahili.
+
+## Key pages
+- [Homepage]({base}/) - overview, pricing, FAQ
+- [For NGOs]({base}/solutions/ngos)
+- [For YouTubers & creators]({base}/solutions/youtubers)
+- [For media & broadcast]({base}/solutions/media-broadcast)
+- [For e-learning & training]({base}/solutions/e-learning)
+- [Blog]({base}/blog)
+- [Terms]({base}/terms) / [Privacy]({base}/privacy)
+
+## Blog posts
+{post_lines}
+
+## Contact
+{CONTACT_EMAIL} / WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}
+"""
+    return Response(content=body, media_type="text/plain")
 
 
 @app.get("/status", response_class=HTMLResponse)
@@ -1085,8 +1494,18 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
     return RedirectResponse("/?sent=1#book", status_code=303)
 
 
+def _safe_next(path: str | None) -> str:
+    """Only ever a relative in-app path - "/client/orders/xyz", never a
+    protocol-relative or absolute URL (which could redirect somewhere
+    outside Kauli after a real login). Falls back to "/" (the normal
+    role-based landing page) for anything else, including empty/missing."""
+    if path and path.startswith("/") and not path.startswith("//") and "://" not in path:
+        return path
+    return "/"
+
+
 @app.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, mode: str = "signin", notice: str | None = None):
+def login_form(request: Request, mode: str = "signin", notice: str | None = None, next: str | None = None):
     display_notice = None
     if notice == "account_closed":
         display_notice = "Your account has been closed."
@@ -1094,6 +1513,7 @@ def login_form(request: Request, mode: str = "signin", notice: str | None = None
         display_notice = "Your password has been reset - sign in with your new password."
     return templates.TemplateResponse(request, "login.html", {
         "error": None, "notice": display_notice, "mode": "signup" if mode == "signup" else "signin",
+        "next": _safe_next(next) if next else "",
     })
 
 
@@ -1145,7 +1565,7 @@ def reset_password_submit(request: Request, access_token: str = Form(""), refres
 
 
 @app.post("/login")
-def login(request: Request, email: str = Form(...), password: str = Form(...)):
+def login(request: Request, email: str = Form(...), password: str = Form(...), next: str = Form("")):
     email = email.strip().lower()
     # Brute-force guard: keyed on the email being attempted, not just IP -
     # protects one account from being hammered from many IPs, and many
@@ -1155,11 +1575,13 @@ def login(request: Request, email: str = Form(...), password: str = Form(...)):
     if not allowed:
         return templates.TemplateResponse(request, "login.html", {
             "error": f"Too many attempts - try again in {retry_after}s.", "notice": None, "mode": "signin",
+            "next": _safe_next(next),
         }, status_code=429)
     session, error = supabase_auth.sign_in(email, password)
     if error or not session:
         return templates.TemplateResponse(request, "login.html", {
             "error": error or "Wrong email or password.", "notice": None, "mode": "signin",
+            "next": _safe_next(next),
         })
     role, is_admin = _resolve_role_and_admin(email)
     user, was_new = db.get_or_create_user(session.user.id, email, default_role=role)
@@ -1168,29 +1590,43 @@ def login(request: Request, email: str = Form(...), password: str = Form(...)):
             db.set_user_admin(user["id"], True)
         if role == "staff" and db.is_invited_staff(email):
             db.remove_staff_invite(email)  # consumed - the invite did its job
+        if role == "voice_actor":
+            db.link_voice_actor_user(email, user["id"])  # consumed - same idea, see that function's comment
         if role == "client":  # the welcome message is written for a client, not a new staff account
-            _queue_welcome_message(user)
+            _queue_welcome_message(user, base_url=str(request.base_url))
     request.session["user_id"] = user["id"]
-    return RedirectResponse("/", status_code=303)
+    # Clicking a deep link from an email (an order, a receipt, billing)
+    # while logged out used to always land back on the generic dashboard
+    # after signing in, losing where they actually meant to go - this
+    # sends them back to the real destination instead, same pattern every
+    # real app uses. _safe_next already rejected anything that isn't a
+    # real in-app path, so "/" (the normal role-based landing page) is
+    # the only fallback, never an open redirect.
+    return RedirectResponse(_safe_next(next), status_code=303)
 
 
 @app.post("/signup")
 def signup(request: Request, email: str = Form(...), password: str = Form(...),
-           marketing_consent: str = Form("")):
+           marketing_consent: str = Form(""), next: str = Form("")):
     email = email.strip().lower()
     policy_errors = supabase_auth.password_policy_errors(password, email=email)
     if policy_errors:
         # Rejected before ever calling Supabase - no point spending an API
         # call on a password that fails our own rules regardless of what
-        # Supabase's own (looser) minimum would have allowed.
+        # Supabase's own (looser) minimum would have allowed. email/
+        # marketing_consent are threaded back through so a rejected password
+        # doesn't also cost them everything else they'd already typed -
+        # found via real client testing, not a hypothetical.
         return templates.TemplateResponse(request, "login.html", {
             "error": "Password needs " + ", ".join(policy_errors) + ".",
-            "notice": None, "mode": "signup",
+            "notice": None, "mode": "signup", "email": email,
+            "marketing_consent": bool(marketing_consent), "next": _safe_next(next),
         })
     session, error = supabase_auth.sign_up(email, password)
     if error:
         return templates.TemplateResponse(request, "login.html", {
-            "error": error, "notice": None, "mode": "signup",
+            "error": error, "notice": None, "mode": "signup", "email": email,
+            "marketing_consent": bool(marketing_consent), "next": _safe_next(next),
         })
     if session is None:
         # Supabase's "Confirm email" setting is on - account exists but
@@ -1210,10 +1646,12 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
             db.set_user_admin(user["id"], True)
         if role == "staff" and db.is_invited_staff(email):
             db.remove_staff_invite(email)
+        if role == "voice_actor":
+            db.link_voice_actor_user(email, user["id"])
         if role == "client":
-            _queue_welcome_message(user)
+            _queue_welcome_message(user, base_url=str(request.base_url))
     request.session["user_id"] = user["id"]
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse(_safe_next(next), status_code=303)
 
 
 @app.get("/logout")
@@ -1232,6 +1670,339 @@ def settings_form(request: Request):
         "user": user, "saved": False, "error": None,
         "theme": "dark" if user["role"] == "staff" else "light",
     })
+
+
+@app.get("/help", response_class=HTMLResponse)
+def help_page(request: Request):
+    """Real, specific answers to the actual states this app's orders/
+    payments can be in - not a generic support-article template. See the
+    account menu (base.html) for where clients reach this from."""
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "help.html", {
+        "user": user, "theme": "dark" if user["role"] == "staff" else "light",
+    })
+
+
+@app.get("/staff/guide", response_class=HTMLResponse)
+def staff_guide(request: Request):
+    """The long-form editor guide + style guide - the Guide tab inside
+    Ereri is the quick-reference version for while you're actually
+    working a segment; this is the comprehensive one, reachable from
+    anywhere in the staff portal (sidebar) so it isn't tied to any one
+    order."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_guide.html", {
+        "user": user, "theme": "dark",
+    })
+
+
+@app.get("/staff/voice-actors", response_class=HTMLResponse)
+def staff_voice_actors(request: Request, notice: str | None = None, error: str | None = None):
+    """Voice-actor roster + payout ledger. Admin-gated, same reasoning as
+    /staff/admin - this is money-adjacent (who's owed what) even though
+    today's single-staff-role reality means that's not really restricting
+    anyone yet. Assigning an already-onboarded actor to a specific order
+    is a normal staff action (see staff_review.html / assign_voice_actor
+    route below), separate from managing the roster/ledger itself."""
+    user = current_user(request)
+    if not user or user["role"] != "staff" or not user["is_admin"]:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_voice_actors.html", {
+        "user": user, "theme": "dark", "notice": notice, "error": error,
+        "actors": db.list_voice_actors(),
+        "payouts_owed": db.list_payouts("owed"),
+        "payouts_paid": db.list_payouts("paid")[:50],  # recent history, not the whole ledger forever
+        "source_languages": SOURCE_LANGUAGES,
+    })
+
+
+@app.post("/staff/voice-actors")
+def staff_voice_actors_create(
+    request: Request, name: str = Form(...), languages: list[str] = Form([]),
+    email: str = Form(""), phone: str = Form(""), bio: str = Form(""),
+    rate_per_min_usd: str = Form(""), notes: str = Form(""),
+):
+    user = current_user(request)
+    if not user or user["role"] != "staff" or not user["is_admin"]:
+        return RedirectResponse("/login")
+    if not name.strip() or not languages:
+        return RedirectResponse("/staff/voice-actors?error=Name+and+at+least+one+language+are+required.",
+                                 status_code=303)
+    rate = None
+    if rate_per_min_usd.strip():
+        try:
+            rate = round(float(rate_per_min_usd), 2)
+            if rate < 0:
+                raise ValueError
+        except ValueError:
+            return RedirectResponse("/staff/voice-actors?error=Rate+must+be+a+positive+number.",
+                                     status_code=303)
+    db.create_voice_actor(name=name, languages=languages, email=email, phone=phone,
+                           bio=bio, rate_per_min_usd=rate, notes=notes)
+    return RedirectResponse(f"/staff/voice-actors?notice=Added+{quote(name.strip())}.", status_code=303)
+
+
+@app.post("/staff/voice-actors/{actor_id}/status")
+def staff_voice_actor_set_status(request: Request, actor_id: str, status: str = Form(...)):
+    user = current_user(request)
+    if not user or user["role"] != "staff" or not user["is_admin"]:
+        return RedirectResponse("/login")
+    if status not in ("active", "inactive"):
+        return RedirectResponse("/staff/voice-actors?error=Unknown+status.", status_code=303)
+    db.set_voice_actor_status(actor_id, status)
+    return RedirectResponse("/staff/voice-actors?notice=Updated.", status_code=303)
+
+
+def _notify_actor_of_assignment(actor: dict, order, base_url: str) -> None:
+    """Real email, sent the moment an actor is actually cast onto an
+    order (see staff_assign_actor) - not at roster-add time (see
+    staff_voice_actors_create, which deliberately doesn't email anyone,
+    same as a plain staff invite - nothing to act on yet at that point).
+    Works whether this is the actor's first job ever (no account linked
+    yet - db.link_voice_actor_user fills that in the moment they sign up
+    with this same email, see _resolve_role_and_admin) or their tenth -
+    one message either way, since the same /login page handles both."""
+    if not actor.get("email") or not mailer.email_configured():
+        return
+    login_url = f"{base_url.rstrip('/')}/login?next=%2Factor"
+    has_account = bool(actor.get("user_id"))
+    action_line = ("Log in to your Kauli account" if has_account
+                   else "Create your free Kauli account (use this same email address)")
+    subject = "New voice-over job on Kauli"
+    text = (
+        f"Hi {actor['name']},\n\n"
+        f"You've been cast on a new job: \"{order['original_filename']}\".\n\n"
+        f"{action_line} to see the script and upload your recording once it's ready:\n{login_url}\n\n"
+        f"Any questions, just reply to this email."
+    )
+    inner = (
+        f'<p style="margin:0 0 14px;">Hi {actor["name"]},</p>'
+        + mailer.text_to_html_paragraphs(f'You\'ve been cast on a new job: "{order["original_filename"]}".')
+        + f'<p style="margin:0 0 14px;">{action_line} to see the script and upload your recording once '
+          f'it\'s ready.</p>'
+    )
+    html = mailer.wrap_email_html(inner, cta_text=action_line, cta_url=login_url, base_url=base_url)
+    mailer.send_email(actor["email"], subject, html, text)
+
+
+@app.post("/staff/orders/{order_id}/assign-actor")
+def staff_assign_actor(request: Request, order_id: str, actor_id: str = Form("")):
+    """Any staff member can cast an already-onboarded actor onto an order -
+    this is normal day-to-day order work, not roster/ledger management
+    (see the admin gate on the routes above)."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    actor_id = actor_id.strip() or None
+    db.assign_voice_actor(order_id, actor_id)
+    if actor_id:
+        actor = db.get_voice_actor(actor_id)
+        if actor:
+            _notify_actor_of_assignment(actor, order, str(request.base_url))
+    return RedirectResponse(f"/staff/orders/{order_id}?notice=Voice+actor+updated.", status_code=303)
+
+
+HUMAN_RECORDING_EXTS = (".wav", ".mp3", ".m4a", ".flac", ".ogg")
+
+
+def _human_recording_path(order) -> Path | None:
+    """The voice actor's own take, kept in a stable slot separate from
+    whatever's currently the ACTIVE delivered dub (see
+    _activate_human_recording) - so switching the dub-voice picker back to
+    an AI voice and later back to "human" never loses the real recording.
+    Returns the existing file's path, or None if no human take has ever
+    been uploaded for this order."""
+    outdir = Path(order["outdir"])
+    for ext in HUMAN_RECORDING_EXTS:
+        p = outdir / f"dub_{order['target_lang']}_human{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+def _activate_human_recording(order_id: str, order, ext: str, content: bytes) -> None:
+    """Saves a freshly uploaded human take to its own permanent slot AND
+    makes it the active delivered dub - same real effect
+    staff_human_voice_upload/actor_upload_recording always had (the
+    client's download link doesn't change, what's behind it does), just
+    now paired with db.set_dub_voice so the editor's voice picker actually
+    reflects "human" as the current choice instead of going stale the
+    moment someone picks a Piper voice and comes back."""
+    outdir = Path(order["outdir"])
+    for other_ext in HUMAN_RECORDING_EXTS:
+        if other_ext != ext:
+            (outdir / f"dub_{order['target_lang']}_human{other_ext}").unlink(missing_ok=True)
+    (outdir / f"dub_{order['target_lang']}_human{ext}").write_bytes(content)
+
+    dest = outdir / f"dub_{order['target_lang']}{ext}"
+    dest.write_bytes(content)
+    # If a stale file from an earlier AI dub is still sitting there under a
+    # different extension than what just got uploaded, the download route
+    # would find both and the old one could still win - remove it so the
+    # human recording is unambiguously what gets delivered.
+    for other_ext in HUMAN_RECORDING_EXTS:
+        if other_ext != ext:
+            (outdir / f"dub_{order['target_lang']}{other_ext}").unlink(missing_ok=True)
+    db.set_dub_voice(order_id, "human", job_status=None)
+
+
+@app.post("/staff/orders/{order_id}/human-voice-upload")
+async def staff_human_voice_upload(request: Request, order_id: str, recording: UploadFile = File(...)):
+    """Drops a voice actor's finished, already-synced recording straight
+    in as the delivered dub file, replacing whatever the AI TTS produced -
+    the client's download link doesn't change, what's behind it does.
+    Deliberately does NOT attempt any automatic timeline-fitting - a full
+    human take doesn't decompose into per-segment slots the way TTS audio
+    does, and pretending to auto-sync it would be a real, silent quality
+    risk. Getting the recording actually synced to the source video before
+    it's uploaded here is real editorial work someone does outside this
+    system (whatever audio tool they're already using) - this is only
+    where the FINISHED result gets delivered from."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    if not order["voice_actor_id"]:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=Assign+a+voice+actor+to+this+order+first.", status_code=303)
+    ext = Path(recording.filename or "").suffix.lower() or ".wav"
+    if ext not in HUMAN_RECORDING_EXTS:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=Unsupported+audio+format+-+use+wav%2C+mp3%2C+m4a%2C+flac+or+ogg.",
+            status_code=303)
+    content = await recording.read()
+    _activate_human_recording(order_id, order, ext, content)
+    return RedirectResponse(
+        f"/staff/orders/{order_id}?notice=Human+voice-over+uploaded+-+it+will+be+what+the+client+downloads.",
+        status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/create-payout")
+def staff_create_payout(request: Request, order_id: str):
+    """Records what's owed the assigned actor for this order, at THEIR
+    rate (not the client's addon price - see billing.ADDONS'
+    human_voice_over comment on why those are different numbers). Does
+    not move any money - see mark_payout_paid for the only thing that
+    does that, and even that's just a staff member confirming a real
+    transfer they already sent by hand."""
+    user = current_user(request)
+    if not user or user["role"] != "staff" or not user["is_admin"]:
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    if not order["voice_actor_id"]:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=No+voice+actor+assigned+to+this+order.", status_code=303)
+    actor = db.get_voice_actor(order["voice_actor_id"])
+    if not actor:
+        return RedirectResponse(f"/staff/orders/{order_id}?error=Assigned+actor+not+found.", status_code=303)
+    if not actor["rate_per_min_usd"]:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=Set+a+rate+for+{quote(actor['name'])}+on+the+"
+            "Voice+Talent+page+first.", status_code=303)
+    minutes = order["duration_minutes"] or 0
+    if minutes <= 0:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=Order+has+no+known+duration+yet.", status_code=303)
+    db.create_payout(actor["id"], order_id, minutes, actor["rate_per_min_usd"])
+    return RedirectResponse(
+        f"/staff/orders/{order_id}?notice=Payout+of+${minutes * actor['rate_per_min_usd']:.2f}+recorded+"
+        f"for+{quote(actor['name'])}+-+see+the+Voice+Talent+page+to+mark+it+paid+once+sent.",
+        status_code=303)
+
+
+@app.post("/staff/payouts/{payout_id}/mark-paid")
+def staff_mark_payout_paid(request: Request, payout_id: str, reference: str = Form("")):
+    """The one action in this whole module that means real money actually
+    moved - and even this doesn't move it, it just records that a staff
+    member confirms they already sent it themselves (M-Pesa, bank
+    transfer, whatever) outside this system. There is no payment-API
+    integration here to automate this with."""
+    user = current_user(request)
+    if not user or user["role"] != "staff" or not user["is_admin"]:
+        return RedirectResponse("/login")
+    db.mark_payout_paid(payout_id, user["id"], reference)
+    return RedirectResponse("/staff/voice-actors?notice=Marked+paid.", status_code=303)
+
+
+# ------------------------------------------------------- voice actor portal ----
+# The actor-facing half of the human-voice-over feature: a real, minimal
+# self-service account, not just a staff-managed roster row - see
+# db.is_invited_voice_actor / link_voice_actor_user (the login/signup
+# machinery) and _resolve_role_and_admin for how an actor's account
+# actually gets this role. Deliberately thin - a job list and an upload
+# form, nothing an actor doesn't need, matching how little Ereri itself
+# exposes to a role that only has one real job to do here.
+def _require_voice_actor(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "voice_actor":
+        return None, None
+    actor = db.get_voice_actor_by_user_id(user["id"])
+    return user, actor
+
+
+@app.get("/actor", response_class=HTMLResponse)
+def actor_dashboard(request: Request, notice: str | None = None, error: str | None = None):
+    user, actor = _require_voice_actor(request)
+    if not user:
+        return RedirectResponse("/login")
+    if not actor:
+        # Real edge case, not a made-up one: the roster row this account
+        # was linked to could have been deleted since - nothing left to
+        # show, but don't crash over it.
+        return HTMLResponse(
+            "Your voice-actor profile wasn't found - contact us.", status_code=404)
+    orders = db.list_orders_for_voice_actor(actor["id"])
+    # The script the actor actually needs to read - real segment text,
+    # same source _build_target_cells/to_srt use, not a re-derived copy.
+    # None for an order whose job hasn't been processed yet (real gap,
+    # shown honestly rather than an empty script pretending it's ready).
+    jobs = {o["id"]: _load_job(o) for o in orders}
+    return templates.TemplateResponse(request, "actor_dashboard.html", {
+        "user": user, "actor": actor, "orders": orders, "jobs": jobs, "notice": notice, "error": error,
+    })
+
+
+@app.post("/actor/orders/{order_id}/upload")
+async def actor_upload_recording(request: Request, order_id: str, recording: UploadFile = File(...)):
+    """The actor's own version of staff_human_voice_upload - same real
+    delivery mechanism (drops straight in as the delivered dub file, no
+    auto-sync attempted - see that function's own docstring for why), the
+    only difference is the ownership check: an actor may only ever
+    upload to an order actually cast to THEM, not any order id they can
+    guess or type into the URL."""
+    user, actor = _require_voice_actor(request)
+    if not user:
+        return RedirectResponse("/login")
+    if not actor:
+        return HTMLResponse("Your voice-actor profile wasn't found - contact us.", status_code=404)
+    order = db.get_order(order_id)
+    if not order or order["voice_actor_id"] != actor["id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    ext = Path(recording.filename or "").suffix.lower() or ".wav"
+    if ext not in HUMAN_RECORDING_EXTS:
+        return RedirectResponse(
+            f"/actor?error=Unsupported+audio+format+-+use+wav%2C+mp3%2C+m4a%2C+flac+or+ogg.", status_code=303)
+    content = await recording.read()
+    _activate_human_recording(order_id, order, ext, content)
+    notifications.notify_staff(
+        f"Kauli: {actor['name']} uploaded a recording for order {order_id}",
+        f"Order {order_id} ({order['original_filename']}) - the human voice-over has been uploaded and "
+        f"is now what the client will download. Give it a listen before the order ships.\n\n"
+        f"See /staff/orders/{order_id}.",
+    )
+    return RedirectResponse(
+        f"/actor?notice=Uploaded+-+that%27s+now+what+the+client+will+download.", status_code=303)
 
 
 @app.post("/settings")
@@ -1358,7 +2129,7 @@ def avatar(request: Request, user_id: str):
 def client_dashboard(request: Request, reorder_youtube_url: str | None = None, reorder_source_lang: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
-        return RedirectResponse("/login")
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
     orders = db.list_orders_for_client(user["id"])
     unread = db.unread_order_ids(user["id"], include_internal=False)
     anthropic_available = bool(os.environ.get("ANTHROPIC_API_KEY"))
@@ -1377,7 +2148,8 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_minutes": db.wallet_minutes_remaining(user["id"]),
+        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["id"]),
         "source_languages": SOURCE_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
@@ -1410,7 +2182,8 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_minutes": db.wallet_minutes_remaining(user["id"]),
+        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["id"]),
         "source_languages": SOURCE_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
@@ -1436,6 +2209,34 @@ def client_request_exception(request: Request, context: str = Form(...), note: s
         + "Review on /staff/exceptions.",
     )
     return RedirectResponse("/client?exception_requested=1", status_code=303)
+
+
+@app.get("/feedback/{context}/{user_id}/{rating}", response_class=HTMLResponse)
+def record_feedback(request: Request, context: str, user_id: str, rating: str):
+    """One click from an email link (see _queue_first_payment_message) - no
+    login required, same as any other real-world "rate your experience"
+    email link. Not a security boundary: user_id here is trusted the same
+    way an order ID or receipt ID is elsewhere in this app - a real,
+    non-sequential id, not something worth signing for a satisfaction
+    rating. 'needs_work' is the actual churn-risk signal, so staff get a
+    real alert for it immediately rather than finding it later in a
+    report."""
+    if rating not in ("great", "good", "needs_work"):
+        return HTMLResponse("Unknown rating.", status_code=404)
+    user = db.get_user(user_id)
+    if not user:
+        return HTMLResponse("Account not found.", status_code=404)
+    db.record_client_feedback(user_id, context, rating)
+    if rating == "needs_work":
+        notifications.notify_staff(
+            f"Kauli: {user['display_name']} said their first order needs work",
+            f"{user['display_name']} ({user['email']}) rated their first-payment experience "
+            f"\"Needs work\" - worth reaching out before this turns into churn.",
+        )
+    return HTMLResponse(
+        "<div style=\"font-family:sans-serif; max-width:480px; margin:80px auto; text-align:center;\">"
+        "<h1>Thanks for the feedback</h1><p>The founder reads every one of these personally.</p></div>"
+    )
 
 
 @app.post("/client/youtube-watches")
@@ -1489,8 +2290,9 @@ def create_order(
     youtube_url: str = Form(""),
     source_lang: str = Form("sw"),
     target_lang: str = Form("en"),
-    service_level: str = Form("dub"),
+    service_level: str = Form("transcribe"),
     addon_video_deliverables: str = Form(""),
+    addon_human_voice_over: str = Form(""),
     instr_speaker_ids: str = Form(""),
     instr_verbatim_level: str = Form("clean_read"),
     instr_transcribe_lyrics: str = Form(""),
@@ -1504,6 +2306,7 @@ def create_order(
     idempotency_key: str = Form(""),
     folder_name: str = Form(""),
     voice_clone_consent: str = Form(""),
+    rush: str = Form(""),
 ):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -1519,12 +2322,13 @@ def create_order(
     form_values = {
         "youtube_url": youtube_url, "source_lang": source_lang, "target_lang": target_lang,
         "service_level": service_level, "addon_video_deliverables": addon_video_deliverables,
+        "addon_human_voice_over": addon_human_voice_over,
         "instr_speaker_ids": instr_speaker_ids, "instr_verbatim_level": instr_verbatim_level,
         "instr_transcribe_lyrics": instr_transcribe_lyrics, "instr_use_italics": instr_use_italics,
         "instr_existing_subs": instr_existing_subs, "instr_no_audio": instr_no_audio,
         "instr_wrong_language": instr_wrong_language, "instr_instrumental_only": instr_instrumental_only,
         "instr_notes": instr_notes, "folder_name": folder_name,
-        "voice_clone_consent": voice_clone_consent,
+        "voice_clone_consent": voice_clone_consent, "rush": rush,
     }
     # Real ASR/MT/TTS work behind every accepted submission - a much
     # tighter budget than the global per-IP limit above, keyed on the
@@ -1556,6 +2360,13 @@ def create_order(
     if target_lang not in ("en", "sw"):
         return _client_dashboard_error(request, user, "Unknown target language.", form_values=form_values)
     addons = ["video_deliverables"] if addon_video_deliverables else []
+    # Only meaningful on a full dub - there's no voice to record on a
+    # transcription/translation-only order. Enforced here, not just by
+    # hiding the checkbox client-side - a submitted form field for the
+    # wrong service level is simply ignored, not trusted.
+    wants_human_voice_over = bool(addon_human_voice_over) and service_level == "dub"
+    if wants_human_voice_over:
+        addons.append("human_voice_over")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Not a checkbox the client toggles - this is a real cost every
         # service level incurs for this language (every SERVICE_LEVELS tier
@@ -1650,7 +2461,14 @@ def create_order(
     elif source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         asr = "manual"  # no ASR model recognizes this language - see the constant's comment
     else:
-        asr = "faster-whisper"
+        # Transkriptor first (real paid transcription, better on real
+        # Kenyan Swahili than local Whisper - see kauli/providers/asr.py's
+        # TranskriptorASR), with local faster-whisper as an automatic,
+        # built-in fallback on any failure or plan-limit hit - that
+        # fallback lives INSIDE the provider itself, not here, so this one
+        # value is the whole policy. Falls straight to faster-whisper with
+        # no attempt at all if no key is configured yet.
+        asr = "transkriptor" if os.environ.get("TRANSKRIPTOR_API_KEY") else "faster-whisper"
     if not level["mt"]:
         mt = "stub"
     elif source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
@@ -1672,18 +2490,43 @@ def create_order(
     # billing.FREE_MINUTES_SERVICE_LEVEL. A translate/dub order pays the
     # full rate from its first minute; order_cost_usd simply isn't offered
     # any free allowance to spend for those.
-    free_minutes_for_this_order = (
-        billing.free_minutes_remaining(subscription) if service_level == billing.FREE_MINUTES_SERVICE_LEVEL else 0.0
-    )
+    #
+    # Reserved atomically here (not just read via free_minutes_remaining)
+    # so two near-simultaneous submissions can't both read the same "X
+    # remaining" snapshot and each get the full free allowance applied -
+    # see db.reserve_free_minutes's docstring for the actual race this
+    # closes. Whatever's granted here is real and already spent the moment
+    # this call returns, whether or not the rest of this order ends up
+    # needing payment.
+    if service_level == billing.FREE_MINUTES_SERVICE_LEVEL:
+        free_cap = billing.FREE_MINUTES_PER_MONTH + (subscription["bonus_minutes"] or 0.0 if subscription else 0.0)
+        free_minutes_for_this_order = db.reserve_free_minutes(user["id"], minutes, free_cap)
+    else:
+        free_minutes_for_this_order = 0.0
+    is_rush = bool(rush)
+    # Same double-spend concern as free minutes above, for prepaid credits:
+    # reserve atomically rather than read-then-consume-later. The ceiling a
+    # reservation could possibly need is a pure function of minutes/rate/
+    # plan/discount, none of which touch the wallet - so it's safe to price
+    # the order once with wallet_credits_available=0 just to learn that
+    # ceiling, reserve up to it (see db.reserve_wallet_credits), then price
+    # it again for real with whatever was actually granted.
+    preliminary_cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
+                                               addons=addons, wallet_credits_available=0.0, rush=is_rush)
+    credits_ceiling = billing.usd_to_credits(preliminary_cost["gross_usd"] - preliminary_cost["discount_usd"])
+    reserved_credits = db.reserve_wallet_credits(user["id"], credits_ceiling)
     cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
-                                   addons=addons, wallet_minutes_available=db.wallet_minutes_remaining(user["id"]))
+                                   addons=addons, wallet_credits_available=reserved_credits, rush=is_rush)
     # order_cost_usd silently drops any addon the plan already includes -
     # reflect that back so we never store/charge for one that didn't apply.
     applied_addons = [line["key"] for line in cost["addons"]]
     # Free-tier only, never a wallet/real-money $0 order (those already
-    # paid for their minutes in a top-up) - this is what gates downloads
-    # below and in order_detail.html.
-    is_free_preview = cost["free_minutes_applied"] > 0 and cost["wallet_minutes_applied"] <= 0 and cost["total_usd"] <= 0
+    # paid for their credits in a top-up) - this is what gates downloads
+    # below and in order_detail.html. A rush order is never a free preview -
+    # the surcharge alone (see billing.order_cost_usd) already makes
+    # total_usd > 0, but spelled out here too for clarity.
+    is_free_preview = (cost["free_minutes_applied"] > 0 and cost["credits_applied"] <= 0
+                        and cost["total_usd"] <= 0 and not is_rush)
 
     db.create_order(
         order_id=order_id,
@@ -1693,6 +2536,7 @@ def create_order(
         source_youtube_id=youtube_video_id,
         idempotency_key=idempotency_key.strip() or None,
         folder_name=folder_name.strip() or None,
+        wants_human_voice_over=wants_human_voice_over,
     )
     if youtube_video_id:
         # Closes the loop on the auto-import flow, if this happens to be
@@ -1700,7 +2544,7 @@ def create_order(
         # longer "pending".
         db.mark_pending_import_ordered(user["id"], youtube_video_id)
     db.set_order_billing(order_id, service_level, minutes, cost["total_usd"], addons=applied_addons,
-                          cost_breakdown=cost)
+                          cost_breakdown=cost, is_rush=is_rush)
     if is_free_preview:
         db.set_order_free_preview(order_id, True)
     if content_safety_flagged:
@@ -1712,25 +2556,33 @@ def create_order(
         # actually enforces this - a client can grant this later too, see
         # client_grant_voice_clone_consent below.
         db.set_voice_clone_consent(order_id, request.client.host if request.client else None)
-    if cost["wallet_minutes_applied"] > 0:
-        # Deducted at submission, not payment confirmation, on purpose -
-        # simpler than threading the applied amount through to
-        # _activate_payment for the (rare) case where a not-fully-free
-        # order sits in pending_payment. Same "reserved the moment you
-        # submit" behavior most prepaid-wallet systems use.
-        db.consume_wallet_minutes(user["id"], cost["wallet_minutes_applied"])
+    if cost["credits_applied"] > 0:
+        # Already deducted above by db.reserve_wallet_credits, atomically,
+        # at the moment it was granted - not repeated here (see that call's
+        # comment for the double-spend race this avoids). Just the
+        # low-balance check left to do.
         if mailer.email_configured() and db.wallet_low_alert_needed(user["id"]):
-            remaining = db.wallet_minutes_remaining(user["id"])
+            remaining = db.wallet_credits_remaining(user["id"])
             name = (user["display_name"] or user["email"].split("@")[0]).strip()
+            billing_url = f"{str(request.base_url).rstrip('/')}/client/billing"
             body = (
                 f"Hi {name},\n\n"
-                f"You're down to about {remaining:.1f} prepaid minutes - just a heads up so an upcoming "
+                f"You're down to about {remaining:.0f} prepaid credits - just a heads up so an upcoming "
                 f"order doesn't get held up waiting on a top-up.\n\n"
-                f"Top up here: {str(request.base_url).rstrip('/')}/client/billing\n\n"
-                f"Questions? WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\nForge Media Services"
+                f"Questions? WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+                f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
             )
-            html = "".join(f"<p>{part}</p>" for part in body.split("\n\n") if part.strip())
-            mailer.send_email(user["email"], "Running low on prepaid Kauli minutes", html, body)
+            inner = (
+                f'<p style="margin:0 0 14px;">Hi {name},</p>'
+                f'<p style="margin:0 0 14px;">You\'re down to about {remaining:.0f} prepaid credits - just '
+                f'a heads up so an upcoming order doesn\'t get held up waiting on a top-up.</p>'
+                f'<p style="margin:0 0 14px;">Questions? Message me on '
+                f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+                f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+            )
+            html = mailer.wrap_email_html(inner, cta_text="Top up your credits", cta_url=billing_url,
+                                           base_url=str(request.base_url))
+            mailer.send_email(user["email"], "Running low on prepaid Kauli credits", html, body)
             db.mark_wallet_low_alert_sent(user["id"])
 
     db.set_job_instructions(
@@ -1744,9 +2596,10 @@ def create_order(
 
     if cost["total_usd"] <= 0:
         # Fully covered by this month's free allowance - no payment step,
-        # straight to processing, same as the old free experience.
-        db.add_usage_minutes(user["id"], cost["free_minutes_applied"])
-        deadlines = tat.compute_deadlines(plan, service_level, minutes)
+        # straight to processing, same as the old free experience. Usage
+        # was already recorded above by db.reserve_free_minutes at the
+        # moment it was granted - not repeated here.
+        deadlines = tat.compute_deadlines(plan, service_level, minutes, rush=is_rush)
         db.set_order_deadlines(order_id, deadlines["start_at"], deadlines["internal_deadline_at"],
                                 deadlines["deadline_at"])
         worker.submit_job(order_id)
@@ -1760,10 +2613,10 @@ def create_order(
 
 
 @app.get("/client/orders/{order_id}", response_class=HTMLResponse)
-def client_order_detail(request: Request, order_id: str):
+def client_order_detail(request: Request, order_id: str, error: str | None = None, notice: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
-        return RedirectResponse("/login")
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["id"]:
         return HTMLResponse("Order not found.", status_code=404)
@@ -1780,6 +2633,8 @@ def client_order_detail(request: Request, order_id: str):
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "receipt": db.get_receipt_for_order(order_id),
+        "error": error, "notice": notice,
+        "folders": db.list_folders_for_client(user["id"]),
     })
 
 
@@ -1797,6 +2652,90 @@ def client_send_message(request: Request, order_id: str, body: str = Form(...)):
         db.create_message(order_id, user["id"], "client", body)
         db.mark_read(user["id"], order_id)
     return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+
+
+@app.post("/client/orders/{order_id}/resume")
+def client_resume_order(request: Request, order_id: str, audio: UploadFile | None = File(None)):
+    """The other way a returned order gets moving again - no brand-new
+    order, no second payment. Most returns just need the client's reply
+    on the message thread above (already handled by client_send_message);
+    a replacement file here is only for the cases that genuinely need
+    one - a real, corrected upload validated the same way as any other
+    submission, on the same order and outdir it already had."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    if order["status"] != "returned_to_client":
+        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+
+    new_audio_path, new_original_filename, new_duration = None, None, None
+    if audio is not None and audio.filename:
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent")
+        order_upload_dir = UPLOAD_DIR / order_id
+        try:
+            audit = upload_security.validate_media_upload(audio, order_upload_dir / "placeholder", audio.filename)
+        except upload_security.UploadRejected as exc:
+            db.log_upload_audit(user["id"], order_id,
+                                 {"original_filename": audio.filename, "rejected": True, "reject_reason": str(exc)},
+                                 client_ip, user_agent)
+            return RedirectResponse(f"/client/orders/{order_id}?error={quote(str(exc))}", status_code=303)
+        db.log_upload_audit(user["id"], order_id, audit, client_ip, user_agent)
+        new_audio_path = audit["final_path"]
+        new_original_filename = audio.filename
+        if audit.get("content_safety_flagged"):
+            db.set_order_content_safety_flag(order_id, True, audit.get("content_safety_detail"))
+        try:
+            new_duration = probe_duration_minutes(new_audio_path)
+        except Exception:
+            return RedirectResponse(
+                f"/client/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
+                status_code=303)
+
+    db.resume_returned_order(order_id, new_audio_path, new_original_filename, new_duration)
+    db.create_message(
+        order_id, user["id"], "client",
+        "Resumed this order" + (" with a replacement file." if new_audio_path else "."),
+    )
+    worker.submit_job(order_id)
+    return RedirectResponse(f"/client/orders/{order_id}?notice=Order+resumed+-+back+in+the+queue.", status_code=303)
+
+
+@app.post("/client/orders/{order_id}/folder")
+def client_move_order_folder(request: Request, order_id: str, folder_name: str = Form("")):
+    """Re-files an order that's already been submitted - folder was
+    previously a one-time choice at upload, with no way back into a
+    different (or new) project after the fact."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    db.set_order_folder(order_id, user["id"], folder_name)
+    return RedirectResponse(f"/client/orders/{order_id}?notice=Folder+updated.", status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/resume")
+def staff_resume_order(request: Request, order_id: str):
+    """Staff-side equivalent - for when the client clarified things over
+    WhatsApp or email rather than through the message thread, and staff
+    just needs to pick the same order back up without waiting on a client
+    click. No file here - if the fix genuinely needs a new upload, that
+    still has to come from the client's own account."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["status"] != "returned_to_client":
+        return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
+    db.resume_returned_order(order_id)
+    db.create_message(order_id, user["id"], "internal", "Resumed by staff - back in the queue.")
+    worker.submit_job(order_id)
+    return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
 
 
 @app.post("/client/orders/{order_id}/grant-voice-clone-consent")
@@ -1823,7 +2762,7 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
                   error: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
-        return RedirectResponse("/login")
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
     subscription = db.get_subscription(user["id"])
     plan = billing.effective_plan(user, subscription)
     is_test_account = plan == "enterprise" and user["email"].strip().lower() in billing.test_client_emails()
@@ -1843,35 +2782,41 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
         "bonus_minutes": bonus_minutes,
         "free_minutes_total": billing.FREE_MINUTES_PER_MONTH + bonus_minutes,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_minutes": db.wallet_minutes_remaining(user["id"]),
-        "wallet_packages": billing.WALLET_PACKAGES,
+        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
+        "credit_packages": billing.CREDIT_PACKAGES,
         "service_levels": billing.SERVICE_LEVELS,
     })
 
 
 @app.post("/client/billing/wallet")
-def buy_wallet_minutes(request: Request, package: str = Form(""), provider: str = Form(...),
+def buy_wallet_credits(request: Request, package: str = Form(""), provider: str = Form(...),
                         phone: str = Form(""), custom_minutes: str = Form("")):
+    """custom_minutes is still the form field name (and still means "how
+    many dub-rate minutes of value do you want", the same reference point
+    the fixed packages use for their discount ladder) - only the balance
+    it actually buys is now denominated in credits, see
+    billing.custom_credit_price."""
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     if custom_minutes.strip():
         try:
-            minutes = float(custom_minutes.strip())
+            minutes_equiv = float(custom_minutes.strip())
         except ValueError:
             return RedirectResponse("/client/billing?error=Enter+a+real+number+of+minutes.", status_code=303)
-        if not (billing.WALLET_CUSTOM_MIN_MINUTES <= minutes <= billing.WALLET_CUSTOM_MAX_MINUTES):
+        if not (billing.CREDIT_CUSTOM_MIN_MINUTES_EQUIV <= minutes_equiv <= billing.CREDIT_CUSTOM_MAX_MINUTES_EQUIV):
             return RedirectResponse(
-                f"/client/billing?error=Enter+between+{billing.WALLET_CUSTOM_MIN_MINUTES}+and+"
-                f"{billing.WALLET_CUSTOM_MAX_MINUTES}+minutes.", status_code=303)
-        pkg = billing.wallet_custom_price(minutes)
-    elif package in billing.WALLET_PACKAGES:
-        pkg = billing.WALLET_PACKAGES[package]
+                f"/client/billing?error=Enter+between+{billing.CREDIT_CUSTOM_MIN_MINUTES_EQUIV}+and+"
+                f"{billing.CREDIT_CUSTOM_MAX_MINUTES_EQUIV}+minutes.", status_code=303)
+        pkg = billing.custom_credit_price(minutes_equiv)
+    elif package in billing.CREDIT_PACKAGES:
+        pkg = billing.CREDIT_PACKAGES[package]
     else:
-        return RedirectResponse("/client/billing?error=Unknown+minute+package.", status_code=303)
+        return RedirectResponse("/client/billing?error=Unknown+credit+package.", status_code=303)
     return _checkout(request, user, provider, "wallet", pkg["price_usd"],
                       None, phone, "/client/billing", "/client/billing",
-                      payment_kind=f"wallet_topup:{pkg['minutes']}")
+                      payment_kind=f"credits_topup:{pkg['credits']}")
 
 
 def _order_receipt_line_items(order) -> list[dict] | None:
@@ -1893,7 +2838,7 @@ def _order_receipt_line_items(order) -> list[dict] | None:
         return None
     minutes, billable, rate = cost["minutes"], cost["billable_minutes"], cost["rate_per_min"]
     if billable < minutes:
-        detail = (f"{billable:.1f} of {minutes:.1f} min billed (the rest covered by free/prepaid minutes) "
+        detail = (f"{billable:.1f} of {minutes:.1f} min billed (the rest covered by free minutes) "
                    f"× ${rate:.2f}/min")
     else:
         detail = f"{minutes:.1f} min × ${rate:.2f}/min"
@@ -1901,9 +2846,16 @@ def _order_receipt_line_items(order) -> list[dict] | None:
     if cost.get("discount_pct"):
         lines.append({"label": f"Plan discount ({cost['discount_pct'] * 100:.0f}%)",
                        "detail": None, "amount_usd": -cost["discount_usd"]})
+    if cost.get("credits_applied_usd"):
+        lines.append({"label": "Prepaid credits applied",
+                       "detail": f"{cost['credits_applied']:.0f} credits × $0.10",
+                       "amount_usd": -cost["credits_applied_usd"]})
     for addon in cost.get("addons", []):
         lines.append({"label": addon["name"], "amount_usd": addon["cost_usd"],
                        "detail": f"{minutes:.1f} min × ${addon['rate_per_min']:.2f}/min"})
+    if cost.get("rush_surcharge_usd"):
+        lines.append({"label": "Rush processing", "amount_usd": cost["rush_surcharge_usd"],
+                       "detail": f"+{billing.RUSH_SURCHARGE_PCT * 100:.0f}% for priority queue handling"})
     return lines
 
 
@@ -1925,11 +2877,10 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     payer = db.get_user(payment["user_id"])
     if payer and payer["onboarding_status"] != "activated":
         # First real money from this account, of any kind (order, plan,
-        # wallet top-up) - the actual "this is a real customer now" moment,
-        # same idea as the doc's "first_payment" trigger. See
-        # _queue_first_payment_message; queuing, not sending - same
-        # no-real-ESP-yet situation as the welcome message.
-        _queue_first_payment_message(payer)
+        # wallet top-up) - the actual "this is a real customer now" moment.
+        # See _queue_first_payment_message - auto-sent now that Brevo is
+        # configured, same as the welcome message.
+        _queue_first_payment_message(payer, base_url=base_url)
         db.set_onboarding_status(payer["id"], "activated")
     try:
         payment_kind = json.loads(payment["meta"]).get("kind", "order") if payment["meta"] else "order"
@@ -1944,10 +2895,18 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     elif payment["order_id"]:
         order = db.get_order(payment["order_id"])
         if order and order["status"] == "pending_payment":
-            db.add_usage_minutes(payment["user_id"], order["duration_minutes"] or 0)
+            # NOT db.add_usage_minutes here - that column tracks the
+            # monthly FREE-trial allowance specifically (see
+            # billing.free_minutes_remaining), already credited at
+            # submission time via cost["free_minutes_applied"] for
+            # whatever portion of THIS order was actually free. Adding the
+            # full paid duration here as well double-counted it - a
+            # client's free trial was silently reading as exhausted the
+            # moment they paid for one big order, even though they'd never
+            # touched their free minutes. Found and fixed 2026-08-23.
             db.update_order_status(payment["order_id"], "queued")
             deadlines = tat.compute_deadlines(order["tier"], order["service_level"],
-                                               order["duration_minutes"] or 0)
+                                               order["duration_minutes"] or 0, rush=bool(order["is_rush"]))
             db.set_order_deadlines(payment["order_id"], deadlines["start_at"],
                                     deadlines["internal_deadline_at"], deadlines["deadline_at"])
             order = db.get_order(payment["order_id"])  # re-fetch with the deadline fields now set
@@ -1956,10 +2915,10 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         description = (f"{level['name']} - {order['original_filename']}" if order and level
                         else f"Order {payment['order_id']} - {payment['plan']} plan")
         line_items = _order_receipt_line_items(order) if order else None
-    elif payment_kind.startswith("wallet_topup:"):
-        minutes = float(payment_kind.split(":", 1)[1])
-        db.add_wallet_minutes(payment["user_id"], minutes)
-        description = f"Prepaid minutes top-up - {minutes:.0f} minutes"
+    elif payment_kind.startswith("credits_topup:"):
+        credits = float(payment_kind.split(":", 1)[1])
+        db.add_wallet_credits(payment["user_id"], credits)
+        description = f"Prepaid credits top-up - {credits:.0f} credits"
     else:
         db.set_subscription_plan(payment["user_id"], payment["plan"], billing.PLAN_PERIOD_DAYS)
         description = f"{billing.PLANS[payment['plan']]['name']} plan subscription"
@@ -1976,12 +2935,41 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     # then holds the real reason, visible on /staff/billing).
     if mailer.email_configured() and payer:
         receipt_url = f"{base_url.rstrip('/')}/receipts/{receipt_id}" if base_url else None
-        html = (
-            f"<p>Hi {payer['display_name']},</p>"
-            f"<p>Your Kauli payment has been received.</p>"
-            f"<p><strong>{description}</strong><br>Total: ${payment['amount_usd']:.2f}</p>"
-            + (f'<p><a href="{receipt_url}">View your receipt →</a></p>' if receipt_url else "")
-            + "<p>Forge Media Services</p>"
+        # Real invoice-style rows - the SAME line_items already computed
+        # above (or a single description/total row for a plan/wallet
+        # payment, which only ever has one real line anyway), not a
+        # second, separately-maintained copy of the breakdown.
+        rows = line_items or [{"label": description, "detail": None, "amount_usd": payment["amount_usd"]}]
+        detail_span_style = f"font-size:12px; color:{mailer.BRAND_MUTED};"
+        cell_style = f"padding:8px 0; border-bottom:1px solid {mailer.BRAND_BORDER};"
+        amount_style = cell_style + " text-align:right; white-space:nowrap;"
+        row_parts = []
+        for r in rows:
+            label_html = r["label"]
+            if r.get("detail"):
+                label_html += f'<br><span style="{detail_span_style}">{r["detail"]}</span>'
+            sign = "-" if r["amount_usd"] < 0 else ""
+            row_parts.append(
+                f'<tr><td style="{cell_style}">{label_html}</td>'
+                f'<td style="{amount_style}">{sign}${abs(r["amount_usd"]):.2f}</td></tr>'
+            )
+        row_html = "".join(row_parts)
+        inner = (
+            f'<p style="margin:0 0 18px;">Hi {payer["display_name"]}, your Kauli payment has been received.</p>'
+            f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px;">'
+            f'<tr><th style="text-align:left; padding-bottom:8px; border-bottom:2px solid {mailer.BRAND_INK}; font-size:12px; '
+            f'text-transform:uppercase; letter-spacing:0.04em; color:{mailer.BRAND_MUTED};">Description</th>'
+            f'<th style="text-align:right; padding-bottom:8px; border-bottom:2px solid {mailer.BRAND_INK}; font-size:12px; '
+            f'text-transform:uppercase; letter-spacing:0.04em; color:{mailer.BRAND_MUTED};">Amount</th></tr>'
+            f'{row_html}'
+            f'<tr><td style="padding:12px 0 0; font-weight:700;">Total paid</td>'
+            f'<td style="padding:12px 0 0; font-weight:700; text-align:right;">${payment["amount_usd"]:.2f}</td></tr>'
+            f'</table>'
+        )
+        html = mailer.wrap_email_html(
+            inner, cta_text="View your receipt →" if receipt_url else None, cta_url=receipt_url,
+            footer_note=f'Billing questions? Just <a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_MUTED};">reply</a> to this email.',
+            base_url=base_url,
         )
         text = (f"Hi {payer['display_name']},\n\nYour Kauli payment has been received.\n"
                 f"{description} - Total: ${payment['amount_usd']:.2f}\n"
@@ -2087,8 +3075,20 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["id"]:
         return HTMLResponse("Order not found.", status_code=404)
+    # Real seconds left before get_active_pending_payment_for_order (the
+    # actual guard - see _checkout) stops blocking a retry - drives the
+    # live countdown on the "already in progress" error (order_pay.html),
+    # computed from the same real payment row and the same constant the
+    # guard itself uses, not a client-side guess re-parsed out of the
+    # error string.
+    pending_retry_after_s = None
+    existing_payment = db.get_active_pending_payment_for_order(order_id)
+    if existing_payment:
+        pending_retry_after_s = max(0, round(
+            db.PENDING_PAYMENT_MAX_AGE_S - (time.time() - existing_payment["created_at"])))
     return templates.TemplateResponse(request, "order_pay.html", {
         "user": user, "order": order, "notice": notice, "error": error,
+        "pending_retry_after_s": pending_retry_after_s,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
         "has_video_addon": db.order_has_addon(order, "video_deliverables"),
@@ -2118,8 +3118,15 @@ def order_surcharge_page(request: Request, order_id: str, notice: str | None = N
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["id"]:
         return HTMLResponse("Order not found.", status_code=404)
+    # Same real countdown as order_pay.html - see that route's comment.
+    pending_retry_after_s = None
+    existing_payment = db.get_active_pending_payment_for_order(order_id)
+    if existing_payment:
+        pending_retry_after_s = max(0, round(
+            db.PENDING_PAYMENT_MAX_AGE_S - (time.time() - existing_payment["created_at"])))
     return templates.TemplateResponse(request, "order_surcharge_pay.html", {
         "user": user, "order": order, "notice": notice, "error": error,
+        "pending_retry_after_s": pending_retry_after_s,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
         "reason_label": db.EXTRA_CHARGE_REASONS.get(order["difficulty_surcharge_reason"], "Additional work"),
@@ -2149,7 +3156,7 @@ def view_receipt(request: Request, receipt_id: str):
     can view it; nobody else."""
     user = current_user(request)
     if not user:
-        return RedirectResponse("/login")
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
     receipt = db.get_receipt(receipt_id)
     if not receipt:
         return HTMLResponse("Receipt not found.", status_code=404)
@@ -2473,9 +3480,21 @@ def staff_queue_nudge(request: Request, user_id: str):
             f"{billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.\n\n"
             "No pressure at all, just wanted to check if anything's unclear or in the way. "
             f"Happy to walk you through it - reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
-            f"{FOUNDER_NAME}\nForge Media Services"
+            f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
         )
-        _queue_and_send(client, "inactivity_nudge", subject, body)
+        nudge_cta_url = f"{str(request.base_url).rstrip('/')}/client"
+        html_inner = (
+            f'<p style="margin:0 0 14px;">Hi {name},</p>'
+            f'<p style="margin:0 0 14px;">Noticed you signed up for Kauli but haven\'t uploaded anything '
+            f'yet - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.</p>'
+            f'<p style="margin:0 0 14px;">No pressure at all, just wanted to check if anything\'s unclear '
+            f'or in the way. Happy to walk you through it - '
+            f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
+            f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+            f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        )
+        _queue_and_send(client, "inactivity_nudge", subject, body, base_url=str(request.base_url),
+                         cta_text="Upload your first order for free", cta_url=nudge_cta_url, html_inner=html_inner)
         db.set_onboarding_status(user_id, "nudged")
     return RedirectResponse("/staff/leads", status_code=303)
 
@@ -2708,6 +3727,118 @@ def staff_admin_demote(request: Request, user_id: str):
 
 
 # ------------------------------------------------------------ staff blog ----
+@app.get("/staff/newsletter", response_class=HTMLResponse)
+def staff_newsletter_form(request: Request, notice: str | None = None):
+    """Real staff-composed newsletter, sent manually - no AI auto-writing
+    it, no cron auto-sending it on a schedule, matching this app's whole
+    "a human decides what goes out under Kauli's name" principle
+    (blog_ai_assist.py's own docstring lays out exactly this same
+    reasoning for blog drafts). Only ever goes to marketing_consent=1
+    clients - that field IS the recipient list, no separate one to keep
+    in sync."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_newsletter.html", {
+        "user": user, "notice": notice,
+        "posts": db.list_blog_posts(published_only=True),
+        "history": db.list_newsletters(),
+        "recipient_count": len(db.list_marketing_opted_in_clients()),
+        "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
+    })
+
+
+@app.post("/staff/newsletter/send")
+def staff_newsletter_send(request: Request, subject: str = Form(...), blog_post_id: str = Form(""),
+                           feature_update: str = Form(""), industry_trend_text: str = Form(""),
+                           industry_trend_url: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    if not mailer.email_configured():
+        return RedirectResponse("/staff/newsletter?notice=Email+isn%27t+configured+-+nothing+sent.", status_code=303)
+
+    base_url = str(request.base_url).rstrip("/")
+    blog_post = db.get_blog_post(blog_post_id) if blog_post_id else None
+
+    sections = []
+    if feature_update.strip():
+        sections.append(
+            '<p style="margin:0 0 6px; font-size:12px; font-weight:700; text-transform:uppercase; '
+            f'letter-spacing:0.05em; color:{mailer.BRAND_ACCENT};">The Kauli Scoop</p>'
+            f'<p style="margin:0 0 24px;">{feature_update.strip()}</p>'
+        )
+    post_url = None
+    if blog_post:
+        post_url = f"{base_url}/blog/{blog_post['slug']}"
+        sections.append(
+            '<p style="margin:0 0 6px; font-size:12px; font-weight:700; text-transform:uppercase; '
+            f'letter-spacing:0.05em; color:{mailer.BRAND_ACCENT};">From the Blog</p>'
+            f'<p style="margin:0 0 6px; font-weight:700;">{blog_post["title"]}</p>'
+            f'<p style="margin:0 0 24px;">{blog_post["description"] or ""}</p>'
+        )
+    if industry_trend_text.strip():
+        trend_link = (f' <a href="{industry_trend_url.strip()}" style="color:{mailer.BRAND_ACCENT};">More →</a>'
+                       if industry_trend_url.strip() else "")
+        sections.append(
+            '<p style="margin:0 0 6px; font-size:12px; font-weight:700; text-transform:uppercase; '
+            f'letter-spacing:0.05em; color:{mailer.BRAND_ACCENT};">Industry Trend</p>'
+            f'<p style="margin:0 0 24px;">{industry_trend_text.strip()}{trend_link}</p>'
+        )
+    if not sections:
+        return RedirectResponse("/staff/newsletter?notice=Add+at+least+one+section+before+sending.", status_code=303)
+
+    calendly_url = os.environ.get("KAULI_CALENDLY_URL")
+    cta_line = (f'Need help localizing your next project? '
+                f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply to this email</a>'
+                + (f' or <a href="{calendly_url}" style="color:{mailer.BRAND_ACCENT};">book a 15-minute call</a>'
+                   if calendly_url else "") + ".")
+    inner = "".join(sections) + f'<p style="margin:24px 0 0; font-size:13px; color:{mailer.BRAND_MUTED};">{cta_line}</p>'
+
+    # A real button, not just inline links - the featured post if one was
+    # picked, otherwise the blog index, so there's always one clear
+    # primary click.
+    newsletter_cta_text, newsletter_cta_url = (
+        ("Read the full article →", post_url) if post_url else ("Read our latest posts", f"{base_url}/blog")
+    )
+
+    recipients = db.list_marketing_opted_in_clients()
+    sent_count = 0
+    for client in recipients:
+        unsub_url = f"{base_url}/unsubscribe/{client['id']}"
+        html = mailer.wrap_email_html(
+            inner, cta_text=newsletter_cta_text, cta_url=newsletter_cta_url, base_url=base_url,
+            footer_note=f'You\'re getting this because you opted in to Kauli updates. '
+                        f'<a href="{unsub_url}" style="color:{mailer.BRAND_MUTED};">Unsubscribe</a> anytime.',
+        )
+        ok, _ = mailer.send_email(client["email"], subject, html)
+        if ok:
+            sent_count += 1
+
+    db.create_newsletter_record(subject, blog_post_id or None, feature_update.strip(),
+                                 industry_trend_text.strip(), industry_trend_url.strip(),
+                                 user["id"], sent_count)
+    return RedirectResponse(
+        f"/staff/newsletter?notice=Sent+to+{sent_count}+of+{len(recipients)}+opted-in+clients.", status_code=303)
+
+
+@app.get("/unsubscribe/{user_id}", response_class=HTMLResponse)
+def unsubscribe(request: Request, user_id: str):
+    """No login needed - the same real-world pattern every newsletter
+    unsubscribe link uses. Only ever touches marketing_consent - never
+    closes the account or stops a real transactional email (order
+    status, receipts), which aren't marketing and don't need this."""
+    user = db.get_user(user_id)
+    if not user:
+        return HTMLResponse("Account not found.", status_code=404)
+    db.set_marketing_consent(user_id, False, request.client.host if request.client else None)
+    return HTMLResponse(
+        "<div style=\"font-family:sans-serif; max-width:480px; margin:80px auto; text-align:center;\">"
+        "<h1>You're unsubscribed</h1><p>You won't get Kauli newsletters anymore - "
+        "order updates and receipts are unaffected.</p></div>"
+    )
+
+
 @app.get("/staff/blog", response_class=HTMLResponse)
 def staff_blog_list(request: Request, error: str | None = None, notice: str | None = None):
     user = current_user(request)
@@ -2885,8 +4016,16 @@ def staff_dashboard(request: Request):
         return RedirectResponse("/login")
     orders = db.list_all_orders()
     unread = db.unread_order_ids(user["id"], include_internal=True)
+    # Real "% edited" per order for the queue - see Job.edited_pct. None
+    # (shown as "-") for anything with no manifest yet (still queued/
+    # processing/awaiting payment) rather than a fabricated 0%.
+    edited_pct = {}
+    for o in orders:
+        job = _load_job(o)
+        edited_pct[o["id"]] = job.edited_pct if job else None
     return templates.TemplateResponse(request, "staff_dashboard.html", {
-        "user": user, "orders": orders, "unread": unread,
+        "user": user, "orders": orders, "unread": unread, "edited_pct": edited_pct,
+        "now_ts": time.time(), "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,
     })
 
 
@@ -2926,7 +4065,7 @@ def staff_ops(request: Request, days: int = 30):
 
 
 @app.get("/staff/orders/{order_id}", response_class=HTMLResponse)
-def staff_review(request: Request, order_id: str):
+def staff_review(request: Request, order_id: str, error: str | None = None, notice: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -2948,10 +4087,14 @@ def staff_review(request: Request, order_id: str):
             order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["rate_per_min"]
         * DIFFICULTY_SURCHARGE_DEFAULT_PCT, 2)
 
+    assigned_actor = db.get_voice_actor(order["voice_actor_id"]) if order["voice_actor_id"] else None
     return templates.TemplateResponse(request, "staff_review.html", {
         "user": user, "order": order, "job": job,
         "client_messages": client_messages, "internal_messages": internal_messages,
         "has_video_source": has_video_source,
+        "voice_actors": db.list_voice_actors("active"),
+        "assigned_actor": assigned_actor,
+        "order_payouts": [p for p in db.list_payouts() if p["order_id"] == order_id],
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "return_reasons": db.RETURN_REASONS,
@@ -2961,6 +4104,7 @@ def staff_review(request: Request, order_id: str):
         "suggested_surcharge_pct": DIFFICULTY_SURCHARGE_DEFAULT_PCT,
         "suggested_surcharge_usd": suggested_surcharge_usd,
         "extra_charge_reasons": db.EXTRA_CHARGE_REASONS,
+        "error": error, "notice": notice,
     })
 
 
@@ -3079,12 +4223,32 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
         if client and mailer.email_configured():
             link = f"{str(request.base_url).rstrip('/')}/client/orders/{order_id}"
             reason_text = f"\n\n{message.strip()}" if message.strip() else ""
-            body = (f"Hi {(client['display_name'] or client['email'].split('@')[0]).strip()},\n\n"
+            client_name = (client["display_name"] or client["email"].split("@")[0]).strip()
+            body = (f"Hi {client_name},\n\n"
                     f"Your order ({order['original_filename']}) was returned without completing - "
                     f"we need something from you before we can continue.{reason_text}\n\n"
-                    f"See the details and reply here: {link}\n\n"
-                    f"Or WhatsApp me directly: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\nForge Media Services")
-            html = "".join(f"<p>{part}</p>" for part in body.split("\n\n") if part.strip())
+                    f"No need to submit a new order or pay again - reply on the order's message thread and, "
+                    f"if we need a corrected file, attach it right there; we'll pick this same order back up "
+                    f"as soon as it's sorted.\n\n"
+                    f"Or reply here, or WhatsApp me directly: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+                    f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services")
+            reason_html = f'<p style="margin:0 0 14px;">{message.strip()}</p>' if message.strip() else ""
+            inner = (
+                f'<p style="margin:0 0 14px;">Hi {client_name},</p>'
+                f'<p style="margin:0 0 14px;">Your order ({order["original_filename"]}) was returned '
+                f'without completing - we need something from you before we can continue.</p>'
+                f'{reason_html}'
+                f'<p style="margin:0 0 14px;">No need to submit a new order or pay again - reply on the '
+                f'order\'s message thread and, if we need a corrected file, attach it right there; we\'ll '
+                f'pick this same order back up as soon as it\'s sorted.</p>'
+                f'<p style="margin:0 0 14px;">Or '
+                f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here, or '
+                f'message me directly on '
+                f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+                f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+            )
+            html = mailer.wrap_email_html(inner, cta_text="View order & resume", cta_url=link,
+                                           base_url=str(request.base_url))
             mailer.send_email(client["email"], "Action needed on your Kauli order", html, body)
     elif action == "resume":
         db.update_order_status(order_id, "awaiting_review")
@@ -3153,6 +4317,17 @@ def staff_set_dub_voice(request: Request, order_id: str, voice: str = Form(...))
             return HTMLResponse(f"Voice model not downloaded: {voice_path}", status_code=400)
         _resynthesize_full_dub(order, job, "piper", voice_path)
         db.set_dub_voice(order_id, voice, job_status=None)
+    elif voice == "human":
+        # No re-render needed - the actor's take already exists in its own
+        # permanent slot (see _human_recording_path/_activate_human_recording).
+        # Switching the picker back to "human" just re-copies it back into
+        # the active delivered slot, in case a Piper/xtts re-render since
+        # overwrote that slot with AI audio.
+        human_path = _human_recording_path(order)
+        if not human_path:
+            return HTMLResponse(
+                "No voice-actor recording has been uploaded for this order yet.", status_code=400)
+        _activate_human_recording(order_id, order, human_path.suffix, human_path.read_bytes())
     else:
         return HTMLResponse("Unknown voice.", status_code=400)
 
@@ -3195,6 +4370,22 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    # The real gate - not just the queue's "% Edited" column showing the
+    # number, this is the actual enforcement point. Nothing ships until
+    # every real speech segment has been through at least one save (see
+    # Job.edited_pct) - a segment that was already correct still needs a
+    # human to confirm it, not just have it silently assumed fine because
+    # nobody happened to touch it.
+    pct = job.edited_pct if job else 0
+    if pct < 100:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}?error=Only+{pct}%25+of+segments+are+confirmed+edited+-+"
+            f"every+segment+needs+at+least+one+save+in+Ereri+before+this+can+ship.",
+            status_code=303)
     db.update_order_status(order_id, "ready_for_delivery")
     order = db.get_order(order_id)
     if order:
@@ -3214,7 +4405,7 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
 # built fresh around kauli's own Segment/Word data model, not a copy of
 # any specific vendor's tool.
 @app.get("/staff/orders/{order_id}/editor", response_class=HTMLResponse)
-def staff_editor(request: Request, order_id: str):
+def staff_editor(request: Request, order_id: str, notice: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -3230,8 +4421,10 @@ def staff_editor(request: Request, order_id: str):
     segments_json = [
         {
             "segment_id": s.segment_id,
+            "segment_type": s.segment_type,
             "start_ms": s.start_ms,
             "end_ms": s.end_ms,
+            "speaker_id": s.speaker_id,
             "source_transcript": s.source_transcript,
             "source_final_text": s.source_final_text,
             "source_confidence": s.source_confidence,
@@ -3243,8 +4436,18 @@ def staff_editor(request: Request, order_id: str):
             "final_text": s.final_text,
             "translation_confidence": s.translation_confidence,
             "translation_stale": s.translation_stale,
+            "manual_pace_pct": s.manual_pace_pct,
+            "spell_out": s.spell_out,
             "source_cells": _build_source_cells(s),
             "target_cells": _build_target_cells(s),
+            # Real delivered-caption formatting - the SAME wrap/display-cap
+            # logic kauli.subtitles.to_srt/to_vtt uses to build the actual
+            # file a client downloads, not a second, JS-side approximation
+            # of it. Powers the Preview tab's caption bar (editor.js's
+            # bindPreviewCaptions) so what an editor sees there is what
+            # actually ships, not just the raw un-wrapped text.
+            "wrapped_caption": _wrap_caption_text(s.final_text.strip()) if s.final_text.strip() else "",
+            "display_end_ms": _display_end_ms(s),
         }
         for s in job.segments
     ]
@@ -3260,6 +4463,14 @@ def staff_editor(request: Request, order_id: str):
     piper_voices = {
         key: v for key, v in PIPER_VOICES.items() if (PROJECT_ROOT / v["path"]).exists()
     }
+    human_recording_available = _human_recording_path(order) is not None
+    # Real speakers actually present in this order - from Transkriptor's
+    # diarization labels or a human's own set-speaker correction (see
+    # editor_set_segment_speaker) - never a fabricated "Speaker 1/2/3"
+    # list when nothing has actually tagged anyone. Sorted for a stable
+    # display order, not insertion order (which would jump around as
+    # segments get corrected).
+    distinct_speakers = sorted({s.speaker_id for s in job.segments if s.speaker_id})
     return templates.TemplateResponse(request, "editor.html", {
         "user": user, "order": order, "job": job,
         "is_video": is_video_file(order["audio_path"]),
@@ -3274,6 +4485,16 @@ def staff_editor(request: Request, order_id: str):
         "dubbed_video_ready": dubbed_video_ready,
         "stale_translation_count": stale_translation_count,
         "piper_voices": piper_voices,
+        "human_recording_available": human_recording_available,
+        "distinct_speakers": distinct_speakers,
+        "speaker_voices": job.speaker_voices,
+        "notice": notice,
+        # Real raw deliverable text, not a re-rendering of it - the exact
+        # bytes-minus-encoding a client's .srt/.vtt download will contain,
+        # so an editor can catch a real formatting/timestamp problem here
+        # before it ships, not after a client reports it.
+        "target_srt": to_srt(job), "target_vtt": to_vtt(job),
+        "source_srt": to_srt(job, source=True),
     })
 
 
@@ -3313,6 +4534,13 @@ def editor_save_segment(request: Request, order_id: str, segment_id: str,
         "ok": True,
         "final_text": seg.final_text,
         "rendered_duration_ms": seg.rendered_duration_ms,
+        # The Preview tab's caption bar (editor.js's bindPreviewCaptions)
+        # closes over the segments array from page load, not segmentMeta -
+        # without this, a correction here never reached that preview until
+        # a full page reload, exactly the "whatever's in the English
+        # transcript should be in the dubbed English transcript, live" bug.
+        "wrapped_caption": _wrap_caption_text(seg.final_text.strip()) if seg.final_text.strip() else "",
+        "display_end_ms": _display_end_ms(seg),
     })
 
 
@@ -3344,11 +4572,63 @@ def editor_toggle_flag(request: Request, order_id: str, segment_id: str):
                           "review_reasons": seg.review_reasons})
 
 
+def _retranslate_and_resync(order, job: Job, seg, mt_provider=None) -> None:
+    """The actual "translate from the corrected source" guarantee: re-run
+    MT on the current seg.source_final_text (a human correction always
+    wins there, same as final_text), using the exact same
+    translate_segment() the main pipeline uses - not a second, drifting
+    copy of that logic - then re-render this segment's audio in the dub's
+    current voice so the delivered dub track is never left speaking a
+    stale translation. Skips the audio step for a gap segment or a
+    stub-TTS (transcription/translation-only) order, same guard
+    _apply_segment_edit uses.
+
+    mt_provider is optional so a caller retranslating MANY segments in one
+    request (editor_retranslate_all) can build one provider instance and
+    reuse it - both ClaudeMT's total_cost_usd and LaraMT's
+    total_chars_used only actually accumulate across calls on the SAME
+    instance; a fresh one per segment would silently reset that tracking
+    every time. A single-segment caller just leaves this unset."""
+    if getattr(seg, "segment_type", "speech") == "gap":
+        # A gap's "text" is a caption tag ([Applause], [Makofi]) an editor
+        # typed on the Swahili side - there's no real language to
+        # translate (run()'s own TTS/MT loops already skip gaps entirely
+        # for exactly this reason), so a real MT provider call here would
+        # just waste a real request and risk garbling a caption
+        # convention into something that doesn't even look like a tag any
+        # more. Mirror the exact source text across instead - that's the
+        # actual fix for "I don't want to retag sounds again in English
+        # once it's already done in Swahili." Into literal/spoken, never
+        # edited_text, so a LATER source correction keeps auto-mirroring
+        # too (same reason a real translate_segment result never touches
+        # edited_text either) - an editor who writes their own English
+        # caption directly (editor_save_target, which DOES set
+        # edited_text) still permanently wins, exactly like a real
+        # hand-edited translation would.
+        seg.literal = seg.source_final_text
+        seg.spoken = seg.source_final_text
+        seg.translation_stale = False
+        return
+    mt_provider = mt_provider or get_mt(order["mt"])
+    cps = timing.DEFAULT_CPS.get(order["target_lang"], 14.0)
+    translate_segment(seg, mt_provider, order["source_lang"], order["target_lang"], cps,
+                       all_segments=job.segments)
+    seg.translation_stale = False  # back in sync - this translation IS of the current source
+    if order["tts"] != "stub" and getattr(seg, "segment_type", "speech") != "gap":
+        _resynthesize_one_segment(order, job, seg)
+
+
 @app.post("/staff/orders/{order_id}/segments/{segment_id}/source")
 def editor_save_source(request: Request, order_id: str, segment_id: str, body: dict = Body(...)):
     """Step 1 of the editor's workflow: correct the Swahili ASR transcript
-    itself. Kept separate from the translation-edit endpoint on purpose -
-    this doesn't touch the English text or re-render anything by itself."""
+    itself. If the English side hasn't been hand-finalized yet, this now
+    ALSO re-translates (and re-renders the dub audio) from the corrected
+    text immediately - see _retranslate_and_resync - so a corrected source
+    reliably produces a corrected translation without a second, easy-to-
+    forget manual step. A human who already reviewed/edited the English
+    directly is never silently overwritten here - that still just gets
+    flagged stale, same as before, and only clears via an explicit
+    Re-translate or their own edit."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return JSONResponse({"error": "unauthorized"}, status_code=401)
@@ -3366,30 +4646,65 @@ def editor_save_source(request: Request, order_id: str, segment_id: str, body: d
     text = body.get("text", "").strip()
     changed = (text or None) != seg.source_final_text
     seg.source_edited_transcript = text or None
+    auto_retranslated = False
+    retranslate_error = None
     if changed:
-        # The English currently shown was translated from whatever the
-        # source said BEFORE this edit - flag it stale rather than silently
-        # leaving a translation of text that no longer exists in step 1
-        # looking exactly as "done" as one that's actually current. See
-        # editor_retranslate/editor_save_target for where this clears.
-        seg.translation_stale = True
+        if seg.edited_text is None and not seg.approved:
+            # Nobody has hand-finalized the English yet - safe to just
+            # redo it from the corrected source, no human work at risk.
+            try:
+                _retranslate_and_resync(order, job, seg)
+                auto_retranslated = True
+            except Exception as exc:  # noqa: BLE001 - the source correction itself must
+                # still save even if the MT provider is down/misconfigured - fall back to
+                # the old flag-it-stale behavior rather than losing the save entirely.
+                traceback.print_exc()
+                seg.translation_stale = True
+                retranslate_error = str(exc)
+        else:
+            # The English was already reviewed/edited directly - don't
+            # silently clobber that; flag it and let a human decide
+            # (Re-translate, or leave their own edit as-is).
+            seg.translation_stale = True
     # Regenerate the actual delivered transcript file too, not just the
-    # manifest - _apply_segment_edit already does this for the target-
-    # language subtitle files on every save; this endpoint didn't, so a
-    # saved Swahili correction never reached transcript_{lang}.srt until
-    # someone happened to trigger a full re-render some other way.
+    # manifest - this endpoint didn't used to, so a saved Swahili
+    # correction never reached transcript_{lang}.srt until someone
+    # happened to trigger a full re-render some other way.
     (Path(order["outdir"]) / f"transcript_{order['source_lang']}.srt").write_text(
         to_srt(job, source=True), encoding="utf-8")
+    # Real bug this used to have: when a source correction auto-
+    # retranslates the English side (see _retranslate_and_resync above),
+    # that changes seg.final_text - but this endpoint never rewrote the
+    # actual DELIVERED subs_<lang>.srt/.vtt files, only the manifest. A
+    # client's downloaded captions could silently drift from what Ereri
+    # showed, forever, unless some unrelated later save happened to touch
+    # them. _apply_segment_edit already does this on every target-side
+    # save; this auto-retranslate path needs the exact same regeneration.
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
+        to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(
+        to_vtt(job), encoding="utf-8")
     job.save(str(Path(order["outdir"]) / "manifest.json"))
-    return JSONResponse({"ok": True, "source_final_text": seg.source_final_text,
-                          "translation_stale": seg.translation_stale})
+    return JSONResponse({
+        "ok": True, "source_final_text": seg.source_final_text,
+        "translation_stale": seg.translation_stale, "auto_retranslated": auto_retranslated,
+        "retranslate_error": retranslate_error,
+        "final_text": seg.final_text, "target_cells": _build_target_cells(seg),
+        # See editor_save_segment's own comment - the Preview tab's caption
+        # bar needs this refreshed too, not just the on-screen cells.
+        "wrapped_caption": _wrap_caption_text(seg.final_text.strip()) if seg.final_text.strip() else "",
+        "display_end_ms": _display_end_ms(seg),
+    })
 
 
 @app.post("/staff/orders/{order_id}/segments/{segment_id}/retranslate")
 def editor_retranslate(request: Request, order_id: str, segment_id: str):
-    """Step 1 -> step 2 of the editor's workflow: re-run MT on the (likely
-    just-corrected) Swahili source, using the exact same translate_segment()
-    the main pipeline uses - not a second, drifting copy of that logic."""
+    """Step 1 -> step 2 of the editor's workflow: the manual trigger for
+    the same real re-translate-and-resync _retranslate_and_resync does
+    automatically on a source save now - kept as its own action for
+    forcing a fresh translation without re-saving the source text (e.g.
+    after switching the order's MT provider, or to discard a stale hand
+    edit and start over from MT)."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return JSONResponse({"error": "unauthorized"}, status_code=401)
@@ -3404,10 +4719,13 @@ def editor_retranslate(request: Request, order_id: str, segment_id: str):
     if seg is None:
         return JSONResponse({"error": "segment not found"}, status_code=404)
 
-    mt_provider = get_mt(order["mt"])
-    cps = timing.DEFAULT_CPS.get(order["target_lang"], 14.0)
-    translate_segment(seg, mt_provider, order["source_lang"], order["target_lang"], cps)
-    seg.translation_stale = False  # back in sync - this translation IS of the current source
+    try:
+        _retranslate_and_resync(order, job, seg)
+    except Exception as exc:  # noqa: BLE001 - a real provider failure (bad/missing key,
+        # network error) should come back as a real error the editor UI can show, not a
+        # raw 500 with no message.
+        traceback.print_exc()
+        return JSONResponse({"error": f"{order['mt']} provider failed: {exc}"}, status_code=502)
 
     (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
         to_srt(job), encoding="utf-8")
@@ -3423,7 +4741,243 @@ def editor_retranslate(request: Request, order_id: str, segment_id: str):
         "review_reasons": seg.review_reasons,
         "translation_stale": seg.translation_stale,
         "target_cells": _build_target_cells(seg),
+        # See editor_save_segment's own comment - the Preview tab's caption
+        # bar needs this refreshed too, not just the on-screen cells.
+        "wrapped_caption": _wrap_caption_text(seg.final_text.strip()) if seg.final_text.strip() else "",
+        "display_end_ms": _display_end_ms(seg),
     })
+
+
+@app.post("/staff/orders/{order_id}/segments/{segment_id}/voice-direction")
+def editor_set_voice_direction(request: Request, order_id: str, segment_id: str, body: dict = Body(...)):
+    """The editor doing final touches on the dub voice directs how THIS
+    segment gets spoken - slower/faster than the automatic fit-to-slot
+    pace, or spelled out letter-by-letter instead of read as a word (see
+    Segment.manual_pace_pct/spell_out and _render_segment_audio) - then
+    re-renders just this segment and the mixed dub track from it. A no-op
+    on the audio side (but the direction still saves) whenever the order's
+    dub is currently a human recording - see _resynthesize_one_segment's
+    own guard on that."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+    if order["tts"] == "stub":
+        return JSONResponse({"error": "This order has no dub voice (transcription/translation only)."},
+                             status_code=400)
+
+    job = _load_job(order)
+    if job is None:
+        return JSONResponse({"error": "job not processed yet"}, status_code=404)
+    seg = next((s for s in job.segments if s.segment_id == segment_id), None)
+    if seg is None:
+        return JSONResponse({"error": "segment not found"}, status_code=404)
+    if getattr(seg, "segment_type", "speech") == "gap":
+        return JSONResponse({"error": "A gap segment has no voice to direct."}, status_code=400)
+
+    try:
+        pace_pct = float(body.get("pace_pct") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "pace_pct must be a number"}, status_code=400)
+    pace_pct = max(-50.0, min(100.0, pace_pct))  # matches time_stretch's own 0.5x-2.0x clamp
+    seg.manual_pace_pct = pace_pct
+    seg.spell_out = bool(body.get("spell_out"))
+    if not pace_pct and "manual_pace_override" in seg.review_reasons:
+        seg.review_reasons.remove("manual_pace_override")
+        seg.review_flag = bool(seg.review_reasons)
+
+    _resynthesize_one_segment(order, job, seg)
+
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
+        to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(
+        to_vtt(job), encoding="utf-8")
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+
+    return JSONResponse({
+        "ok": True,
+        "manual_pace_pct": seg.manual_pace_pct,
+        "spell_out": seg.spell_out,
+        "rendered_duration_ms": seg.rendered_duration_ms,
+        "review_flag": seg.review_flag,
+        "review_reasons": seg.review_reasons,
+        "dub_voice": order["dub_voice"],
+    })
+
+
+@app.post("/staff/orders/{order_id}/detect-gaps")
+def editor_detect_gaps(request: Request, order_id: str):
+    """Retrofits real gap segments onto an order that was processed BEFORE
+    kauli.pipeline._insert_non_speech_segments existed - every order run
+    through the pipeline since gets these automatically at the ASR step;
+    this is the one-time catch-up for one that predates it. Existing
+    segments (and any corrections already made to them) are untouched -
+    this only ever ADDS new gap-type segments into stretches that
+    currently have no segment at all, using the exact same real function
+    a fresh pipeline run uses, not a second copy of the gap-finding logic."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+
+    before = len(job.segments)
+    job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
+    added = len(job.segments) - before
+
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(to_vtt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"transcript_{order['source_lang']}.srt").write_text(
+        to_srt(job, source=True), encoding="utf-8")
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    return RedirectResponse(
+        f"/staff/orders/{order_id}/editor?notice=Added+{added}+gap+cell(s)+for+non-speech+stretches.",
+        status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/retranslate-all")
+def editor_retranslate_all(request: Request, order_id: str):
+    """Bulk version of _retranslate_and_resync - re-translates (and
+    re-renders audio for) EVERY segment that hasn't been hand-finalized on
+    the English side, from its current (possibly corrected) source text.
+    For fixing a whole order that was translated with a weaker MT
+    provider before a better one was available (e.g. before
+    ANTHROPIC_API_KEY was set) or before a batch of source corrections
+    went in - one click instead of retranslating each segment by hand.
+    Segments a human has already reviewed/edited directly are skipped,
+    same "never silently overwrite finished human work" rule as the
+    auto-retranslate-on-source-save path."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+
+    # One provider instance for the whole batch, not one per segment - see
+    # _retranslate_and_resync's docstring on why that matters for
+    # ClaudeMT's total_cost_usd / LaraMT's total_chars_used.
+    mt_provider = get_mt(order["mt"])
+    retranslated = 0
+    skipped = 0
+    failed_error = None
+    for seg in job.segments:
+        if getattr(seg, "segment_type", "speech") == "gap":
+            continue
+        if seg.edited_text is not None or seg.approved:
+            skipped += 1
+            continue
+        try:
+            _retranslate_and_resync(order, job, seg, mt_provider=mt_provider)
+        except Exception as exc:  # noqa: BLE001 - a real provider failure (bad/missing key,
+            # network error) shouldn't lose whatever DID succeed before it, or crash to a
+            # raw 500 with no way back into the editor.
+            traceback.print_exc()
+            failed_error = str(exc)
+            break
+        retranslated += 1
+
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(to_vtt(job), encoding="utf-8")
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    usage_note = ""
+    if hasattr(mt_provider, "total_chars_used") and mt_provider.total_chars_used:
+        usage_note = f"+-+{mt_provider.total_chars_used}+real+characters+used+this+run"
+    elif hasattr(mt_provider, "total_cost_usd") and mt_provider.total_cost_usd:
+        usage_note = f"+-+%24{mt_provider.total_cost_usd:.4f}+real+spend+this+run"
+    if failed_error:
+        return RedirectResponse(
+            f"/staff/orders/{order_id}/editor?notice=Retranslated+{retranslated}+segment(s)+before+"
+            f"hitting+an+error+with+the+{quote(order['mt'])}+provider+-+{quote(failed_error[:200])}"
+            f"{usage_note}.",
+            status_code=303)
+    return RedirectResponse(
+        f"/staff/orders/{order_id}/editor?notice=Retranslated+{retranslated}+segment(s)"
+        f"+({skipped}+already+hand-finalized,+left+alone){usage_note}.",
+        status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/segments/{segment_id}/set-speaker")
+def editor_set_segment_speaker(request: Request, order_id: str, segment_id: str,
+                                speaker_id: str = Form("")):
+    """Manual speaker correction/assignment for ONE segment - the human
+    half of multi-speaker support. Transkriptor's real diarization labels
+    (TranskriptorASR) populate seg.speaker_id automatically for orders
+    that use it; faster-whisper never does, and even a real diarization
+    label can be wrong (two segments split from one person, or one
+    segment actually crossing a speaker change). An editor is already
+    listening to every segment for QA anyway - correcting or assigning a
+    speaker by ear costs nothing extra and is what actually makes "cast
+    each character a distinct voice" (see assign-speaker-voice below)
+    possible on an order that has no automatic diarization at all.
+    Doesn't re-synthesize by itself - Ctrl+Shift+S or a fresh voice
+    assignment on the (corrected) speaker picks it up."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+    seg = next((s for s in job.segments if s.segment_id == segment_id), None)
+    if not seg:
+        return HTMLResponse("Segment not found.", status_code=404)
+    seg.speaker_id = speaker_id.strip() or None
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    return RedirectResponse(f"/staff/orders/{order_id}/editor?notice=Speaker+updated.", status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/assign-speaker-voice")
+def editor_assign_speaker_voice(request: Request, order_id: str, speaker_id: str = Form(...),
+                                 voice_key: str = Form(...)):
+    """Assigns one detected/tagged speaker a specific, distinct Piper
+    voice - the actual "same character, same voice throughout" guarantee
+    (see Job.speaker_voices' own comment), achieved with the voices
+    already installed, not a new diarization/casting ML pipeline. Only
+    re-renders THAT speaker's segments (only_speaker_id), not the whole
+    order - assigning a second character's voice shouldn't waste time
+    re-doing a first one that's already right.
+
+    Piper only, on purpose: XTTS voice cloning is a single reference
+    speaker cloned from the source audio (see kauli.pipeline.run's own
+    comment - "multi-speaker sources need diarization, not built yet"),
+    it doesn't extend to "clone several different speakers at once"
+    without real per-speaker reference-clip isolation, which is a bigger,
+    separate piece of work this doesn't attempt."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+    if voice_key not in PIPER_VOICES:
+        return RedirectResponse(f"/staff/orders/{order_id}/editor?notice=Unknown+voice.", status_code=303)
+    voice_path = str(PROJECT_ROOT / PIPER_VOICES[voice_key]["path"])
+    if not Path(voice_path).exists():
+        return RedirectResponse(
+            f"/staff/orders/{order_id}/editor?notice=Voice+model+not+downloaded%3A+{quote(voice_path)}",
+            status_code=303)
+    job.speaker_voices[speaker_id] = voice_path
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    if order["tts"] != "stub":
+        _resynthesize_full_dub(order, job, "piper", voice_path, only_speaker_id=speaker_id)
+    return RedirectResponse(
+        f"/staff/orders/{order_id}/editor?notice=Assigned+{quote(PIPER_VOICES[voice_key]['label'])}+to+"
+        f"{quote(speaker_id)}.", status_code=303)
 
 
 # ------------------------------------------------------- youtube polling ----
@@ -3472,6 +5026,18 @@ DEADLINE_WATCH_INTERVAL_S = 15 * 60
 DEADLINE_WARNING_WINDOW_S = 2 * 3600  # matches the doc's "within 2 hours" check
 
 
+def _system_sender_id() -> str | None:
+    """A real staff account id to send an automated, staff-authored
+    message under - client-facing message templates already show any
+    staff sender as just "Kauli" (see staff_review.html), so which real
+    staff account this is doesn't matter, only that it's a genuine one.
+    None (and the caller skips sending) on the - currently impossible -
+    case of no staff account existing at all, rather than crashing the
+    background deadline-watch loop over it."""
+    staff = db.list_staff_users()
+    return staff[0]["id"] if staff else None
+
+
 def _deadline_watch_once() -> None:
     now = time.time()
     for order in db.list_orders_needing_deadline_check():
@@ -3495,6 +5061,37 @@ def _deadline_watch_once() -> None:
                 f"See /staff/orders/{order['id']}.",
             )
             db.mark_deadline_warning_sent(order["id"])
+
+        # Enterprise SLA credit (billing.ENTERPRISE_SLA_CREDIT_PCT) - a
+        # separate, later threshold than the internal-deadline alert
+        # above: deadline_at is the real CLIENT-FACING promise (already
+        # includes tat.py's 20% buffer specifically so a normal day
+        # delivers early), so this only fires once that promise itself
+        # has actually been broken, not just the tighter internal one
+        # staff works against. Real money (wallet credit), so this stays
+        # narrowly scoped: enterprise tier only, one credit per order
+        # ever (sla_credit_issued_at), and only when a real charge
+        # (cost_usd) exists to take a percentage of.
+        if (order["tier"] == "enterprise" and order["deadline_at"] and order["deadline_at"] <= now
+                and not order["sla_credit_issued_at"] and (order["cost_usd"] or 0) > 0):
+            credit_usd = round(order["cost_usd"] * billing.ENTERPRISE_SLA_CREDIT_PCT, 2)
+            db.add_wallet_credits(order["client_id"], billing.usd_to_credits(credit_usd))
+            db.mark_sla_credit_issued(order["id"])
+            sender_id = _system_sender_id()
+            if sender_id:
+                db.create_message(
+                    order["id"], sender_id, "client",
+                    f"This order missed the delivery window we promised you - that's on us, not you. "
+                    f"We've credited ${credit_usd:.2f} ({billing.ENTERPRISE_SLA_CREDIT_PCT:.0%} of this "
+                    f"order's cost) to your account as wallet credit, automatically, no need to ask. "
+                    f"We're still finishing this order and will let you know the moment it's ready.",
+                )
+            notifications.notify_staff(
+                f"Kauli: SLA credit auto-issued on order {order['id']}",
+                f"Order {order['id']} ({order['original_filename']}) missed its client-facing deadline - "
+                f"${credit_usd:.2f} was automatically credited to the client's wallet. "
+                f"See /staff/orders/{order['id']}.",
+            )
 
 
 def _deadline_watch_loop() -> None:

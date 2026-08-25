@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Newsletter{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+  <h1 style="margin:0;">Newsletter</h1>
+  <span class="muted" style="font-size:0.84rem;">{{ recipient_count }} client{{ '' if recipient_count == 1 else 's' }} opted in to marketing email</span>
+</div>
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+<p class="muted" style="font-size:0.82rem; max-width:640px;">
+  Every send here is written and approved by a real person before it goes out - there's no AI
+  auto-drafting or auto-sending step, and nothing is scheduled to fire on its own. Recipients are exactly
+  the clients who ticked "send me updates" at signup or in their account settings; unsubscribing here
+  only stops newsletters, never order or receipt emails.
+</p>
+
+<div class="card" style="max-width:640px; margin-top:16px;">
+  <form method="post" action="/staff/newsletter/send">
+    <label>Subject
+      <input type="text" name="subject" required placeholder="e.g. New in Kauli: gap-cell tagging for sound effects">
+    </label>
+
+    <label style="margin-top:12px;">Feature update / what's new <span class="muted">(optional)</span>
+      <textarea name="feature_update" rows="3" placeholder="A short, honest note on something real that shipped recently."></textarea>
+    </label>
+
+    <label style="margin-top:12px;">Blog highlight <span class="muted">(optional - links to the real published post)</span>
+      <select name="blog_post_id">
+        <option value="">- None -</option>
+        {% for post in posts %}
+        <option value="{{ post['id'] }}">{{ post['title'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label style="margin-top:12px;">Industry trend note <span class="muted">(optional)</span>
+      <textarea name="industry_trend_text" rows="2" placeholder="A real, attributed trend worth mentioning."></textarea>
+    </label>
+    <label style="margin-top:8px;">Industry trend link <span class="muted">(optional)</span>
+      <input type="url" name="industry_trend_url" placeholder="https://...">
+    </label>
+
+    <button type="submit" class="btn" style="margin-top:16px;"
+            onclick="return confirm('Send this newsletter to {{ recipient_count }} opted-in client(s) now?');">
+      Send to {{ recipient_count }} opted-in client{{ '' if recipient_count == 1 else 's' }}
+    </button>
+  </form>
+</div>
+
+<h2 style="margin-top:32px;">Send history</h2>
+<div class="card" style="padding:0; margin-top:12px;">
+  <table>
+    <thead><tr><th>Subject</th><th>Blog post</th><th>Recipients</th><th>Sent by</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for n in history %}
+      <tr>
+        <td>{{ n['subject'] }}</td>
+        <td class="muted">{{ n['blog_post_title'] or '-' }}</td>
+        <td>{{ n['recipient_count'] }}</td>
+        <td class="muted">{{ n['sent_by_name'] or '-' }}</td>
+        <td class="muted">{{ n['created_at']|int|timestamp_to_str }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted" style="padding:20px 24px;">No newsletters sent yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

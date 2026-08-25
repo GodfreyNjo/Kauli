@@ -15,6 +15,15 @@ one-time Brevo account step, not something this code can do for you.
 Then set in .env:
   BREVO_API_KEY=xkeysib-...
   BREVO_FROM_EMAIL=receipts@yourdomain.com
+
+Sending from a Gmail address (through Brevo) works and is what's
+configured today, but it's a real deliverability tradeoff, not a
+technicality to ignore: Gmail's own SPF/DKIM records don't authorize
+Brevo's servers to send as you, so some inboxes may flag or spam-fold
+these. The real fix needs a domain you own - Brevo > Senders, Domains &
+Dedicated IPs > add your domain, then add the SPF/DKIM/DMARC records it
+gives you to your domain's real DNS. That's a domain-ownership and DNS
+step only you can do; nothing here can fake owning a domain.
 """
 from __future__ import annotations
 
@@ -24,9 +33,81 @@ import httpx
 
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
+BRAND_ACCENT = "#556b2f"   # Kauli's real olive accent (style.css's --accent)
+BRAND_INK = "#21201d"
+BRAND_MUTED = "#6b6862"
+BRAND_PAGE_BG = "#f5f4f1"
+BRAND_CARD_BG = "#ffffff"
+BRAND_BORDER = "#e7e3dc"
+
 
 def email_configured() -> bool:
     return bool(os.environ.get("BREVO_API_KEY")) and bool(os.environ.get("BREVO_FROM_EMAIL"))
+
+
+def text_to_html_paragraphs(body: str) -> str:
+    """Plain text -> simple HTML paragraphs - blank-line-separated blocks
+    become separate <p> tags, and a single newline WITHIN one block (e.g.
+    a multi-line signature: "Talk soon,\\nGodfrey\\n(Forge Media
+    Services)") becomes a real <br>, not silently collapsed the way raw
+    HTML always does with a bare newline. Every email body up to now used
+    only the paragraph split, which is exactly why a 3-line signature was
+    rendering as one run-on line - found from a real screenshot of a real
+    sent email, not a hypothetical."""
+    parts = [p.strip() for p in body.split("\n\n") if p.strip()]
+    return "".join(f'<p style="margin:0 0 14px;">{p.replace(chr(10), "<br>")}</p>' for p in parts)
+
+
+def wrap_email_html(body_html: str, cta_text: str | None = None, cta_url: str | None = None,
+                     footer_note: str | None = None, base_url: str = "") -> str:
+    """The shared branded envelope every Kauli email renders inside -
+    light-grey page background, a white rounded card, a text wordmark
+    header (no logo image: that needs a stable public URL, and this is
+    still a local prototype without one yet - a real domain makes that a
+    one-line addition later), an optional single CTA button, and a real
+    footer with contact/terms links. All styles inline - most email
+    clients strip <style> blocks, so this is the only way that reliably
+    renders the same in Gmail, Outlook and everything between.
+
+    body_html is the email-specific content, already-formed HTML (e.g. a
+    handful of <p> tags or a table) - this just wraps it, never rewrites
+    it."""
+    cta_html = ""
+    if cta_text and cta_url:
+        cta_html = f"""
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 8px;">
+          <tr><td style="border-radius:8px; background:{BRAND_ACCENT};">
+            <a href="{cta_url}" style="display:inline-block; padding:13px 28px; font-size:15px;
+               font-weight:600; color:#ffffff; text-decoration:none; border-radius:8px;">{cta_text}</a>
+          </td></tr>
+        </table>"""
+    footer_extra = f"<p style=\"margin:6px 0 0;\">{footer_note}</p>" if footer_note else ""
+    base = base_url.rstrip("/")
+    terms_url = f"{base}/terms" if base else "/terms"
+    privacy_url = f"{base}/privacy" if base else "/privacy"
+    return f"""<!--[if mso]><style>table {{ border-collapse: collapse; }}</style><![endif]-->
+<div style="background:{BRAND_PAGE_BG}; padding:32px 16px; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="max-width:600px; margin:0 auto;">
+    <tr><td style="padding:0 4px 20px;">
+      <span style="font-size:20px; font-weight:800; letter-spacing:0.02em; color:{BRAND_INK};">KAULI</span>
+      <span style="font-size:11px; color:{BRAND_MUTED}; text-transform:uppercase; letter-spacing:0.06em; margin-left:8px;">Forge Media Services</span>
+    </td></tr>
+    <tr><td style="background:{BRAND_CARD_BG}; border:1px solid {BRAND_BORDER}; border-radius:12px; padding:32px 28px;">
+      <div style="font-size:15px; line-height:1.6; color:{BRAND_INK};">
+        {body_html}
+      </div>
+      {cta_html}
+    </td></tr>
+    <tr><td style="padding:20px 4px 0; font-size:12px; color:{BRAND_MUTED}; line-height:1.6;">
+      <p style="margin:0;"><em>Solutions for bold people like you, by people like you!</em> Forge Media Services &middot; Operated by Godfrey Njoroge</p>
+      {footer_extra}
+      <p style="margin:10px 0 0;">Don't see this in your inbox next time? Check your spam/junk folder and
+         mark it "Not spam" - that's what keeps future emails landing where you'll actually see them.</p>
+      <p style="margin:10px 0 0;"><a href="{terms_url}" style="color:{BRAND_MUTED};">Terms</a>
+         &middot; <a href="{privacy_url}" style="color:{BRAND_MUTED};">Privacy</a></p>
+    </td></tr>
+  </table>
+</div>"""
 
 
 def send_email(to: str, subject: str, html_body: str, text_body: str | None = None) -> tuple[bool, str]:
@@ -38,7 +119,10 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     if not email_configured():
         return False, "email not configured (BREVO_API_KEY / BREVO_FROM_EMAIL not set)"
     payload = {
-        "sender": {"name": "Kauli", "email": os.environ["BREVO_FROM_EMAIL"]},
+        # "Godfrey at Kauli", not just "Kauli" - sounds like a person sent
+        # it, not a bot, matching the same real, human-authored voice the
+        # message bodies already use.
+        "sender": {"name": "Godfrey at Kauli", "email": os.environ["BREVO_FROM_EMAIL"]},
         "to": [{"email": to}],
         "subject": subject,
         "htmlContent": html_body,

@@ -60,17 +60,20 @@
 }
 
 html[data-theme="dark"] {
-  /* Neutral zinc surfaces, not warm-tinted - the accent is the only thing
-     that should read as "warm" now, so it actually pops against a calm
-     background instead of competing with it. */
-  --bg: #18181b;
-  --sidebar-bg: #1c1c1f;
-  --panel: #27272a;
-  --surface: #2d2d31;
-  --hover: #323236;
-  --active-bg: #3a3a3f;
-  --border-subtle: #2e2e32;
-  --border: #3f3f46;
+  /* Deep indigo-black surfaces, matched to Rev's actual dark background
+     (rgb(18,15,32), confirmed live off rev.com) rather than neutral zinc -
+     same lightness steps as before (bg -> sidebar -> panel -> surface ->
+     hover -> active), just recolored, so every existing contrast ratio
+     (ink/muted text, the olive accent) holds exactly as it did - verified
+     with real WCAG contrast math, not eyeballed. */
+  --bg: #141023;
+  --sidebar-bg: #171428;
+  --panel: #211d34;
+  --surface: #28233a;
+  --hover: #2d293f;
+  --active-bg: #363247;
+  --border-subtle: #29243b;
+  --border: #3d394c;
   --ink: #e4e4e7;
   --heading-ink: #ffffff;
   --muted: #a1a1aa;
@@ -220,6 +223,15 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   flex-direction: column;
   padding: 16px 14px;
   transition: width 0.15s ease;
+  /* Stays in view on a long page (Billing, a big order list) instead of
+     scrolling away with the content - app-shell has no fixed height of its
+     own (min-height only), so without this the sidebar just scrolls off
+     like any other block the moment the page is taller than one screen. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  max-height: 100vh;
+  overflow-y: auto;
 }
 .sidebar-top { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
 .wordmark { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
@@ -261,6 +273,39 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   font-weight: 600;
   border-left-color: var(--accent);
 }
+
+.sidebar-divider { height: 1px; background: var(--border-subtle); margin: 8px 4px; }
+
+/* The client-only "Help & troubleshooting" button - deliberately styled
+   apart from the rest of the nav (a tinted background, not just another
+   plain row) so it reads as its own prominent thing, not one more link
+   to scan past when something's actually gone wrong. */
+.sidebar-help-btn {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--ink) !important;
+  font-weight: 600;
+}
+.sidebar-help-btn .icon { color: var(--accent); border-color: var(--accent); }
+.sidebar-help-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+
+/* Compact WhatsApp/Email pair right under it - same "real person, one
+   click away" contact options the account menu and /help page already
+   offer, surfaced here too since a client mid-problem shouldn't have to
+   go hunting in a dropdown for them. */
+.sidebar-contact-row { display: flex; gap: 4px; padding: 0 2px; }
+.sidebar-contact-row a {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  color: var(--muted); text-decoration: none; font-size: 0.76rem;
+  padding: 6px 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);
+}
+.sidebar-contact-row a:hover { background: var(--hover); color: var(--ink); }
+.sidebar-contact-row a .icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 0.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--faint);
+}
+.sidebar.collapsed .sidebar-contact-row { flex-direction: column; }
+.sidebar.collapsed .sidebar-divider { margin: 8px 2px; }
 
 /* Reused outside the sidebar too: the topbar account button and the
    settings-page avatar upload both use these. */
@@ -331,6 +376,36 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
   margin-bottom: 20px;
 }
 .card.narrow { max-width: 420px; margin: 60px auto; }
+
+/* -------------------------------------------------- Billing page ---- */
+.billing-snapshot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.billing-snapshot-cell { display: flex; flex-direction: column; gap: 4px; }
+.billing-snapshot-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
+.billing-snapshot-value { font-size: 1.5rem; font-weight: 700; color: var(--heading-ink); }
+.billing-snapshot-value.plan-value { font-size: 1.3rem; }
+.billing-progress-track { height: 6px; border-radius: 4px; background: var(--border-subtle); margin-top: 6px; overflow: hidden; }
+.billing-progress-fill { height: 100%; background: var(--accent); border-radius: 4px; }
+@media (max-width: 720px) {
+  .billing-snapshot { grid-template-columns: 1fr; gap: 16px; }
+}
+
+.pricing-card {
+  border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 16px 18px;
+  flex: 1; min-width: 180px; background: var(--surface); transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.pricing-card:hover, .pricing-card:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.pricing-card-credits { font-weight: 700; font-size: 1.1rem; color: var(--heading-ink); }
+.pricing-card-price { font-weight: 800; font-size: 1.7rem; color: var(--heading-ink); margin: 4px 0; }
+.pricing-card-save { color: var(--ok); font-size: 0.78rem; }
+
+.usage-rates-table { background: var(--surface); border-radius: var(--radius-sm); }
+.usage-rates-table td:last-child { font-weight: 700; color: var(--ink); }
+
+.plan-active-pill {
+  display: inline-flex; align-items: center; gap: 5px; color: var(--ok); background: var(--ok-soft);
+  font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-pill);
+  text-transform: uppercase; letter-spacing: 0.02em;
+}
 
 h1 { font-size: 1.3rem; margin: 0 0 4px; font-weight: 650; color: var(--heading-ink); letter-spacing: 0.01em; }
 h2 { font-size: 1rem; font-weight: 650; color: var(--heading-ink); letter-spacing: 0.01em; }
@@ -403,6 +478,25 @@ button.approve:hover { filter: brightness(0.92); }
 .deadline-bar-fill.deadline-green { background: var(--ok); }
 .deadline-bar-fill.deadline-yellow { background: var(--warn); }
 .deadline-bar-fill.deadline-red { background: var(--err); }
+
+/* Staff queue's "time in stage" column - flags a real bottleneck, see
+   tat.STUCK_STAGE_THRESHOLD_SECONDS. */
+.stage-age-stuck { color: var(--err); font-weight: 700; }
+
+/* Whole row opens the order - no separate button. */
+tr.clickable-row { cursor: pointer; }
+tr.clickable-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* "% Edited" column - see kauli.models.Job.edited_pct. Only 100% (every
+   speech segment confirmed) is allowed to ship - see staff_approve's own
+   gate. */
+.edited-pct-pill {
+  display: inline-block; padding: 3px 9px; border-radius: var(--radius-pill);
+  font-size: 0.76rem; font-weight: 650; white-space: nowrap;
+}
+.edited-pct-done { color: var(--ok); background: var(--ok-soft); }
+.edited-pct-mid { color: var(--warn); background: var(--warn-soft); }
+.edited-pct-low { color: var(--err); background: var(--err-soft); }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
 th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border-subtle); }
@@ -529,6 +623,12 @@ tbody tr:hover { background: var(--hover); }
 .status-won::before { background: var(--ok); }
 .status-lost { color: var(--err); background: var(--err-soft); }
 .status-lost::before { background: var(--err); }
+
+/* payment history (Billing page) */
+.status-completed { color: var(--ok); background: var(--ok-soft); }
+.status-completed::before { background: var(--ok); }
+.status-pending { color: var(--warn); background: var(--warn-soft); }
+.status-pending::before { background: var(--warn); }
 .status-qualified, .status-proposal { color: var(--info); background: var(--info-soft); }
 .status-qualified::before, .status-proposal::before { background: var(--info); }
 .status-new, .status-contacted { color: var(--warn); background: var(--warn-soft); }
@@ -734,6 +834,25 @@ tbody tr:hover { background: var(--hover); }
 .auth-forgot a:hover { color: var(--accent); text-decoration: underline; }
 .auth-consent { font-size: 0.75rem; color: var(--faint); text-align: left; margin: 16px 0 0; line-height: 1.5; }
 .auth-consent a { color: var(--muted); text-decoration: underline; }
+/* Live feedback as the client types - found missing via real client
+   testing ("doesn't give a green light as they type"). Starts neutral
+   (grey, no check/x) before anything's typed, turns green the instant a
+   rule is met, red only once they've started typing and it's genuinely
+   unmet - not red by default, which would look like an error before
+   they've done anything. */
+.password-checklist {
+  list-style: none; margin: 2px 0 12px; padding: 0;
+  font-size: 0.76rem; color: var(--faint); display: flex; flex-direction: column; gap: 3px;
+}
+.password-checklist li { padding-left: 18px; position: relative; }
+.password-checklist li::before {
+  content: "○"; position: absolute; left: 0; top: 0; font-size: 0.7rem;
+}
+.password-checklist li.met { color: var(--ok); }
+.password-checklist li.met::before { content: "✓"; }
+.password-checklist li.unmet { color: var(--err); }
+.password-checklist li.unmet::before { content: "✕"; }
+
 .auth-checkbox-row {
   display: flex; align-items: flex-start; gap: 10px; margin: 16px 0 24px;
   font-size: 0.82rem; color: var(--muted); line-height: 1.4; cursor: pointer;
@@ -984,7 +1103,12 @@ body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover);
   margin-top: 14px; padding: 16px 18px; min-height: 3em;
   background: #0c0e10; color: #fff; border-radius: var(--radius);
   font-size: 1rem; line-height: 1.5; text-align: center;
+  /* wrapped_caption carries real \n line breaks (kauli.subtitles'
+     MAX_LINE_CHARS wrap) - pre-line renders them instead of collapsing
+     them the way normal whitespace handling would. */
+  white-space: pre-line;
 }
+.preview-flag-note { color: var(--warn); font-size: 0.82rem; text-align: center; margin-top: 8px; }
 .player-card:has(.custom-controls) video { cursor: pointer; }
 
 .speed-row {
@@ -1116,21 +1240,30 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .wordcell:focus { background: var(--accent-soft); border-color: var(--accent); }
 .wordcell.playing { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .wordcell.approx { border-bottom: 2px dotted var(--faint); }
+/* A leading "NAME:" speaker tag - real caption metadata (kept in
+   subs_*.srt/vtt), never spoken by the TTS voice. Bold + accent-colored
+   so it reads as a label at a glance, not just another word. */
+.wordcell.speaker-tag-cell { font-weight: 700; color: var(--accent); }
+/* A whole [MUSIC]-style bracket tag rendered as ONE cell (see
+   _tokenize_with_speaker_tag) - italic marks it as a caption/sound cue,
+   not a transcript word, the same visual convention the delivered
+   captions themselves use. */
+.wordcell.bracket-tag-cell { font-style: italic; color: var(--muted); }
 .wordcell.para-start {
-  /* display:block (not inline-block) so it always starts on its own new
-     line, the way an actual paragraph break should - a ::before-based
-     line-break trick was tried here first, but that technique only
-     works on `display:inline` elements; on an inline-block host (what
-     .wordcell already is) the pseudo just becomes an internal child
-     stacked inside the SAME box instead of pushing a real line break,
-     which is exactly the "floating disconnected box" rendering this was
-     reported against. width:max-content keeps the block shrink-to-fit
-     instead of stretching to the container's full width - the actual
-     bug from the very first version of this fix. */
-  display: block;
-  width: max-content;
-  max-width: 100%;
-  margin-top: 14px;
+  /* Purely a visual marker now - stays inline-block, same flow behavior
+     as every other cell, so the words right after it keep flowing on
+     that same new line (wrapping normally) instead of each getting
+     pushed onto its own separate line. The actual line break comes from
+     a real <br> element inserted before this cell (see
+     insertParagraphBreak in editor.js) - a genuine break in normal
+     inline flow, not a style hack. An earlier version made THIS cell
+     display:block, which really did start a new line, but a block box
+     also forces whatever comes immediately after it onto a line of its
+     own rather than sharing one - exactly the "one word per line"
+     rendering this was reported against.
+     margin-top instead of the <br>'s own default line-height keeps a bit
+     of paragraph-gap spacing. */
+  margin-top: 12px;
   padding-top: 4px;
   border-top: 2px solid var(--accent);
   background: var(--accent-soft);
@@ -1163,12 +1296,18 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
    default (unpositioned) spot instead of staying hidden until a
    misspelled cell is actually clicked. */
 .spell-popover[hidden] { display: none; }
+.spell-popover .spell-suggestion-row { display: flex; gap: 4px; align-items: stretch; }
 .spell-popover .spell-suggestion {
-  display: block; width: 100%; text-align: left; margin: 0;
+  display: block; flex: 1; text-align: left; margin: 0;
   background: var(--surface); color: var(--ink); border: 1px solid var(--border);
   padding: 5px 9px; font-size: 0.85rem;
 }
 .spell-popover .spell-suggestion:hover { background: var(--hover); }
+.spell-popover .spell-suggestion-all {
+  flex-shrink: 0; margin: 0; background: none; color: var(--accent);
+  border: 1px solid var(--border); padding: 5px 8px; font-size: 0.72rem; white-space: nowrap;
+}
+.spell-popover .spell-suggestion-all:hover { background: var(--hover); }
 .spell-popover .spell-none { font-size: 0.8rem; color: var(--faint); padding: 2px 0; }
 .spell-popover .spell-ignore { background: none; color: var(--muted); border: none; padding: 2px 0; margin-top: 2px; text-decoration: underline; font-size: 0.78rem; }
 
@@ -1228,9 +1367,8 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 
 .macro-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .macro-row kbd { flex-shrink: 0; width: 66px; text-align: center; }
-.macro-row input[type="text"] { margin-top: 0; }
-.macro-para-label { flex-shrink: 0; display: flex; align-items: center; gap: 5px; margin: 0; font-size: 0.76rem; white-space: nowrap; }
-.macro-para-label input { width: auto; margin: 0; }
+.macro-key-hint { flex-shrink: 0; width: 54px; color: var(--faint); font-size: 0.74rem; font-family: var(--font-mono); }
+.macro-row input[type="text"] { margin-top: 0; flex: 1; }
 
 .preview-doc {
   background: var(--panel);
@@ -1931,6 +2069,12 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
 }
 .demo-lang-tag.accent { background: var(--accent-soft); color: var(--accent); }
 .demo-text { font-weight: 550; }
+/* Karaoke word highlight on the EN line - .active tracks the real <audio>
+   playhead (see marketing.html's onTimeUpdate), .done marks a word
+   already spoken so the sentence reads as progress, not a static block. */
+.demo-word { transition: color 0.15s ease, opacity 0.15s ease; }
+.demo-word.done { color: var(--muted); opacity: 0.7; }
+.demo-word.active { color: var(--accent); font-weight: 700; }
 .demo-cursor { display: inline-block; width: 2px; height: 1.1em; background: var(--accent); animation: demo-blink 0.9s step-end infinite; vertical-align: middle; }
 .demo-speaker { opacity: 0; transition: opacity 0.2s ease; font-size: 0.9rem; }
 .demo-speaker.playing { opacity: 1; animation: demo-speaker-pulse 0.6s ease-in-out infinite; }

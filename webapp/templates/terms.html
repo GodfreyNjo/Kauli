@@ -3,17 +3,7 @@
 {% block body_class %}m-public{% endblock %}
 {% block title %}Terms of Service{% endblock %}
 {% block content %}
-<nav class="m-nav" id="m-nav">
-  <a href="/" class="m-nav-brand-link">
-    <picture>
-      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
-      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
-    </picture>
-  </a>
-  <div class="m-nav-links">
-    <a href="/">← Back to Kauli</a>
-  </div>
-</nav>
+{% include "_nav.html" %}
 
 <section class="m-section" style="padding-top:48px;">
   <div class="m-inner narrow legal">

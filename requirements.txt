@@ -8,6 +8,22 @@ piper-tts>=1.2.0             # local English TTS, free
 # --- quality translation (cents per audio-hour) ---
 anthropic>=0.40.0
 
+# --- primary ASR (--asr transkriptor): real paid transcription via
+# Transkriptor's API, with automatic fallback to local faster-whisper on
+# any failure or plan-limit hit built into the provider itself - see
+# kauli/providers/asr.py:TranskriptorASR. Set TRANSKRIPTOR_API_KEY.
+requests>=2.31.0
+
+# --- free-tier translation (--mt lara): real adaptive NMT (Translated /
+# Lara Translate), 10,000 characters/month at no cost, no credit card -
+# meaningfully better than --mt local (see kauli/providers/mt.py:LaraMT),
+# but that quota is small: a single ~5-minute dub order can easily use
+# 1,500-2,500 characters across its segments, so this covers roughly a
+# handful of orders a month, not real production volume. Set
+# LARA_ACCESS_KEY_ID and LARA_ACCESS_KEY_SECRET - see
+# developers.laratranslate.com to generate a free key pair.
+lara-sdk>=1.12.0
+
 # --- free local MT placeholder (--mt local): no API key, weaker than Claude ---
 # transformers is pinned <5 because coqui-tts's bundled XTTS code (below)
 # imports a function transformers 5.x removed - if you ever drop XTTS you

@@ -7,6 +7,35 @@
 
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if pending_retry_after_s is not none %}
+  <p class="muted" id="pending-payment-countdown" data-seconds="{{ pending_retry_after_s }}">
+    {% if pending_retry_after_s > 0 %}You can try again in <strong><span id="pending-countdown-value"></span></strong>.
+    {% else %}You can try again now - <a href="javascript:location.reload()">refresh this page</a>.{% endif %}
+  </p>
+  <script>
+    (function () {
+      var el = document.getElementById('pending-payment-countdown');
+      var valueEl = document.getElementById('pending-countdown-value');
+      if (!el || !valueEl) return;
+      var remaining = Number(el.dataset.seconds) || 0;
+      function render() {
+        var m = Math.floor(remaining / 60), s = remaining % 60;
+        valueEl.textContent = m + ':' + String(s).padStart(2, '0');
+      }
+      if (remaining <= 0) return;
+      render();
+      var timer = setInterval(function () {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(timer);
+          location.reload();
+          return;
+        }
+        render();
+      }, 1000);
+    })();
+  </script>
+  {% endif %}
 
   {% if order['difficulty_surcharge_status'] != 'pending_approval' %}
     <p class="ok">Nothing pending here - <a href="/client/orders/{{ order['id'] }}">view your order</a>.</p>

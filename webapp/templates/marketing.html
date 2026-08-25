@@ -185,7 +185,7 @@
         <div class="demo-player-chrome" aria-hidden="true">
           <span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span>
           <span class="demo-chrome-title">Kauli editor · live preview</span>
-          <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span>illustrative demo</span>
+          <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span id="demo-status-text">illustrative demo</span></span>
         </div>
         <div class="demo-waveform">
           {% for i in range(28) %}<span></span>{% endfor %}
@@ -204,12 +204,11 @@
         </div>
         <audio id="demo-audio-en" src="/static/demo-en.wav" preload="auto"></audio>
       </div>
-      <p class="demo-caption">Illustrative example with a synthesized voice on the English line - not a real
-         client recording. (We don't voice the Swahili line for real orders either - the original audio you
-         upload is the source; only the translated output ever gets synthesized.)</p>
+      <p class="demo-caption">Illustrative example, not a real client recording. Swahili is your original
+         source audio; only the translated (English) output is ever synthesized.</p>
 
       <div style="text-align:center; margin-top:22px;">
-        <button type="button" class="btn secondary" id="demo-replay">↺ Replay</button>
+        <button type="button" class="btn secondary" id="demo-play-pause">▶ Play demo</button>
         <a href="/login?mode=signup" class="btn cta-olive" style="margin-left:10px;">Try it with your own audio →</a>
       </div>
     </div>
@@ -222,10 +221,11 @@
       var enEl = document.getElementById('demo-text-en');
       var enLine = document.getElementById('demo-line-en');
       var resultEl = document.getElementById('demo-result');
-      var replayBtn = document.getElementById('demo-replay');
+      var playPauseBtn = document.getElementById('demo-play-pause');
       var player = document.querySelector('.demo-player');
       var enAudio = document.getElementById('demo-audio-en');
       var speakerEl = document.getElementById('demo-speaker');
+      var statusEl = document.getElementById('demo-status-text');
       if (!swEl || !player) return;
       var timers = [];
 
@@ -243,54 +243,130 @@
         step();
       }
 
-      function runSequence() {
+      // Real per-word timing for the karaoke highlight below: proportioned
+      // across the ACTUAL audio file's real duration by character count -
+      // the same approximation kauli's own editor/ASR fallbacks use
+      // wherever there's no true word-level alignment (there isn't one
+      // here either - Piper doesn't emit one). Falls back to the file's
+      // known real duration (measured via ffprobe when this was recorded)
+      // if metadata hasn't loaded yet for some reason - never a made-up
+      // guess with no basis.
+      var FALLBACK_DURATION_S = 2.589;
+      var words = EN_TEXT.split(' ');
+      var wordSpans = [];
+
+      function buildWordSpans() {
+        enEl.textContent = '';
+        wordSpans = [];
+        var totalChars = words.reduce(function (n, w) { return n + w.length; }, 0) || 1;
+        var duration = (enAudio && enAudio.duration && isFinite(enAudio.duration))
+          ? enAudio.duration : FALLBACK_DURATION_S;
+        var t = 0;
+        words.forEach(function (w, i) {
+          var dur = duration * (w.length / totalChars);
+          var span = document.createElement('span');
+          span.className = 'demo-word';
+          span.textContent = w + (i < words.length - 1 ? ' ' : '');
+          span.dataset.start = t;
+          span.dataset.end = t + dur;
+          enEl.appendChild(span);
+          wordSpans.push(span);
+          t += dur;
+        });
+      }
+
+      // Driven by the audio element's REAL playhead (timeupdate), not a
+      // second, independently-timed animation guessing alongside it - this
+      // is what actually guarantees the highlight can't drift out of sync
+      // with what's playing, the way two separately-scheduled timers could.
+      function onTimeUpdate() {
+        if (!enAudio) return;
+        var now = enAudio.currentTime;
+        wordSpans.forEach(function (span) {
+          var start = Number(span.dataset.start), end = Number(span.dataset.end);
+          span.classList.toggle('active', now >= start && now < end);
+          span.classList.toggle('done', now >= end);
+        });
+      }
+
+      function setStatus(text) { if (statusEl) statusEl.textContent = text; }
+
+      // Idle by default (no autoplay - a visitor controls this explicitly,
+      // it never starts itself just because the section scrolled into
+      // view). Pause is a real stop, not a resume-from-mid-word: it clears
+      // every pending timer, pauses the real audio, and resets the whole
+      // sequence back to this same idle state - simpler and more
+      // predictable than pretending to resume mid-sentence from wherever
+      // it was paused.
+      var isRunning = false;
+
+      function setIdleUI() {
+        clearTimers();
+        if (enAudio) enAudio.pause();
+        if (speakerEl) speakerEl.classList.remove('playing');
+        swEl.textContent = ''; enEl.textContent = '';
+        enLine.style.opacity = 0; resultEl.style.opacity = 0;
+        setStatus('illustrative demo');
+        isRunning = false;
+        if (playPauseBtn) playPauseBtn.textContent = '▶ Play demo';
+      }
+
+      function startSequence() {
         clearTimers();
         swEl.textContent = ''; enEl.textContent = '';
         enLine.style.opacity = 0; resultEl.style.opacity = 0;
+        setStatus('transcribing source audio…');
         if (speakerEl) speakerEl.classList.remove('playing');
         if (enAudio) { enAudio.pause(); enAudio.currentTime = 0; }
+        isRunning = true;
+        if (playPauseBtn) playPauseBtn.textContent = '⏸ Pause';
         timers.push(setTimeout(function () {
           typeInto(swEl, SW_TEXT, 45, function () {
+            setStatus('translating…');
             timers.push(setTimeout(function () {
               enLine.style.opacity = 1;
+              buildWordSpans();
               // Real synthesized audio (Piper), not a stand-in - starts the
               // instant the English line appears, same moment a real dubbed
-              // job's voice track would play against its subtitle.
+              // job's voice track would play against its subtitle. Word
+              // highlighting (onTimeUpdate) tracks this same element's
+              // real position, so it can't fall out of sync with it.
+              function showVerified() {
+                setStatus('human-verified');
+                resultEl.style.opacity = 1;
+                isRunning = false;
+                if (playPauseBtn) playPauseBtn.textContent = '▶ Play again';
+              }
               if (enAudio) {
                 enAudio.currentTime = 0;
-                enAudio.play().catch(function () {}); // autoplay can be blocked before any user interaction - fails silently, text still plays
+                enAudio.play().catch(showVerified); // autoplay can be blocked before any user interaction - show the result anyway rather than stall forever
                 if (speakerEl) speakerEl.classList.add('playing');
+                setStatus('dub rendered - playing back…');
+                // Tied to the real audio actually finishing, not a guessed
+                // timer - the checkmark appears exactly when playback does,
+                // not on some fixed delay that could drift from it.
+                enAudio.addEventListener('ended', showVerified, { once: true });
+              } else {
+                setStatus('dub rendered');
+                timers.push(setTimeout(showVerified, 1200));
               }
-              typeInto(enEl, EN_TEXT, 40, function () {
-                timers.push(setTimeout(function () { resultEl.style.opacity = 1; }, 400));
-              });
             }, 500));
           });
         }, 400));
       }
       if (enAudio) {
+        enAudio.addEventListener('timeupdate', onTimeUpdate);
         enAudio.addEventListener('ended', function () {
           if (speakerEl) speakerEl.classList.remove('playing');
         });
       }
 
-      if (replayBtn) replayBtn.addEventListener('click', runSequence);
-
-      // Play once it actually scrolls into view, not immediately on load.
-      var started = false;
-      if ('IntersectionObserver' in window) {
-        var obs = new IntersectionObserver(function (entries) {
-          entries.forEach(function (entry) {
-            if (entry.isIntersecting && !started) {
-              started = true;
-              runSequence();
-            }
-          });
-        }, { threshold: 0.4 });
-        obs.observe(player);
-      } else {
-        runSequence();
+      if (playPauseBtn) {
+        playPauseBtn.addEventListener('click', function () {
+          if (isRunning) { setIdleUI(); } else { startSequence(); }
+        });
       }
+      setIdleUI(); // explicit idle render on load - nothing plays until clicked
     })();
   </script>
 
@@ -418,6 +494,15 @@
         </div>
         <div class="m-feature">
           <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>Real human voice actors, when you want one</h3>
+          <ul class="m-feature-bullets">
+            <li>Add a real actor's voice to any full dub order</li>
+            <li>The automated dub still ships right away either way</li>
+            <li>Multi-speaker videos get a distinct, consistent voice per speaker</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
           <h3>A real account manager for volume work</h3>
           <ul class="m-feature-bullets">
             <li>Dedicated contact, not a support queue</li>
@@ -505,6 +590,8 @@
               {% for key, sl in service_levels.items() %}
               <tr><td>{{ sl['name'] }}</td><td>${{ "%.2f"|format(sl['rate_per_min']) }} / audio-minute</td></tr>
               {% endfor %}
+              <tr><td>+ Real human voice actor (on a full dub)</td><td>+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }} / audio-minute</td></tr>
+              <tr><td>+ Video deliverables (burned captions + dubbed video)</td><td>+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }} / audio-minute</td></tr>
             </tbody>
           </table>
         </div>

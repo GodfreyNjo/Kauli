@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Help &amp; Troubleshooting{% endblock %}
+{% block content %}
+<h1>Help &amp; troubleshooting</h1>
+<p class="muted" style="margin-top:0;">Common questions about what's happening with your order, your minutes,
+   and your account. If nothing here solves it, email or WhatsApp us directly - a real person reads every
+   message, not a bot.</p>
+
+<div class="card">
+  <details class="m-faq-item" open>
+    <summary>My order says "Analysis in progress" and hasn't changed - is it stuck?</summary>
+    <p>Almost always not stuck - it just means the file hasn't finished uploading and being probed yet
+       (checking its real length and format before it can be priced). Once that's done you'll see the
+       language/service pills fill in and, if payment is needed, a "Pay now" prompt. If it's been more than a
+       few minutes on a short file, or the page hasn't changed after a refresh, that's worth reaching out
+       about.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>My order is "queued" or "processing" - how long should that take?</summary>
+    <p>Every order gets a real, calculated delivery estimate the moment it's confirmed, based on its actual
+       length and the service you picked - you'll see it on the order page as a "time remaining" bar, not a
+       vague promise. Orders update themselves automatically while they're active, so you don't need to keep
+       refreshing.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>I paid by bank transfer - why hasn't my order started?</summary>
+    <p>Bank transfer is the one payment method that isn't confirmed automatically - there's no live bank
+       integration, so a real staff member manually confirms once the transfer has actually landed, same as
+       any business without automated bank reconciliation would. Card payments (Paystack) and M-Pesa confirm
+       automatically and start right away. If a bank transfer has been pending for a while, email or WhatsApp
+       us the reference number shown on your payment page and we'll check on it directly.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>Why is it asking me to pay when I still have free minutes?</summary>
+    <p>Your free monthly minutes only ever cover <strong>transcription-only</strong> orders - they're a way to
+       try the AI-drafted, human-checked quality for yourself before spending anything, not a way to get a
+       free full dub or translation. If you specifically picked "Transcription only" and it's still asking for
+       payment, that's worth flagging to us directly - it shouldn't happen.</p>
+    <p>If you've bought prepaid credits separately (a wallet top-up), those apply automatically to any service
+       level, right after your free minutes, at the same fixed value regardless of which service they're spent
+       on - you don't need to do anything to use them, and you can see your current credit balance on the
+       Billing page.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>My order was "returned" without completing - what do I do?</summary>
+    <p>This means our team flagged something they needed from you before continuing - check the message
+       thread on that order's page for the specific reason. Reply there directly, and if we need a corrected
+       file, attach it right on that same page - there's a "Resume this order" button once you have. No need
+       to submit a whole new order or pay again; a returned order just won't pick itself back up until you do.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>My order shows "Something went wrong on our end"</summary>
+    <p>This means the processing job failed after a few automatic retries. You don't need to do anything -
+       our team is notified automatically the moment this happens and looks into it. If you're on a real
+       deadline, email or WhatsApp us the order so we can prioritize it.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>I can't log in / forgot my password</summary>
+    <p>Use <a href="/forgot-password">Forgot your password?</a> on the sign-in page - it emails you a real
+       reset link. If you don't receive it within a few minutes, check spam before contacting us.</p>
+  </details>
+  <details class="m-faq-item">
+    <summary>What does "voice cloning consent" mean, and do I need to check it?</summary>
+    <p>Only if you specifically want the dubbed track to sound like the original speaker's actual voice,
+       rather than one of our standard voices. Leave it unchecked if you're not sure - you can always grant
+       consent later from the order page once it's running, nothing is lost by waiting.</p>
+  </details>
+</div>
+
+<div class="card" style="margin-top:24px; text-align:center;">
+  <h2 style="margin-top:0;">Still stuck?</h2>
+  <p class="muted">A real person reads these, not a support queue bot.</p>
+  <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+    <a href="mailto:{{ contact_email }}" class="btn secondary">Email us</a>
+    <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="btn cta-olive">WhatsApp us</a>
+  </div>
+</div>
+{% endblock %}
