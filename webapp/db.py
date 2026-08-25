@@ -436,6 +436,21 @@ def init_db() -> None:
         conn.execute("ALTER TABLE users ADD COLUMN account_status TEXT NOT NULL DEFAULT 'active'")
     if "is_admin" not in existing_user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+    if "created_at" not in existing_user_cols:
+        # Backfilled to "now" for accounts that already exist (this
+        # migration only runs once) - not real history for those, but
+        # accurate for every account created from here on, which is what
+        # clients_needing_activation_nudge() below actually needs.
+        #
+        # Moved up here from further down in this function - a real bug
+        # caught by the FIRST deploy against a genuinely fresh database:
+        # old_clients_missing_leads (below) reads users.created_at, but
+        # this migration used to run after that query, so it only ever
+        # worked by accident on a dev database that already had the
+        # column from an earlier code version. A brand-new database has
+        # no such history to hide behind.
+        conn.execute("ALTER TABLE users ADD COLUMN created_at REAL")
+        conn.execute("UPDATE users SET created_at = ? WHERE created_at IS NULL", (time.time(),))
     if "trusted_submitter_until" not in existing_user_cols:
         # Staff-granted, time-boxed lift on the order-submission rate limit
         # (see rate_limit.check's "submit:{user_id}" key in app.py) -
@@ -529,13 +544,6 @@ def init_db() -> None:
     if "content_safety_flagged" not in existing_upload_audit_cols:
         conn.execute("ALTER TABLE upload_audit_log ADD COLUMN content_safety_flagged INTEGER")
         conn.execute("ALTER TABLE upload_audit_log ADD COLUMN content_safety_detail TEXT")
-    if "created_at" not in existing_user_cols:
-        # Backfilled to "now" for accounts that already exist (this
-        # migration only runs once) - not real history for those, but
-        # accurate for every account created from here on, which is what
-        # clients_needing_activation_nudge() below actually needs.
-        conn.execute("ALTER TABLE users ADD COLUMN created_at REAL")
-        conn.execute("UPDATE users SET created_at = ? WHERE created_at IS NULL", (time.time(),))
     existing_order_cols = {row["name"] for row in conn.execute("PRAGMA table_info(orders)")}
     if "content_safety_flagged" not in existing_order_cols:
         # See upload_security.scan_video_for_explicit_content - set when a
