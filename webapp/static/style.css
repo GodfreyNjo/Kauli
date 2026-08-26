@@ -377,6 +377,20 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
 }
 .card.narrow { max-width: 420px; margin: 60px auto; }
 
+/* ------------------------------------------------ client dashboard home --- */
+/* Same label/big-value cell pattern billing.html's .billing-snapshot
+   already uses - reused here instead of a new visual language, just a
+   4-column layout for the dashboard's stat cards. */
+.dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.dashboard-stat-card {
+  background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.dashboard-stat-card .stat-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--faint); }
+.dashboard-stat-card .stat-value { display: block; font-size: 1.9rem; font-weight: 700; color: var(--heading-ink); margin: 4px 0 2px; }
+.dashboard-stat-card .stat-hint { font-size: 0.8rem; color: var(--faint); }
+.dashboard-stat-card.needs-you .stat-value { color: var(--err); }
+
 /* -------------------------------------------------- Billing page ---- */
 .billing-snapshot { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
 .billing-snapshot-cell { display: flex; flex-direction: column; gap: 4px; }

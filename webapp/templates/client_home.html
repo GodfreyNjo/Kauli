@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 style="margin-bottom:2px;">{{ greeting }}, {{ user['display_name'] or user['email'].split('@')[0] }}</h1>
+<p class="muted" style="margin-top:0;">Here's what's happening with your orders.</p>
+
+<div class="dashboard-stats">
+  <div class="dashboard-stat-card">
+    <span class="stat-label">In progress</span>
+    <span class="stat-value">{{ stats['in_progress'] }}</span>
+    <span class="stat-hint">Orders being worked on</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">In review</span>
+    <span class="stat-value">{{ stats['in_review'] }}</span>
+    <span class="stat-hint">With our staff</span>
+  </div>
+  <div class="dashboard-stat-card {{ 'needs-you' if stats['needs_you'] > 0 else '' }}">
+    <span class="stat-label">Needs your input</span>
+    <span class="stat-value">{{ stats['needs_you'] }}</span>
+    <span class="stat-hint">Payment or a file we need from you</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Completed</span>
+    <span class="stat-value">{{ stats['completed'] }}</span>
+    <span class="stat-hint">Ready to download</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Total spent</span>
+    <span class="stat-value">${{ "%.2f"|format(stats['total_spent_usd']) }}</span>
+    <span class="stat-hint">All-time, confirmed payments</span>
+  </div>
+</div>
+
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <h2 style="margin:0;">Recent orders</h2>
+    <a href="/client" class="btn secondary">View all orders</a>
+  </div>
+  {% if not recent_orders %}
+  <div class="empty-state">
+    <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M32 8c-6 0-10 5-10 11v10a10 10 0 0 0 20 0V19c0-6-4-11-10-11Z" stroke="currentColor" stroke-width="2"/>
+      <path d="M18 28a14 14 0 0 0 28 0M32 42v8m-7 0h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    <p>You haven't submitted any projects yet.</p>
+    <a href="/client#order-form" class="btn secondary">+ Submit your first order</a>
+  </div>
+  {% else %}
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Service</th>
+          <th>Duration</th>
+          <th>Status</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in recent_orders %}
+        <tr>
+          <td>
+            <a href="/client/orders/{{ o['id'] }}">{{ o['original_filename'] }}</a><br>
+            <span class="muted" style="font-size:0.78rem;">{{ o['created_at']|timestamp_to_str }}
+              &middot; {{ source_languages.get(o['source_lang'], o['source_lang']) }} &rarr; {{ 'English' if o['target_lang'] == 'en' else 'Swahili' }}</span>
+          </td>
+          <td>{{ o['service_level']|replace('_', ' ')|capitalize }}</td>
+          <td>{{ "%.1f"|format(o['duration_minutes'] or 0) }} min</td>
+          <td><span class="status status-{{ o['status'] }}">{{ o['status']|client_status_label }}</span></td>
+          <td>{% if o['cost_usd'] %}${{ "%.2f"|format(o['cost_usd']) }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

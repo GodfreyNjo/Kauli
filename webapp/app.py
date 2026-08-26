@@ -1123,7 +1123,7 @@ def solution_page(request: Request, slug: str):
     user = current_user(request)
     if user:
         return RedirectResponse(
-            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client")
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
     return templates.TemplateResponse(request, "solution_page.html",
         {**_marketing_context(home="/"), "page": page})
 
@@ -1277,7 +1277,7 @@ def index(request: Request):
     user = current_user(request)
     if user:
         return RedirectResponse(
-            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client")
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
     return templates.TemplateResponse(request, "marketing.html",
         _marketing_context(sent=request.query_params.get("sent") == "1"))
 
@@ -2242,6 +2242,28 @@ def avatar(request: Request, user_id: str):
 
 
 # -------------------------------------------------------------- client ----
+@app.get("/client/home", response_class=HTMLResponse)
+def client_home(request: Request):
+    """The client portal's real landing page - summary stats + a preview
+    of recent orders, separate from /client (the full order list +
+    submission wizard, kept at its existing URL so none of the 'back to
+    my orders' links elsewhere break). Every number here is a real,
+    freshly-computed count from the client's own orders/payments - no
+    placeholder/demo data."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    orders = db.list_orders_for_client(user["id"])
+    stats = db.client_dashboard_stats(user["id"])
+    hour = datetime.now().hour
+    greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
+    return templates.TemplateResponse(request, "client_home.html", {
+        "user": user, "greeting": greeting,
+        "stats": stats, "recent_orders": orders[:6],
+        "source_languages": SOURCE_LANGUAGES,
+    })
+
+
 @app.get("/client", response_class=HTMLResponse)
 def client_dashboard(request: Request, reorder_youtube_url: str | None = None, reorder_source_lang: str | None = None):
     user = current_user(request)

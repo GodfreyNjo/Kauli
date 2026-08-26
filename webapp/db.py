@@ -1660,6 +1660,46 @@ def list_orders_for_client(client_id: str):
     return rows
 
 
+# Real order-lifecycle buckets a client actually cares about - matches the
+# same grouping client_dashboard.html's filter chips use (see that
+# template's IN_PROGRESS/READY/NEEDS_YOU), so the dashboard's summary
+# numbers and the order-list filters never tell two different stories
+# about what state an order is actually in.
+CLIENT_STAT_IN_PROGRESS = ("queued", "processing", "editor_returned")
+CLIENT_STAT_IN_REVIEW = ("awaiting_review",)
+CLIENT_STAT_NEEDS_YOU = ("pending_payment", "returned_to_client")
+CLIENT_STAT_COMPLETED = ("ready_for_delivery", "delivered")
+
+
+def client_dashboard_stats(client_id: str) -> dict:
+    """Real counts for the client dashboard's summary cards, plus
+    all-time confirmed spend (payments.status = 'completed' only - a
+    pending Paystack checkout or an unconfirmed bank transfer isn't
+    money this client has actually paid yet, same rule the staff-side
+    revenue report uses)."""
+    conn = get_conn()
+
+    def _count(statuses):
+        placeholders = ",".join("?" for _ in statuses)
+        return conn.execute(
+            f"SELECT COUNT(*) FROM orders WHERE client_id = ? AND status IN ({placeholders})",
+            (client_id, *statuses),
+        ).fetchone()[0]
+
+    stats = {
+        "in_progress": _count(CLIENT_STAT_IN_PROGRESS),
+        "in_review": _count(CLIENT_STAT_IN_REVIEW),
+        "needs_you": _count(CLIENT_STAT_NEEDS_YOU),
+        "completed": _count(CLIENT_STAT_COMPLETED),
+        "total_spent_usd": conn.execute(
+            "SELECT COALESCE(SUM(amount_usd), 0) FROM payments WHERE user_id = ? AND status = 'completed'",
+            (client_id,),
+        ).fetchone()[0],
+    }
+    conn.close()
+    return stats
+
+
 def list_all_orders():
     """Still-active orders with a real deadline on file sort soonest-due
     first - "today's deadline" at the top, never an unsorted queue (see
