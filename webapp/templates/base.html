@@ -298,6 +298,28 @@
         setInterval(loadNotifs, 60000);  // gentle - real counts, not real-time push
       }
 
+      // Generic collapsible card - see style.css's .card-collapsible comment.
+      // Any page opts in with the right markup; this wires all of them.
+      document.querySelectorAll(".card-collapsible[data-collapse-key]").forEach(function (card) {
+        var storeKey = "kauli_card_collapsed_" + card.dataset.collapseKey;
+        var btn = card.querySelector(".card-collapse-toggle");
+        var stored = null;
+        try { stored = localStorage.getItem(storeKey); } catch (e) {}
+        var collapsed = stored !== null ? stored === "1" : !!(btn && btn.getAttribute("aria-expanded") === "false");
+        function apply() {
+          card.classList.toggle("collapsed", collapsed);
+          if (btn) btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        }
+        apply();
+        if (btn) {
+          btn.addEventListener("click", function () {
+            collapsed = !collapsed;
+            apply();
+            try { localStorage.setItem(storeKey, collapsed ? "1" : "0"); } catch (e) {}
+          });
+        }
+      });
+
       // Ctrl/Cmd+K jumps to the staff search box, same shortcut convention
       // as most search-first apps - only wired when the box actually
       // exists on this page (staff role only, see the topbar markup above).

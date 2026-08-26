@@ -61,6 +61,7 @@
       <p>No orders yet.</p>
     </div>
   {% else %}
+  <div class="table-scroll">
   <table id="queue-table">
     <thead><tr>
       <th class="sortable" data-sort="text" data-col="0">Client</th>
@@ -82,9 +83,9 @@
       <tr data-status="{{ o['status'] }}" data-service="{{ o['service_level'] or '' }}"
           data-sortvals="{{ pct if pct is not none else -1 }}|{{ stage_seconds|int }}|{{ (o['internal_deadline_at']|int) if ts else 9999999999 }}|{{ o['created_at']|int }}"
           class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
-        <td>{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
-        <td>{% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
-        <td style="font-family: var(--font-mono); font-size: 0.82rem;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
+        <td class="ellipsis-cell" style="max-width:140px;">{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
+        <td class="ellipsis-cell" title="{{ o['original_filename'] }}">{% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
+        <td style="font-family: var(--font-mono); font-size: 0.82rem; white-space:nowrap;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
         <td>{{ o['tier'] }}</td>
         <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
         <td>
@@ -113,6 +114,12 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
+  <div id="queue-pager" class="queue-pager" hidden>
+    <button type="button" id="queue-pager-prev" class="secondary">&larr; Previous</button>
+    <span id="queue-pager-label" class="muted"></span>
+    <button type="button" id="queue-pager-next" class="secondary">Next &rarr;</button>
+  </div>
   {% endif %}
 </div>
 
@@ -136,13 +143,45 @@
     var sortCol = view.sortCol; // undefined = server's own deadline-priority default order
     var sortDir = view.sortDir || 'asc';
 
-    function applyFilters() {
+    // ----------------------------------------------------- pagination ----
+    // Real ask this answers: "everything should be visible without having
+    // to scroll" - a queue with dozens of orders can't satisfy that by
+    // showing them all at once, so it's paginated instead (10/page,
+    // matching the count a screen can show without scrolling). Filtering
+    // and sorting stay real and instant (client-side, same as before);
+    // pagination is layered on top rather than replacing that logic - see
+    // updateVisibility, the one place that decides what's actually shown.
+    var PAGE_SIZE = 10;
+    var currentPage = 1;
+    function updateVisibility() {
+      var matching = [];
       document.querySelectorAll('tbody tr').forEach(function (row) {
         var statusOk = statusWanted[0] === 'all' || statusWanted.includes(row.dataset.status);
         var serviceOk = serviceWanted === 'all' || row.dataset.service === serviceWanted;
-        row.style.display = (statusOk && serviceOk) ? '' : 'none';
+        row.dataset.filterMatch = (statusOk && serviceOk) ? '1' : '0';
+        if (statusOk && serviceOk) matching.push(row);
       });
+      var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
+      currentPage = Math.min(currentPage, totalPages);
+      var start = (currentPage - 1) * PAGE_SIZE;
+      matching.forEach(function (row, i) {
+        row.style.display = (i >= start && i < start + PAGE_SIZE) ? '' : 'none';
+      });
+      document.querySelectorAll('tbody tr[data-filter-match="0"]').forEach(function (row) { row.style.display = 'none'; });
+      var pager = document.getElementById('queue-pager');
+      if (pager) {
+        pager.hidden = totalPages <= 1;
+        document.getElementById('queue-pager-label').textContent =
+          'Page ' + currentPage + ' of ' + totalPages + ' (' + matching.length + ' job' + (matching.length === 1 ? '' : 's') + ')';
+        document.getElementById('queue-pager-prev').disabled = currentPage <= 1;
+        document.getElementById('queue-pager-next').disabled = currentPage >= totalPages;
+      }
     }
+    function applyFilters() { currentPage = 1; updateVisibility(); }
+    var pagerPrev = document.getElementById('queue-pager-prev');
+    var pagerNext = document.getElementById('queue-pager-next');
+    if (pagerPrev) pagerPrev.addEventListener('click', function () { currentPage -= 1; updateVisibility(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    if (pagerNext) pagerNext.addEventListener('click', function () { currentPage += 1; updateVisibility(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
     document.querySelectorAll('#status-filter button').forEach(function (btn) {
       if (btn.dataset.filter === (view.status || 'all')) {
         document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
@@ -206,6 +245,7 @@
         }
         sortRows(sortCol, sortDir);
         saveView({ status: statusWanted.join(','), service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
+        updateVisibility();
       });
     });
     if (sortCol !== undefined && sortCol !== null) sortRows(sortCol, sortDir);

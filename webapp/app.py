@@ -4702,8 +4702,12 @@ def staff_overview(request: Request):
     revenue_prev_month = db.revenue_between(prev_month_start, month_start)
 
     orders = db.list_all_orders()
-    active_jobs = orders[:10]
-    review_queue = [o for o in orders if o["status"] == "awaiting_review"][:6]
+    # Compact by design - "everything visible without scrolling" (a real
+    # ask, not a nice-to-have) means this widget shows a short real slice
+    # with a real link to the full, properly-paginated list at /staff/jobs,
+    # not every order crammed into one tall table.
+    active_jobs = orders[:5]
+    review_queue = [o for o in orders if o["status"] == "awaiting_review"][:4]
     edited_pct = {}
     for o in active_jobs + review_queue:
         if o["id"] not in edited_pct:

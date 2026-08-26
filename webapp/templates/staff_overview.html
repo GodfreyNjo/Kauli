@@ -51,7 +51,7 @@
     <div class="card" style="padding:0;">
       <div class="overview-card-head">
         <h2>Active jobs</h2>
-        <a href="/staff/jobs" class="overview-viewall">View all →</a>
+        <a href="/staff/jobs" class="overview-viewall">Showing {{ active_jobs|length }} of {{ total_jobs }} &middot; View all &rarr;</a>
       </div>
       <div class="filter-tabs" id="overview-job-tabs" style="margin:0 20px 14px;">
         <button type="button" class="active" data-filter="all">All</button>
@@ -64,6 +64,7 @@
         <p>No jobs yet.</p>
       </div>
       {% else %}
+      <div class="table-scroll">
       <table id="overview-job-table">
         <thead><tr>
           <th>Job</th><th>Client</th><th>Route</th><th>Status</th><th>Due</th>
@@ -72,11 +73,11 @@
           {% for o in active_jobs %}
           {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
           <tr data-status="{{ o['status'] }}" class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
-            <td>{% if o['is_rush'] %}<span title="Rush order" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
-            <td>{{ o['client_name'] }}</td>
-            <td style="font-family: var(--font-mono); font-size: 0.8rem;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
-            <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
-            <td>
+            <td class="ellipsis-cell" title="{{ o['original_filename'] }}">{% if o['is_rush'] %}<span title="Rush order" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
+            <td class="ellipsis-cell" style="max-width:120px;">{{ o['client_name'] }}</td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem; white-space:nowrap;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
+            <td style="white-space:nowrap;"><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+            <td style="white-space:nowrap;">
               {% if ts %}
                 <span class="deadline-pill deadline-{{ ts['level'] }}">{% if ts['overdue'] %}Overdue{% else %}{{ o['internal_deadline_at']|int|timestamp_to_str }}{% endif %}</span>
               {% else %}<span class="muted">-</span>{% endif %}
@@ -85,43 +86,54 @@
           {% endfor %}
         </tbody>
       </table>
-      {% endif %}
-    </div>
-
-    <div class="card">
-      <div style="display:flex; align-items:center; justify-content:space-between;">
-        <h2 style="margin-top:0;">Jobs, last 30 days</h2>
-        <span class="muted" style="font-size:0.78rem;">
-          <span style="color:var(--accent);">&#9679;</span> delivered
-          &nbsp; <span style="opacity:0.5;">&#9679;</span> created
-        </span>
       </div>
-      {% if daily_trend_svg %}
-        {{ daily_trend_svg | safe }}
-      {% else %}
-        <p class="muted">No activity yet.</p>
       {% endif %}
     </div>
 
-    <div class="card">
-      <h2 style="margin-top:0;">Top clients by usage</h2>
-      <p class="muted" style="margin-top:-6px;">Minutes processed, last 30 days</p>
-      {% if not top_clients %}
-        <p class="muted">No usage yet.</p>
-      {% else %}
-      {% set max_minutes = top_clients[0]['minutes'] %}
-      <div class="top-clients-list">
-        {% for c in top_clients %}
-        <div class="top-clients-row">
-          <span class="top-clients-name">{{ c['client_name'] }}</span>
-          <div class="top-clients-bar-track">
-            <div class="top-clients-bar-fill" style="width: {{ ((c['minutes'] / max_minutes) * 100) if max_minutes else 0 }}%;"></div>
-          </div>
-          <span class="top-clients-value">{{ "%.1f"|format(c['minutes']) }} min</span>
+    <div class="card card-collapsible" data-collapse-key="overview-chart">
+      <div class="card-head-row">
+        <h2 style="margin:0;">Jobs, last 30 days</h2>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="muted" style="font-size:0.78rem;">
+            <span style="color:var(--accent);">&#9679;</span> delivered
+            &nbsp; <span style="color:var(--faint);">&#9679;</span> created
+          </span>
+          <button type="button" class="card-collapse-toggle" aria-expanded="false" aria-label="Expand">&#9662;</button>
         </div>
-        {% endfor %}
       </div>
-      {% endif %}
+      <div class="card-collapse-body">
+        {% if daily_trend_svg %}
+          {{ daily_trend_svg | safe }}
+        {% else %}
+          <p class="muted">No activity yet.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card card-collapsible" data-collapse-key="overview-top-clients">
+      <div class="card-head-row">
+        <h2 style="margin:0;">Top clients by usage</h2>
+        <button type="button" class="card-collapse-toggle" aria-expanded="false" aria-label="Expand">&#9662;</button>
+      </div>
+      <div class="card-collapse-body">
+        <p class="muted" style="margin-top:-6px;">Minutes processed, last 30 days</p>
+        {% if not top_clients %}
+          <p class="muted">No usage yet.</p>
+        {% else %}
+        {% set max_minutes = top_clients[0]['minutes'] %}
+        <div class="top-clients-list">
+          {% for c in top_clients %}
+          <div class="top-clients-row">
+            <span class="top-clients-name">{{ c['client_name'] }}</span>
+            <div class="top-clients-bar-track">
+              <div class="top-clients-bar-fill" style="width: {{ ((c['minutes'] / max_minutes) * 100) if max_minutes else 0 }}%;"></div>
+            </div>
+            <span class="top-clients-value">{{ "%.1f"|format(c['minutes']) }} min</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 
