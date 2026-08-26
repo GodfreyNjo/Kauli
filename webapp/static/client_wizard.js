@@ -15,6 +15,71 @@
   let currentStep = 1;
   const TOTAL_STEPS = 3;
 
+  // ------------------------------------------- surviving a refresh ----
+  // Real problem this fixes: a client mid-upload (or one who'd just
+  // finished uploading but hadn't hit final Submit yet) who refreshed
+  // the page used to lose everything - the whole file, gone, with no way
+  // back except picking it and uploading it again from scratch. Once the
+  // file has actually finished its PUT to R2, there's no reason a
+  // refresh should cost anything: the bytes are already safely stored,
+  // only the small metadata-only finalize POST is still needed. Persist
+  // just enough (the R2 object key + original filename) to skip
+  // re-uploading, not the whole wizard's other fields (language/service/
+  // instructions) - re-picking a dropdown is trivial next to re-uploading
+  // a real file; not worth the complexity of persisting everything.
+  const RESUME_KEY = "kauli_pending_upload";
+  let resumedUploadKey = null;
+  let uploadTransferActive = false;
+
+  function saveResumableUpload(uploadKey, filename) {
+    try {
+      sessionStorage.setItem(RESUME_KEY, JSON.stringify({ uploadKey, filename }));
+    } catch (e) { /* private browsing / storage disabled - resume just won't be offered, not fatal */ }
+  }
+  function clearResumableUpload() {
+    resumedUploadKey = null;
+    try { sessionStorage.removeItem(RESUME_KEY); } catch (e) { /* ignore */ }
+  }
+  function offerResumableUploadIfAny() {
+    let saved;
+    try { saved = JSON.parse(sessionStorage.getItem(RESUME_KEY) || "null"); } catch (e) { saved = null; }
+    if (!saved || !saved.uploadKey) return;
+    const dz = $("#dropzone");
+    if (!dz) return;
+    const banner = document.createElement("div");
+    banner.className = "modal-warning";
+    banner.style.marginBottom = "12px";
+    banner.innerHTML =
+      "You have an already-uploaded file waiting to submit: <strong></strong>. " +
+      "Continue with it, or discard and pick a different file.";
+    banner.querySelector("strong").textContent = saved.filename;
+    const continueBtn = document.createElement("button");
+    continueBtn.type = "button";
+    continueBtn.className = "secondary";
+    continueBtn.style.marginTop = "8px";
+    continueBtn.textContent = "Continue with this file";
+    const discardBtn = document.createElement("button");
+    discardBtn.type = "button";
+    discardBtn.className = "secondary";
+    discardBtn.style.marginTop = "8px";
+    discardBtn.style.marginLeft = "8px";
+    discardBtn.textContent = "Discard";
+    banner.appendChild(continueBtn);
+    banner.appendChild(discardBtn);
+    dz.parentNode.insertBefore(banner, dz);
+    continueBtn.addEventListener("click", function () {
+      resumedUploadKey = saved.uploadKey;
+      dz.classList.add("has-file");
+      const text = $("#dropzone-text");
+      if (text) text.textContent = saved.filename + " (already uploaded - ready to submit)";
+      banner.remove();
+    });
+    discardBtn.addEventListener("click", function () {
+      clearResumableUpload();
+      banner.remove();
+    });
+  }
+
   function showStep(n) {
     currentStep = n;
     $all(".wizard-pane").forEach((p) => { p.hidden = Number(p.dataset.pane) !== n; });
@@ -38,7 +103,7 @@
       return true;
     }
     const file = $("#file-input").files[0];
-    if (!file) { alert("Choose a file first."); return false; }
+    if (!file && !resumedUploadKey) { alert("Choose a file first."); return false; }
     return true;
   }
 
@@ -322,7 +387,24 @@
         // real error message if something went wrong) - just reached
         // without a second full-page round trip, so the progress bar
         // stays visible right up until the real result is ready.
-        history.replaceState(null, "", xhr.responseURL);
+        //
+        // Real bug this fixes: on a VALIDATION error, the server renders
+        // the dashboard directly at the POST target (/client/orders,
+        // no redirect) - xhr.responseURL in that case is just that same
+        // POST-only URL, which has no GET handler at all. Blindly
+        // replaceState-ing to it left the address bar pointed at a URL
+        // that 405'd on refresh - confirmed live ("Method Not Allowed"
+        // reported by a real client). A real success always goes through
+        // a redirect first, so xhr.responseURL differs from form.action
+        // in that case; only fall back to the real, always-GET-able
+        // dashboard URL when it doesn't.
+        var landedUrl = (xhr.responseURL && xhr.responseURL !== form.action) ? xhr.responseURL : "/client";
+        // A real redirect means success - the order really was created,
+        // so the saved upload_key is spent and safe to forget. An error
+        // (no redirect) leaves it in place so "Continue with this file"
+        // is still there for a genuine retry.
+        if (landedUrl !== "/client") clearResumableUpload();
+        history.replaceState(null, "", landedUrl);
         document.open();
         document.write(xhr.responseText);
         document.close();
@@ -340,6 +422,7 @@
       presignBody.append("content_type", file.type || "application/octet-stream");
       const presignXhr = new XMLHttpRequest();
       presignXhr.open("POST", "/client/orders/presign-upload", true);
+      uploadTransferActive = true;
       presignXhr.onload = function () {
         let data;
         try {
@@ -348,6 +431,7 @@
           data = null;
         }
         if (presignXhr.status !== 200 || !data || !data.put_url) {
+          uploadTransferActive = false;
           progressLabel.textContent = (data && data.error) || "Couldn't prepare the upload - please try again.";
           if (submitBtn) submitBtn.disabled = false;
           return;
@@ -362,6 +446,7 @@
           progressLabel.textContent = "Uploading… " + pct + "%";
         });
         putXhr.onload = function () {
+          uploadTransferActive = false;
           if (putXhr.status < 200 || putXhr.status >= 300) {
             progressLabel.textContent = "Upload failed - please try again.";
             if (submitBtn) submitBtn.disabled = false;
@@ -369,22 +454,37 @@
           }
           progressFill.style.width = "100%";
           progressLabel.textContent = "Upload complete - processing your order…";
+          // Safely on R2 now - a refresh from here on only needs to skip
+          // straight to "Continue with this file", never re-upload it.
+          saveResumableUpload(data.upload_key, file.name);
           formData.delete("audio");
           formData.set("upload_key", data.upload_key);
           finalizeOrder(formData);
         };
         putXhr.onerror = function () {
+          uploadTransferActive = false;
           progressLabel.textContent = "Upload failed - please try again.";
           if (submitBtn) submitBtn.disabled = false;
         };
         putXhr.send(file);
       };
       presignXhr.onerror = function () {
+        uploadTransferActive = false;
         progressLabel.textContent = "Couldn't prepare the upload - please try again.";
         if (submitBtn) submitBtn.disabled = false;
       };
       presignXhr.send(presignBody);
     }
+
+    // Warn before an accidental refresh/close ONLY while raw file bytes
+    // are actually in flight - once the R2 PUT finishes, upload_key is
+    // already safely saved (see saveResumableUpload) and there's nothing
+    // left to lose, so this deliberately stops guarding at that point.
+    window.addEventListener("beforeunload", function (e) {
+      if (!uploadTransferActive) return;
+      e.preventDefault();
+      e.returnValue = "";
+    });
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -399,12 +499,22 @@
 
       if (usingFile) {
         uploadFileDirectToR2(fileInput.files[0], formData);
+      } else if (resumedUploadKey) {
+        // Already safely on R2 from before a refresh - skip straight to
+        // finalize, no re-upload.
+        progressFill.style.width = "100%";
+        progressLabel.textContent = "Submitting your already-uploaded file…";
+        formData.delete("audio");
+        formData.set("upload_key", resumedUploadKey);
+        finalizeOrder(formData);
       } else {
         progressFill.classList.add("indeterminate");
         progressLabel.textContent = "Fetching from YouTube… this can take a few minutes for longer videos, it hasn't hung.";
         finalizeOrder(formData);
       }
     });
+
+    offerResumableUploadIfAny();
   }
 
   document.addEventListener("DOMContentLoaded", () => {

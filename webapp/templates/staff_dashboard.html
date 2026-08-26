@@ -2,7 +2,27 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Queue{% endblock %}
 {% block content %}
-<meta http-equiv="refresh" content="6">
+<script>
+  // Real bug this replaces: a flat <meta http-equiv="refresh" content="6">
+  // reloaded this entire page every 6 seconds, UNCONDITIONALLY - wiping
+  // out any column sort, filter tab, or in-progress typing every time
+  // ("our system keeps refreshing itself" - a real, reported live
+  // complaint, not hypothetical). Same "see new orders without a manual
+  // refresh" goal, far less disruptive: much longer interval, and it
+  // defers instead of firing while focus is in a text field.
+  (function () {
+    var REFRESH_MS = 30000;
+    function isTyping() {
+      var el = document.activeElement;
+      return !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
+    }
+    function tick() {
+      if (isTyping()) { setTimeout(tick, REFRESH_MS); return; }
+      location.reload();
+    }
+    setTimeout(tick, REFRESH_MS);
+  })();
+</script>
 <h1>Orders</h1>
 <p class="muted" style="margin-top:0;">One staff role for now (contractor + QA + admin combined) - per the
    roadmap, that's correct until there's a second person to split it across.</p>
@@ -41,8 +61,18 @@
       <p>No orders yet.</p>
     </div>
   {% else %}
-  <table>
-    <thead><tr><th>Client</th><th>File</th><th>Route</th><th>Tier</th><th>Status</th><th>% Edited</th><th>Time in stage</th><th>Deadline</th></tr></thead>
+  <table id="queue-table">
+    <thead><tr>
+      <th class="sortable" data-sort="text" data-col="0">Client</th>
+      <th class="sortable" data-sort="text" data-col="1">File</th>
+      <th>Route</th>
+      <th>Tier</th>
+      <th>Status</th>
+      <th class="sortable" data-sort="num" data-col="5">% Edited</th>
+      <th class="sortable" data-sort="num" data-col="6" data-default-sort="desc">Time in stage</th>
+      <th class="sortable" data-sort="num" data-col="7">Deadline</th>
+      <th class="sortable" data-sort="num" data-col="8" data-default-sort="desc">Created</th>
+    </tr></thead>
     <tbody>
       {% for o in orders %}
       {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
@@ -50,6 +80,7 @@
       {% set stage_stuck = o['status'] in ('queued', 'processing', 'awaiting_review', 'editor_returned') and stage_seconds > stuck_threshold_seconds %}
       {% set pct = edited_pct.get(o['id']) %}
       <tr data-status="{{ o['status'] }}" data-service="{{ o['service_level'] or '' }}"
+          data-sortvals="{{ pct if pct is not none else -1 }}|{{ stage_seconds|int }}|{{ (o['internal_deadline_at']|int) if ts else 9999999999 }}|{{ o['created_at']|int }}"
           class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
         <td>{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
         <td>{% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
@@ -87,8 +118,24 @@
 
 <script>
   (function () {
-    var statusWanted = ['all'];
-    var serviceWanted = 'all';
+    // Real filters+sort, remembered across the periodic auto-refresh
+    // (see the script at the top of this page) and across visits - the
+    // actual complaint this fixes was having to re-scroll/re-find "the
+    // latest" by eye every time, made worse by a page that used to
+    // reload out from under any choice every 6 seconds regardless.
+    var STORE_KEY = 'kauli_staff_queue_view';
+    function loadView() {
+      try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || {}; } catch (e) { return {}; }
+    }
+    function saveView(v) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
+    }
+    var view = loadView();
+    var statusWanted = view.status ? view.status.split(',') : ['all'];
+    var serviceWanted = view.service || 'all';
+    var sortCol = view.sortCol; // undefined = server's own deadline-priority default order
+    var sortDir = view.sortDir || 'asc';
+
     function applyFilters() {
       document.querySelectorAll('tbody tr').forEach(function (row) {
         var statusOk = statusWanted[0] === 'all' || statusWanted.includes(row.dataset.status);
@@ -97,21 +144,72 @@
       });
     }
     document.querySelectorAll('#status-filter button').forEach(function (btn) {
+      if (btn.dataset.filter === (view.status || 'all')) {
+        document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      }
       btn.addEventListener('click', function () {
         document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         statusWanted = btn.dataset.filter.split(',');
+        saveView({ status: btn.dataset.filter, service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
         applyFilters();
       });
     });
     document.querySelectorAll('#service-filter button').forEach(function (btn) {
+      if (btn.dataset.service === serviceWanted) {
+        document.querySelectorAll('#service-filter button').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      }
       btn.addEventListener('click', function () {
         document.querySelectorAll('#service-filter button').forEach(function (b) { b.classList.remove('active'); });
         btn.classList.add('active');
         serviceWanted = btn.dataset.service;
+        saveView({ status: statusWanted.join(','), service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
         applyFilters();
       });
     });
+
+    // ------------------------------------------------------- sorting ----
+    var table = document.getElementById('queue-table');
+    function sortRows(col, dir) {
+      var tbody = table.querySelector('tbody');
+      var rows = Array.from(tbody.querySelectorAll('tr'));
+      var th = table.querySelector('th[data-col="' + col + '"]');
+      var isNum = th && th.dataset.sort === 'num';
+      var sortvalsIndex = { 5: 0, 6: 1, 7: 2, 8: 3 }[col]; // matches the pipe-separated order baked into data-sortvals
+      rows.sort(function (a, b) {
+        var av, bv;
+        if (isNum) {
+          var avAll = a.dataset.sortvals.split('|'), bvAll = b.dataset.sortvals.split('|');
+          av = parseFloat(avAll[sortvalsIndex]); bv = parseFloat(bvAll[sortvalsIndex]);
+        } else {
+          av = a.children[col].textContent.trim().toLowerCase();
+          bv = b.children[col].textContent.trim().toLowerCase();
+        }
+        if (av < bv) return dir === 'asc' ? -1 : 1;
+        if (av > bv) return dir === 'asc' ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(function (row) { tbody.appendChild(row); });
+      table.querySelectorAll('th.sortable').forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+      if (th) th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    }
+    table.querySelectorAll('th.sortable').forEach(function (th) {
+      th.addEventListener('click', function () {
+        var col = Number(th.dataset.col);
+        if (sortCol === col) {
+          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortCol = col;
+          sortDir = th.dataset.defaultSort || 'asc';
+        }
+        sortRows(sortCol, sortDir);
+        saveView({ status: statusWanted.join(','), service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
+      });
+    });
+    if (sortCol !== undefined && sortCol !== null) sortRows(sortCol, sortDir);
+    applyFilters();
 
     // Whole row opens the order - no separate "open" button needed.
     // Middle-click / Ctrl/Cmd+click still opens in a new tab, same as a

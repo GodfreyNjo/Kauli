@@ -3491,8 +3491,35 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
     if provider == "bank":
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "bank", order_id=order_id,
                            meta=json.dumps({"kind": payment_kind}))
+        # order_pay.html has always promised "We'll email transfer
+        # instructions" - a real gap until now, nothing ever actually
+        # sent one. bank_details is a real, deliberate KAULI_BANK_DETAILS
+        # env var (account name/number/bank, set by the account owner) -
+        # never fabricated here; if it isn't set yet, the email still
+        # goes out honestly saying a follow-up is coming, rather than
+        # inventing account details that don't exist.
+        bank_details = os.environ.get("KAULI_BANK_DETAILS", "").strip()
+        details_html = (
+            f"<p style=\"white-space:pre-wrap;\">{bank_details}</p>" if bank_details
+            else "<p>We'll follow up shortly with the account details to transfer to.</p>"
+        )
+        client_html = mailer.wrap_email_html(
+            f"<p>Hi {user['display_name']}, thanks - we've got your bank transfer request for "
+            f"${amount_usd:.2f}.</p>{details_html}"
+            f"<p>Please include reference <strong>{payment_id}</strong> on the transfer so we can match it "
+            f"to your account quickly. We confirm bank transfers manually once they land - you'll get a "
+            f"real receipt the moment it's confirmed.</p>",
+            base_url=str(request.base_url),
+        )
+        mailer.send_email(user["email"], f"Kauli bank transfer - reference {payment_id}", client_html)
+        staff_html = mailer.wrap_email_html(
+            f"<p>{user['display_name']} ({user['email']}) requested a bank transfer for ${amount_usd:.2f} - "
+            f"reference {payment_id}. Watch for it and confirm at /staff/billing once it lands.</p>",
+            base_url=str(request.base_url),
+        )
+        mailer.send_email(CONTACT_EMAIL, f"New bank transfer expected - {payment_id}", staff_html)
         return RedirectResponse(f"{back_url}?notice=Bank+transfer+request+received+-+"
-                                 f"see+instructions+below%2C+reference+{payment_id}.", status_code=303)
+                                 f"check+your+email+for+instructions%2C+reference+{payment_id}.", status_code=303)
 
     return RedirectResponse(back_url, status_code=303)
 
