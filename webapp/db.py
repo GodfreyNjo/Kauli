@@ -1339,6 +1339,19 @@ def staff_search(query: str, limit: int = 8):
     return {"orders": orders, "clients": clients, "leads": leads}
 
 
+def create_notification(recipient_id: str, kind: str, title: str, link: str | None = None) -> None:
+    """Single-recipient version of notify_all_staff - the client-facing
+    half of the same bell/notifications table (base.html renders it for
+    every logged-in role, staff and client alike)."""
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO notifications (id, recipient_id, kind, title, link, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        (uuid.uuid4().hex, recipient_id, kind, title, link, time.time()),
+    )
+    conn.commit()
+    conn.close()
+
+
 def notify_all_staff(kind: str, title: str, link: str | None = None) -> None:
     """Real in-app notification for every current staff account - the bell's
     actual data source. Fired from the same real events notifications.py's

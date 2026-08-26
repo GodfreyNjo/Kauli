@@ -4902,6 +4902,10 @@ def staff_send_message(request: Request, order_id: str,
     if body.strip() and visibility in ("client", "internal"):
         db.create_message(order_id, user["id"], visibility, body)
         db.mark_read(user["id"], order_id)
+        if visibility == "client":
+            db.create_notification(order["client_id"], "staff_message",
+                                    f"New message about {order['original_filename']}",
+                                    link=f"/client/orders/{order_id}")
         # also_email is only ever meaningful on a client-visible message -
         # an internal note has no client to email, and the checkbox
         # doesn't even exist on that form, but the check here is real

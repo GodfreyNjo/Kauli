@@ -82,6 +82,8 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
     html = mailer.wrap_email_html(inner, cta_text="View & download your files" if link else None,
                                    cta_url=link, base_url=link_base)
     mailer.send_email(client["email"], "Your Kauli order is ready", html, body)
+    db.create_notification(client["id"], "order_ready", f"{order['original_filename']} is ready",
+                            link=f"/client/orders/{order['id']}")
 
 
 def notify_staff_needs_review(order) -> None:
