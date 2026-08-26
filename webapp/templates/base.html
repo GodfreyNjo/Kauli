@@ -50,7 +50,10 @@
     <div class="topbar-right">
     <div class="notif-bell" id="notif-bell">
       <button type="button" class="notif-bell-trigger" id="notif-bell-trigger" aria-haspopup="true" aria-expanded="false" title="Notifications">
-        <span class="icon" aria-hidden="true">N</span>
+        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
         <span class="notif-bell-badge" id="notif-bell-badge" hidden>0</span>
       </button>
       <div class="notif-bell-panel" id="notif-bell-panel" hidden>
@@ -64,7 +67,9 @@
     <div class="account-menu" id="account-menu">
       <button type="button" class="account-menu-trigger" id="account-menu-trigger" aria-haspopup="true" aria-expanded="false">
         {% if user['avatar_path'] %}
-          <img class="avatar-img" src="/avatar/{{ user['id'] }}" alt="">
+          <img class="avatar-img" src="/avatar/{{ user['id'] }}" alt=""
+               onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+          <div class="avatar" style="display:none;">{{ user['display_name'][0]|upper }}</div>
         {% else %}
           <div class="avatar">{{ user['display_name'][0]|upper }}</div>
         {% endif %}

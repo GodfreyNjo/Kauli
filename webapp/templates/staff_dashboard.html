@@ -183,7 +183,12 @@
           {% if r['assignee'] %}
           <div class="queue-assignee">
             {% if r['assignee']['avatar_path'] %}
-              <img class="avatar-img avatar-img-sm" src="/avatar/{{ r['assignee']['id'] }}" alt="">
+              {# avatar_path being set doesn't guarantee the file is still really
+                 there (a real gap found live: it wasn't, post-migration) - fall
+                 back to initials on a real load error instead of a broken-image icon. #}
+              <img class="avatar-img avatar-img-sm" src="/avatar/{{ r['assignee']['id'] }}" alt=""
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+              <div class="avatar avatar-sm" style="display:none;">{{ r['assignee']['display_name'][0]|upper }}</div>
             {% else %}
               <div class="avatar avatar-sm">{{ r['assignee']['display_name'][0]|upper }}</div>
             {% endif %}

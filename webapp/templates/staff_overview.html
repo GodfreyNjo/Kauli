@@ -138,11 +138,15 @@
   </div>
 
   <div class="overview-side">
-    <div class="card">
+    <div class="card card-collapsible" data-collapse-key="overview-review-queue">
       <div class="overview-card-head">
         <h2>My review queue</h2>
-        <a href="/staff/jobs" class="overview-viewall">View all ({{ in_review }}) →</a>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <a href="/staff/jobs" class="overview-viewall">View all ({{ in_review }}) &rarr;</a>
+          <button type="button" class="card-collapse-toggle" aria-expanded="true" aria-label="Collapse">&#9662;</button>
+        </div>
       </div>
+      <div class="card-collapse-body">
       {% if not review_queue %}
       <div class="empty-state" style="padding:24px 0;">
         <p>You're all caught up 🎉</p>
@@ -168,10 +172,15 @@
       </a>
       {% endfor %}
       {% endif %}
+      </div>
     </div>
 
-    <div class="card">
-      <h2 style="margin-top:0;">Recent activity</h2>
+    <div class="card card-collapsible" data-collapse-key="overview-activity">
+      <div class="overview-card-head">
+        <h2>Recent activity</h2>
+        <button type="button" class="card-collapse-toggle" aria-expanded="false" aria-label="Expand">&#9662;</button>
+      </div>
+      <div class="card-collapse-body">
       {% if not activity %}
         <p class="muted">Nothing yet.</p>
       {% else %}
@@ -185,6 +194,7 @@
         {% endfor %}
       </ul>
       {% endif %}
+      </div>
     </div>
   </div>
 </div>

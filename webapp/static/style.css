@@ -254,14 +254,13 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   cursor: pointer; color: var(--chrome-text-active);
 }
 .notif-bell-trigger .icon {
-  /* Real bug this fixes: this used the same dim var(--chrome-text) the
-     hover-to-reveal account-menu icon uses, but the bell has no adjacent
-     label to give it presence the way the avatar+name does - dim-by-
-     default made it read as barely-there against the dark topbar. Bright
-     by default, like the rest of the topbar's own icon-only controls. */
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; border: 1px solid var(--chrome-text); border-radius: 5px;
-  font-size: 0.66rem; font-weight: 700; font-family: var(--font-mono); color: var(--chrome-text-active);
+  /* Real bug this fixed: this used to be the same dim var(--chrome-text)
+     the hover-to-reveal account-menu icon uses, but the bell has no
+     adjacent label to give it presence the way the avatar+name does -
+     dim-by-default made it read as barely-there against the dark topbar.
+     A plain envelope glyph, bright by default, no bordered box - matches
+     the icon-only look the user pointed at directly. */
+  width: 20px; height: 20px; color: var(--chrome-text-active);
 }
 .notif-bell-trigger:hover, .notif-bell-trigger[aria-expanded="true"] { background: var(--chrome-active-bg); }
 .notif-bell-trigger:hover .icon, .notif-bell-trigger[aria-expanded="true"] .icon { color: var(--chrome-text-active); }
