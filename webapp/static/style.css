@@ -22,25 +22,39 @@
   --muted: #6b6862;
   --faint: #8c877e;
 
-  /* The system accent, system-wide - was rust ("the Anthropic color"),
-     now olive, on request: replaces it everywhere this token is used
-     (buttons, links, focus states, badges, tier/step highlights), not
-     just the marketing site. */
-  --accent: #556b2f;
-  --accent-hover: #445423;
-  --accent-soft: #eeeee8;
+  /* The system accent, system-wide - was rust, then olive, now indigo on
+     request (matching a reference "studio-grade" client-portal design) -
+     replaces it everywhere this token is used (buttons, links, focus
+     states, badges, tier/step highlights, the sidebar's active-row
+     marker), not just the marketing site. */
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-soft: #eef0fd;
   --accent-ink: #ffffff;
 
   /* Second CTA color, marketing-site buttons/borders only - keeps the
      public site from reading as one flat color end to end (buttons,
      borders, form focus - see body.m-public rules near the end of this
-     file). --accent3 now duplicates --accent (both olive) - kept as its
+     file). --accent3 now duplicates --accent (both indigo) - kept as its
      own token rather than removed, since marketing.html's cta-olive class
      still references it directly. */
   --accent2: #4b21d9;
   --accent2-hover: #3c19ae;
-  --accent3: #556b2f;
-  --accent3-hover: #64802e;
+  --accent3: #4f46e5;
+  --accent3-hover: #4338ca;
+
+  /* Fixed dark-navy "chrome" for the app sidebar/topbar - deliberately
+     NOT swapped by the light/dark theme toggle (same idea login.html's
+     data-theme-locked already uses: some surfaces are one committed look
+     regardless of the page's own theme). Gives the persistent "studio"
+     frame around a light or dark canvas, matching the reference design,
+     without touching the actual content-area theme system at all. */
+  --chrome-bg: #0f1420;
+  --chrome-active-bg: #1b2340;
+  --chrome-border: #1f2536;
+  --chrome-text: #9aa3bd;
+  --chrome-text-active: #ffffff;
+  --chrome-icon-border: #2b3350;
 
   --ok: #3f7a52;
   --ok-soft: #e7f1ea;
@@ -79,9 +93,9 @@ html[data-theme="dark"] {
   --muted: #a1a1aa;
   --faint: #71717a;
 
-  --accent: #556b2f;
-  --accent-hover: #64802e;
-  --accent-soft: #25291f;
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-soft: #24243f;
   --accent-ink: #ffffff;
 
   --ok: #6f9b78;
@@ -158,11 +172,18 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 20px;
-  background: var(--sidebar-bg);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--chrome-bg);
+  border-bottom: 1px solid var(--chrome-border);
+  color: var(--chrome-text-active);
 }
 .topbar-brand { overflow: hidden; }
-.topbar .wordmark { font-size: 0.98rem; }
+.topbar .wordmark { font-size: 0.98rem; color: var(--chrome-text-active); }
+.topbar .sub-wordmark { color: var(--chrome-text); }
+.topbar .account-menu-trigger { color: var(--chrome-text-active); }
+.topbar .account-menu-trigger:hover, .topbar .account-menu-trigger[aria-expanded="true"] {
+  background: var(--chrome-active-bg); border-color: var(--chrome-border);
+}
+.topbar .account-menu-trigger .chevron { color: var(--chrome-text); }
 
 .account-menu { position: relative; flex-shrink: 0; }
 .account-menu-trigger {
@@ -217,8 +238,8 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: var(--sidebar-bg);
-  border-right: 1px solid var(--border-subtle);
+  background: var(--chrome-bg);
+  border-right: 1px solid var(--chrome-border);
   display: flex;
   flex-direction: column;
   padding: 16px 14px;
@@ -234,19 +255,19 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   overflow-y: auto;
 }
 .sidebar-top { display: flex; align-items: center; justify-content: flex-end; margin-bottom: 10px; }
-.wordmark { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; }
-.sub-wordmark { font-size: 0.68rem; color: var(--faint); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; white-space: nowrap; }
+.wordmark { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; color: var(--chrome-text-active); }
+.sub-wordmark { font-size: 0.68rem; color: var(--chrome-text); letter-spacing: 0.06em; text-transform: uppercase; margin-top: 2px; white-space: nowrap; }
 .sidebar-collapse-btn {
-  background: none; color: var(--faint); border: 1px solid var(--border-subtle);
+  background: none; color: var(--chrome-text); border: 1px solid var(--chrome-border);
   border-radius: var(--radius-sm); width: 22px; height: 22px; padding: 0;
   font-size: 0.75rem; line-height: 1; margin: 0; flex-shrink: 0;
 }
-.sidebar-collapse-btn:hover { background: var(--hover); color: var(--ink); }
+.sidebar-collapse-btn:hover { background: var(--chrome-active-bg); color: var(--chrome-text-active); }
 
 .sidebar-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .sidebar-nav a {
   display: flex; align-items: center; gap: 10px;
-  color: var(--muted);
+  color: var(--chrome-text);
   text-decoration: none;
   font-size: 0.86rem;
   padding: 8px 10px;
@@ -256,37 +277,37 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .sidebar-nav a .icon {
   display: inline-flex; align-items: center; justify-content: center;
   width: 20px; height: 20px; flex-shrink: 0;
-  border: 1px solid var(--border); border-radius: 5px;
+  border: 1px solid var(--chrome-icon-border); border-radius: 5px;
   font-size: 0.66rem; font-weight: 700; font-family: var(--font-mono);
-  color: var(--faint);
+  color: var(--chrome-text);
 }
-.sidebar-nav a:hover .icon { color: var(--ink); border-color: var(--muted); }
-.sidebar-nav a.active .icon { color: var(--accent); border-color: var(--accent); }
-.sidebar-nav a:hover { background: var(--hover); color: var(--ink); }
+.sidebar-nav a:hover .icon { color: var(--chrome-text-active); border-color: var(--chrome-text); }
+.sidebar-nav a.active .icon { color: var(--chrome-text-active); border-color: var(--accent); }
+.sidebar-nav a:hover { background: var(--chrome-active-bg); color: var(--chrome-text-active); }
 .sidebar-nav a {
   border-left: 3px solid transparent;
   padding-left: 7px;
 }
 .sidebar-nav a.active {
-  background: var(--hover);
-  color: var(--ink);
+  background: var(--accent);
+  color: var(--chrome-text-active);
   font-weight: 600;
   border-left-color: var(--accent);
 }
 
-.sidebar-divider { height: 1px; background: var(--border-subtle); margin: 8px 4px; }
+.sidebar-divider { height: 1px; background: var(--chrome-border); margin: 8px 4px; }
 
 /* The client-only "Help & troubleshooting" button - deliberately styled
    apart from the rest of the nav (a tinted background, not just another
    plain row) so it reads as its own prominent thing, not one more link
    to scan past when something's actually gone wrong. */
 .sidebar-help-btn {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--ink) !important;
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--chrome-text-active) !important;
   font-weight: 600;
 }
-.sidebar-help-btn .icon { color: var(--accent); border-color: var(--accent); }
-.sidebar-help-btn:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+.sidebar-help-btn .icon { color: var(--chrome-text-active); border-color: var(--accent); }
+.sidebar-help-btn:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
 /* Compact WhatsApp/Email pair right under it - same "real person, one
    click away" contact options the account menu and /help page already
@@ -295,14 +316,14 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .sidebar-contact-row { display: flex; gap: 4px; padding: 0 2px; }
 .sidebar-contact-row a {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  color: var(--muted); text-decoration: none; font-size: 0.76rem;
-  padding: 6px 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);
+  color: var(--chrome-text); text-decoration: none; font-size: 0.76rem;
+  padding: 6px 4px; border-radius: var(--radius-sm); border: 1px solid var(--chrome-border);
 }
-.sidebar-contact-row a:hover { background: var(--hover); color: var(--ink); }
+.sidebar-contact-row a:hover { background: var(--chrome-active-bg); color: var(--chrome-text-active); }
 .sidebar-contact-row a .icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; flex-shrink: 0; border: 1px solid var(--border); border-radius: 4px;
-  font-size: 0.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--faint);
+  width: 16px; height: 16px; flex-shrink: 0; border: 1px solid var(--chrome-icon-border); border-radius: 4px;
+  font-size: 0.6rem; font-weight: 700; font-family: var(--font-mono); color: var(--chrome-text);
 }
 .sidebar.collapsed .sidebar-contact-row { flex-direction: column; }
 .sidebar.collapsed .sidebar-divider { margin: 8px 2px; }
