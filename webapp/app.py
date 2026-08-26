@@ -4758,6 +4758,59 @@ def staff_search(request: Request, q: str = ""):
     })
 
 
+def _queue_file_kind(order) -> str:
+    """Real, cheap classification for the queue's file-type icon - not a
+    fabricated media-library feature, just "what should the icon look
+    like" from data already on the order."""
+    if order["source_youtube_id"]:
+        return "youtube"
+    return "video" if is_video_file(order["audio_path"]) else "audio"
+
+
+def _queue_row_view(order, pct, ts, unread: bool, now: float, assignee) -> dict:
+    """Everything staff_jobs.html needs for one row, computed once here
+    instead of repeated ad-hoc Jinja logic - real derived values only:
+    review_minutes from real duration_minutes x real edited_pct (no new
+    per-minute tracking invented), sla_exceeded/needs_attention from the
+    same real tat_status every deadline pill in the app already uses."""
+    duration = order["duration_minutes"] or 0.0
+    review_minutes = round(duration * (pct / 100), 1) if pct is not None else None
+    sla_exceeded = bool(ts and ts["overdue"])
+    needs_attention = (
+        order["status"] in ("editor_returned", "dead_letter", "failed")
+        or (ts is not None and ts["level"] in ("red", "yellow"))
+    )
+    # tat.time_status clamps remaining_s to >= 0 (it's built for a progress
+    # bar, not a "how overdue" readout) - this recomputes the real signed
+    # delta directly from internal_deadline_at so "Overdue by 23h" can show
+    # an actual duration instead of just the word "Overdue".
+    deadline_delta_s = (order["internal_deadline_at"] - now) if order["internal_deadline_at"] else None
+    return {
+        "order": order, "pct": pct, "ts": ts, "unread": unread,
+        "file_kind": _queue_file_kind(order),
+        "review_minutes": review_minutes, "duration_minutes": duration,
+        "sla_exceeded": sla_exceeded, "needs_attention": needs_attention,
+        "stage_seconds": now - (order["status_changed_at"] or order["created_at"]),
+        "deadline_delta_s": deadline_delta_s,
+        "assignee": assignee,
+    }
+
+
+@app.post("/staff/orders/{order_id}/mark-read")
+def staff_mark_order_read(request: Request, order_id: str):
+    """The queue's one real, safe bulk action (see the checkbox column in
+    staff_dashboard.html) - clears the unread-message dot. Deliberately
+    the only bulk action wired up for now: every other real status
+    transition (approve, retry, return) has side effects (re-running a
+    real pipeline, notifying a client) that shouldn't fire on a batch of
+    orders from one careless click."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    db.mark_read(user["id"], order_id)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/staff/jobs", response_class=HTMLResponse)
 def staff_jobs(request: Request):
     user = current_user(request)
@@ -4765,16 +4818,43 @@ def staff_jobs(request: Request):
         return RedirectResponse("/login")
     orders = db.list_all_orders()
     unread = db.unread_order_ids(user["id"], include_internal=True)
-    # Real "% edited" per order for the queue - see Job.edited_pct. None
-    # (shown as "-") for anything with no manifest yet (still queued/
-    # processing/awaiting payment) rather than a fabricated 0%.
-    edited_pct = {}
+    now = time.time()
+    # Real single-operator reality (see the "one staff role for now"
+    # note elsewhere in this file) - every job's "assignee" is whichever
+    # real staff account exists, never a fabricated name. None if somehow
+    # no staff account exists at all (never happens in practice, but a
+    # real None is correct there, not a placeholder person).
+    staff_list = db.list_staff_users()
+    the_assignee = staff_list[0] if staff_list else None
+
+    rows = []
     for o in orders:
         job = _load_job(o)
-        edited_pct[o["id"]] = job.edited_pct if job else None
+        pct = job.edited_pct if job else None
+        ts = tat.time_status(o["tat_start_at"], o["deadline_at"], now=now)
+        rows.append(_queue_row_view(o, pct, ts, o["id"] in unread, now, the_assignee))
+
+    needs_attention_n = sum(1 for r in rows if r["needs_attention"])
+    overdue_n = sum(1 for r in rows if r["ts"] and r["ts"]["overdue"])
+    due_today_n = sum(1 for r in rows if r["ts"] and not r["ts"]["overdue"] and r["ts"]["remaining_s"] <= 86400)
+    in_progress_n = sum(1 for r in rows if r["order"]["status"] in ("queued", "processing"))
+    awaiting_review_n = sum(1 for r in rows if r["order"]["status"] == "awaiting_review")
+    exceptions_n = sum(1 for r in rows if r["order"]["status"] in ("editor_returned", "dead_letter", "failed", "returned_to_client"))
+    ready_n = sum(1 for r in rows if r["order"]["status"] == "ready_for_delivery")
+    delivered_n = sum(1 for r in rows if r["order"]["status"] == "delivered")
+    today_start = datetime(datetime.fromtimestamp(now).year, datetime.fromtimestamp(now).month,
+                            datetime.fromtimestamp(now).day).timestamp()
+    delivered_today_n = sum(1 for r in rows if r["order"]["status"] == "delivered" and r["order"]["status_changed_at"] >= today_start)
+
+    service_level_labels = {k: v["name"] for k, v in billing.SERVICE_LEVELS.items()}
     return templates.TemplateResponse(request, "staff_dashboard.html", {
-        "user": user, "orders": orders, "unread": unread, "edited_pct": edited_pct,
-        "now_ts": time.time(), "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,
+        "user": user, "rows": rows, "now_ts": now,
+        "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,
+        "service_level_labels": service_level_labels,
+        "total_jobs": len(rows), "needs_attention_n": needs_attention_n,
+        "overdue_n": overdue_n, "due_today_n": due_today_n, "in_progress_n": in_progress_n,
+        "awaiting_review_n": awaiting_review_n, "exceptions_n": exceptions_n,
+        "ready_n": ready_n, "delivered_n": delivered_n, "delivered_today_n": delivered_today_n,
     })
 
 

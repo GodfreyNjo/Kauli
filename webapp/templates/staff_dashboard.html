@@ -1,15 +1,7 @@
 {% extends "base.html" %}
-{% block theme %}dark{% endblock %}
-{% block title %}Queue{% endblock %}
+{% block title %}Production Queue{% endblock %}
 {% block content %}
 <script>
-  // Real bug this replaces: a flat <meta http-equiv="refresh" content="6">
-  // reloaded this entire page every 6 seconds, UNCONDITIONALLY - wiping
-  // out any column sort, filter tab, or in-progress typing every time
-  // ("our system keeps refreshing itself" - a real, reported live
-  // complaint, not hypothetical). Same "see new orders without a manual
-  // refresh" goal, far less disruptive: much longer interval, and it
-  // defers instead of firing while focus is in a text field.
   (function () {
     var REFRESH_MS = 30000;
     function isTyping() {
@@ -23,36 +15,118 @@
     setTimeout(tick, REFRESH_MS);
   })();
 </script>
-<h1>Orders</h1>
-<p class="muted" style="margin-top:0;">One staff role for now (contractor + QA + admin combined) - per the
-   roadmap, that's correct until there's a second person to split it across.</p>
 
-{% if orders %}
-{% set awaiting_n = orders | selectattr('status', 'equalto', 'awaiting_review') | list | length %}
-{% set processing_n = orders | selectattr('status', 'in', ['processing', 'queued']) | list | length %}
-{% set ops_n = orders | selectattr('status', 'equalto', 'editor_returned') | list | length %}
-{% set ready_n = orders | selectattr('status', 'equalto', 'ready_for_delivery') | list | length %}
-{% set delivered_n = orders | selectattr('status', 'equalto', 'delivered') | list | length %}
-{% set holds_n = orders | selectattr('status', 'in', ['pending_payment', 'returned_to_client', 'failed', 'dead_letter']) | list | length %}
-<div class="filter-tabs" id="status-filter" style="margin-bottom:8px;">
-  <button type="button" class="active" data-filter="all">All <span class="tab-count">{{ orders|length }}</span></button>
-  <button type="button" data-filter="awaiting_review">In review <span class="tab-count">{{ awaiting_n }}</span></button>
-  <button type="button" data-filter="processing,queued">Processing <span class="tab-count">{{ processing_n }}</span></button>
-  <button type="button" data-filter="editor_returned">Needs ops decision <span class="tab-count">{{ ops_n }}</span></button>
-  <button type="button" data-filter="ready_for_delivery">Ready <span class="tab-count">{{ ready_n }}</span></button>
-  <button type="button" data-filter="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
-  <button type="button" data-filter="pending_payment,returned_to_client,failed,dead_letter">Holds &amp; exceptions <span class="tab-count">{{ holds_n }}</span></button>
+<div class="overview-header">
+  <h1>Production Queue</h1>
+  <p class="muted" style="margin-top:2px;">All jobs across Kauli. Monitor progress and keep deliveries on schedule.</p>
 </div>
-<div class="filter-tabs" id="service-filter" style="margin-bottom:14px;">
-  <button type="button" class="active" data-service="all">All services</button>
-  <button type="button" data-service="transcribe">Transcription</button>
-  <button type="button" data-service="translate">Translation</button>
-  <button type="button" data-service="dub">Dubbing</button>
+
+<div class="dashboard-stats overview-kpis">
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Total jobs</span>
+    <span class="stat-value">{{ total_jobs }}</span>
+    <span class="stat-hint">All time in queue</span>
+  </div>
+  <div class="dashboard-stat-card {{ 'needs-you' if needs_attention_n else '' }}">
+    <span class="stat-label">Needs attention</span>
+    <span class="stat-value">{{ needs_attention_n }}</span>
+    <span class="stat-hint">{{ overdue_n }} overdue &middot; {{ due_today_n }} due today</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">In progress</span>
+    <span class="stat-value">{{ in_progress_n }}</span>
+    <span class="stat-hint">AI processing</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Ready</span>
+    <span class="stat-value">{{ ready_n }}</span>
+    <span class="stat-hint">Ready for delivery</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Delivered</span>
+    <span class="stat-value">{{ delivered_today_n }}</span>
+    <span class="stat-hint">Completed today</span>
+  </div>
+</div>
+
+<div class="card queue-health">
+  <div class="queue-health-row">
+    <div class="queue-health-item"><span class="queue-health-num queue-health-red">{{ overdue_n }}</span><span class="muted">Overdue</span></div>
+    <div class="queue-health-item"><span class="queue-health-num queue-health-warn">{{ due_today_n }}</span><span class="muted">Due today</span></div>
+    <div class="queue-health-item"><span class="queue-health-num">{{ awaiting_review_n }}</span><span class="muted">Awaiting review</span></div>
+    <div class="queue-health-item"><span class="queue-health-num">{{ in_progress_n }}</span><span class="muted">AI processing</span></div>
+    <div class="queue-health-item"><span class="queue-health-num queue-health-warn">{{ exceptions_n }}</span><span class="muted">Exceptions</span></div>
+    <div class="queue-health-item"><span class="queue-health-num queue-health-ok">{{ ready_n }}</span><span class="muted">Ready</span></div>
+    <span class="muted queue-health-updated">&#9679; Last updated: just now</span>
+  </div>
+</div>
+
+{% if rows %}
+<div class="card queue-toolbar">
+  <input type="text" id="queue-search" placeholder="Search jobs, clients, files or Job ID...">
+  <button type="button" id="queue-filters-toggle" class="secondary">Filters <span id="queue-filters-badge" class="filter-count-badge" hidden>0</span></button>
+  <div style="flex:1;"></div>
+  <button type="button" id="queue-columns-toggle" class="secondary">Columns</button>
+  <button type="button" id="queue-export" class="secondary">Export CSV</button>
+</div>
+
+<div class="card queue-filters" id="queue-filters-panel" hidden>
+  <div class="queue-filter-field">
+    <label>Status</label>
+    <select id="filter-status">
+      <option value="all">All</option>
+      <option value="pending_payment">Pending payment</option>
+      <option value="queued">Queued</option>
+      <option value="processing">Processing</option>
+      <option value="awaiting_review">Awaiting review</option>
+      <option value="editor_returned">Ops decision</option>
+      <option value="ready_for_delivery">Ready</option>
+      <option value="delivered">Delivered</option>
+      <option value="dead_letter">Dead letter</option>
+      <option value="failed">Failed</option>
+      <option value="returned_to_client">Returned to client</option>
+    </select>
+  </div>
+  <div class="queue-filter-field">
+    <label>Service</label>
+    <select id="filter-service">
+      <option value="all">All</option>
+      <option value="transcribe">Transcription</option>
+      <option value="translate">Translation</option>
+      <option value="dub">Full dub</option>
+    </select>
+  </div>
+  <div class="queue-filter-field">
+    <label>Tier</label>
+    <select id="filter-tier">
+      <option value="all">All</option>
+      <option value="free">Free</option>
+      <option value="pro">Pro</option>
+      <option value="enterprise">Enterprise</option>
+    </select>
+  </div>
+  <div class="queue-filter-field">
+    <label>Deadline</label>
+    <select id="filter-deadline">
+      <option value="all">All</option>
+      <option value="overdue">Overdue</option>
+      <option value="today">Due today</option>
+    </select>
+  </div>
+  <button type="button" id="queue-filters-clear" class="link-btn">Clear all</button>
+</div>
+
+<div class="filter-tabs" id="queue-tabs" style="margin-bottom:14px;">
+  <button type="button" class="active" data-tab="all">All <span class="tab-count">{{ total_jobs }}</span></button>
+  <button type="button" data-tab="needs_attention">Needs attention <span class="tab-count">{{ needs_attention_n }}</span></button>
+  <button type="button" data-tab="in_progress">In progress <span class="tab-count">{{ in_progress_n }}</span></button>
+  <button type="button" data-tab="ready">Ready <span class="tab-count">{{ ready_n }}</span></button>
+  <button type="button" data-tab="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
 </div>
 {% endif %}
 
 <div class="card" style="padding:0;">
-  {% if not orders %}
+  {% if not rows %}
     <div class="empty-state">
       <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <rect x="14" y="10" width="36" height="46" rx="3" stroke="currentColor" stroke-width="2"/>
@@ -64,205 +138,341 @@
   <div class="table-scroll">
   <table id="queue-table">
     <thead><tr>
-      <th class="sortable" data-sort="text" data-col="0">Client</th>
-      <th class="sortable" data-sort="text" data-col="1">File</th>
-      <th>Route</th>
-      <th>Tier</th>
+      <th style="width:28px;"><input type="checkbox" id="queue-select-all"></th>
+      <th class="sortable" data-sort="text" data-col="1">Job</th>
+      <th class="sortable" data-sort="text" data-col="2">Client</th>
+      <th>Service / route</th>
       <th>Status</th>
-      <th class="sortable" data-sort="num" data-col="5">% Edited</th>
-      <th class="sortable" data-sort="num" data-col="6" data-default-sort="desc">Time in stage</th>
+      <th>Assignee</th>
+      <th class="sortable" data-sort="num" data-col="6">Review progress</th>
       <th class="sortable" data-sort="num" data-col="7">Deadline</th>
-      <th class="sortable" data-sort="num" data-col="8" data-default-sort="desc">Created</th>
+      <th class="sortable" data-sort="num" data-col="8" data-default-sort="desc">Time in stage</th>
+      <th class="sortable" data-sort="num" data-col="9" data-default-sort="desc">Created</th>
     </tr></thead>
     <tbody>
-      {% for o in orders %}
-      {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
-      {% set stage_seconds = now_ts - (o['status_changed_at'] or o['created_at']) %}
-      {% set stage_stuck = o['status'] in ('queued', 'processing', 'awaiting_review', 'editor_returned') and stage_seconds > stuck_threshold_seconds %}
-      {% set pct = edited_pct.get(o['id']) %}
-      <tr data-status="{{ o['status'] }}" data-service="{{ o['service_level'] or '' }}"
-          data-sortvals="{{ pct if pct is not none else -1 }}|{{ stage_seconds|int }}|{{ (o['internal_deadline_at']|int) if ts else 9999999999 }}|{{ o['created_at']|int }}"
+      {% for r in rows %}
+      {% set o = r['order'] %}
+      {% set stage_stuck = o['status'] in ('queued', 'processing', 'awaiting_review', 'editor_returned') and r['stage_seconds'] > stuck_threshold_seconds %}
+      <tr data-status="{{ o['status'] }}" data-service="{{ o['service_level'] or '' }}" data-tier="{{ o['tier'] }}"
+          data-attention="{{ '1' if r['needs_attention'] else '0' }}"
+          data-tab-in-progress="{{ '1' if o['status'] in ('queued', 'processing') else '0' }}"
+          data-tab-ready="{{ '1' if o['status'] == 'ready_for_delivery' else '0' }}"
+          data-tab-delivered="{{ '1' if o['status'] == 'delivered' else '0' }}"
+          data-overdue="{{ '1' if (r['ts'] and r['ts']['overdue']) else '0' }}"
+          data-due-today="{{ '1' if (r['ts'] and not r['ts']['overdue'] and r['ts']['remaining_s'] <= 86400) else '0' }}"
+          data-search="{{ (o['original_filename'] ~ ' ' ~ o['client_name'] ~ ' ' ~ o['id'])|lower }}"
+          data-sortvals="{{ r['pct'] if r['pct'] is not none else -1 }}|{{ (o['internal_deadline_at']|int) if r['ts'] else 9999999999 }}|{{ r['stage_seconds']|int }}|{{ o['created_at']|int }}"
           class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
-        <td class="ellipsis-cell" style="max-width:140px;">{{ o['client_name'] }} {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}</td>
-        <td class="ellipsis-cell" title="{{ o['original_filename'] }}">{% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
-        <td style="font-family: var(--font-mono); font-size: 0.82rem; white-space:nowrap;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
-        <td>{{ o['tier'] }}</td>
-        <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
-        <td>
-          {% if pct is not none %}
-            <span class="edited-pct-pill {{ 'edited-pct-done' if pct == 100 else ('edited-pct-mid' if pct >= 50 else 'edited-pct-low') }}">{{ pct }}%</span>
-          {% else %}
-            <span class="muted">-</span>
-          {% endif %}
+        <td onclick="event.stopPropagation();"><input type="checkbox" class="queue-row-select" data-order-id="{{ o['id'] }}"></td>
+        <td class="ellipsis-cell" style="max-width:260px;" title="{{ o['original_filename'] }}">
+          <span class="queue-file-icon queue-file-{{ r['file_kind'] }}" aria-hidden="true">
+            {% if r['file_kind'] == 'youtube' %}&#9654;{% elif r['file_kind'] == 'video' %}&#127909;{% else %}&#127925;{% endif %}
+          </span>
+          {% if o['is_rush'] %}<span title="Rush order - paid priority" style="color:var(--err);">&#9889;</span>{% endif %}
+          {{ o['original_filename'] }}
+          {% if r['unread'] %}<span class="unread-dot" title="New message"></span>{% endif %}
+          <div class="muted queue-job-sub">#{{ o['id'] }} &middot; {{ "%.1f"|format(r['duration_minutes']) }} min</div>
+        </td>
+        <td class="ellipsis-cell" style="max-width:130px;">{{ o['client_name'] }}</td>
+        <td style="font-size:0.82rem;">
+          {{ service_level_labels.get(o['service_level'], o['service_level'] or '-') }}
+          <div class="muted" style="font-family:var(--font-mono); font-size:0.78rem;">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</div>
+        </td>
+        <td style="white-space:nowrap;"><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+        <td style="white-space:nowrap;">
+          {% if r['assignee'] %}
+          <div class="queue-assignee">
+            {% if r['assignee']['avatar_path'] %}
+              <img class="avatar-img avatar-img-sm" src="/avatar/{{ r['assignee']['id'] }}" alt="">
+            {% else %}
+              <div class="avatar avatar-sm">{{ r['assignee']['display_name'][0]|upper }}</div>
+            {% endif %}
+            <span>{{ r['assignee']['display_name'] }}</span>
+          </div>
+          {% else %}<span class="muted">Unassigned</span>{% endif %}
+        </td>
+        <td style="min-width:130px;">
+          {% if r['pct'] is not none %}
+            <span class="edited-pct-pill {{ 'edited-pct-done' if r['pct'] == 100 else ('edited-pct-mid' if r['pct'] >= 50 else 'edited-pct-low') }}">{{ r['pct'] }}%</span>
+            <div class="review-queue-progress-track" style="margin:5px 0 3px;"><div class="review-queue-progress-fill" style="width:{{ r['pct'] }}%;"></div></div>
+            <span class="muted" style="font-size:0.72rem;">{{ r['review_minutes'] }} / {{ "%.1f"|format(r['duration_minutes']) }} min</span>
+          {% else %}<span class="muted">-</span>{% endif %}
+        </td>
+        <td style="white-space:nowrap;">
+          {% if r['ts'] %}
+            <span class="deadline-pill deadline-{{ r['ts']['level'] }}">
+              {% if r['deadline_delta_s'] < 0 %}Overdue by {{ (-r['deadline_delta_s'])|duration_short }}{% else %}Due in {{ r['deadline_delta_s']|duration_short }}{% endif %}
+            </span>
+            <div class="muted" style="font-size:0.74rem; margin-top:2px;">{{ o['internal_deadline_at']|int|timestamp_to_str }}</div>
+            {% if r['sla_exceeded'] %}<div class="sla-exceeded-tag">&#9888; SLA exceeded</div>{% endif %}
+          {% else %}<span class="muted">-</span>{% endif %}
         </td>
         <td>
-          <span class="{{ 'stage-age-stuck' if stage_stuck else 'muted' }}" style="font-size:0.82rem;"
+          <span class="{{ 'stage-age-stuck' if stage_stuck else 'muted' }}" style="font-size:0.82rem; white-space:nowrap;"
                 title="{% if stage_stuck %}Longer than expected in this stage - worth a look{% endif %}">
-            {{ stage_seconds|duration_short }}{% if stage_stuck %} ⚠{% endif %}
+            {{ r['stage_seconds']|duration_short }}{% if stage_stuck %} &#9888;{% endif %}
           </span>
         </td>
-        <td>
-          {% if ts %}
-            <span class="deadline-pill deadline-{{ ts['level'] }}">
-              {% if ts['overdue'] %}Overdue{% else %}{{ o['internal_deadline_at']|int|timestamp_to_str }}{% endif %}
-            </span>
-          {% else %}
-            <span class="muted">-</span>
-          {% endif %}
-        </td>
+        <td class="muted" style="font-size:0.8rem; white-space:nowrap;">{{ o['created_at']|int|timestamp_to_str }}</td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
   </div>
-  <div id="queue-pager" class="queue-pager" hidden>
-    <button type="button" id="queue-pager-prev" class="secondary">&larr; Previous</button>
-    <span id="queue-pager-label" class="muted"></span>
-    <button type="button" id="queue-pager-next" class="secondary">Next &rarr;</button>
+  <div class="queue-footer">
+    <span class="muted" id="queue-selected-label">0 selected</span>
+    <button type="button" id="queue-mark-read" class="secondary" disabled>Mark read</button>
+    <div style="flex:1;"></div>
+    <label class="muted" style="display:flex; align-items:center; gap:6px;">Rows per page
+      <select id="queue-page-size">
+        <option value="10">10</option>
+        <option value="25" selected>25</option>
+        <option value="50">50</option>
+      </select>
+    </label>
+    <div id="queue-pager" class="queue-pager" hidden>
+      <button type="button" id="queue-pager-prev" class="secondary">&larr; Previous</button>
+      <span id="queue-pager-label" class="muted"></span>
+      <button type="button" id="queue-pager-next" class="secondary">Next &rarr;</button>
+    </div>
   </div>
   {% endif %}
 </div>
 
 <script>
-  (function () {
-    // Real filters+sort, remembered across the periodic auto-refresh
-    // (see the script at the top of this page) and across visits - the
-    // actual complaint this fixes was having to re-scroll/re-find "the
-    // latest" by eye every time, made worse by a page that used to
-    // reload out from under any choice every 6 seconds regardless.
-    var STORE_KEY = 'kauli_staff_queue_view';
-    function loadView() {
-      try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || {}; } catch (e) { return {}; }
-    }
-    function saveView(v) {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) { /* ignore */ }
-    }
-    var view = loadView();
-    var statusWanted = view.status ? view.status.split(',') : ['all'];
-    var serviceWanted = view.service || 'all';
-    var sortCol = view.sortCol; // undefined = server's own deadline-priority default order
-    var sortDir = view.sortDir || 'asc';
+(function () {
+  if (!document.getElementById('queue-table')) return;
+  var STORE_KEY = 'kauli_staff_queue_view';
+  function loadView() { try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || {}; } catch (e) { return {}; } }
+  function saveView(v) { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
+  var view = loadView();
 
-    // ----------------------------------------------------- pagination ----
-    // Real ask this answers: "everything should be visible without having
-    // to scroll" - a queue with dozens of orders can't satisfy that by
-    // showing them all at once, so it's paginated instead (10/page,
-    // matching the count a screen can show without scrolling). Filtering
-    // and sorting stay real and instant (client-side, same as before);
-    // pagination is layered on top rather than replacing that logic - see
-    // updateVisibility, the one place that decides what's actually shown.
-    var PAGE_SIZE = 10;
-    var currentPage = 1;
-    function updateVisibility() {
-      var matching = [];
-      document.querySelectorAll('tbody tr').forEach(function (row) {
-        var statusOk = statusWanted[0] === 'all' || statusWanted.includes(row.dataset.status);
-        var serviceOk = serviceWanted === 'all' || row.dataset.service === serviceWanted;
-        row.dataset.filterMatch = (statusOk && serviceOk) ? '1' : '0';
-        if (statusOk && serviceOk) matching.push(row);
+  var table = document.getElementById('queue-table');
+  var rowsAll = Array.from(table.querySelectorAll('tbody tr'));
+  var activeTab = view.tab || 'all';
+  var searchQ = '';
+  var f = { status: view.status || 'all', service: view.service || 'all', tier: view.tier || 'all', deadline: view.deadline || 'all' };
+  var sortCol = view.sortCol, sortDir = view.sortDir || 'asc';
+  var pageSize = view.pageSize || 25;
+  var currentPage = 1;
+
+  document.getElementById('filter-status').value = f.status;
+  document.getElementById('filter-service').value = f.service;
+  document.getElementById('filter-tier').value = f.tier;
+  document.getElementById('filter-deadline').value = f.deadline;
+  document.getElementById('queue-page-size').value = String(pageSize);
+  document.querySelectorAll('#queue-tabs button').forEach(function (b) {
+    b.classList.toggle('active', b.dataset.tab === activeTab);
+  });
+
+  function matchesTab(row) {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'needs_attention') return row.dataset.attention === '1';
+    if (activeTab === 'in_progress') return row.dataset.tabInProgress === '1';
+    if (activeTab === 'ready') return row.dataset.tabReady === '1';
+    if (activeTab === 'delivered') return row.dataset.tabDelivered === '1';
+    return true;
+  }
+  function matchesFilters(row) {
+    if (f.status !== 'all' && row.dataset.status !== f.status) return false;
+    if (f.service !== 'all' && row.dataset.service !== f.service) return false;
+    if (f.tier !== 'all' && row.dataset.tier !== f.tier) return false;
+    if (f.deadline === 'overdue' && row.dataset.overdue !== '1') return false;
+    if (f.deadline === 'today' && row.dataset.dueToday !== '1') return false;
+    if (searchQ && row.dataset.search.indexOf(searchQ) === -1) return false;
+    return true;
+  }
+  function updateFiltersBadge() {
+    var n = ['status', 'service', 'tier', 'deadline'].filter(function (k) { return f[k] !== 'all'; }).length;
+    var badge = document.getElementById('queue-filters-badge');
+    badge.hidden = n === 0;
+    badge.textContent = String(n);
+  }
+
+  function render() {
+    var matching = rowsAll.filter(function (row) { return matchesTab(row) && matchesFilters(row); });
+    var totalPages = Math.max(1, Math.ceil(matching.length / pageSize));
+    currentPage = Math.min(currentPage, totalPages);
+    var start = (currentPage - 1) * pageSize;
+    rowsAll.forEach(function (row) { row.style.display = 'none'; });
+    matching.forEach(function (row, i) {
+      row.style.display = (i >= start && i < start + pageSize) ? '' : 'none';
+    });
+    var pager = document.getElementById('queue-pager');
+    pager.hidden = totalPages <= 1;
+    document.getElementById('queue-pager-label').textContent = 'Page ' + currentPage + ' of ' + totalPages + ' (' + matching.length + ' job' + (matching.length === 1 ? '' : 's') + ')';
+    document.getElementById('queue-pager-prev').disabled = currentPage <= 1;
+    document.getElementById('queue-pager-next').disabled = currentPage >= totalPages;
+    updateFiltersBadge();
+  }
+
+  document.querySelectorAll('#queue-tabs button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#queue-tabs button').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      currentPage = 1;
+      saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
+      render();
+    });
+  });
+
+  var searchInput = document.getElementById('queue-search');
+  searchInput.addEventListener('input', function () {
+    searchQ = searchInput.value.trim().toLowerCase();
+    currentPage = 1;
+    render();
+  });
+
+  var filtersPanel = document.getElementById('queue-filters-panel');
+  document.getElementById('queue-filters-toggle').addEventListener('click', function () {
+    filtersPanel.hidden = !filtersPanel.hidden;
+  });
+  ['status', 'service', 'tier', 'deadline'].forEach(function (key) {
+    document.getElementById('filter-' + key).addEventListener('change', function (e) {
+      f[key] = e.target.value;
+      currentPage = 1;
+      saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
+      render();
+    });
+  });
+  document.getElementById('queue-filters-clear').addEventListener('click', function () {
+    f = { status: 'all', service: 'all', tier: 'all', deadline: 'all' };
+    ['status', 'service', 'tier', 'deadline'].forEach(function (k) { document.getElementById('filter-' + k).value = 'all'; });
+    currentPage = 1;
+    saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
+    render();
+  });
+
+  document.getElementById('queue-page-size').addEventListener('change', function (e) {
+    pageSize = Number(e.target.value);
+    currentPage = 1;
+    saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
+    render();
+  });
+  document.getElementById('queue-pager-prev').addEventListener('click', function () { currentPage -= 1; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+  document.getElementById('queue-pager-next').addEventListener('click', function () { currentPage += 1; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+  // ------------------------------------------------------- sorting ----
+  function sortRows(col, dir) {
+    var tbody = table.querySelector('tbody');
+    var rows = Array.from(tbody.querySelectorAll('tr'));
+    var th = table.querySelector('th[data-col="' + col + '"]');
+    var isNum = th && th.dataset.sort === 'num';
+    var sortvalsIndex = { 6: 0, 7: 1, 8: 2, 9: 3 }[col];
+    rows.sort(function (a, b) {
+      var av, bv;
+      if (isNum) {
+        var avAll = a.dataset.sortvals.split('|'), bvAll = b.dataset.sortvals.split('|');
+        av = parseFloat(avAll[sortvalsIndex]); bv = parseFloat(bvAll[sortvalsIndex]);
+      } else {
+        av = a.children[col].textContent.trim().toLowerCase();
+        bv = b.children[col].textContent.trim().toLowerCase();
+      }
+      if (av < bv) return dir === 'asc' ? -1 : 1;
+      if (av > bv) return dir === 'asc' ? 1 : -1;
+      return 0;
+    });
+    rows.forEach(function (row) { tbody.appendChild(row); });
+    rowsAll = rows;
+    table.querySelectorAll('th.sortable').forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
+    if (th) th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
+  }
+  table.querySelectorAll('th.sortable').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var col = Number(th.dataset.col);
+      if (sortCol === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+      else { sortCol = col; sortDir = th.dataset.defaultSort || 'asc'; }
+      sortRows(sortCol, sortDir);
+      saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
+      render();
+    });
+  });
+  if (sortCol !== undefined && sortCol !== null) sortRows(sortCol, sortDir);
+  render();
+
+  // ---------------------------------------------------- row select ----
+  var selectAll = document.getElementById('queue-select-all');
+  var selectedLabel = document.getElementById('queue-selected-label');
+  var markReadBtn = document.getElementById('queue-mark-read');
+  function updateSelection() {
+    var checked = Array.from(document.querySelectorAll('.queue-row-select:checked'));
+    selectedLabel.textContent = checked.length + ' selected';
+    markReadBtn.disabled = checked.length === 0;
+  }
+  document.querySelectorAll('.queue-row-select').forEach(function (cb) {
+    cb.addEventListener('change', updateSelection);
+  });
+  selectAll.addEventListener('click', function () {
+    document.querySelectorAll('.queue-row-select').forEach(function (cb) {
+      var row = cb.closest('tr');
+      if (row.style.display !== 'none') cb.checked = selectAll.checked;
+    });
+    updateSelection();
+  });
+  markReadBtn.addEventListener('click', function () {
+    var ids = Array.from(document.querySelectorAll('.queue-row-select:checked')).map(function (cb) { return cb.dataset.orderId; });
+    Promise.all(ids.map(function (id) {
+      return fetch('/staff/orders/' + id + '/mark-read', { method: 'POST' });
+    })).then(function () { location.reload(); });
+  });
+
+  // ------------------------------------------------- columns toggle ----
+  var ALL_COLUMNS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  var colKey = 'kauli_staff_queue_columns';
+  var hiddenCols = [];
+  try { hiddenCols = JSON.parse(localStorage.getItem(colKey) || '[]'); } catch (e) {}
+  function applyColumns() {
+    ALL_COLUMNS.forEach(function (i) {
+      var show = hiddenCols.indexOf(i) === -1;
+      table.querySelectorAll('tr').forEach(function (row) {
+        var cell = row.children[i];
+        if (cell) cell.style.display = show ? '' : 'none';
       });
-      var totalPages = Math.max(1, Math.ceil(matching.length / PAGE_SIZE));
-      currentPage = Math.min(currentPage, totalPages);
-      var start = (currentPage - 1) * PAGE_SIZE;
-      matching.forEach(function (row, i) {
-        row.style.display = (i >= start && i < start + PAGE_SIZE) ? '' : 'none';
-      });
-      document.querySelectorAll('tbody tr[data-filter-match="0"]').forEach(function (row) { row.style.display = 'none'; });
-      var pager = document.getElementById('queue-pager');
-      if (pager) {
-        pager.hidden = totalPages <= 1;
-        document.getElementById('queue-pager-label').textContent =
-          'Page ' + currentPage + ' of ' + totalPages + ' (' + matching.length + ' job' + (matching.length === 1 ? '' : 's') + ')';
-        document.getElementById('queue-pager-prev').disabled = currentPage <= 1;
-        document.getElementById('queue-pager-next').disabled = currentPage >= totalPages;
+    });
+  }
+  applyColumns();
+  document.getElementById('queue-columns-toggle').addEventListener('click', function () {
+    var labels = ['', 'Job', 'Client', 'Service/route', 'Status', 'Assignee', 'Review progress', 'Deadline', 'Time in stage', 'Created'];
+    var choice = prompt('Hide which column? Type its name (' + ALL_COLUMNS.map(function (i) { return labels[i]; }).join(', ') + '), or leave blank to show all again.');
+    if (choice === null) return;
+    if (!choice.trim()) { hiddenCols = []; }
+    else {
+      var idx = labels.indexOf(choice.trim());
+      if (idx > 0) {
+        var pos = hiddenCols.indexOf(idx);
+        if (pos === -1) hiddenCols.push(idx); else hiddenCols.splice(pos, 1);
       }
     }
-    function applyFilters() { currentPage = 1; updateVisibility(); }
-    var pagerPrev = document.getElementById('queue-pager-prev');
-    var pagerNext = document.getElementById('queue-pager-next');
-    if (pagerPrev) pagerPrev.addEventListener('click', function () { currentPage -= 1; updateVisibility(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-    if (pagerNext) pagerNext.addEventListener('click', function () { currentPage += 1; updateVisibility(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
-    document.querySelectorAll('#status-filter button').forEach(function (btn) {
-      if (btn.dataset.filter === (view.status || 'all')) {
-        document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-      }
-      btn.addEventListener('click', function () {
-        document.querySelectorAll('#status-filter button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        statusWanted = btn.dataset.filter.split(',');
-        saveView({ status: btn.dataset.filter, service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
-        applyFilters();
-      });
-    });
-    document.querySelectorAll('#service-filter button').forEach(function (btn) {
-      if (btn.dataset.service === serviceWanted) {
-        document.querySelectorAll('#service-filter button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-      }
-      btn.addEventListener('click', function () {
-        document.querySelectorAll('#service-filter button').forEach(function (b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        serviceWanted = btn.dataset.service;
-        saveView({ status: statusWanted.join(','), service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
-        applyFilters();
-      });
-    });
+    try { localStorage.setItem(colKey, JSON.stringify(hiddenCols)); } catch (e) {}
+    applyColumns();
+  });
 
-    // ------------------------------------------------------- sorting ----
-    var table = document.getElementById('queue-table');
-    function sortRows(col, dir) {
-      var tbody = table.querySelector('tbody');
-      var rows = Array.from(tbody.querySelectorAll('tr'));
-      var th = table.querySelector('th[data-col="' + col + '"]');
-      var isNum = th && th.dataset.sort === 'num';
-      var sortvalsIndex = { 5: 0, 6: 1, 7: 2, 8: 3 }[col]; // matches the pipe-separated order baked into data-sortvals
-      rows.sort(function (a, b) {
-        var av, bv;
-        if (isNum) {
-          var avAll = a.dataset.sortvals.split('|'), bvAll = b.dataset.sortvals.split('|');
-          av = parseFloat(avAll[sortvalsIndex]); bv = parseFloat(bvAll[sortvalsIndex]);
-        } else {
-          av = a.children[col].textContent.trim().toLowerCase();
-          bv = b.children[col].textContent.trim().toLowerCase();
-        }
-        if (av < bv) return dir === 'asc' ? -1 : 1;
-        if (av > bv) return dir === 'asc' ? 1 : -1;
-        return 0;
+  // -------------------------------------------------------- export ----
+  document.getElementById('queue-export').addEventListener('click', function () {
+    var headerCells = Array.from(table.querySelectorAll('thead th')).slice(1).map(function (th) { return th.textContent.trim(); });
+    var lines = [headerCells.join(',')];
+    rowsAll.forEach(function (row) {
+      if (row.style.display === 'none') return;
+      var cells = Array.from(row.children).slice(1).map(function (td) {
+        return '"' + td.textContent.trim().replace(/\s+/g, ' ').replace(/"/g, '""') + '"';
       });
-      rows.forEach(function (row) { tbody.appendChild(row); });
-      table.querySelectorAll('th.sortable').forEach(function (h) { h.classList.remove('sort-asc', 'sort-desc'); });
-      if (th) th.classList.add(dir === 'asc' ? 'sort-asc' : 'sort-desc');
-    }
-    table.querySelectorAll('th.sortable').forEach(function (th) {
-      th.addEventListener('click', function () {
-        var col = Number(th.dataset.col);
-        if (sortCol === col) {
-          sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-        } else {
-          sortCol = col;
-          sortDir = th.dataset.defaultSort || 'asc';
-        }
-        sortRows(sortCol, sortDir);
-        saveView({ status: statusWanted.join(','), service: serviceWanted, sortCol: sortCol, sortDir: sortDir });
-        updateVisibility();
-      });
+      lines.push(cells.join(','));
     });
-    if (sortCol !== undefined && sortCol !== null) sortRows(sortCol, sortDir);
-    applyFilters();
+    var blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = 'kauli-queue-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
 
-    // Whole row opens the order - no separate "open" button needed.
-    // Middle-click / Ctrl/Cmd+click still opens in a new tab, same as a
-    // real link, since this is a real navigation, not a JS-only trick.
-    document.querySelectorAll('tr.clickable-row').forEach(function (row) {
-      row.addEventListener('click', function () { window.location.href = row.dataset.href; });
-      row.addEventListener('auxclick', function (e) {
-        if (e.button === 1) window.open(row.dataset.href, '_blank');
-      });
-      row.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') window.location.href = row.dataset.href;
-      });
-    });
-  })();
+  // Whole row opens the order - checkboxes stop propagation above.
+  document.querySelectorAll('tr.clickable-row').forEach(function (row) {
+    row.addEventListener('click', function () { window.location.href = row.dataset.href; });
+    row.addEventListener('auxclick', function (e) { if (e.button === 1) window.open(row.dataset.href, '_blank'); });
+    row.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.href = row.dataset.href; });
+  });
+})();
 </script>
 {% endblock %}
