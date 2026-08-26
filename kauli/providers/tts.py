@@ -5,6 +5,24 @@ Cost note that drives the whole product sequencing:
   en -> sw  : Amazon Polly has NO Swahili voice. You need Azure
               (sw-KE-ZuriNeural / sw-KE-RafikiNeural) or Google Cloud TTS.
 That's why we ship sw->en first.
+
+Real, confirmed gap this stretch: webapp/app.py's create_order hard-codes
+tts="piper" for every full-dub order regardless of target_lang - so
+every en->sw dub today is actually read by an ENGLISH Piper voice
+attempting Swahili text, not real Swahili speech at all. Two real
+Swahili options were researched, not just assumed:
+  - Piper does have a real Swahili voice (sw_CD-lanfrica) - but its
+    underlying training dataset's own commercial-use terms couldn't be
+    confirmed (lanfrica.com's page didn't state them), so it's not
+    something to route real paying orders to without that answered.
+  - Meta's MMS-TTS (facebook/mms-tts-swa, see MMSTTS below) is real,
+    free, and produces genuine Swahili speech - but ships under
+    CC-BY-NC 4.0, explicitly non-commercial (confirmed via Hugging
+    Face's own model card). Built as an evaluation-only provider,
+    deliberately not wired into any real order.
+The one CONFIRMED commercially-safe real Swahili voice is Azure's
+sw-KE-ZuriNeural/RafikiNeural (AzureTTS below) - already fully built,
+just needs AZURE_SPEECH_KEY/AZURE_SPEECH_REGION set to actually ship.
 """
 from __future__ import annotations
 
@@ -173,8 +191,70 @@ class XTTSCloneTTS(TTSProvider):
             return int(w.getnframes() / w.getframerate() * 1000)
 
 
+class MMSTTS(TTSProvider):
+    """Meta's MMS (Massively Multilingual Speech) TTS - real, free, local
+    Swahili synthesis, via transformers' VitsModel. This is the actual
+    gap Piper can't cover on its own for en->sw (Piper's real Swahili
+    voice, sw_CD-lanfrica, exists but its underlying dataset's license
+    couldn't be confirmed commercial-safe - see the module docstring).
+
+    !! EVALUATION ONLY, NOT WIRED INTO REAL ORDERS !! MMS-TTS checkpoints
+    (including facebook/mms-tts-swa) ship under CC-BY-NC 4.0 - explicitly
+    NON-COMMERCIAL. That's real and confirmed (Hugging Face's own model
+    card language), not a formality - using this for a real paying
+    client's dub would violate the license. This class exists so it can
+    be tried and heard, same as any other real evaluation; get_tts() and
+    every order-creation path deliberately do NOT route to "mms" - that
+    stays a manual, explicit choice (see kauli/cli.py --tts mms) until/
+    unless a real commercially-licensed Swahili voice is set up (Azure's
+    sw-KE-ZuriNeural/RafikiNeural, already built as AzureTTS above, is
+    the actual safe-to-ship option - just needs AZURE_SPEECH_KEY).
+
+    ~145MB model, one-time download on first use, no GPU required
+    (VITS is fast enough on CPU for real dub-length segments)."""
+    name = "mms"
+    sample_rate = 16000
+    MODEL_NAME = "facebook/mms-tts-swa"
+
+    def __init__(self):
+        self._model = None
+        self._tokenizer = None
+
+    def _load(self):
+        if self._model is None:
+            from transformers import VitsModel, AutoTokenizer
+            self._model = VitsModel.from_pretrained(self.MODEL_NAME)
+            self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+            self.sample_rate = self._model.config.sampling_rate
+        return self._model, self._tokenizer
+
+    def synthesize(self, text: str, out_path: str, voice_id=None, rate: float = 1.0) -> int:
+        import torch
+        model, tokenizer = self._load()
+        inputs = tokenizer(text, return_tensors="pt")
+        with torch.no_grad():
+            output = model(**inputs).waveform
+        # rate here means "speaking speed multiplier", same convention as
+        # every other provider - VITS has no direct rate control, so this
+        # resamples-by-stretch the generated waveform instead (a real,
+        # if slightly less natural-sounding, approximation).
+        samples = output.squeeze().numpy()
+        if rate != 1.0:
+            import numpy as np
+            new_len = max(1, int(len(samples) / max(rate, 0.1)))
+            samples = np.interp(
+                np.linspace(0, len(samples) - 1, new_len), np.arange(len(samples)), samples)
+        pcm = (samples * 32767).clip(-32768, 32767).astype("int16")
+        with wave.open(out_path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(self.sample_rate)
+            w.writeframes(pcm.tobytes())
+        return int(len(pcm) / self.sample_rate * 1000)
+
+
 _REGISTRY = {
-    "stub": StubTTS, "piper": PiperTTS, "azure": AzureTTS, "xtts": XTTSCloneTTS,
+    "stub": StubTTS, "piper": PiperTTS, "azure": AzureTTS, "xtts": XTTSCloneTTS, "mms": MMSTTS,
 }
 
 # A small, realistic picker for jobs where actual voice cloning (see
