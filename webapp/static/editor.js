@@ -251,6 +251,11 @@
       get duration() { return ready ? player.getDuration() : 0; },
       get playbackRate() { return ready ? player.getPlaybackRate() : 1; },
       set playbackRate(v) { if (ready) player.setPlaybackRate(v); },
+      // Real YT.Player mute API - bindCustomControls' mute button needs
+      // this to actually do anything for a YouTube-sourced order, not
+      // just toggle a property nothing reads.
+      get muted() { return ready && player.isMuted(); },
+      set muted(v) { if (ready) { v ? player.mute() : player.unMute(); } },
       play() { if (ready) player.playVideo(); },
       pause() { if (ready) player.pauseVideo(); },
       addEventListener(evt, cb) {
@@ -383,7 +388,22 @@
 
   function bindCustomControls() {
     const bar = $("#custom-controls");
-    if (!bar || !audio || audio.tagName !== "VIDEO") return;
+    // Real bug this fixes: this used to require audio.tagName === "VIDEO",
+    // which is only ever true for a native <video> element - the YouTube
+    // adapter (createYouTubeAdapter) is a plain JS object with no
+    // tagName at all, so this returned immediately for EVERY YouTube-
+    // sourced order. That meant Kauli's own fullscreen button (which
+    // deliberately fullscreens .media-wrap, not the raw player - see
+    // below) never had a working click handler on a YouTube order,
+    // confirmed live: clicking it did nothing Kauli controlled, and
+    // whatever fullscreen a client/staff member DID get into (YouTube's
+    // own embedded UI, cross-origin, completely outside this app's CSS)
+    // was never going to size correctly no matter what this stylesheet
+    // said. Both media types belong here now - the YT adapter
+    // deliberately mirrors enough of the real media-element interface
+    // (currentTime/paused/duration/play/pause/muted/addEventListener)
+    // for this same code to work against either one.
+    if (!bar || !audio) return;
 
     const playBtn = $("#cc-play");
     const elapsedEl = $("#cc-elapsed");
