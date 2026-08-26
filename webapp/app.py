@@ -4707,7 +4707,7 @@ def staff_overview(request: Request):
     # with a real link to the full, properly-paginated list at /staff/jobs,
     # not every order crammed into one tall table.
     active_jobs = orders[:5]
-    review_queue = [o for o in orders if o["status"] == "awaiting_review"][:4]
+    review_queue = [o for o in orders if o["status"] == "awaiting_review"][:3]
     edited_pct = {}
     for o in active_jobs + review_queue:
         if o["id"] not in edited_pct:
