@@ -4569,8 +4569,9 @@ def staff_review(request: Request, order_id: str, error: str | None = None, noti
         * DIFFICULTY_SURCHARGE_DEFAULT_PCT, 2)
 
     assigned_actor = db.get_voice_actor(order["voice_actor_id"]) if order["voice_actor_id"] else None
+    order_client = db.get_user(order["client_id"])
     return templates.TemplateResponse(request, "staff_review.html", {
-        "user": user, "order": order, "job": job,
+        "user": user, "order": order, "job": job, "order_client_email": order_client["email"] if order_client else None,
         "client_messages": client_messages, "internal_messages": internal_messages,
         "has_video_source": has_video_source,
         "voice_actors": db.list_voice_actors("active"),
@@ -4623,7 +4624,7 @@ def staff_difficulty_surcharge(request: Request, order_id: str, action: str = Fo
 
 @app.post("/staff/orders/{order_id}/messages")
 def staff_send_message(request: Request, order_id: str,
-                        body: str = Form(...), visibility: str = Form(...)):
+                        body: str = Form(...), visibility: str = Form(...), also_email: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -4633,6 +4634,20 @@ def staff_send_message(request: Request, order_id: str,
     if body.strip() and visibility in ("client", "internal"):
         db.create_message(order_id, user["id"], visibility, body)
         db.mark_read(user["id"], order_id)
+        # also_email is only ever meaningful on a client-visible message -
+        # an internal note has no client to email, and the checkbox
+        # doesn't even exist on that form, but the check here is real
+        # defense, not just relying on the template never sending it.
+        if also_email and visibility == "client":
+            client = db.get_user(order["client_id"])
+            if client and client["email"]:
+                html = mailer.wrap_email_html(
+                    f"<p>{body.strip()}</p>".replace("\n", "</p><p>"),
+                    cta_text="View your order →", cta_url=str(request.base_url).rstrip("/") + f"/client/orders/{order_id}",
+                    base_url=str(request.base_url),
+                )
+                mailer.send_email(client["email"], f"Update on your Kauli order - {order['original_filename']}",
+                                   html, body.strip())
     return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
 
 

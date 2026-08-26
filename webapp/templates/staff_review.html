@@ -273,6 +273,11 @@
   <form method="post" action="/staff/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
     <input type="hidden" name="visibility" value="client">
     <textarea name="body" rows="2" placeholder="Reply to client..." required></textarea>
+    <label class="auth-checkbox-row" style="margin:8px 0;">
+      <input type="checkbox" name="also_email" value="1">
+      <span>Also email {{ order_client_email or 'the client' }} this message right now (otherwise they
+        only see it next time they check their dashboard)</span>
+    </label>
     <button type="submit">Send to client</button>
   </form>
 </details>
