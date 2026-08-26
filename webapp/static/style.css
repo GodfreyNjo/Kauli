@@ -22,26 +22,30 @@
   --muted: #6b6862;
   --faint: #8c877e;
 
-  /* The system accent, system-wide - was rust, then olive, now indigo on
-     request (matching a reference "studio-grade" client-portal design) -
-     replaces it everywhere this token is used (buttons, links, focus
-     states, badges, tier/step highlights, the sidebar's active-row
-     marker), not just the marketing site. */
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef0fd;
+  /* The system accent, system-wide - was rust, then olive (a deliberate
+     brand choice, not a placeholder) - briefly changed to indigo chasing
+     a reference mockup's look, reverted back to olive on request: that
+     mockup was a real, useful LAYOUT reference (the dashboard/orders-
+     table/stepper/etc. structure it inspired all stays), but the actual
+     brand color wasn't meant to go with it. Replaces this token
+     everywhere it's used (buttons, links, focus states, badges, tier/
+     step highlights, the sidebar's active-row marker), not just the
+     marketing site. */
+  --accent: #556b2f;
+  --accent-hover: #445423;
+  --accent-soft: #eeeee8;
   --accent-ink: #ffffff;
 
   /* Second CTA color, marketing-site buttons/borders only - keeps the
      public site from reading as one flat color end to end (buttons,
      borders, form focus - see body.m-public rules near the end of this
-     file). --accent3 now duplicates --accent (both indigo) - kept as its
+     file). --accent3 now duplicates --accent (both olive) - kept as its
      own token rather than removed, since marketing.html's cta-olive class
      still references it directly. */
   --accent2: #4b21d9;
   --accent2-hover: #3c19ae;
-  --accent3: #4f46e5;
-  --accent3-hover: #4338ca;
+  --accent3: #556b2f;
+  --accent3-hover: #64802e;
 
   /* Fixed dark-navy "chrome" for the app sidebar/topbar - deliberately
      NOT swapped by the light/dark theme toggle (same idea login.html's
@@ -93,9 +97,9 @@ html[data-theme="dark"] {
   --muted: #a1a1aa;
   --faint: #71717a;
 
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-soft: #24243f;
+  --accent: #556b2f;
+  --accent-hover: #64802e;
+  --accent-soft: #25291f;
   --accent-ink: #ffffff;
 
   --ok: #6f9b78;
