@@ -315,9 +315,61 @@ class LocalMT(MTProvider):
         }
 
 
+class AzureTranslateMT(MTProvider):
+    """Real, commercially-licensed, direction-aware MT via Azure AI
+    Translator - built to replace LocalMT below on Free/Pro tier.
+
+    Real bug this fixes, not just a quality upgrade: LocalMT is
+    Helsinki-NLP/opus-mt-swc-en, a Swahili-TO-English-ONLY model - it
+    ignores source_lang/target_lang entirely and always runs text
+    through that one fixed direction. On an en->sw order (Free/Pro
+    tier), that meant feeding ENGLISH text into a model trained to
+    output English FROM Swahili - not just weaker, actually nonsensical
+    regardless of input. Azure Translator is genuinely bidirectional
+    (confirmed: Swahili `sw` is a real supported language, both
+    directions, via Microsoft's own current language-support docs) and
+    commercially licensed - 2,000,000 characters/month free, real
+    pay-as-you-go pricing beyond that (nowhere close to what a real
+    order's transcript volume would need to worry about).
+
+    Like AwsTranslateMT/LaraMT, this returns ONE translation, not four
+    length-targeted candidates - duration fitting only has 'literal'/
+    'spoken' (identical here) to work with. Set AZURE_TRANSLATOR_KEY
+    and AZURE_TRANSLATOR_REGION (a Translator resource, NOT the same
+    resource as AZURE_SPEECH_KEY/AZURE_SPEECH_REGION - see
+    kauli/providers/tts.py:AzureTTS for that one)."""
+    name = "azure-translate"
+    ENDPOINT = "https://api.cognitive.microsofttranslator.com/translate"
+
+    def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
+        import httpx
+        import uuid as _uuid
+        resp = httpx.post(
+            self.ENDPOINT,
+            params={"api-version": "3.0", "from": source_lang, "to": target_lang},
+            headers={
+                "Ocp-Apim-Subscription-Key": os.environ["AZURE_TRANSLATOR_KEY"],
+                "Ocp-Apim-Subscription-Region": os.environ["AZURE_TRANSLATOR_REGION"],
+                "Content-Type": "application/json",
+                "X-ClientTraceId": str(_uuid.uuid4()),
+            },
+            json=[{"text": text}],
+            timeout=15,
+        )
+        resp.raise_for_status()
+        out = resp.json()[0]["translations"][0]["text"]
+        return {
+            "literal": out, "spoken": out, "shorter": None, "longer": None,
+            "notes": "Azure Translator: one translation, no length-targeted paraphrase - "
+                     "duration fitting only has this one candidate to work with.",
+            "confidence": 0.75 if out else 0.0,
+            "flags": [] if out else ["unclear"],
+        }
+
+
 _REGISTRY = {
     "stub": StubMT, "claude": ClaudeMT, "aws-translate": AwsTranslateMT,
-    "local": LocalMT, "lara": LaraMT,
+    "local": LocalMT, "lara": LaraMT, "azure-translate": AzureTranslateMT,
 }
 
 

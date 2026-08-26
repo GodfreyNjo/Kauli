@@ -2858,6 +2858,25 @@ def create_order(
         mt = "claude"
     else:
         mt = plan_mt
+        # Real bug this fixes, same class as the Kikuyu guard just above:
+        # LocalMT (kauli/providers/mt.py) is Helsinki-NLP/opus-mt-swc-en -
+        # a Swahili-TO-English-ONLY model that ignores source_lang/
+        # target_lang entirely. It only ever produces a real answer for
+        # sw->en; any other direction reaching "local" (most concretely,
+        # an en->sw order on Free/Pro tier) fed English text through a
+        # model built to output English, producing nonsense regardless of
+        # input - confirmed live, not hypothetical. AzureTranslateMT is
+        # genuinely bidirectional; refuse rather than ship garbage if it
+        # isn't configured yet, same pattern as Kikuyu and the dub-voice
+        # case below.
+        if mt == "local" and not (source_lang == "sw" and target_lang == "en"):
+            if os.environ.get("AZURE_TRANSLATOR_KEY"):
+                mt = "azure-translate"
+            else:
+                return _client_dashboard_error(request, user,
+                    "Translating that language pair needs our translation provider connected first, "
+                    "which isn't done yet - contact us and we'll handle this one manually in the meantime.",
+                    form_values=form_values)
     # Real bug this fixes: this used to be tts = "piper" if level["tts"]
     # else "stub", with zero regard for target_lang - so every en->sw
     # full-dub order was read by an ENGLISH Piper voice attempting
