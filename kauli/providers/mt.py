@@ -373,7 +373,81 @@ _REGISTRY = {
 }
 
 
+class ResilientMT(MTProvider):
+    """Same 'use X first, fall back to Y automatically' pattern
+    kauli.providers.asr.TranskriptorASR already uses for ASR (see that
+    class's own docstring) - here for MT. get_mt() returns one of these
+    instead of the bare named provider whenever a real, already-configured
+    fallback exists (see FALLBACK_CHAIN/_fallback_configured below), so a
+    caller selecting mt="claude" gets "Claude, and if it's actually down
+    fall back to Azure Translator" as ONE resolved behavior, not two
+    providers it has to orchestrate itself. fallback_used/fallback_reason
+    mirror TranskriptorASR's exact attribute names on purpose - callers
+    that already know to check an ASR provider for these can check an MT
+    provider the same way."""
+    def __init__(self, primary: MTProvider, fallback: MTProvider, fallback_name: str):
+        self.primary = primary
+        self.fallback = fallback
+        self.fallback_name = fallback_name
+        self.name = primary.name
+        self.fallback_used = False
+        self.fallback_reason: str | None = None
+
+    @property
+    def total_cost_usd(self) -> float:
+        # Real cost from BOTH providers, summed - a mid-job switch means
+        # the primary genuinely already spent real money on whatever
+        # segments it completed before failing; reporting only whichever
+        # provider is "current" would silently drop that from
+        # ops_ai_spend_today (webapp/db.py) the moment a fallback fires.
+        return getattr(self.primary, "total_cost_usd", 0.0) + getattr(self.fallback, "total_cost_usd", 0.0)
+
+    def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
+        # Once the primary has shown it's down, stay on the fallback for
+        # the rest of THIS job rather than re-trying (and possibly
+        # succeeding on) the primary per segment - a flaky primary
+        # otherwise produces a translation stitched from two different
+        # models' style/terminology choices within one delivered order,
+        # which is worse than a consistent fallback throughout.
+        if not self.fallback_used:
+            try:
+                return self.primary.translate(text, target_chars, source_lang, target_lang)
+            except Exception as exc:  # noqa: BLE001 - any primary failure means "fall back", not "fail the order"
+                self.fallback_used = True
+                self.fallback_reason = f"{self.primary.name} failed ({exc}) - used {self.fallback_name} instead"
+        return self.fallback.translate(text, target_chars, source_lang, target_lang)
+
+
+# Real fallback pairing, not every provider paired with every other one -
+# each entry is "if THIS fails, and a working alternative is actually
+# configured, use THAT instead". Azure Translator is the fallback target
+# across the board: it's the one MT provider here confirmed genuinely
+# bidirectional and Kiswahili-capable independent of Claude being up (see
+# that class's own docstring) - not just "some other provider happened to
+# be available".
+MT_FALLBACK_CHAIN = {"claude": "azure-translate", "aws-translate": "azure-translate", "lara": "azure-translate"}
+
+
+def _mt_fallback_configured(name: str) -> bool:
+    """Whether the fallback candidate actually has what it needs to run -
+    never wrap a primary in a fallback that would just fail too (silently
+    swapping one exception for a different, equally-broken one)."""
+    if name == "azure-translate":
+        return bool(os.environ.get("AZURE_TRANSLATOR_KEY"))
+    if name == "claude":
+        return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    if name == "aws-translate":
+        return bool(os.environ.get("AWS_ACCESS_KEY_ID"))
+    if name == "lara":
+        return bool(os.environ.get("LARA_ACCESS_KEY_ID"))
+    return True
+
+
 def get_mt(name: str, **kwargs) -> MTProvider:
     if name not in _REGISTRY:
         raise ValueError(f"Unknown MT provider '{name}'. Options: {list(_REGISTRY)}")
-    return _REGISTRY[name](**kwargs)
+    primary = _REGISTRY[name](**kwargs)
+    fallback_name = MT_FALLBACK_CHAIN.get(name)
+    if fallback_name and fallback_name != name and _mt_fallback_configured(fallback_name):
+        return ResilientMT(primary, _REGISTRY[fallback_name](), fallback_name)
+    return primary

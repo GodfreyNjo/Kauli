@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import wave
+from pathlib import Path
 
 
 class TTSProvider:
@@ -304,7 +305,64 @@ PIPER_VOICES = {
 }
 
 
-def get_tts(name: str, **kwargs) -> TTSProvider:
+class ResilientTTS(TTSProvider):
+    """Same 'use X first, fall back to Y automatically' pattern as
+    kauli.providers.asr.TranskriptorASR and kauli.providers.mt.ResilientMT -
+    here for TTS, with a real constraint neither of those has: there is
+    only ever a safe fallback when the target language is English. Piper
+    (the one local/free TTS option) has NO Swahili voice at all (see
+    PIPER_VOICES above and this module's own header comment) - wrapping a
+    Swahili-target Azure call in a Piper fallback would "succeed" by
+    reading Swahili text in an English voice, which is worse than a clear
+    failure. get_tts() only ever constructs this when target_lang == "en"."""
+    def __init__(self, primary: TTSProvider, fallback: TTSProvider, fallback_name: str):
+        self.primary = primary
+        self.fallback = fallback
+        self.fallback_name = fallback_name
+        self.name = primary.name
+        self.fallback_used = False
+        self.fallback_reason: str | None = None
+
+    @property
+    def sample_rate(self) -> int:
+        return self.fallback.sample_rate if self.fallback_used else self.primary.sample_rate
+
+    def synthesize(self, text: str, out_path: str, voice_id=None, rate: float = 1.0) -> int:
+        # Once fallen back, stay on the fallback for the rest of this job -
+        # same reasoning as ResilientMT.translate: retrying a flaky primary
+        # per segment risks a dub mixing two different providers' sample
+        # rates/voices within one delivered file, which build_timeline
+        # can't reconcile (see pipeline.run's own comment on this).
+        if not self.fallback_used:
+            try:
+                return self.primary.synthesize(text, out_path, voice_id=voice_id, rate=rate)
+            except Exception as exc:  # noqa: BLE001 - any primary failure means "fall back", not "fail the order"
+                self.fallback_used = True
+                self.fallback_reason = f"{self.primary.name} failed ({exc}) - used {self.fallback_name} instead"
+        # voice_id is meaningless across providers (an Azure voice NAME
+        # vs a Piper model PATH) - same reasoning kauli.pipeline's
+        # resolve_voice_for_segment already guards on, applied here:
+        # let the fallback provider use its own real default voice.
+        return self.fallback.synthesize(text, out_path, voice_id=None, rate=rate)
+
+
+TTS_FALLBACK_CHAIN = {"azure": "piper"}
+
+
+def _tts_fallback_configured(name: str) -> bool:
+    if name == "piper":
+        return bool(PIPER_VOICES) and any(Path(v["path"]).exists() for v in PIPER_VOICES.values())
+    return True
+
+
+def get_tts(name: str, target_lang: str | None = None, **kwargs) -> TTSProvider:
     if name not in _REGISTRY:
         raise ValueError(f"Unknown TTS provider '{name}'. Options: {list(_REGISTRY)}")
-    return _REGISTRY[name](**kwargs)
+    primary = _REGISTRY[name](**kwargs)
+    fallback_name = TTS_FALLBACK_CHAIN.get(name)
+    # target_lang == "en" is a hard requirement, not a preference - see
+    # ResilientTTS's own docstring on why any other target makes this
+    # fallback actively wrong rather than just less ideal.
+    if fallback_name and target_lang == "en" and _tts_fallback_configured(fallback_name):
+        return ResilientTTS(primary, _REGISTRY[fallback_name](), fallback_name)
+    return primary

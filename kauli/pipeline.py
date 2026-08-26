@@ -550,6 +550,16 @@ def run(
         if seg.spoken:
             continue  # resumed with a real translation already - a retry never re-spends an MT call either
         translate_segment(seg, mt_provider, source_lang, target_lang, cps, all_segments=job.segments)
+    # Same real "log it, don't hide it" rule the ASR fallback above
+    # follows - get_mt() may have silently switched to a backup MT
+    # provider mid-order (see ResilientMT); the manifest needs a real
+    # record of that, not a providers["mt"] that quietly claims the
+    # original provider ran when it didn't for some/all segments.
+    if getattr(mt_provider, "fallback_used", False):
+        job.providers["mt"] = mt_provider.fallback_name
+        if mt_provider.fallback_reason:
+            job.warnings.append(mt_provider.fallback_reason)
+        log(f"      {mt_provider.fallback_reason or 'MT fell back to ' + mt_provider.fallback_name}")
 
     # Real dollar cost of this job's MT calls, when the provider tracks one
     # (ClaudeMT does; local/stub/AWS providers don't accrue a real per-call
@@ -571,7 +581,7 @@ def run(
     else:
         log(f"[3/5] Synthesising with {tts} ...")
         job.status = "synthesizing"
-        tts_provider = get_tts(tts)
+        tts_provider = get_tts(tts, target_lang=target_lang)
 
         # Real multi-speaker default for Azure: a man, a woman, and several
         # other speakers on one source shouldn't all come out as the same
@@ -657,10 +667,27 @@ def run(
             seg.rendered_duration_ms = rendered
             seg.voice_id = seg_voice_id or tts_provider.name
 
+        # Same "log it, don't hide it" rule as the ASR/MT fallbacks above -
+        # get_tts() may have silently switched to Piper mid-order (see
+        # ResilientTTS), and the manifest needs a real record of that.
+        if getattr(tts_provider, "fallback_used", False):
+            job.providers["tts"] = tts_provider.fallback_name
+            if tts_provider.fallback_reason:
+                job.warnings.append(tts_provider.fallback_reason)
+            log(f"      {tts_provider.fallback_reason or 'TTS fell back to ' + tts_provider.fallback_name}")
+
         # ---------- 4. Mix ----------
         log("[4/5] Mixing timeline ...")
         job.status = "mixing"
-        sr = get_tts(tts).sample_rate
+        # Real bug this fixes: this used to construct a THROWAWAY second TTS
+        # provider just to read .sample_rate, instead of the one that
+        # actually just ran - harmless when it's a plain provider (same
+        # sample rate either way), but wrong the moment tts_provider is a
+        # ResilientTTS that fell back mid-order: Piper and Azure have
+        # different real sample rates, and build_timeline needs the rate
+        # the audio was ACTUALLY rendered at, not whatever a fresh instance
+        # of the ORIGINAL provider would report.
+        sr = tts_provider.sample_rate
         track = build_timeline(
             [(s.start_ms, s.audio_path) for s in job.segments],
             job.source_duration_ms or (job.segments[-1].end_ms if job.segments else 0),
