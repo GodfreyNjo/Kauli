@@ -2858,7 +2858,26 @@ def create_order(
         mt = "claude"
     else:
         mt = plan_mt
-    tts = "piper" if level["tts"] else "stub"
+    # Real bug this fixes: this used to be tts = "piper" if level["tts"]
+    # else "stub", with zero regard for target_lang - so every en->sw
+    # full-dub order was read by an ENGLISH Piper voice attempting
+    # Swahili text (Piper has no real Swahili voice in this app's own
+    # PIPER_VOICES set), not real Swahili speech at all. Same refuse-
+    # rather-than-ship-it-wrong pattern as the Kikuyu MT case above:
+    # Azure's real sw-KE-ZuriNeural/RafikiNeural voices are what this
+    # actually needs (see kauli/providers/tts.py:AzureTTS) - if that
+    # isn't configured yet, hold the order instead of silently
+    # delivering garbled audio a client already paid for.
+    if not level["tts"]:
+        tts = "stub"
+    elif target_lang == "sw":
+        if not os.environ.get("AZURE_SPEECH_KEY"):
+            return _client_dashboard_error(request, user,
+                "Swahili dubbing needs our voice provider connected first, which isn't done yet - "
+                "contact us and we'll handle this one manually in the meantime.", form_values=form_values)
+        tts = "azure"
+    else:
+        tts = "piper"
 
     # Free minutes only ever apply to a transcription-only order - see
     # billing.FREE_MINUTES_SERVICE_LEVEL. A translate/dub order pays the

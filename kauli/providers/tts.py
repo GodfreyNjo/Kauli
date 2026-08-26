@@ -214,17 +214,26 @@ class MMSTTS(TTSProvider):
     (VITS is fast enough on CPU for real dub-length segments)."""
     name = "mms"
     sample_rate = 16000
-    MODEL_NAME = "facebook/mms-tts-swa"
+    # facebook/mms-tts-swa (Meta's base checkpoint) is real but requires a
+    # Hugging Face account + access token to even view the model page
+    # (confirmed live: a plain fetch returns 401) - Benjamin-png's public
+    # fine-tune is a real, non-gated alternative, specifically tuned to
+    # improve Swahili pronunciation over the base model. Same CC-BY-NC
+    # lineage either way (a fine-tune of a non-commercial checkpoint
+    # inherits that restriction) - still evaluation-only, see the class
+    # docstring above.
+    MODEL_NAME = "Benjamin-png/swahili-mms-tts-finetuned"
 
-    def __init__(self):
+    def __init__(self, model_name: str | None = None):
+        self.model_name = model_name or self.MODEL_NAME
         self._model = None
         self._tokenizer = None
 
     def _load(self):
         if self._model is None:
             from transformers import VitsModel, AutoTokenizer
-            self._model = VitsModel.from_pretrained(self.MODEL_NAME)
-            self._tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
+            self._model = VitsModel.from_pretrained(self.model_name)
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name)
             self.sample_rate = self._model.config.sampling_rate
         return self._model, self._tokenizer
 

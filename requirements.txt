@@ -80,8 +80,16 @@ Pillow>=10.0.0
 # app's logs at all. Presigned R2 uploads bypass the Tunnel entirely.
 boto3>=1.34.0
 
-# --- only if/when you move to cloud ---
-# azure-cognitiveservices-speech>=1.40.0   # Swahili TTS for en->sw
+# --- real Swahili dub voice (en->sw) ---
+# Piper has no real Swahili voice in this app's PIPER_VOICES set, and
+# the free/open alternatives researched (Piper's own sw_CD-lanfrica -
+# dataset commercial terms unconfirmed; Meta's MMS-TTS - confirmed
+# CC-BY-NC, non-commercial) aren't safe to ship to a paying client.
+# Azure's sw-KE-ZuriNeural/RafikiNeural are the real, commercially-
+# licensed option - see kauli/providers/tts.py:AzureTTS and
+# webapp/app.py's create_order tts selection. Set AZURE_SPEECH_KEY and
+# AZURE_SPEECH_REGION.
+azure-cognitiveservices-speech>=1.40.0
 
 # --- local demo webapp (webapp/) - client upload -> staff review -> delivery
 # UI on top of the pipeline above. Auth is real (Supabase); everything else
