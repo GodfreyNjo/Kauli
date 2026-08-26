@@ -170,7 +170,10 @@
            what's actually said. Timing here is real (straight from faster-whisper),
            so click-to-seek is accurate. Low-opacity words are ones it was less
            confident about - once you save a correction for a segment, its words
-           go back to full opacity - you've read them, the flag's done its job.</p>
+           go back to full opacity - you've read them, the flag's done its job.
+           If a whole segment came out garbled or missed real speech, you don't have
+           to retype it by hand - <kbd>alt</kbd>+<kbd>t</kbd> re-runs ASR on just that
+           segment's own audio and drops the fresh result in, real timing included.</p>
         <p><strong>Step 2 - {{ target_lang_name }} translation:</strong> correct the text that
            actually gets spoken and subtitled. If you fixed the source in step 1,
            hit "Re-translate from corrected source" (<kbd>alt</kbd>+<kbd>r</kbd>) first to get a fresh
@@ -306,6 +309,26 @@
         {% endif %}
         {% endif %}
 
+        {% if order['tts'] == 'azure' and distinct_speakers %}
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Speaker voices ({{ target_lang_name }} dub)</p>
+        <p class="muted" style="font-size:0.78rem; margin-top:0;">Each speaker got an automatic guess from their
+           own voice's pitch when this ran - correct any that guessed wrong.</p>
+        {% for spk in distinct_speakers %}
+        <form method="post" action="/staff/orders/{{ order['id'] }}/assign-speaker-voice-azure" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">
+          <input type="hidden" name="speaker_id" value="{{ spk }}">
+          <strong style="font-size:0.85rem; min-width:90px;">{{ spk }}</strong>
+          <select name="voice_name" style="flex:1;">
+            {% for voice_name, label in azure_voice_labels.items() %}
+            <option value="{{ voice_name }}" {% if speaker_voice_names.get(spk) == voice_name %}selected{% endif %}>
+              {{ label }}
+            </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="secondary" style="font-size:0.78rem; padding:5px 10px;">Assign</button>
+        </form>
+        {% endfor %}
+        {% endif %}
+
         <p class="muted" style="margin:14px 0 4px; font-weight:650;">Bulk actions</p>
         <form method="post" action="/staff/orders/{{ order['id'] }}/detect-gaps" style="margin-bottom:8px;">
           <button type="submit" class="secondary">Detect non-speech gaps</button>
@@ -341,6 +364,7 @@
         <div class="shortcut-row"><kbd>esc</kbd><span>Stop editing current cell</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>s</kbd><span>Save focused segment now (autosave also fires ~2s after you stop typing)</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd><span>Save + re-synthesize audio for this segment (target step)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>t</kbd><span>Re-transcribe the focused segment from its own audio (ASR missed/mangled it)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate the focused segment from its (corrected) source</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>v</kbd><span>Voice direction - slow down/speed up or spell out this segment's dub audio</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>p</kbd><span>Toggle prose preview of the current step</span></div>

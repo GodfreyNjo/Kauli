@@ -16,6 +16,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
@@ -36,10 +37,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads  # noqa: E402
 from kauli import timing  # noqa: E402
-from kauli.models import Job, split_off_speaker_tag  # noqa: E402
-from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, time_stretch  # noqa: E402
+from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
+from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
 from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
-from kauli.providers import get_mt, get_tts  # noqa: E402
+from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
@@ -432,6 +433,53 @@ def _duration_short(seconds) -> str:
 
 
 templates.env.filters["duration_short"] = _duration_short
+
+
+def _daily_trend_svg(daily_trend: list[dict], width: int = 760, height: int = 200) -> str:
+    """Hand-rolled inline SVG line chart, real data only (see
+    db.daily_job_trend) - no charting library, two series (created vs
+    delivered per day). currentColor for the "created" line so it follows
+    the page's own text color in both themes; the accent color is reserved
+    for "delivered" since that's the one number worth drawing the eye to."""
+    if not daily_trend:
+        return ""
+    n = len(daily_trend)
+    pad_l, pad_r, pad_t, pad_b = 8, 8, 14, 22
+    plot_w = width - pad_l - pad_r
+    plot_h = height - pad_t - pad_b
+    max_val = max(1, max(max(d["created"], d["delivered"]) for d in daily_trend))
+    x_step = plot_w / max(1, n - 1)
+
+    def points(key: str) -> str:
+        pts = []
+        for i, d in enumerate(daily_trend):
+            x = pad_l + i * x_step
+            y = pad_t + plot_h - (d[key] / max_val) * plot_h
+            pts.append(f"{x:.1f},{y:.1f}")
+        return " ".join(pts)
+
+    first_day = daily_trend[0]["day"]
+    last_day = daily_trend[-1]["day"]
+    return (
+        f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Jobs created and delivered, last {n} days" '
+        f'xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">'
+        f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{width - pad_r}" y2="{pad_t + plot_h}" '
+        f'stroke="currentColor" stroke-opacity="0.15"/>'
+        f'<polyline points="{points("created")}" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="2"/>'
+        f'<polyline points="{points("delivered")}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>'
+        f'<text x="{pad_l}" y="{height - 4}" font-size="10" fill="currentColor" opacity="0.6">{first_day}</text>'
+        f'<text x="{width - pad_r}" y="{height - 4}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">{last_day}</text>'
+        f'</svg>'
+    )
+
+
+def _pct_change(current: float, previous: float) -> float | None:
+    """Real percentage change, current vs previous. None (rendered as "-",
+    never a fabricated 0% or a divide-by-zero) when there's no previous-
+    period data to compare against - see staff_overview."""
+    if not previous:
+        return None
+    return round(((current - previous) / previous) * 100)
 
 
 def current_user(request: Request):
@@ -1725,6 +1773,44 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login")
+
+
+# ------------------------------------------------------- notifications ----
+@app.get("/notifications/recent")
+def notifications_recent(request: Request):
+    """JSON, polled by the bell in base.html - a real, persistent notification
+    the user hasn't dismissed yet, not a client-side guess. See db.notify_all_staff
+    for what actually creates these."""
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    rows = db.list_recent_notifications(user["id"], limit=10)
+    return JSONResponse({
+        "unread_count": db.count_unread_notifications(user["id"]),
+        "items": [
+            {"id": r["id"], "title": r["title"], "link": r["link"], "kind": r["kind"],
+             "created_at": r["created_at"], "unread": r["read_at"] is None}
+            for r in rows
+        ],
+    })
+
+
+@app.post("/notifications/{notification_id}/read")
+def notifications_mark_read(request: Request, notification_id: str):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    db.mark_notification_read(notification_id, user["id"])
+    return JSONResponse({"ok": True})
+
+
+@app.post("/notifications/mark-all-read")
+def notifications_mark_all_read(request: Request):
+    user = current_user(request)
+    if not user:
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    db.mark_all_notifications_read(user["id"])
+    return JSONResponse({"ok": True})
 
 
 # ------------------------------------------------------------- settings ----
@@ -3564,6 +3650,8 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
             base_url=str(request.base_url),
         )
         mailer.send_email(CONTACT_EMAIL, f"New bank transfer expected - {payment_id}", staff_html)
+        db.notify_all_staff("payment_received", f"{user['display_name']} requested a bank transfer (${amount_usd:.2f})",
+                             link="/staff/billing")
         return RedirectResponse(f"{back_url}?notice=Bank+transfer+request+received+-+"
                                  f"check+your+email+for+instructions%2C+reference+{payment_id}.", status_code=303)
 
@@ -4563,8 +4651,111 @@ def staff_blog_publish_devto(request: Request, post_id: str):
 
 
 # --------------------------------------------------------------- staff ----
+_ACTIVITY_STATUS_LABELS = {
+    "pending_payment": "is awaiting payment",
+    "queued": "was queued for AI processing",
+    "processing": "started AI processing",
+    "awaiting_review": "is ready for human review",
+    "editor_returned": "needs an ops decision",
+    "ready_for_delivery": "is ready for delivery",
+    "delivered": "was delivered",
+    "returned_to_client": "was returned to the client",
+    "failed": "failed processing",
+    "dead_letter": "failed processing (retries exhausted)",
+}
+
+
 @app.get("/staff", response_class=HTMLResponse)
-def staff_dashboard(request: Request):
+def staff_overview(request: Request):
+    """Landing page for staff, replacing a bare queue table with an actual
+    "what needs my attention right now" view - real KPI counts, a live
+    slice of the queue, the human-review backlog, and recent activity, all
+    from data that already exists (no fabricated metrics, no features that
+    don't exist yet like per-staff assignment, notifications, or search -
+    see the Aug 26 2026 staff-portal-spec conversation for what's
+    deliberately deferred)."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+
+    now = time.time()
+    DAY = 86400
+    now_dt = datetime.fromtimestamp(now)
+    month_start = datetime(now_dt.year, now_dt.month, 1).timestamp()
+    if now_dt.month == 1:
+        prev_month_start = datetime(now_dt.year - 1, 12, 1).timestamp()
+    else:
+        prev_month_start = datetime(now_dt.year, now_dt.month - 1, 1).timestamp()
+
+    status_counts = db.orders_by_status()
+    total_jobs = sum(status_counts.values())
+    in_progress = status_counts.get("queued", 0) + status_counts.get("processing", 0)
+    in_review = status_counts.get("awaiting_review", 0)
+    ops_decision = status_counts.get("editor_returned", 0)
+    completed_total = status_counts.get("delivered", 0)
+
+    jobs_last_30 = db.orders_created_between(now - 30 * DAY, now)
+    jobs_prev_30 = db.orders_created_between(now - 60 * DAY, now - 30 * DAY)
+    completed_last_30 = db.orders_reaching_status_between("delivered", now - 30 * DAY, now)
+    completed_prev_30 = db.orders_reaching_status_between("delivered", now - 60 * DAY, now - 30 * DAY)
+    revenue_this_month = db.revenue_between(month_start, now)
+    revenue_prev_month = db.revenue_between(prev_month_start, month_start)
+
+    orders = db.list_all_orders()
+    active_jobs = orders[:10]
+    review_queue = [o for o in orders if o["status"] == "awaiting_review"][:6]
+    edited_pct = {}
+    for o in active_jobs + review_queue:
+        if o["id"] not in edited_pct:
+            job = _load_job(o)
+            edited_pct[o["id"]] = job.edited_pct if job else None
+
+    # Activity feed: merged from two REAL sources (recent status
+    # transitions, recent client-visible messages), not a fabricated
+    # per-staff-member log - see recent_status_changes/recent_client_messages
+    # docstrings for why (no audit-log table, single combined staff role).
+    activity = []
+    for o in db.recent_status_changes(limit=8):
+        label = _ACTIVITY_STATUS_LABELS.get(o["status"], o["status"].replace("_", " "))
+        activity.append({
+            "actor": "System", "ts": o["status_changed_at"],
+            "text": f"{o['original_filename']} ({o['client_name']}) {label}",
+        })
+    for m in db.recent_client_messages(limit=8):
+        activity.append({
+            "actor": m["staff_name"] or "Staff", "ts": m["created_at"],
+            "text": f"sent an update to {m['client_name']} on {m['original_filename']}",
+        })
+    activity.sort(key=lambda a: a["ts"], reverse=True)
+    activity = activity[:8]
+
+    greeting = "morning" if now_dt.hour < 12 else ("afternoon" if now_dt.hour < 18 else "evening")
+    return templates.TemplateResponse(request, "staff_overview.html", {
+        "user": user, "now_ts": now, "greeting": greeting,
+        "total_jobs": total_jobs, "jobs_pct_change": _pct_change(jobs_last_30, jobs_prev_30),
+        "in_progress": in_progress, "in_review": in_review, "ops_decision": ops_decision,
+        "completed_total": completed_total, "completed_pct_change": _pct_change(completed_last_30, completed_prev_30),
+        "revenue_this_month": revenue_this_month, "revenue_pct_change": _pct_change(revenue_this_month, revenue_prev_month),
+        "active_jobs": active_jobs, "review_queue": review_queue, "edited_pct": edited_pct,
+        "activity": activity, "top_clients": db.top_clients_by_usage(days=30, limit=5),
+        "daily_trend_svg": _daily_trend_svg(db.daily_job_trend(days=30)),
+        "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,
+    })
+
+
+@app.get("/staff/search", response_class=HTMLResponse)
+def staff_search(request: Request, q: str = ""):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    results = db.staff_search(q, limit=15) if q.strip() else {"orders": [], "clients": [], "leads": []}
+    return templates.TemplateResponse(request, "staff_search.html", {
+        "user": user, "q": q, "results": results,
+    })
+
+
+@app.get("/staff/jobs", response_class=HTMLResponse)
+def staff_jobs(request: Request):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -4921,7 +5112,14 @@ def staff_retry_order(request: Request, order_id: str):
     """Manual retry for a 'dead_letter' order - see worker.py's automatic
     retry budget (2 attempts) that gave up before this. Resets the count
     so it gets its own fresh retry budget rather than immediately
-    dead-lettering again after one more try."""
+    dead-lettering again after one more try.
+
+    resume=True: the same real-cost fix as worker.py's own automatic
+    retry - this order already has a manifest on disk from its last
+    attempt, quite possibly with real, correctly-transcribed and
+    -translated segments in it. A manual retry re-running ASR/MT from
+    scratch would re-bill a paid provider (Transkriptor) for the whole
+    file for no reason - see kauli.pipeline.run's resume docstring."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -4930,7 +5128,7 @@ def staff_retry_order(request: Request, order_id: str):
         return HTMLResponse("Order not found.", status_code=404)
     db.reset_retry_count(order_id)
     db.update_order_status(order_id, "queued")
-    worker.submit_job(order_id)
+    worker.submit_job(order_id, resume=True)
     return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
 
 
@@ -5068,6 +5266,8 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
         "human_recording_available": human_recording_available,
         "distinct_speakers": distinct_speakers,
         "speaker_voices": job.speaker_voices,
+        "speaker_voice_names": job.speaker_voice_names,
+        "azure_voice_labels": _AZURE_VOICE_LABELS,
         "notice": notice,
         # Real raw deliverable text, not a re-rendering of it - the exact
         # bytes-minus-encoding a client's .srt/.vtt download will contain,
@@ -5328,6 +5528,117 @@ def editor_retranslate(request: Request, order_id: str, segment_id: str):
     })
 
 
+@app.post("/staff/orders/{order_id}/segments/{segment_id}/retranscribe")
+def editor_retranscribe(request: Request, order_id: str, segment_id: str):
+    """Alt+T: re-run ASR on just this segment's own audio window, instead of
+    fixing a transcription miss by hand. Real, not a re-run of the whole
+    file - slices exactly [start_ms, end_ms] out of the order's source audio
+    (same ffmpeg window-cut extract_audio_window already does for a dub's
+    non-speech gap bed) and sends only that clip to the order's ASR
+    provider, the same one the original pass used.
+
+    A clip this short can come back as more than one provider-side segment
+    (a genuine pause inside it) or as several near-duplicate low-confidence
+    guesses - this always joins whatever text comes back into ONE flat
+    transcript for THIS segment, on purpose: a chunk redo is defined as
+    "reprocess what's already here", not "let the ASR provider silently
+    re-draw segment/timing boundaries out from under the editor and the
+    translation/dub already built on top of them."
+
+    Writes into source_transcript (a fresh ASR result) and clears any prior
+    source_edited_transcript - a human correction of the OLD wrong text
+    would be nonsensical to keep layered on top of a fresh transcript that
+    supersedes it. Real per-word timing comes back from the provider too
+    (offset from clip-relative back to the segment's real position in the
+    source audio), so _build_source_cells's click-to-seek stays accurate -
+    exactly what a manual correction can never give it (see that function's
+    own docstring on the approx-timing fallback this avoids).
+
+    Then reuses the exact same "auto-retranslate if the English hasn't been
+    hand-finalized yet, else just flag it stale" rule editor_save_source
+    already applies to a human's own source correction - a fresh ASR result
+    is no different from one for that purpose."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+
+    job = _load_job(order)
+    if job is None:
+        return JSONResponse({"error": "job not processed yet"}, status_code=404)
+    seg = next((s for s in job.segments if s.segment_id == segment_id), None)
+    if seg is None:
+        return JSONResponse({"error": "segment not found"}, status_code=404)
+    if getattr(seg, "segment_type", "speech") == "gap":
+        return JSONResponse({"error": "This is a non-speech gap - there's no speech here to re-transcribe."}, status_code=400)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        clip_path = str(Path(tmpdir) / "clip.wav")
+        if not extract_audio_window(order["audio_path"], seg.start_ms, seg.end_ms, clip_path, sample_rate=16000):
+            return JSONResponse({"error": "Could not extract this segment's audio (ffmpeg unavailable, or the window is empty)."}, status_code=502)
+        try:
+            asr_provider = get_asr(order["asr"])
+            clip_segments = asr_provider.transcribe(clip_path, language=order["source_lang"])
+        except Exception as exc:  # noqa: BLE001 - a real provider failure should come back
+            # as a real error the editor UI can show, not a raw 500 with no message.
+            traceback.print_exc()
+            return JSONResponse({"error": f"{order['asr']} provider failed: {exc}"}, status_code=502)
+
+    if not clip_segments:
+        return JSONResponse({"error": "The ASR provider found no speech in this window - it may genuinely be silence or non-speech audio."}, status_code=422)
+
+    # Every returned word's timing is relative to the CLIP (starts at 0) -
+    # shift it back by seg.start_ms so it lines up with the real source
+    # audio timeline, same as every other timestamp in the manifest.
+    new_words = []
+    for cs in clip_segments:
+        for w in cs.words:
+            new_words.append(Word(text=w.text, start_ms=seg.start_ms + w.start_ms,
+                                   end_ms=seg.start_ms + w.end_ms, confidence=w.confidence))
+    new_text = " ".join(cs.source_transcript.strip() for cs in clip_segments if cs.source_transcript.strip())
+    confidences = [cs.source_confidence for cs in clip_segments if cs.source_transcript.strip()]
+
+    seg.words = new_words
+    seg.source_transcript = new_text
+    seg.source_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+    seg.source_edited_transcript = None  # supersedes any prior hand correction of the old text
+
+    auto_retranslated = False
+    retranslate_error = None
+    if seg.edited_text is None and not seg.approved:
+        try:
+            _retranslate_and_resync(order, job, seg)
+            auto_retranslated = True
+        except Exception as exc:  # noqa: BLE001 - the fresh transcript must still save even
+            # if the MT provider is down/misconfigured - fall back to flag-it-stale.
+            traceback.print_exc()
+            seg.translation_stale = True
+            retranslate_error = str(exc)
+    else:
+        seg.translation_stale = True
+
+    (Path(order["outdir"]) / f"transcript_{order['source_lang']}.srt").write_text(
+        to_srt(job, source=True), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
+        to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(
+        to_vtt(job), encoding="utf-8")
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+
+    return JSONResponse({
+        "ok": True, "source_final_text": seg.source_final_text,
+        "source_cells": _build_source_cells(seg), "source_confidence": seg.source_confidence,
+        "auto_retranslated": auto_retranslated, "retranslate_error": retranslate_error,
+        "review_flag": seg.review_flag, "review_reasons": seg.review_reasons,
+        "translation_confidence": seg.translation_confidence, "translation_stale": seg.translation_stale,
+        "final_text": seg.final_text, "target_cells": _build_target_cells(seg),
+        "wrapped_caption": _wrap_caption_text(seg.final_text.strip()) if seg.final_text.strip() else "",
+        "display_end_ms": _display_end_ms(seg),
+    })
+
+
 @app.post("/staff/orders/{order_id}/segments/{segment_id}/voice-direction")
 def editor_set_voice_direction(request: Request, order_id: str, segment_id: str, body: dict = Body(...)):
     """The editor doing final touches on the dub voice directs how THIS
@@ -5557,6 +5868,39 @@ def editor_assign_speaker_voice(request: Request, order_id: str, speaker_id: str
         _resynthesize_full_dub(order, job, "piper", voice_path, only_speaker_id=speaker_id)
     return RedirectResponse(
         f"/staff/orders/{order_id}/editor?notice=Assigned+{quote(PIPER_VOICES[voice_key]['label'])}+to+"
+        f"{quote(speaker_id)}.", status_code=303)
+
+
+_AZURE_VOICE_LABELS = {"sw-KE-ZuriNeural": "Zuri (female)", "sw-KE-RafikiNeural": "Rafiki (male)"}
+
+
+@app.post("/staff/orders/{order_id}/assign-speaker-voice-azure")
+def editor_assign_speaker_voice_azure(request: Request, order_id: str, speaker_id: str = Form(...),
+                                       voice_name: str = Form(...)):
+    """The Azure-voice sibling of editor_assign_speaker_voice above - same
+    per-speaker guarantee, for the two real Azure Kiswahili voices instead
+    of a Piper model. This is the manual override half of multi-speaker
+    voice assignment; kauli.pipeline.run's own TTS stage already assigns a
+    default automatically from each detected speaker's pitch (see
+    kauli.speaker_gender) - a human correcting that by ear here always
+    wins, permanently, same as a Piper assignment does."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+    if voice_name not in _AZURE_VOICE_LABELS:
+        return RedirectResponse(f"/staff/orders/{order_id}/editor?notice=Unknown+voice.", status_code=303)
+    job.speaker_voice_names[speaker_id] = voice_name
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    if order["tts"] == "azure":
+        _resynthesize_full_dub(order, job, "azure", voice_name, only_speaker_id=speaker_id)
+    return RedirectResponse(
+        f"/staff/orders/{order_id}/editor?notice=Assigned+{quote(_AZURE_VOICE_LABELS[voice_name])}+to+"
         f"{quote(speaker_id)}.", status_code=303)
 
 

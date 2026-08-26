@@ -16,6 +16,7 @@ from . import timing
 from .models import Job, Segment, split_off_speaker_tag
 from .mixer import build_timeline, extract_audio_window, extract_reference_clip, time_stretch, write_wav_mono
 from .providers import get_asr, get_mt, get_tts
+from .speaker_gender import AZURE_VOICE_BY_GENDER, estimate_speaker_genders
 from .subtitles import to_srt, to_vtt
 
 # A full second or more of no detected speech at all gets its own real,
@@ -164,6 +165,13 @@ def resolve_voice_for_segment(job, seg, default_voice_id, tts_provider_name: str
     if (seg.speaker_id and job.speaker_voices.get(seg.speaker_id)
             and (tts_provider_name is None or tts_provider_name == "piper")):
         return job.speaker_voices[seg.speaker_id]
+    # Same guarantee, for Azure's named voices instead of a Piper model
+    # path - see Job.speaker_voice_names' own comment on why this can't
+    # share the dict above (a Piper path and an Azure voice name mean
+    # nothing to each other's provider).
+    if (seg.speaker_id and job.speaker_voice_names.get(seg.speaker_id)
+            and tts_provider_name == "azure"):
+        return job.speaker_voice_names[seg.speaker_id]
     return default_voice_id
 
 
@@ -461,6 +469,7 @@ def run(
     voice_id: str | None = None,
     skip_tts: bool = False,
     verbose: bool = True,
+    resume: bool = False,
 ) -> Job:
     out = Path(outdir)
     (out / "segments").mkdir(parents=True, exist_ok=True)
@@ -468,6 +477,29 @@ def run(
     def log(msg):
         if verbose:
             print(msg, flush=True)
+
+    # Real cost bug this fixes: webapp/worker.py's own retry-on-failure used
+    # to always call this fresh from ASR, no matter which stage actually
+    # failed - a real, PAID cloud ASR call (Transkriptor, at $/minute) got
+    # re-billed for the full file on every single retry, even when the
+    # transcript and translation from the FAILED attempt were already
+    # sitting on disk, correct, in its manifest - only a later stage (TTS/
+    # mix) had failed. resume=True (set by worker.py's retry path only,
+    # never the original attempt) loads that existing manifest and reuses
+    # whatever real ASR/MT work it already contains, per segment - a
+    # segment already transcribed is never re-sent to a paid ASR provider
+    # just because a DIFFERENT segment's TTS call happened to fail.
+    resumed_segments = None
+    resumed_cost_usd = 0.0
+    manifest_path = out / "manifest.json"
+    if resume and manifest_path.exists():
+        try:
+            candidate = Job.load(str(manifest_path))
+            if candidate.segments:
+                resumed_segments = candidate.segments
+                resumed_cost_usd = candidate.cost_usd or 0.0
+        except Exception:
+            resumed_segments = None  # a corrupt/partial manifest - fall back to a real full run rather than crash
 
     job = Job(
         source_path=audio_path,
@@ -478,26 +510,32 @@ def run(
     job.source_duration_ms = probe_duration_ms(audio_path)
 
     # ---------- 1. ASR ----------
-    log(f"[1/5] Transcribing with {asr} ...")
-    job.status = "transcribing"
-    asr_provider = get_asr(asr)
-    job.segments = asr_provider.transcribe(audio_path, language=source_lang)
-    # TranskriptorASR (and any future provider with a real fallback) sets
-    # these on itself rather than raising - the manifest's own
-    # providers["asr"] must reflect what actually ran, not what was asked
-    # for, or an editor/client checking the job's real provenance would be
-    # misled about which transcriber actually produced this text.
-    if getattr(asr_provider, "fallback_used", False):
-        job.providers["asr"] = "faster-whisper"
-        reason = getattr(asr_provider, "fallback_reason", None)
-        if reason:
-            job.warnings.append(reason)
-        log(f"      {reason or 'ASR fell back to faster-whisper'}")
-    if not job.source_duration_ms and job.segments:
-        job.source_duration_ms = job.segments[-1].end_ms
-    job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
-    n_gaps = sum(1 for s in job.segments if s.segment_type == "gap")
-    log(f"      {len(job.segments)} segments ({n_gaps} non-speech), {job.source_duration_ms/1000:.1f}s")
+    non_gap_resumed = [s for s in (resumed_segments or []) if s.segment_type != "gap"]
+    if resumed_segments and non_gap_resumed and all(s.source_transcript for s in non_gap_resumed):
+        log(f"[1/5] Resuming: reusing {len(resumed_segments)} already-transcribed segments (skipping {asr})")
+        job.segments = resumed_segments
+        job.status = "transcribing"
+    else:
+        log(f"[1/5] Transcribing with {asr} ...")
+        job.status = "transcribing"
+        asr_provider = get_asr(asr)
+        job.segments = asr_provider.transcribe(audio_path, language=source_lang)
+        # TranskriptorASR (and any future provider with a real fallback) sets
+        # these on itself rather than raising - the manifest's own
+        # providers["asr"] must reflect what actually ran, not what was asked
+        # for, or an editor/client checking the job's real provenance would be
+        # misled about which transcriber actually produced this text.
+        if getattr(asr_provider, "fallback_used", False):
+            job.providers["asr"] = "faster-whisper"
+            reason = getattr(asr_provider, "fallback_reason", None)
+            if reason:
+                job.warnings.append(reason)
+            log(f"      {reason or 'ASR fell back to faster-whisper'}")
+        if not job.source_duration_ms and job.segments:
+            job.source_duration_ms = job.segments[-1].end_ms
+        job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
+        n_gaps = sum(1 for s in job.segments if s.segment_type == "gap")
+        log(f"      {len(job.segments)} segments ({n_gaps} non-speech), {job.source_duration_ms/1000:.1f}s")
     job.save(out / "manifest.json")
 
     # ---------- 2. Translate + fit ----------
@@ -509,13 +547,20 @@ def run(
     for seg in job.segments:
         if seg.segment_type == "gap":
             continue  # nothing to translate - a human tags these manually in Ereri
+        if seg.spoken:
+            continue  # resumed with a real translation already - a retry never re-spends an MT call either
         translate_segment(seg, mt_provider, source_lang, target_lang, cps, all_segments=job.segments)
 
     # Real dollar cost of this job's MT calls, when the provider tracks one
     # (ClaudeMT does; local/stub/AWS providers don't accrue a real per-call
     # cost the same way, so this is 0.0 for those - see ops_ai_spend_today
-    # in webapp/db.py for what reads this back out).
-    job.cost_usd = getattr(mt_provider, "total_cost_usd", 0.0)
+    # in webapp/db.py for what reads this back out). Added to, not replaced
+    # by, whatever the RESUMED-from attempt already really spent - most of
+    # a resumed job's segments were skipped above (already translated), so
+    # this run's own mt_provider.total_cost_usd only reflects the FEW it
+    # still had to redo; the resumed segments' real cost still happened and
+    # must not silently disappear from the job's own cost record.
+    job.cost_usd = resumed_cost_usd + getattr(mt_provider, "total_cost_usd", 0.0)
 
     log(f"      fit rate {job.fit_rate:.0%}, {job.flagged_count}/{len(job.segments)} flagged for review")
     job.save(out / "manifest.json")
@@ -527,6 +572,32 @@ def run(
         log(f"[3/5] Synthesising with {tts} ...")
         job.status = "synthesizing"
         tts_provider = get_tts(tts)
+
+        # Real multi-speaker default for Azure: a man, a woman, and several
+        # other speakers on one source shouldn't all come out as the same
+        # single voice. Guesses each detected speaker's gender from their
+        # own audio's pitch (see kauli.speaker_gender - a genuine, if
+        # coarse, signal, not a fabricated assignment) and maps it onto
+        # Azure's two real Kiswahili voices. Only runs when nobody's
+        # already set an assignment for this speaker (an editor's manual
+        # override in Ereri always wins, this never clobbers one), and
+        # only for speakers real diarization actually distinguished
+        # (speaker_id set - faster-whisper alone never sets one, so a
+        # single-speaker/no-diarization order is completely unaffected).
+        if tts == "azure":
+            speakers_needing_a_default = {
+                s.speaker_id for s in job.segments
+                if s.speaker_id and s.segment_type != "gap"
+                and s.speaker_id not in job.speaker_voice_names
+            }
+            if speakers_needing_a_default:
+                genders = estimate_speaker_genders(job, audio_path)
+                for speaker_id in speakers_needing_a_default:
+                    gender = genders.get(speaker_id, "unknown")
+                    if gender in AZURE_VOICE_BY_GENDER:
+                        job.speaker_voice_names[speaker_id] = AZURE_VOICE_BY_GENDER[gender]
+                log(f"      auto-assigned voices for {len(speakers_needing_a_default)} speaker(s): "
+                    f"{ {k: v for k, v in genders.items() if k in speakers_needing_a_default} }")
 
         # Voice cloning (--tts xtts): auto-extract a reference clip of the
         # SOURCE speaker from the source audio, unless one was given via

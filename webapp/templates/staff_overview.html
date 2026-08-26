@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="overview-header">
+  <h1>Good {{ greeting }}, {{ user['display_name'].split(' ')[0] }} 👋</h1>
+  <p class="muted" style="margin-top:2px;">Here's what's happening with your jobs.</p>
+</div>
+
+<div class="dashboard-stats overview-kpis">
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Total jobs</span>
+    <span class="stat-value">{{ total_jobs }}</span>
+    <span class="stat-hint">
+      {% if jobs_pct_change is not none %}
+        <span class="{{ 'trend-up' if jobs_pct_change >= 0 else 'trend-down' }}">{{ '+' if jobs_pct_change >= 0 else '' }}{{ jobs_pct_change }}%</span> vs last 30 days
+      {% else %}no data yet{% endif %}
+    </span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">In progress</span>
+    <span class="stat-value">{{ in_progress }}</span>
+    <span class="stat-hint">AI processing</span>
+  </div>
+  <div class="dashboard-stat-card {{ 'needs-you' if in_review else '' }}">
+    <span class="stat-label">In review</span>
+    <span class="stat-value">{{ in_review }}</span>
+    <span class="stat-hint">{{ review_queue|length }} in your queue</span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Completed</span>
+    <span class="stat-value">{{ completed_total }}</span>
+    <span class="stat-hint">
+      {% if completed_pct_change is not none %}
+        <span class="{{ 'trend-up' if completed_pct_change >= 0 else 'trend-down' }}">{{ '+' if completed_pct_change >= 0 else '' }}{{ completed_pct_change }}%</span> vs last 30 days
+      {% else %}no data yet{% endif %}
+    </span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Revenue (this month)</span>
+    <span class="stat-value">${{ "%.2f"|format(revenue_this_month) }}</span>
+    <span class="stat-hint">
+      {% if revenue_pct_change is not none %}
+        <span class="{{ 'trend-up' if revenue_pct_change >= 0 else 'trend-down' }}">{{ '+' if revenue_pct_change >= 0 else '' }}{{ revenue_pct_change }}%</span> vs last month
+      {% else %}no data yet{% endif %}
+    </span>
+  </div>
+</div>
+
+<div class="overview-grid">
+  <div class="overview-main">
+    <div class="card" style="padding:0;">
+      <div class="overview-card-head">
+        <h2>Active jobs</h2>
+        <a href="/staff/jobs" class="overview-viewall">View all →</a>
+      </div>
+      <div class="filter-tabs" id="overview-job-tabs" style="margin:0 20px 14px;">
+        <button type="button" class="active" data-filter="all">All</button>
+        <button type="button" data-filter="queued,processing">AI processing</button>
+        <button type="button" data-filter="awaiting_review">Human review</button>
+        <button type="button" data-filter="editor_returned">Ops decision</button>
+      </div>
+      {% if not active_jobs %}
+      <div class="empty-state">
+        <p>No jobs yet.</p>
+      </div>
+      {% else %}
+      <table id="overview-job-table">
+        <thead><tr>
+          <th>Job</th><th>Client</th><th>Route</th><th>Status</th><th>Due</th>
+        </tr></thead>
+        <tbody>
+          {% for o in active_jobs %}
+          {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
+          <tr data-status="{{ o['status'] }}" class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
+            <td>{% if o['is_rush'] %}<span title="Rush order" style="color:var(--err);">⚡</span> {% endif %}{{ o['original_filename'] }}</td>
+            <td>{{ o['client_name'] }}</td>
+            <td style="font-family: var(--font-mono); font-size: 0.8rem;">{{ o['source_lang'] }} → {{ o['target_lang'] }}</td>
+            <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+            <td>
+              {% if ts %}
+                <span class="deadline-pill deadline-{{ ts['level'] }}">{% if ts['overdue'] %}Overdue{% else %}{{ o['internal_deadline_at']|int|timestamp_to_str }}{% endif %}</span>
+              {% else %}<span class="muted">-</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <h2 style="margin-top:0;">Jobs, last 30 days</h2>
+        <span class="muted" style="font-size:0.78rem;">
+          <span style="color:var(--accent);">&#9679;</span> delivered
+          &nbsp; <span style="opacity:0.5;">&#9679;</span> created
+        </span>
+      </div>
+      {% if daily_trend_svg %}
+        {{ daily_trend_svg | safe }}
+      {% else %}
+        <p class="muted">No activity yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Top clients by usage</h2>
+      <p class="muted" style="margin-top:-6px;">Minutes processed, last 30 days</p>
+      {% if not top_clients %}
+        <p class="muted">No usage yet.</p>
+      {% else %}
+      {% set max_minutes = top_clients[0]['minutes'] %}
+      <div class="top-clients-list">
+        {% for c in top_clients %}
+        <div class="top-clients-row">
+          <span class="top-clients-name">{{ c['client_name'] }}</span>
+          <div class="top-clients-bar-track">
+            <div class="top-clients-bar-fill" style="width: {{ ((c['minutes'] / max_minutes) * 100) if max_minutes else 0 }}%;"></div>
+          </div>
+          <span class="top-clients-value">{{ "%.1f"|format(c['minutes']) }} min</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="overview-side">
+    <div class="card">
+      <div class="overview-card-head">
+        <h2>My review queue</h2>
+        <a href="/staff/jobs" class="overview-viewall">View all ({{ in_review }}) →</a>
+      </div>
+      {% if not review_queue %}
+      <div class="empty-state" style="padding:24px 0;">
+        <p>You're all caught up 🎉</p>
+        <p class="muted" style="margin-top:-8px;">No jobs are waiting for review.</p>
+      </div>
+      {% else %}
+      {% for o in review_queue %}
+      {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
+      {% set pct = edited_pct.get(o['id']) %}
+      <a href="/staff/orders/{{ o['id'] }}/editor" class="review-queue-item">
+        <div class="review-queue-item-top">
+          <span class="review-queue-item-title">{{ o['original_filename'] }}</span>
+          {% if o['is_rush'] %}<span class="review-priority review-priority-high">High</span>{% else %}<span class="review-priority review-priority-medium">Normal</span>{% endif %}
+        </div>
+        <div class="review-queue-item-sub muted">{{ o['source_lang'] }} → {{ o['target_lang'] }} &middot; {{ o['client_name'] }}</div>
+        <div class="review-queue-progress-track">
+          <div class="review-queue-progress-fill" style="width: {{ pct if pct is not none else 0 }}%;"></div>
+        </div>
+        <div class="review-queue-item-bottom muted">
+          <span>{{ pct if pct is not none else 0 }}% edited</span>
+          {% if ts %}<span class="{{ 'trend-down' if ts['overdue'] else '' }}">{% if ts['overdue'] %}Overdue{% else %}Due {{ o['internal_deadline_at']|int|timestamp_to_str }}{% endif %}</span>{% endif %}
+        </div>
+      </a>
+      {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Recent activity</h2>
+      {% if not activity %}
+        <p class="muted">Nothing yet.</p>
+      {% else %}
+      <ul class="activity-feed">
+        {% for a in activity %}
+        <li>
+          <span class="activity-actor">{{ a['actor'] }}</span>
+          <span class="activity-text">{{ a['text'] }}</span>
+          <span class="activity-time muted">{{ (now_ts - a['ts'])|duration_short }} ago</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var buttons = document.querySelectorAll('#overview-job-tabs button');
+    var rows = document.querySelectorAll('#overview-job-table tbody tr');
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        buttons.forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var wanted = btn.dataset.filter.split(',');
+        rows.forEach(function (row) {
+          row.style.display = (wanted[0] === 'all' || wanted.includes(row.dataset.status)) ? '' : 'none';
+        });
+      });
+    });
+    document.querySelectorAll('tr.clickable-row').forEach(function (row) {
+      row.addEventListener('click', function () { window.location.href = row.dataset.href; });
+      row.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.href = row.dataset.href; });
+    });
+  })();
+</script>
+{% endblock %}

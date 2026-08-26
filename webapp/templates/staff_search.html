@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<h1>Search</h1>
+<form method="get" action="/staff/search" class="search-form" style="margin-bottom:20px;">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search jobs, clients, leads..." autofocus
+         style="max-width:420px;">
+  <button type="submit" class="btn">Search</button>
+</form>
+
+{% if not q.strip() %}
+  <p class="muted">Type something above - job id, filename, client or lead name/email.</p>
+{% elif not results.orders and not results.clients and not results.leads %}
+  <div class="empty-state"><p>No matches for "{{ q }}".</p></div>
+{% else %}
+
+{% if results.orders %}
+<div class="card">
+  <h2 style="margin-top:0;">Jobs</h2>
+  <table>
+    <thead><tr><th>File</th><th>Client</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for o in results.orders %}
+      <tr class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
+        <td>{{ o['original_filename'] }}</td>
+        <td>{{ o['client_name'] }}</td>
+        <td><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if results.clients %}
+<div class="card">
+  <h2 style="margin-top:0;">Clients</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th></tr></thead>
+    <tbody>
+      {% for c in results.clients %}
+      <tr><td>{{ c['display_name'] }}</td><td><a href="mailto:{{ c['email'] }}">{{ c['email'] }}</a></td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if results.leads %}
+<div class="card">
+  <h2 style="margin-top:0;">Leads</h2>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Stage</th></tr></thead>
+    <tbody>
+      {% for l in results.leads %}
+      <tr class="clickable-row" data-href="/staff/leads/{{ l['id'] }}" tabindex="0">
+        <td>{{ l['name'] }}</td><td>{{ l['email'] }}</td><td>{{ l['status'] }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% endif %}
+
+<script>
+  (function () {
+    document.querySelectorAll('tr.clickable-row').forEach(function (row) {
+      row.addEventListener('click', function () { window.location.href = row.dataset.href; });
+      row.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.href = row.dataset.href; });
+    });
+  })();
+</script>
+{% endblock %}

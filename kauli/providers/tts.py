@@ -129,7 +129,20 @@ class AzureTTS(TTSProvider):
         synth = speechsdk.SpeechSynthesizer(speech_config=cfg, audio_config=out)
         result = synth.speak_ssml_async(ssml).get()
         if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
-            raise RuntimeError(f"Azure TTS failed: {result.reason}")
+            # Real bug this fixes: `result.reason` alone is just an enum name
+            # ("ResultReason.Canceled") with zero information about WHY - a
+            # bad/expired key, a rate-limit/quota hit, and a network blip all
+            # log identically without this. CancellationDetails carries the
+            # actual reason (Error vs a clean stop) and, for a real error,
+            # Azure's own error_details string (e.g. "WebSocket upgrade
+            # failed... 429" for a rate limit) - exactly what's needed to
+            # tell "your key is wrong" apart from "you're calling this too
+            # fast for the free tier" apart from "Azure had a blip, retry".
+            detail = ""
+            if result.reason == speechsdk.ResultReason.Canceled:
+                cancellation = speechsdk.CancellationDetails.from_result(result)
+                detail = f" ({cancellation.reason}: {cancellation.error_details})"
+            raise RuntimeError(f"Azure TTS failed: {result.reason}{detail}")
         with wave.open(out_path, "rb") as w:
             return int(w.getnframes() / w.getframerate() * 1000)
 

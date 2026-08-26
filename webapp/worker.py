@@ -88,8 +88,10 @@ def notify_staff_needs_review(order) -> None:
     notifications.notify_staff(
         "Kauli: an order needs review",
         f"Order {order['id']} ({order['original_filename']}) finished processing and is waiting "
-        f"in the review queue before it can go to the client.\n\nReview on /staff.",
+        f"in the review queue before it can go to the client.\n\nReview on /staff/jobs.",
     )
+    db.notify_all_staff("needs_review", f"{order['original_filename']} is ready for review",
+                         link=f"/staff/orders/{order['id']}")
 
 
 def notify_staff_dead_letter(order, error: str) -> None:
@@ -99,15 +101,17 @@ def notify_staff_dead_letter(order, error: str) -> None:
         f"and is now dead-lettered - it will NOT retry again on its own.\n\n"
         f"Error: {error}\n\nSee /staff/orders/{order['id']} to retry or investigate.",
     )
+    db.notify_all_staff("dead_letter", f"{order['original_filename']} failed and needs attention",
+                         link=f"/staff/orders/{order['id']}")
 
 
-def _run_job(order_id: str) -> None:
+def _run_job(order_id: str, is_retry: bool = False) -> None:
     order = db.get_order(order_id)
     if not order:
         log.warning("job started for missing order", extra={"job_id": order_id})
         return
     db.update_order_status(order_id, "processing")
-    log.info("job started", extra={"job_id": order_id, "user_id": order["client_id"]})
+    log.info("job started", extra={"job_id": order_id, "user_id": order["client_id"], "is_retry": is_retry})
     try:
         kauli_run(
             audio_path=order["audio_path"],
@@ -118,6 +122,16 @@ def _run_job(order_id: str) -> None:
             source_lang=order["source_lang"],
             target_lang=order["target_lang"],
             verbose=False,
+            # Real cost bug this fixes: a retry used to always re-run ASR/MT
+            # from scratch even when the FAILED attempt's own manifest
+            # already had a real, correct transcript and translation sitting
+            # on disk - re-billing a paid ASR provider (Transkriptor, per
+            # minute) for the whole file again just because a LATER stage
+            # (TTS/mix) is what actually failed. resume=True only on a
+            # retry (never the original attempt) tells kauli.pipeline.run
+            # to reuse whatever real work is already in that manifest,
+            # per segment - see that function's own docstring.
+            resume=is_retry,
         )
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))
@@ -154,7 +168,7 @@ def _run_job(order_id: str) -> None:
             # scale (one job at a time); a real queue's scheduled-retry
             # feature is the thing to reach for once that's justified.
             time.sleep(delay)
-            _run_job(order_id)
+            _run_job(order_id, is_retry=True)
             return
         log.error("job exhausted retries, dead-lettering", extra={
             "job_id": order_id, "user_id": order["client_id"],
@@ -164,7 +178,16 @@ def _run_job(order_id: str) -> None:
         notify_staff_dead_letter(db.get_order(order_id), str(exc))
 
 
-def submit_job(order_id: str) -> None:
-    """Fire-and-forget: kicks off processing on a daemon thread."""
-    t = threading.Thread(target=_run_job, args=(order_id,), daemon=True)
+def submit_job(order_id: str, resume: bool = False) -> None:
+    """Fire-and-forget: kicks off processing on a daemon thread.
+
+    resume: same real-money reason as _run_job's automatic retry path -
+    staff manually hitting Retry on a stuck/dead-lettered order (the
+    /staff/orders/{id}/retry route) is exactly the same situation as an
+    automatic retry (a previous attempt's real ASR/MT work may already be
+    sitting in the manifest), just human-triggered instead of exception-
+    triggered. Default False because a genuinely NEW order (client just
+    uploaded, first submit_job call ever for this id) has no prior
+    manifest to resume from - True is only correct for a real re-attempt."""
+    t = threading.Thread(target=_run_job, args=(order_id,), kwargs={"is_retry": resume}, daemon=True)
     t.start()

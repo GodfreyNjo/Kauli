@@ -168,6 +168,19 @@ class Job:
     # same voice throughout," achieved without any new diarization model.
     speaker_voices: dict[str, str] = field(default_factory=dict)
 
+    # Same idea as speaker_voices above, but for Azure: a Piper voice-model
+    # PATH means nothing to Azure's synthesize() (it wants a named voice
+    # like "sw-KE-RafikiNeural"), and resolve_voice_for_segment already
+    # refuses to hand a Piper path to a non-Piper provider - see that
+    # function's own docstring on why that split has to be a real, separate
+    # dict, not a shared one keyed the same way with values that mean two
+    # different things depending on which provider reads them. Populated
+    # either automatically (see kauli.speaker_gender's pitch-based
+    # male/female default) or by a human overriding it by ear in Ereri
+    # (webapp/app.py's editor_assign_speaker_voice_azure) - the automatic
+    # guess is a default, never the only way to set this.
+    speaker_voice_names: dict[str, str] = field(default_factory=dict)
+
     # ---- quality rollups ----
     @property
     def fit_rate(self) -> float:

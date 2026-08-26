@@ -599,6 +599,66 @@
     }
   }
 
+  // Alt+T: re-run ASR on just this segment's own audio window - the
+  // transcription-stage equivalent of Alt+R. Swaps BOTH the source cells
+  // (fresh ASR text/timing) and, when the server auto-retranslated from it,
+  // the target cells too - same "surgically replace just this segment,
+  // don't touch anything else on the page" approach as retranslate().
+  async function retranscribe(segmentId) {
+    const sourceFlow = $("#flow-source");
+    const targetFlow = $("#flow-target");
+    const oldSourceCells = $all(`[data-segment-id="${segmentId}"]`, sourceFlow);
+    if (!oldSourceCells.length) return;
+    const sourceParent = oldSourceCells[0].parentElement;
+    const sourceInsertBefore = oldSourceCells[oldSourceCells.length - 1].nextSibling;
+    oldSourceCells.forEach((el) => el.classList.add("retranslating"));
+    try {
+      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/retranscribe`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "re-transcribe failed");
+
+      allCells = allCells.filter((c) => c.el.dataset.segmentId !== segmentId || !sourceFlow.contains(c.el));
+      oldSourceCells.forEach((el) => el.remove());
+
+      segmentMeta[segmentId] = Object.assign({}, segmentMeta[segmentId], {
+        review_flag: data.review_flag, review_reasons: data.review_reasons,
+        translation_confidence: data.translation_confidence,
+        translation_stale: !!data.translation_stale,
+      });
+      const flagTitle = buildFlagTitle(segmentMeta[segmentId]);
+      const sourceFrag = document.createDocumentFragment();
+      buildCells(sourceFrag, data.source_cells, segmentId, data.source_final_text, "source", flagTitle);
+      sourceParent.insertBefore(sourceFrag, sourceInsertBefore);
+
+      if (data.auto_retranslated) {
+        // The server re-ran MT from the fresh transcript too - the target
+        // side changed, swap it the same way retranslate() does.
+        const oldTargetCells = $all(`[data-segment-id="${segmentId}"]`, targetFlow);
+        if (oldTargetCells.length) {
+          const targetParent = oldTargetCells[0].parentElement;
+          const targetInsertBefore = oldTargetCells[oldTargetCells.length - 1].nextSibling;
+          allCells = allCells.filter((c) => c.el.dataset.segmentId !== segmentId || !targetFlow.contains(c.el));
+          oldTargetCells.forEach((el) => el.remove());
+          const targetFrag = document.createDocumentFragment();
+          buildCells(targetFrag, data.target_cells, segmentId, data.final_text, "target",
+                     flagTitle, staleTranslationTitle(segmentMeta[segmentId]));
+          targetParent.insertBefore(targetFrag, targetInsertBefore);
+        }
+        updatePreviewSegment(segmentId, data.wrapped_caption, data.display_end_ms);
+      } else {
+        // English was already hand-finalized - untouched, just flagged
+        // stale (same rule editor_save_source uses for a manual correction).
+        applyStaleTranslationUI(segmentId, data.translation_stale);
+      }
+      if (data.retranslate_error) {
+        alert("Transcript updated, but re-translating it failed: " + data.retranslate_error);
+      }
+    } catch (err) {
+      alert("Re-transcribe failed: " + err.message);
+      oldSourceCells.forEach((el) => el.classList.remove("retranslating"));
+    }
+  }
+
   // Ctrl+S: save the segment the focused cell belongs to, right now -
   // cancels any pending autosave for it so there's no duplicate request.
   function saveFocusedSegment(resynthesize) {
@@ -1580,6 +1640,12 @@
         e.preventDefault();
         const segmentId = active && active.dataset.segmentId;
         if (segmentId) retranslate(segmentId);
+        return;
+      }
+      if (e.altKey && key === "t") {
+        e.preventDefault();
+        const segmentId = active && active.dataset.segmentId;
+        if (segmentId) retranscribe(segmentId);
         return;
       }
       if (e.altKey && key === "v") {

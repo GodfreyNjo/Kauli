@@ -5,7 +5,7 @@
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
 <div class="card">
-  <a href="/staff" class="breadcrumb">&larr; back to queue</a>
+  <a href="/staff/jobs" class="breadcrumb">&larr; back to queue</a>
   <h1>{% if order['is_rush'] %}⚡ {% endif %}{{ order['original_filename'] }}</h1>
   <p>
      <span class="status status-{{ order['status'] }}">{{ order['status'].replace('_', ' ') }}</span>

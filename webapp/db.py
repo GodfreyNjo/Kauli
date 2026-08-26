@@ -13,6 +13,7 @@ import os
 import sqlite3
 import time
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent / "data" / "kauli_demo.db"
@@ -415,6 +416,22 @@ CREATE TABLE IF NOT EXISTS upload_audit_log (
     ip_address TEXT,
     user_agent TEXT,
     created_at REAL NOT NULL
+);
+
+-- Real, persistent in-app notifications (the staff overview page's bell) -
+-- separate from notifications.py's notify_staff*, which only ever sends an
+-- EMAIL. Both fire from the same real events; this is what lets a staff
+-- member see "5 things happened" without checking their inbox. link is a
+-- same-origin path (an order/lead page, etc.), never rendered as raw HTML.
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    recipient_id TEXT NOT NULL,
+    kind TEXT NOT NULL,          -- 'needs_review' | 'dead_letter' | 'payment_received' | 'ops_decision'
+    title TEXT NOT NULL,
+    link TEXT,
+    created_at REAL NOT NULL,
+    read_at REAL,
+    FOREIGN KEY (recipient_id) REFERENCES users(id)
 );
 """
 
@@ -1289,6 +1306,95 @@ def list_staff_users():
         "SELECT * FROM users WHERE role = 'staff' ORDER BY is_admin DESC, display_name ASC").fetchall()
     conn.close()
     return rows
+
+
+def staff_search(query: str, limit: int = 8):
+    """Real cross-entity search - orders (by id, filename, or client name/
+    email), clients (by name/email), leads (by name/email). Plain SQL LIKE,
+    not a search index - fine at this order volume (see the "one staff
+    role for now" note elsewhere), and it's a real query against real
+    data, not a fabricated typeahead over static text."""
+    q = f"%{query.strip()}%"
+    conn = get_conn()
+    orders = conn.execute(
+        """SELECT orders.id, orders.original_filename, orders.status, users.display_name AS client_name
+           FROM orders JOIN users ON orders.client_id = users.id
+           WHERE orders.id LIKE ? OR orders.original_filename LIKE ?
+              OR users.display_name LIKE ? OR users.email LIKE ?
+           ORDER BY orders.created_at DESC LIMIT ?""",
+        (q, q, q, q, limit),
+    ).fetchall()
+    clients = conn.execute(
+        """SELECT id, display_name, email FROM users
+           WHERE role = 'client' AND (display_name LIKE ? OR email LIKE ?)
+           ORDER BY display_name ASC LIMIT ?""",
+        (q, q, limit),
+    ).fetchall()
+    leads = conn.execute(
+        """SELECT id, name, email, status FROM leads
+           WHERE name LIKE ? OR email LIKE ? ORDER BY created_at DESC LIMIT ?""",
+        (q, q, limit),
+    ).fetchall()
+    conn.close()
+    return {"orders": orders, "clients": clients, "leads": leads}
+
+
+def notify_all_staff(kind: str, title: str, link: str | None = None) -> None:
+    """Real in-app notification for every current staff account - the bell's
+    actual data source. Fired from the same real events notifications.py's
+    notify_staff*/notify_staff_needs_review email helpers already fire
+    from, not a new trigger of its own - see those call sites."""
+    conn = get_conn()
+    now = time.time()
+    for staff in list_staff_users():
+        conn.execute(
+            "INSERT INTO notifications (id, recipient_id, kind, title, link, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (uuid.uuid4().hex, staff["id"], kind, title, link, now),
+        )
+    conn.commit()
+    conn.close()
+
+
+def list_recent_notifications(user_id: str, limit: int = 10):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM notifications WHERE recipient_id = ? ORDER BY created_at DESC LIMIT ?",
+        (user_id, limit),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def count_unread_notifications(user_id: str) -> int:
+    conn = get_conn()
+    n = conn.execute(
+        "SELECT COUNT(*) FROM notifications WHERE recipient_id = ? AND read_at IS NULL", (user_id,)
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def mark_notification_read(notification_id: str, user_id: str) -> None:
+    """user_id scopes this to the recipient's OWN notification - without it
+    a guessed/enumerated id could mark (or reveal the existence of)
+    someone else's notification as read."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE notifications SET read_at = ? WHERE id = ? AND recipient_id = ? AND read_at IS NULL",
+        (time.time(), notification_id, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def mark_all_notifications_read(user_id: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE notifications SET read_at = ? WHERE recipient_id = ? AND read_at IS NULL",
+        (time.time(), user_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def promote_to_staff(user_id: str) -> bool:
@@ -3055,6 +3161,138 @@ def revenue_summary(days: int = 30):
         "pending_bank_amount": pending_bank[0] or 0.0,
         "pending_bank_count": pending_bank[1] or 0,
     }
+
+
+def orders_created_between(start_ts: float, end_ts: float) -> int:
+    """Count of orders created in [start_ts, end_ts) - the building block for
+    real 'vs previous period' comparisons on the staff overview page (see
+    orders_reaching_status_between and revenue_between for the same pattern
+    applied to completions and revenue)."""
+    conn = get_conn()
+    n = conn.execute(
+        "SELECT COUNT(*) FROM orders WHERE created_at >= ? AND created_at < ?",
+        (start_ts, end_ts),
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def orders_reaching_status_between(status: str, start_ts: float, end_ts: float) -> int:
+    """Count of orders currently in `status` whose status_changed_at falls in
+    [start_ts, end_ts). Only meaningful for a status real orders don't leave
+    once reached (e.g. 'delivered' is terminal) - otherwise status_changed_at
+    reflects the most recent transition, not necessarily the one into this
+    status."""
+    conn = get_conn()
+    n = conn.execute(
+        "SELECT COUNT(*) FROM orders WHERE status = ? AND status_changed_at >= ? AND status_changed_at < ?",
+        (status, start_ts, end_ts),
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def revenue_between(start_ts: float, end_ts: float) -> float:
+    """Confirmed revenue (completed payments only) in [start_ts, end_ts) -
+    same definition as revenue_summary's total_period, just over an
+    arbitrary bounded window instead of "since N days ago", so the overview
+    page can compare this calendar month against last."""
+    conn = get_conn()
+    total = conn.execute(
+        "SELECT COALESCE(SUM(amount_usd), 0) FROM payments WHERE status = 'completed' AND completed_at >= ? AND completed_at < ?",
+        (start_ts, end_ts),
+    ).fetchone()[0]
+    conn.close()
+    return total or 0.0
+
+
+def recent_status_changes(limit: int = 12):
+    """Most recently changed orders - the real signal behind the staff
+    overview's activity feed. No separate audit-log table exists yet; this
+    derives "what just happened" from status_changed_at, which every real
+    status transition already updates (see update_order_status and the
+    other status-writing call sites)."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT orders.id, orders.status, orders.status_changed_at, orders.original_filename,
+                  users.display_name AS client_name
+           FROM orders JOIN users ON orders.client_id = users.id
+           ORDER BY orders.status_changed_at DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def recent_client_messages(limit: int = 8):
+    """Most recent staff-sent, client-visible messages - real activity for
+    the overview feed (an actual event with a real actor, not derived from a
+    status field like recent_status_changes)."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT messages.order_id, messages.body, messages.created_at, messages.sender_id,
+                  orders.original_filename, sender.display_name AS staff_name,
+                  client.display_name AS client_name
+           FROM messages
+           JOIN orders ON messages.order_id = orders.id
+           JOIN users AS client ON orders.client_id = client.id
+           LEFT JOIN users AS sender ON messages.sender_id = sender.id
+           WHERE messages.visibility = 'client'
+           ORDER BY messages.created_at DESC LIMIT ?""",
+        (limit,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def daily_job_trend(days: int = 30):
+    """Real, retroactive trend data - no new snapshot table needed, because
+    created_at and status_changed_at are both real timestamps every order
+    already has. Two series: jobs CREATED per day (created_at) and jobs
+    DELIVERED per day (status_changed_at, status='delivered' - terminal,
+    so this is a real one-time event per order, not recount-able later).
+    SQLite's strftime works directly on a unix epoch REAL with the
+    'unixepoch' modifier - no Python-side date math needed."""
+    cutoff = time.time() - days * 86400
+    conn = get_conn()
+    created_rows = conn.execute(
+        """SELECT strftime('%Y-%m-%d', created_at, 'unixepoch') AS day, COUNT(*) AS n
+           FROM orders WHERE created_at >= ? GROUP BY day""",
+        (cutoff,),
+    ).fetchall()
+    delivered_rows = conn.execute(
+        """SELECT strftime('%Y-%m-%d', status_changed_at, 'unixepoch') AS day, COUNT(*) AS n
+           FROM orders WHERE status = 'delivered' AND status_changed_at >= ? GROUP BY day""",
+        (cutoff,),
+    ).fetchall()
+    conn.close()
+    created_by_day = {r["day"]: r["n"] for r in created_rows}
+    delivered_by_day = {r["day"]: r["n"] for r in delivered_rows}
+    days_list = []
+    for i in range(days - 1, -1, -1):
+        day = datetime.fromtimestamp(time.time() - i * 86400).strftime("%Y-%m-%d")
+        days_list.append({"day": day, "created": created_by_day.get(day, 0), "delivered": delivered_by_day.get(day, 0)})
+    return days_list
+
+
+def top_clients_by_usage(days: int = 30, limit: int = 5):
+    """Clients ranked by billed minutes processed in the window - real
+    duration_minutes off completed/in-flight orders, not a fabricated usage
+    metric. Counts any order created in the window regardless of current
+    status, since duration is known at order-creation time (billing.py sets
+    it from the upload) rather than only once delivered."""
+    cutoff = time.time() - days * 86400
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT users.id AS client_id, users.display_name AS client_name,
+                  COALESCE(SUM(orders.duration_minutes), 0) AS minutes, COUNT(*) AS n
+           FROM orders JOIN users ON orders.client_id = users.id
+           WHERE orders.created_at >= ? AND orders.duration_minutes IS NOT NULL
+           GROUP BY users.id ORDER BY minutes DESC LIMIT ?""",
+        (cutoff, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 def margin_summary(days: int = 30):

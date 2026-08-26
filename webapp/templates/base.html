@@ -42,6 +42,25 @@
       <div class="wordmark">KAULI</div>
       <div class="sub-wordmark">Forge Media Services</div>
     </div>
+    {% if user['role'] == 'staff' %}
+    <form method="get" action="/staff/search" class="topbar-search">
+      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads... (Ctrl+K)">
+    </form>
+    {% endif %}
+    <div class="topbar-right">
+    <div class="notif-bell" id="notif-bell">
+      <button type="button" class="notif-bell-trigger" id="notif-bell-trigger" aria-haspopup="true" aria-expanded="false" title="Notifications">
+        <span class="icon" aria-hidden="true">N</span>
+        <span class="notif-bell-badge" id="notif-bell-badge" hidden>0</span>
+      </button>
+      <div class="notif-bell-panel" id="notif-bell-panel" hidden>
+        <div class="notif-bell-panel-head">
+          <span>Notifications</span>
+          <button type="button" id="notif-mark-all-read" class="notif-mark-all">Mark all read</button>
+        </div>
+        <div id="notif-bell-list"></div>
+      </div>
+    </div>
     <div class="account-menu" id="account-menu">
       <button type="button" class="account-menu-trigger" id="account-menu-trigger" aria-haspopup="true" aria-expanded="false">
         {% if user['avatar_path'] %}
@@ -69,6 +88,7 @@
         <a href="/logout" class="account-menu-item account-menu-item-danger"><span class="icon">O</span>Sign out</a>
       </div>
     </div>
+    </div>
   </header>
   {% endif %}
   <div class="app-shell{% if not user %} no-sidebar{% endif %}" id="app-shell">
@@ -79,7 +99,8 @@
       </div>
       <nav class="sidebar-nav">
         {% if user['role'] == 'staff' %}
-        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}"><span class="icon">Q</span><span class="label">Queue</span></a>
+        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}"><span class="icon">O</span><span class="label">Overview</span></a>
+        <a href="/staff/jobs" class="{{ 'active' if request.url.path == '/staff/jobs' else '' }}"><span class="icon">Q</span><span class="label">All jobs</span></a>
         <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}"><span class="icon">R</span><span class="label">Reports</span></a>
         <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}"><span class="icon">C</span><span class="label">CRM</span></a>
         <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}"><span class="icon">E</span><span class="label">Exceptions</span></a>
@@ -209,6 +230,85 @@
         });
         document.addEventListener("keydown", function (e) {
           if (e.key === "Escape" && !panel.hidden) { closeMenu(); trigger.focus(); }
+        });
+      }
+
+      // Notification bell - real data from /notifications/recent (see
+      // db.notify_all_staff for what creates these), polled gently rather
+      // than pushed - same "no new realtime infra until it's justified"
+      // choice as everything else's periodic-reload pattern in this app.
+      var bell = document.getElementById("notif-bell");
+      var bellTrigger = document.getElementById("notif-bell-trigger");
+      var bellPanel = document.getElementById("notif-bell-panel");
+      var bellBadge = document.getElementById("notif-bell-badge");
+      var bellList = document.getElementById("notif-bell-list");
+      var markAllBtn = document.getElementById("notif-mark-all-read");
+      if (bell && bellTrigger && bellPanel) {
+        function timeAgo(ts) {
+          var s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+          if (s < 60) return "just now";
+          if (s < 3600) return Math.floor(s / 60) + "m ago";
+          if (s < 86400) return Math.floor(s / 3600) + "h ago";
+          return Math.floor(s / 86400) + "d ago";
+        }
+        function renderNotifs(data) {
+          if (data.unread_count > 0) {
+            bellBadge.hidden = false;
+            bellBadge.textContent = data.unread_count > 9 ? "9+" : String(data.unread_count);
+          } else {
+            bellBadge.hidden = true;
+          }
+          if (!data.items.length) {
+            bellList.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+            return;
+          }
+          bellList.innerHTML = "";
+          data.items.forEach(function (item) {
+            var row = document.createElement(item.link ? "a" : "div");
+            row.className = "notif-item" + (item.unread ? " notif-unread" : "");
+            if (item.link) row.href = item.link;
+            row.innerHTML = '<span class="notif-item-title"></span><span class="notif-item-time"></span>';
+            row.querySelector(".notif-item-title").textContent = item.title;
+            row.querySelector(".notif-item-time").textContent = timeAgo(item.created_at);
+            row.addEventListener("click", function () {
+              if (item.unread) fetch("/notifications/" + item.id + "/read", { method: "POST" });
+            });
+            bellList.appendChild(row);
+          });
+        }
+        function loadNotifs() {
+          fetch("/notifications/recent").then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) { if (data) renderNotifs(data); }).catch(function () {});
+        }
+        function closeBell() { bellPanel.hidden = true; bellTrigger.setAttribute("aria-expanded", "false"); }
+        function openBell() { bellPanel.hidden = false; bellTrigger.setAttribute("aria-expanded", "true"); loadNotifs(); }
+        bellTrigger.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (bellPanel.hidden) { openBell(); } else { closeBell(); }
+        });
+        document.addEventListener("click", function (e) {
+          if (!bellPanel.hidden && !bell.contains(e.target)) closeBell();
+        });
+        if (markAllBtn) {
+          markAllBtn.addEventListener("click", function () {
+            fetch("/notifications/mark-all-read", { method: "POST" }).then(loadNotifs);
+          });
+        }
+        loadNotifs();
+        setInterval(loadNotifs, 60000);  // gentle - real counts, not real-time push
+      }
+
+      // Ctrl/Cmd+K jumps to the staff search box, same shortcut convention
+      // as most search-first apps - only wired when the box actually
+      // exists on this page (staff role only, see the topbar markup above).
+      var searchInput = document.getElementById("topbar-search-input");
+      if (searchInput) {
+        document.addEventListener("keydown", function (e) {
+          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+          }
         });
       }
     })();
