@@ -16,6 +16,17 @@
      &middot; {{ order['tier']|capitalize }} plan
      {% if receipt %}&middot; <a href="/receipts/{{ receipt['id'] }}">View receipt ({{ receipt['receipt_number'] }}) →</a>{% endif %}</p>
 
+  <ol class="order-progress">
+    {% for step in progress_steps %}
+    <li class="order-progress-step order-progress-{{ step['state'] }}">
+      <span class="order-progress-dot">
+        {% if step['state'] == 'done' %}&check;{% elif step['state'] == 'attention' %}!{% else %}{{ loop.index }}{% endif %}
+      </span>
+      <span class="order-progress-label">{{ step['label'] }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+
   <details style="margin-top:6px;">
     <summary class="muted" style="cursor:pointer; font-size:0.85rem; display:inline-block;">
       {% if order['folder_name'] %}Folder: <strong>{{ order['folder_name'] }}</strong>{% else %}Not in a folder{% endif %} - move &raquo;

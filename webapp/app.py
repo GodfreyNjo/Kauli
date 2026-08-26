@@ -2850,6 +2850,48 @@ def create_order(
     return RedirectResponse(f"/client/orders/{order_id}/pay", status_code=303)
 
 
+_PROGRESS_STEPS = [
+    ("submitted", "Submitted"),
+    ("processing", "Processing"),
+    ("staff_review", "Staff review"),
+    ("delivered", "Delivered"),
+]
+# Which real order.status values map onto which step - queued/processing
+# are both "processing" from the client's point of view (the distinction
+# between them is a staff/ops concern, not something worth a whole extra
+# step here). editor_returned still counts as "staff review" - the order
+# is back with a Kauli editor, not sitting on the client.
+_STEP_FOR_STATUS = {
+    "pending_payment": "submitted", "queued": "processing", "processing": "processing",
+    "awaiting_review": "staff_review", "editor_returned": "staff_review",
+    "returned_to_client": "staff_review", "ready_for_delivery": "delivered", "delivered": "delivered",
+    "failed": "processing", "dead_letter": "processing",
+}
+
+
+def _order_progress_steps(status: str) -> list[dict]:
+    """Real step states for order_detail.html's progress tracker - never
+    a fixed animation, always derived from the actual order.status. Two
+    real statuses don't fit a clean "moving forward" story and get their
+    own marker instead of silently advancing: returned_to_client (needs
+    the CLIENT's action, not further progress) and failed/dead_letter
+    (something broke) both mark their step 'attention' instead of
+    'current' or 'done'."""
+    current_key = _STEP_FOR_STATUS.get(status, "submitted")
+    current_idx = next((i for i, (k, _) in enumerate(_PROGRESS_STEPS) if k == current_key), 0)
+    attention = status in ("returned_to_client", "failed", "dead_letter")
+    steps = []
+    for i, (key, label) in enumerate(_PROGRESS_STEPS):
+        if i < current_idx:
+            state = "done"
+        elif i == current_idx:
+            state = "attention" if attention else "current"
+        else:
+            state = "pending"
+        steps.append({"key": key, "label": label, "state": state})
+    return steps
+
+
 @app.get("/client/orders/{order_id}", response_class=HTMLResponse)
 def client_order_detail(request: Request, order_id: str, error: str | None = None, notice: str | None = None):
     user = current_user(request)
@@ -2873,6 +2915,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["id"]),
+        "progress_steps": _order_progress_steps(order["status"]),
     })
 
 
