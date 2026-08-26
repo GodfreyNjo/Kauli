@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<h1>Messages</h1>
+<p class="muted" style="margin-top:0;">Every conversation across your orders, newest first. Replying happens on the order itself.</p>
+
+{% if not conversations %}
+<div class="empty-state">
+  <p>No conversations yet - questions, revisions and delivery updates will show up here once there's a message on any order.</p>
+</div>
+{% else %}
+<div class="card" style="padding:0;">
+  {% for c in conversations %}
+  <a href="/client/orders/{{ c['order_id'] }}" style="display:flex; gap:12px; align-items:flex-start; padding:14px 20px; border-bottom:1px solid var(--border-subtle); color:inherit;">
+    <div class="avatar" style="flex-shrink:0;">{{ c['original_filename'][0]|upper }}</div>
+    <div style="min-width:0; flex:1;">
+      <div style="display:flex; justify-content:space-between; gap:10px;">
+        <strong style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ c['original_filename'] }}</strong>
+        <span class="muted" style="font-size:0.76rem; flex-shrink:0;">{{ c['last_at']|int|timestamp_to_str }}</span>
+      </div>
+      <p class="muted" style="margin:2px 0 0; font-size:0.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+        {% if c['last_sender_id'] == user['id'] %}<span class="muted">You: </span>{% endif %}{{ c['last_body'] }}
+      </p>
+    </div>
+    {% if c['order_id'] in unread %}<span class="unread-dot" title="New message" style="margin-top:6px;"></span>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

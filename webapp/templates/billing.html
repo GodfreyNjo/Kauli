@@ -9,6 +9,26 @@
      of what's below.</p>
 {% endif %}
 
+<div class="dashboard-stats">
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Total spent</span>
+    <span class="stat-value">${{ "%.2f"|format(total_spent_usd) }}</span>
+    <span class="stat-hint">All-time, confirmed payments</span>
+  </div>
+  <div class="dashboard-stat-card {{ 'needs-you' if outstanding_usd > 0 else '' }}">
+    <span class="stat-label">Outstanding</span>
+    <span class="stat-value">${{ "%.2f"|format(outstanding_usd) }}</span>
+    <span class="stat-hint">
+      {% if outstanding_usd > 0 %}Across orders awaiting payment{% else %}Nothing owed right now{% endif %}
+    </span>
+  </div>
+  <div class="dashboard-stat-card">
+    <span class="stat-label">Prepaid credits</span>
+    <span class="stat-value" style="{{ 'color:var(--ok);' if wallet_credits > 0 else '' }}">{{ "%.0f"|format(wallet_credits) }}</span>
+    <span class="stat-hint">$0.10/credit, never expires</span>
+  </div>
+</div>
+
 <div class="card">
   <div class="billing-snapshot">
     <div class="billing-snapshot-cell">

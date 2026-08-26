@@ -1763,6 +1763,32 @@ def list_messages(order_id: str, include_internal: bool):
     return rows
 
 
+def list_conversations_for_client(client_id: str):
+    """One row per order that has at least one client-visible message,
+    newest activity first - the real data behind a cross-order 'Messages'
+    inbox view (client_files.html's sibling, client_messages.html). Never
+    a second messaging system: this is a read-only summary over the same
+    messages/orders tables the per-order thread (list_messages,
+    create_message) already uses - replying still happens on the real
+    order page, where the full thread and the actual reply form live."""
+    conn = get_conn()
+    rows = conn.execute(
+        """SELECT orders.id AS order_id, orders.original_filename, orders.status,
+                  m.body AS last_body, m.created_at AS last_at, m.sender_id AS last_sender_id
+           FROM orders
+           JOIN (
+             SELECT order_id, body, created_at, sender_id,
+                    ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY created_at DESC) AS rn
+             FROM messages WHERE visibility = 'client'
+           ) m ON m.order_id = orders.id AND m.rn = 1
+           WHERE orders.client_id = ?
+           ORDER BY m.created_at DESC""",
+        (client_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
 def mark_read(user_id: str, order_id: str) -> None:
     conn = get_conn()
     conn.execute(

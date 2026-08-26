@@ -2242,6 +2242,59 @@ def avatar(request: Request, user_id: str):
 
 
 # -------------------------------------------------------------- client ----
+@app.get("/client/files", response_class=HTMLResponse)
+def client_files(request: Request):
+    """A real cross-order file view - every order's source file plus
+    whatever's actually deliverable for it, in one place, instead of
+    having to open each order individually to find a download link.
+    Reuses the exact same /client/orders/{id}/download/{kind} routes and
+    the same real gating order_detail.html already uses (free-preview
+    orders and anything not yet delivered get no download links here
+    either) - no new file-serving logic, purely an aggregated view over
+    what already exists per order."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    rows = []
+    for o in db.list_orders_for_client(user["id"]):
+        deliverables = []
+        if o["status"] in ("ready_for_delivery", "delivered") and not o["is_free_preview"]:
+            outdir = Path(o["outdir"]) if o["outdir"] else None
+            deliverables = [
+                {"kind": "audio", "label": "Dubbed audio (.wav)"},
+                {"kind": "srt", "label": "Subtitles (.srt)"},
+                {"kind": "vtt", "label": "Subtitles (.vtt)"},
+                {"kind": "transcript", "label": "Source transcript (.srt)"},
+            ]
+            if outdir and (outdir / f"burned_captions_{o['target_lang']}.mp4").exists():
+                deliverables.append({"kind": "burned", "label": "Video with burned-in captions"})
+            if outdir and (outdir / f"dubbed_video_{o['target_lang']}.mp4").exists():
+                deliverables.append({"kind": "dubbed", "label": "Dubbed video"})
+        source_size = None
+        if o["audio_path"] and Path(o["audio_path"]).exists():
+            source_size = Path(o["audio_path"]).stat().st_size
+        rows.append({"order": o, "deliverables": deliverables, "source_size": source_size})
+    return templates.TemplateResponse(request, "client_files.html", {"user": user, "rows": rows})
+
+
+@app.get("/client/messages", response_class=HTMLResponse)
+def client_messages(request: Request):
+    """A real cross-order inbox - every order with a conversation, newest
+    activity first, so a client with several orders doesn't have to open
+    each one to check for a reply. Not a second messaging system:
+    clicking through goes to the real order page, where the full thread
+    and reply form already live (client_send_message) - this is a
+    read-only summary over that same data."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    unread = db.unread_order_ids(user["id"], include_internal=False)
+    conversations = db.list_conversations_for_client(user["id"])
+    return templates.TemplateResponse(request, "client_messages.html", {
+        "user": user, "conversations": conversations, "unread": unread,
+    })
+
+
 @app.get("/client/home", response_class=HTMLResponse)
 def client_home(request: Request):
     """The client portal's real landing page - summary stats + a preview
@@ -3074,10 +3127,21 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     receipts_by_payment = {
         r["payment_id"]: r for r in db.list_receipts_for_client(user["id"])
     }
+    # Real, not decorative: total_spent is the same all-time confirmed-
+    # payments figure client_home.html's dashboard card shows (one source
+    # of truth); outstanding is what's actually sitting unpaid right now
+    # across every order, so a client with several pending_payment orders
+    # sees the real total they owe in one number instead of adding pills
+    # up themselves order by order.
+    client_stats = db.client_dashboard_stats(user["id"])
+    outstanding_usd = sum(
+        (o["cost_usd"] or 0) for o in db.list_orders_for_client(user["id"]) if o["status"] == "pending_payment"
+    )
     return templates.TemplateResponse(request, "billing.html", {
         "user": user, "plans": billing.PLANS, "current_plan": plan,
         "subscription": subscription, "is_test_account": is_test_account,
         "payments": payments, "receipts_by_payment": receipts_by_payment,
+        "total_spent_usd": client_stats["total_spent_usd"], "outstanding_usd": outstanding_usd,
         "upgrade_for": upgrade_for, "notice": notice, "error": error,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),

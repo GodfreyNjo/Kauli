@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Files{% endblock %}
+{% block content %}
+<h1>Files</h1>
+<p class="muted" style="margin-top:0;">Every order's source file and its real deliverables, in one place.</p>
+
+{% if not rows %}
+<div class="empty-state">
+  <p>You haven't submitted any projects yet.</p>
+  <a href="/client#order-form" class="btn secondary">+ Submit your first order</a>
+</div>
+{% else %}
+{% for r in rows %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap;">
+    <h2 style="margin:0;"><a href="/client/orders/{{ r['order']['id'] }}">{{ r['order']['original_filename'] }}</a></h2>
+    <span class="status status-{{ r['order']['status'] }}">{{ r['order']['status']|client_status_label }}</span>
+  </div>
+  <table style="margin-top:10px;">
+    <thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead>
+    <tbody>
+      <tr>
+        <td>{{ r['order']['original_filename'] }}</td>
+        <td class="muted">Source upload</td>
+        <td class="muted">{% if r['source_size'] %}{{ r['source_size']|filesizeformat }}{% else %}&mdash;{% endif %}</td>
+        <td class="muted" style="font-size:0.78rem;">Not re-downloadable once submitted</td>
+      </tr>
+      {% for d in r['deliverables'] %}
+      <tr>
+        <td>{{ d['label'] }}</td>
+        <td class="muted">Deliverable</td>
+        <td class="muted">&mdash;</td>
+        <td><a href="/client/orders/{{ r['order']['id'] }}/download/{{ d['kind'] }}" class="row-action-btn" title="Download">&darr;</a></td>
+      </tr>
+      {% endfor %}
+      {% if not r['deliverables'] %}
+      <tr>
+        <td colspan="4" class="muted" style="font-size:0.85rem;">
+          {% if r['order']['status'] in ('ready_for_delivery', 'delivered') %}
+            Ran on free trial minutes - no downloadable deliverables for a preview.
+          {% else %}
+            Deliverables appear here once this order is ready.
+          {% endif %}
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

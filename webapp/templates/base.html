@@ -104,6 +104,8 @@
         {% else %}
         <a href="/client/home" class="{{ 'active' if request.url.path == '/client/home' else '' }}"><span class="icon">D</span><span class="label">Dashboard</span></a>
         <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}"><span class="icon">O</span><span class="label">My orders</span></a>
+        <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}"><span class="icon">F</span><span class="label">Files</span></a>
+        <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}"><span class="icon">M</span><span class="label">Messages</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Help &amp; troubleshooting</span></a>
