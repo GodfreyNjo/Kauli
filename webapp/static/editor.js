@@ -10,6 +10,12 @@
   "use strict";
 
   let ORDER_ID = null;
+  // Real per-order languages (an en->sw job has these the other way
+  // round from the far more common sw->en one) - set once by
+  // initKauliEditor, read anywhere a message needs to name a side
+  // instead of assuming it's always Swahili source / English target.
+  let SOURCE_LANG_NAME = "the source language";
+  let TARGET_LANG_NAME = "the target language";
   let audio = null;
   let allCells = [];      // flat list of {el, startMs, endMs} across BOTH steps, all segments
   let currentStep = "source"; // "source" | "target"
@@ -154,7 +160,8 @@
 
   function staleTranslationTitle(seg) {
     return seg && seg.translation_stale
-      ? "The Swahili source was corrected after this translation - click Re-translate (Alt+R) to sync it, or edit this English text directly."
+      ? "The " + SOURCE_LANG_NAME + " source was corrected after this translation - click Re-translate " +
+        "(Alt+R) to sync it, or edit this " + TARGET_LANG_NAME + " text directly."
       : null;
   }
 
@@ -1878,8 +1885,10 @@
   }
 
   // -------------------------------------------------------------- init ----
-  window.initKauliEditor = function (orderId, segments, youtubeVideoId) {
+  window.initKauliEditor = function (orderId, segments, youtubeVideoId, sourceLangName, targetLangName) {
     ORDER_ID = orderId;
+    SOURCE_LANG_NAME = sourceLangName || "the source language";
+    TARGET_LANG_NAME = targetLangName || "the target language";
     previewSegments = segments; // kept live from here on - see updatePreviewSegment
     loadBookmarks(); // before renderAllSegments/buildCells so bookmarked cells render marked from the start
     audio = youtubeVideoId

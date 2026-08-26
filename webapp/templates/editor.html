@@ -166,12 +166,12 @@
       </div>
 
       <div class="info-pane" id="pane-instructions">
-        <p><strong>Step 1 - Swahili source:</strong> fix the ASR transcript against
+        <p><strong>Step 1 - {{ source_lang_name }} source:</strong> fix the ASR transcript against
            what's actually said. Timing here is real (straight from faster-whisper),
            so click-to-seek is accurate. Low-opacity words are ones it was less
            confident about - once you save a correction for a segment, its words
            go back to full opacity - you've read them, the flag's done its job.</p>
-        <p><strong>Step 2 - English translation:</strong> correct the text that
+        <p><strong>Step 2 - {{ target_lang_name }} translation:</strong> correct the text that
            actually gets spoken and subtitled. If you fixed the source in step 1,
            hit "Re-translate from corrected source" (<kbd>alt</kbd>+<kbd>r</kbd>) first to get a fresh
            translation of it before hand-editing - a translation that's fallen behind a
@@ -238,7 +238,7 @@
         <p class="muted" style="margin-top:0;">The actual dubbed voice track, with the exact captions the
            client will get streaming underneath it as it plays (real line-wrapping and the 6s on-screen cap
            included - this is what the delivered .srt/.vtt actually contain, not the raw text) - not the
-           source Swahili audio above.</p>
+           source {{ source_lang_name }} audio above.</p>
         <audio id="preview-audio" controls style="width:100%;" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
         <div class="preview-caption" id="preview-caption">&nbsp;</div>
         <p class="preview-flag-note muted" id="preview-flag-note" hidden></p>
@@ -254,13 +254,13 @@
           <p class="muted" style="font-size:0.8rem; margin:8px 0;">Catch a real formatting or timestamp
              problem here before it ships - a codec-breaking stray character, a missing blank line, a
              timestamp that doesn't parse.</p>
-          <label style="font-size:0.82rem; font-weight:650;">English captions (.srt)
+          <label style="font-size:0.82rem; font-weight:650;">{{ target_lang_name }} captions (.srt)
             <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ target_srt }}</textarea>
           </label>
-          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">English captions (.vtt)
+          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">{{ target_lang_name }} captions (.vtt)
             <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ target_vtt }}</textarea>
           </label>
-          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">Swahili transcript (.srt)
+          <label style="font-size:0.82rem; font-weight:650; margin-top:10px; display:block;">{{ source_lang_name }} transcript (.srt)
             <textarea readonly rows="8" style="font-family:var(--font-mono); font-size:0.78rem; width:100%; margin-top:4px;">{{ source_srt }}</textarea>
           </label>
         </details>
@@ -315,11 +315,11 @@
         </form>
         <form method="post" action="/staff/orders/{{ order['id'] }}/retranslate-all">
           <button type="submit" class="secondary"
-                  onclick="return confirm('Re-translate every segment that has not been hand-finalized on the English side, from its current source text?');">
+                  onclick="return confirm('Re-translate every segment that has not been hand-finalized on the {{ target_lang_name }} side, from its current source text?');">
             Re-translate all (from corrected source)
           </button>
           <p class="muted" style="font-size:0.76rem; margin:4px 0 0;">Re-runs MT + re-renders audio for every
-             segment you (or a colleague) haven't already reviewed/edited directly on the English side -
+             segment you (or a colleague) haven't already reviewed/edited directly on the {{ target_lang_name }} side -
              for fixing a whole order after a source correction pass or an MT provider upgrade.</p>
         </form>
       </div>
@@ -368,7 +368,7 @@
         <div class="shortcut-row"><kbd>shift</kbd>+<kbd>,</kbd><span>Toggle case of the whole cell</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>,</kbd><span>Capitalize the whole cell (always up, not a toggle)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>shift</kbd>+<kbd>u</kbd><span>Toggle case of the whole cell (either direction)</span></div>
-        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>p</kbd><span>Pluralize (English only - Swahili plurals need a manual edit)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>p</kbd><span>Pluralize (English only - {{ non_english_lang_name }} plurals need a manual edit)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>i</kbd><span>Toggle italics (real &lt;i&gt; markup, carries into SRT/VTT)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>q</kbd><span>Prepend a quote mark</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>d</kbd><span>Add trailing -- for cut-off speech</span></div>
@@ -403,11 +403,11 @@
     <div class="transcript-toolbar">
       <div class="stage-picker" id="stage-picker">
         <button type="button" class="stage-picker-btn" id="stage-picker-btn">
-          <span id="stage-picker-label">1. Swahili source</span><span class="caret">&#9662;</span>
+          <span id="stage-picker-label">1. {{ source_lang_name }} source</span><span class="caret">&#9662;</span>
         </button>
         <div class="stage-picker-menu" id="stage-picker-menu" hidden>
-          <button type="button" class="stage-picker-item active" data-step="source" data-label="1. Swahili source">1. Swahili source</button>
-          <button type="button" class="stage-picker-item" data-step="target" data-label="2. English translation">2. English translation{% if stale_translation_count %} <span class="stale-count-badge" title="{{ stale_translation_count }} segment{{ 's' if stale_translation_count != 1 }} translated before a later source correction">{{ stale_translation_count }} out of sync</span>{% endif %}</button>
+          <button type="button" class="stage-picker-item active" data-step="source" data-label="1. {{ source_lang_name }} source">1. {{ source_lang_name }} source</button>
+          <button type="button" class="stage-picker-item" data-step="target" data-label="2. {{ target_lang_name }} translation">2. {{ target_lang_name }} translation{% if stale_translation_count %} <span class="stale-count-badge" title="{{ stale_translation_count }} segment{{ 's' if stale_translation_count != 1 }} translated before a later source correction">{{ stale_translation_count }} out of sync</span>{% endif %}</button>
           {% for step in workflow_steps %}
             {% if step['key'] == 'voice' %}
             <button type="button" class="stage-picker-item" data-step="voice"
@@ -481,7 +481,8 @@
 
 <script src="/static/editor.js?v={{ static_version('editor.js') }}"></script>
 <script>
-  initKauliEditor("{{ order['id'] }}", {{ segments_json|safe }}, {{ youtube_video_id_json|safe }});
+  initKauliEditor("{{ order['id'] }}", {{ segments_json|safe }}, {{ youtube_video_id_json|safe }},
+                   "{{ source_lang_name }}", "{{ target_lang_name }}");
 
   (function () {
     var bar = document.getElementById("editor-topbar");

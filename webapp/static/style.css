@@ -1130,6 +1130,23 @@ body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover);
 .player-card #editor-media iframe { width: 100%; height: 190px; border: none; border-radius: var(--radius-sm); display: block; }
 
 .media-wrap { position: relative; }
+/* Real bug this fixes: the fullscreen button calls requestFullscreen()
+   on .media-wrap (deliberately, not the bare <video> - see editor.js -
+   so the custom control bar stays usable in fullscreen), but with no
+   sizing rule for that state, the wrapper filled the screen while its
+   <video> child kept its small normal-flow size, leaving a tiny video
+   floating in an otherwise black screen (confirmed live, screenshot).
+   :fullscreen only affects the element fullscreen was actually
+   requested on - its content still needs its own explicit sizing. */
+.media-wrap:fullscreen,
+.media-wrap:-webkit-full-screen {
+  width: 100vw; height: 100vh; background: #000;
+  display: flex; align-items: center; justify-content: center;
+}
+.media-wrap:fullscreen video,
+.media-wrap:-webkit-full-screen video {
+  width: 100%; height: 100%; object-fit: contain;
+}
 .video-end-burner {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;

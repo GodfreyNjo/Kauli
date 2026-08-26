@@ -545,12 +545,20 @@ def workflow_steps_for_order(order) -> list[dict]:
     than keeping its own separate state."""
     level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     done = db.get_workflow_steps_raw(order)
+    # Real bug this fixes: these two labels were hardcoded "Swahili
+    # source"/"English translation" regardless of the order's actual
+    # source_lang/target_lang - correct for sw->en (the common case) but
+    # backwards for any other real, already-supported direction (e.g.
+    # en->sw), where staff would see "Swahili source" on a step that's
+    # actually the ENGLISH source transcript.
+    source_name = SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"])
+    target_name = SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"])
     steps = []
     if level["asr"]:
-        steps.append({"key": "source", "label": "Swahili source", "manual": True,
+        steps.append({"key": "source", "label": f"{source_name} source", "manual": True,
                       "done": bool(done.get("source"))})
     if level["mt"]:
-        steps.append({"key": "target", "label": "English translation", "manual": True,
+        steps.append({"key": "target", "label": f"{target_name} translation", "manual": True,
                       "done": bool(done.get("target"))})
     if level["tts"]:
         steps.append({"key": "voice", "label": "Clone voice & apply to dub", "manual": True,
@@ -4996,6 +5004,17 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     distinct_speakers = sorted({s.speaker_id for s in job.segments if s.speaker_id})
     return templates.TemplateResponse(request, "editor.html", {
         "user": user, "order": order, "job": job,
+        "source_lang_name": SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"]),
+        "target_lang_name": SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]),
+        # The alt+p pluralize shortcut (editor.js:pluralizeWord) is a real
+        # English grammar-rules algorithm - it only ever produces a
+        # correct result on English text, whichever STEP that happens to
+        # be for this order (source for an en->sw job, target for sw->en).
+        # This is the other language, whichever side it's actually on.
+        "non_english_lang_name": (
+            SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]) if order["source_lang"] == "en"
+            else SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"])
+        ),
         "is_video": is_video_file(order["audio_path"]),
         "youtube_video_id": order["source_youtube_id"],
         # Jinja2Templates has no Flask-style `tojson` filter, so serialize
