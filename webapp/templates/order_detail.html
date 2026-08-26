@@ -155,7 +155,34 @@
   {% endif %}
 </div>
 
-<details class="card message-collapsible" open>
+{% if job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'ready_for_delivery', 'delivered', 'returned_to_client'] and not order['is_free_preview'] %}
+<details class="card">
+  <summary><h2 style="display:inline;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2></summary>
+  <p class="muted" style="font-size:0.82rem;">Read-only preview of what our team is working from - not an
+     editor. See something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
+  <div style="max-height:420px; overflow-y:auto; margin-top:10px;">
+    <table>
+      <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
+      <tbody>
+        {% for seg in job.segments %}
+        {% if seg.segment_type == 'speech' %}
+        <tr>
+          <td class="muted" style="font-size:0.78rem; white-space:nowrap;">
+            {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
+            {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.68rem;">{{ seg.speaker_id }}</span>{% endif %}
+          </td>
+          <td>{{ seg.source_final_text }}</td>
+          <td>{{ seg.final_text }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+<details class="card message-collapsible" open id="revision-request">
   <summary><h2 style="display:inline;">Messages ({{ messages|length }})</h2></summary>
   <div class="message-thread">
     {% if not messages %}
@@ -169,9 +196,28 @@
     </div>
     {% endfor %}
   </div>
-  <form method="post" action="/client/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
-    <textarea name="body" rows="2" placeholder="Write a message..." required></textarea>
+  <form method="post" action="/client/orders/{{ order['id'] }}/messages" style="margin-top:14px;" id="message-form">
+    {% if job and job.segments %}
+    <button type="button" class="secondary" id="request-revision-btn" style="margin-bottom:8px;">Request a revision</button>
+    {% endif %}
+    <textarea name="body" id="message-body" rows="2" placeholder="Write a message..." required></textarea>
     <button type="submit">Send</button>
   </form>
 </details>
+<script>
+  (function () {
+    // Real action, no new backend: a revision request is just a message
+    // on this order's thread, same as any other - staff already see and
+    // act on these. This just saves the client from typing the same
+    // opening line every time.
+    var btn = document.getElementById('request-revision-btn');
+    var body = document.getElementById('message-body');
+    if (!btn || !body) return;
+    btn.addEventListener('click', function () {
+      body.value = "I'd like a revision on this order - here's what needs changing: ";
+      body.focus();
+      body.setSelectionRange(body.value.length, body.value.length);
+    });
+  })();
+</script>
 {% endblock %}
