@@ -4,6 +4,7 @@
 {% block content %}
 <a href="/staff/leads" style="color:var(--muted); font-size:0.85rem; text-decoration:none;">← All leads</a>
 <h1 style="margin-top:8px;">{{ lead['name'] }}</h1>
+{% if notice %}<p class="{{ 'ok' if 'sent' in notice.lower() else 'error' }}">{{ notice }}</p>{% endif %}
 
 <div class="card">
   <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:16px;">
@@ -42,6 +43,24 @@
     {% if lead['preferred_time'] %}<p class="muted" style="margin:0 0 6px;"><strong>Preferred time:</strong> {{ lead['preferred_time'] }}</p>{% endif %}
     {% if lead['message'] %}<p style="margin:0; white-space:pre-wrap;">{{ lead['message'] }}</p>{% endif %}
   </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">Send email</h2>
+  {% if not email_configured %}
+    <p class="muted">Email isn't configured on this server yet (BREVO_API_KEY/BREVO_FROM_EMAIL).</p>
+  {% else %}
+    <p class="muted" style="margin-top:0; font-size:0.85rem;">Sent to {{ lead['email'] }} from Kauli Operations - logged to Activity below either way.</p>
+    <form method="post" action="/staff/leads/{{ lead['id'] }}/email">
+      <label>Subject
+        <input type="text" name="subject" required>
+      </label>
+      <label>Message
+        <textarea name="body" rows="6" required placeholder="Hi {{ lead['name'] }},"></textarea>
+      </label>
+      <button type="submit">Send email</button>
+    </form>
   {% endif %}
 </div>
 

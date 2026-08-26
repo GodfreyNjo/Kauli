@@ -119,10 +119,7 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     if not email_configured():
         return False, "email not configured (BREVO_API_KEY / BREVO_FROM_EMAIL not set)"
     payload = {
-        # "Godfrey at Kauli", not just "Kauli" - sounds like a person sent
-        # it, not a bot, matching the same real, human-authored voice the
-        # message bodies already use.
-        "sender": {"name": "Godfrey at Kauli", "email": os.environ["BREVO_FROM_EMAIL"]},
+        "sender": {"name": "Kauli Operations", "email": os.environ["BREVO_FROM_EMAIL"]},
         "to": [{"email": to}],
         "subject": subject,
         "htmlContent": html_body,

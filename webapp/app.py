@@ -3971,7 +3971,7 @@ def staff_create_lead(request: Request, name: str = Form(""), email: str = Form(
 
 
 @app.get("/staff/leads/{lead_id}", response_class=HTMLResponse)
-def staff_lead_detail(request: Request, lead_id: str):
+def staff_lead_detail(request: Request, lead_id: str, notice: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -3982,6 +3982,7 @@ def staff_lead_detail(request: Request, lead_id: str):
     return templates.TemplateResponse(request, "staff_lead_detail.html", {
         "user": user, "lead": lead, "notes": db.list_lead_notes(lead_id),
         "converted_user": converted_user, "lead_statuses": db.LEAD_STATUSES,
+        "notice": notice, "email_configured": mailer.email_configured(),
     })
 
 
@@ -4004,6 +4005,30 @@ def staff_add_lead_note(request: Request, lead_id: str, body: str = Form("")):
     if body.strip():
         db.add_lead_note(lead_id, user["id"], body.strip())
     return RedirectResponse(f"/staff/leads/{lead_id}", status_code=303)
+
+
+@app.post("/staff/leads/{lead_id}/email")
+def staff_email_lead(request: Request, lead_id: str, subject: str = Form(...), body: str = Form(...)):
+    """Real, one-to-one outreach to a real inbound lead - sent from the
+    SAME Kauli Operations address/infrastructure every transactional
+    email already uses (mailer.send_email), logged to the lead's own
+    activity timeline either way so there's a real record of what was
+    sent and when, success or failure."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    lead = db.get_lead(lead_id)
+    if not lead:
+        return HTMLResponse("Lead not found.", status_code=404)
+    html = mailer.wrap_email_html(f"<p>{body}</p>".replace("\n", "</p><p>"), base_url=str(request.base_url))
+    ok, detail = mailer.send_email(lead["email"], subject.strip(), html, body.strip())
+    note = (
+        f"Email sent - \"{subject.strip()}\"\n\n{body.strip()}" if ok
+        else f"Email FAILED to send - \"{subject.strip()}\": {detail}"
+    )
+    db.add_lead_note(lead_id, user["id"], note)
+    notice = "Email sent." if ok else f"Couldn't send: {detail}"
+    return RedirectResponse(f"/staff/leads/{lead_id}?notice={quote(notice)}", status_code=303)
 
 
 @app.get("/orders/{order_id}/style-guide")
