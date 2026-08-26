@@ -1152,13 +1152,22 @@ body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover);
    replaces/lives at), on top of the tag selectors, since either the
    div wrapper or an element with that literal id could end up holding
    the real player depending on which YT API version's DOM behavior. */
+/* Real third miss: confirmed live (a genuine fullscreen, with the
+   control bar correctly spanning the full width) that the video/iframe
+   itself STILL didn't stretch. YouTube's own IFrame API script sets
+   the iframe's size via an inline style attribute (width/height in
+   px) - an inline style always wins over any external stylesheet rule
+   no matter how specific the selector, so the plain rule below was
+   simply never going to beat it. !important is the correct, standard
+   way to override a style you don't control the JS for - this isn't
+   fighting Kauli's own code, it's fighting a third party's. */
 .media-wrap:fullscreen video,
 .media-wrap:-webkit-full-screen video,
 .media-wrap:fullscreen iframe,
 .media-wrap:-webkit-full-screen iframe,
 .media-wrap:fullscreen #editor-media,
 .media-wrap:-webkit-full-screen #editor-media {
-  width: 100%; height: 100%; object-fit: contain; border: 0;
+  width: 100% !important; height: 100% !important; object-fit: contain; border: 0;
 }
 .video-end-burner {
   position: absolute; inset: 0;
