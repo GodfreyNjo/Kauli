@@ -448,6 +448,17 @@ def current_user(request: Request):
         request.session.clear()
         return None
     request.session["last_seen"] = time.time()  # touch -> resets the idle clock
+    # Team accounts: an accepted team member sees/acts on the OWNER's
+    # orders and billing, never their own (they have no orders of their
+    # own at all, most likely) - client_scope_id is the id every
+    # order/billing ownership check and list query should use instead of
+    # user["id"]. Converted to a plain dict here (sqlite3.Row can't take
+    # a new key) - every existing user["field"] access, in every route
+    # and template, keeps working identically either way.
+    user = dict(user)
+    user["client_scope_id"] = (
+        (db.get_team_owner_for_member(user["id"]) if user["role"] == "client" else None) or user["id"]
+    )
     return user
 
 
@@ -1627,6 +1638,11 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
         })
     role, is_admin = _resolve_role_and_admin(email)
     user, was_new = db.get_or_create_user(session.user.id, email, default_role=role)
+    # Not gated on was_new - an existing account can also accept a team
+    # invite sent to their email; this just needs to run once per login,
+    # which is exactly what it does (accept_team_invite is a no-op once
+    # there's no more 'pending' row for this email).
+    db.accept_team_invite(user["id"], email)
     if was_new:
         if is_admin:
             db.set_user_admin(user["id"], True)
@@ -1683,6 +1699,7 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
         session.user.id, email, default_role=role,
         marketing_consent=bool(marketing_consent), consent_ip=request.client.host if request.client else None,
     )
+    db.accept_team_invite(user["id"], email)
     if was_new:
         if is_admin:
             db.set_user_admin(user["id"], True)
@@ -1704,14 +1721,72 @@ def logout(request: Request):
 
 # ------------------------------------------------------------- settings ----
 @app.get("/settings", response_class=HTMLResponse)
-def settings_form(request: Request):
+def settings_form(request: Request, team_notice: str | None = None, team_error: str | None = None):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
+    # is_team_owner: this client is NOT themselves an accepted member of
+    # someone else's team - only the real account owner can invite/remove
+    # people, never a teammate (who might not even be trusted with who
+    # else is on the account, let alone able to remove them).
+    is_team_owner = user["role"] == "client" and user["client_scope_id"] == user["id"]
+    team_members = db.list_team_members(user["id"]) if is_team_owner else []
+    team_owner_name = None
+    if user["role"] == "client" and not is_team_owner:
+        owner = db.get_user(user["client_scope_id"])
+        team_owner_name = owner["display_name"] or owner["email"] if owner else None
     return templates.TemplateResponse(request, "settings.html", {
         "user": user, "saved": False, "error": None,
         "theme": "dark" if user["role"] == "staff" else "light",
+        "is_team_owner": is_team_owner, "team_members": team_members, "team_owner_name": team_owner_name,
+        "team_notice": team_notice, "team_error": team_error,
     })
+
+
+@app.post("/settings/team/invite")
+def settings_team_invite(request: Request, email: str = Form(...)):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    # Only the real owner can invite - a team member's own client_scope_id
+    # already points at the owner, not themselves, so this check alone is
+    # enough to block a teammate from inviting people onto an account
+    # that isn't theirs to manage.
+    if user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/settings", status_code=303)
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        return RedirectResponse("/settings?team_error=Enter+a+real+email+address.", status_code=303)
+    if email == user["email"].strip().lower():
+        return RedirectResponse("/settings?team_error=That%27s+your+own+email.", status_code=303)
+    existing = [m for m in db.list_team_members(user["id"]) if m["invited_email"] == email]
+    if existing:
+        return RedirectResponse("/settings?team_error=Already+invited.", status_code=303)
+    db.create_team_invite(user["id"], email)
+    # Real email, not just a DB row - an invite nobody's told about isn't
+    # an invite. Reuses the same mailer/wrap_email_html every other
+    # transactional email in this app already goes through.
+    try:
+        inner = (
+            f"<p>{user['display_name'] or user['email']} invited you to their Kauli account, so you can "
+            f"see and manage the same orders and billing together.</p>"
+            f"<p>Sign up or log in with this email address ({email}) to accept.</p>"
+        )
+        html = mailer.wrap_email_html(inner, cta_text="Sign up for Kauli", cta_url=str(request.base_url).rstrip("/") + "/login",
+                                       base_url=str(request.base_url))
+        mailer.send_email(email, f"{user['display_name'] or 'A Kauli client'} invited you to their team", html, inner)
+    except Exception:
+        pass  # the invite row itself is what matters - acceptance is checked at login regardless of this email landing
+    return RedirectResponse("/settings?team_notice=Invite+sent.", status_code=303)
+
+
+@app.post("/settings/team/remove")
+def settings_team_remove(request: Request, member_id: str = Form(...)):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.remove_team_member(user["id"], member_id)
+    return RedirectResponse("/settings?team_notice=Removed.", status_code=303)
 
 
 @app.get("/help", response_class=HTMLResponse)
@@ -2256,7 +2331,7 @@ def client_files(request: Request):
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
     rows = []
-    for o in db.list_orders_for_client(user["id"]):
+    for o in db.list_orders_for_client(user["client_scope_id"]):
         deliverables = []
         if o["status"] in ("ready_for_delivery", "delivered") and not o["is_free_preview"]:
             outdir = Path(o["outdir"]) if o["outdir"] else None
@@ -2288,8 +2363,8 @@ def client_messages(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    unread = db.unread_order_ids(user["id"], include_internal=False)
-    conversations = db.list_conversations_for_client(user["id"])
+    unread = db.unread_order_ids(user["client_scope_id"], include_internal=False)
+    conversations = db.list_conversations_for_client(user["client_scope_id"])
     return templates.TemplateResponse(request, "client_messages.html", {
         "user": user, "conversations": conversations, "unread": unread,
     })
@@ -2306,8 +2381,8 @@ def client_home(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    orders = db.list_orders_for_client(user["id"])
-    stats = db.client_dashboard_stats(user["id"])
+    orders = db.list_orders_for_client(user["client_scope_id"])
+    stats = db.client_dashboard_stats(user["client_scope_id"])
     hour = datetime.now().hour
     greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
     return templates.TemplateResponse(request, "client_home.html", {
@@ -2322,10 +2397,10 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    orders = db.list_orders_for_client(user["id"])
-    unread = db.unread_order_ids(user["id"], include_internal=False)
+    orders = db.list_orders_for_client(user["client_scope_id"])
+    unread = db.unread_order_ids(user["client_scope_id"], include_internal=False)
     anthropic_available = bool(os.environ.get("ANTHROPIC_API_KEY"))
-    subscription = db.get_subscription_current(user["id"])
+    subscription = db.get_subscription_current(user["client_scope_id"])
     plan = billing.effective_plan(user, subscription)
     # "Process this in another language" from order_detail.html - only for
     # a YouTube-sourced original (re-fetches the same real video, not a
@@ -2340,15 +2415,15 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
-        "folders": db.list_folders_for_client(user["id"]),
+        "folders": db.list_folders_for_client(user["client_scope_id"]),
         "source_languages": SOURCE_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "form_values": reorder_form_values,
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
-        "youtube_watches": db.list_youtube_watches(client_id=user["id"]),
-        "youtube_pending_imports": db.list_pending_imports(user["id"]),
+        "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
+        "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
     })
 
 
@@ -2364,27 +2439,27 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
     trigger under the error - only set it for limits a staff-granted
     exception can actually lift (see grant_trusted_submitter), not for
     every error message on this page."""
-    subscription = db.get_subscription_current(user["id"])
+    subscription = db.get_subscription_current(user["client_scope_id"])
     plan = billing.effective_plan(user, subscription)
     return templates.TemplateResponse(request, "client_dashboard.html", {
         "user": user,
-        "orders": db.list_orders_for_client(user["id"]),
-        "unread": db.unread_order_ids(user["id"], include_internal=False),
+        "orders": db.list_orders_for_client(user["client_scope_id"]),
+        "unread": db.unread_order_ids(user["client_scope_id"], include_internal=False),
         "anthropic_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
-        "folders": db.list_folders_for_client(user["id"]),
+        "folders": db.list_folders_for_client(user["client_scope_id"]),
         "source_languages": SOURCE_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "error": error,
         "exception_context": exception_context,
         "form_values": form_values or {},
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
-        "youtube_watches": db.list_youtube_watches(client_id=user["id"]),
-        "youtube_pending_imports": db.list_pending_imports(user["id"]),
+        "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
+        "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
     })
 
 
@@ -2455,7 +2530,7 @@ def client_remove_youtube_watch(request: Request, watch_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
-    watches = {w["id"]: w for w in db.list_youtube_watches(client_id=user["id"])}
+    watches = {w["id"]: w for w in db.list_youtube_watches(client_id=user["client_scope_id"])}
     if watch_id not in watches:
         return HTMLResponse("Not found.", status_code=404)
     db.set_youtube_watch_active(watch_id, False)
@@ -2624,7 +2699,7 @@ def create_order(
     # same key on a resubmit, so this just returns the order that's
     # already there instead of creating a second one.
     if idempotency_key.strip():
-        existing = db.get_order_by_idempotency_key(user["id"], idempotency_key.strip())
+        existing = db.get_order_by_idempotency_key(user["client_scope_id"], idempotency_key.strip())
         if existing:
             return RedirectResponse(f"/client/orders/{existing['id']}", status_code=303)
     if service_level not in billing.SERVICE_LEVELS:
@@ -2658,7 +2733,7 @@ def create_order(
     if instr_instrumental_only not in db.CONTENT_HANDLING_OPTIONS:
         instr_instrumental_only = "tag"
 
-    subscription = db.get_subscription_current(user["id"])
+    subscription = db.get_subscription_current(user["client_scope_id"])
     plan = billing.effective_plan(user, subscription)
     plan_mt = billing.PLANS[plan]["mt"]
     if plan_mt == "claude" and not os.environ.get("ANTHROPIC_API_KEY"):
@@ -2791,7 +2866,7 @@ def create_order(
     # needing payment.
     if service_level == billing.FREE_MINUTES_SERVICE_LEVEL:
         free_cap = billing.FREE_MINUTES_PER_MONTH + (subscription["bonus_minutes"] or 0.0 if subscription else 0.0)
-        free_minutes_for_this_order = db.reserve_free_minutes(user["id"], minutes, free_cap)
+        free_minutes_for_this_order = db.reserve_free_minutes(user["client_scope_id"], minutes, free_cap)
     else:
         free_minutes_for_this_order = 0.0
     is_rush = bool(rush)
@@ -2805,7 +2880,7 @@ def create_order(
     preliminary_cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
                                                addons=addons, wallet_credits_available=0.0, rush=is_rush)
     credits_ceiling = billing.usd_to_credits(preliminary_cost["gross_usd"] - preliminary_cost["discount_usd"])
-    reserved_credits = db.reserve_wallet_credits(user["id"], credits_ceiling)
+    reserved_credits = db.reserve_wallet_credits(user["client_scope_id"], credits_ceiling)
     cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
                                    addons=addons, wallet_credits_available=reserved_credits, rush=is_rush)
     # order_cost_usd silently drops any addon the plan already includes -
@@ -2821,7 +2896,7 @@ def create_order(
 
     db.create_order(
         order_id=order_id,
-        client_id=user["id"], original_filename=original_filename,
+        client_id=user["client_scope_id"], original_filename=original_filename,
         audio_path=str(audio_path), source_lang=source_lang, target_lang=target_lang,
         tier=plan, asr=asr, mt=mt, tts=tts, outdir=str(outdir),
         source_youtube_id=youtube_video_id,
@@ -2853,7 +2928,7 @@ def create_order(
         # comment for the double-spend race this avoids). Just the
         # low-balance check left to do.
         if mailer.email_configured() and db.wallet_low_alert_needed(user["id"]):
-            remaining = db.wallet_credits_remaining(user["id"])
+            remaining = db.wallet_credits_remaining(user["client_scope_id"])
             name = (user["display_name"] or user["email"].split("@")[0]).strip()
             billing_url = f"{str(request.base_url).rstrip('/')}/client/billing"
             body = (
@@ -2951,7 +3026,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
 
     job = _load_job(order)
@@ -2967,7 +3042,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
-        "folders": db.list_folders_for_client(user["id"]),
+        "folders": db.list_folders_for_client(user["client_scope_id"]),
         "progress_steps": _order_progress_steps(order["status"]),
     })
 
@@ -2978,7 +3053,7 @@ def client_send_message(request: Request, order_id: str, body: str = Form(...)):
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if body.strip():
         # visibility is hardcoded here, never read from the request - a
@@ -3001,7 +3076,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["status"] != "returned_to_client":
         return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
@@ -3069,7 +3144,7 @@ def client_move_order_folder(request: Request, order_id: str, folder_name: str =
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     db.set_order_folder(order_id, user["id"], folder_name)
     return RedirectResponse(f"/client/orders/{order_id}?notice=Folder+updated.", status_code=303)
@@ -3106,7 +3181,7 @@ def client_grant_voice_clone_consent(request: Request, order_id: str):
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     db.set_voice_clone_consent(order_id, request.client.host if request.client else None)
     return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
@@ -3119,13 +3194,13 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    subscription = db.get_subscription(user["id"])
+    subscription = db.get_subscription(user["client_scope_id"])
     plan = billing.effective_plan(user, subscription)
     is_test_account = plan == "enterprise" and user["email"].strip().lower() in billing.test_client_emails()
     bonus_minutes = (subscription["bonus_minutes"] or 0.0) if subscription else 0.0
-    payments = db.list_payments_for_user(user["id"])
+    payments = db.list_payments_for_user(user["client_scope_id"])
     receipts_by_payment = {
-        r["payment_id"]: r for r in db.list_receipts_for_client(user["id"])
+        r["payment_id"]: r for r in db.list_receipts_for_client(user["client_scope_id"])
     }
     # Real, not decorative: total_spent is the same all-time confirmed-
     # payments figure client_home.html's dashboard card shows (one source
@@ -3133,9 +3208,9 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     # across every order, so a client with several pending_payment orders
     # sees the real total they owe in one number instead of adding pills
     # up themselves order by order.
-    client_stats = db.client_dashboard_stats(user["id"])
+    client_stats = db.client_dashboard_stats(user["client_scope_id"])
     outstanding_usd = sum(
-        (o["cost_usd"] or 0) for o in db.list_orders_for_client(user["id"]) if o["status"] == "pending_payment"
+        (o["cost_usd"] or 0) for o in db.list_orders_for_client(user["client_scope_id"]) if o["status"] == "pending_payment"
     )
     return templates.TemplateResponse(request, "billing.html", {
         "user": user, "plans": billing.PLANS, "current_plan": plan,
@@ -3149,7 +3224,7 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
         "bonus_minutes": bonus_minutes,
         "free_minutes_total": billing.FREE_MINUTES_PER_MONTH + bonus_minutes,
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "wallet_credits": db.wallet_credits_remaining(user["id"]),
+        "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "credit_packages": billing.CREDIT_PACKAGES,
         "service_levels": billing.SERVICE_LEVELS,
@@ -3375,7 +3450,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
     if provider == "paystack":
         if not billing.paystack_configured():
             return RedirectResponse(f"{back_url}?error=Paystack+isn%27t+configured+yet.", status_code=303)
-        db.create_payment(payment_id, user["id"], plan, amount_usd, None, "USD", "paystack", order_id=order_id,
+        db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "paystack", order_id=order_id,
                            meta=json.dumps({"kind": payment_kind}))
         callback_url = str(request.base_url).rstrip("/") + f"/billing/callback/paystack?payment_id={payment_id}"
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url)
@@ -3397,7 +3472,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         if not phone.strip():
             return RedirectResponse(f"{back_url}?error=Enter+the+M-Pesa+phone+number.", status_code=303)
         amount_kes, rate_source = billing.usd_to_kes(amount_usd)
-        db.create_payment(payment_id, user["id"], plan, amount_usd, amount_kes, "KES", "mpesa",
+        db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, amount_kes, "KES", "mpesa",
                            meta=json.dumps({"phone": phone.strip(), "rate_source": rate_source, "kind": payment_kind}),
                            order_id=order_id)
         callback_url = str(request.base_url).rstrip("/") + "/webhooks/mpesa"
@@ -3414,7 +3489,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
             f"KES+{amount_kes:,.2f}.", status_code=303)
 
     if provider == "bank":
-        db.create_payment(payment_id, user["id"], plan, amount_usd, None, "USD", "bank", order_id=order_id,
+        db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "bank", order_id=order_id,
                            meta=json.dumps({"kind": payment_kind}))
         return RedirectResponse(f"{back_url}?notice=Bank+transfer+request+received+-+"
                                  f"see+instructions+below%2C+reference+{payment_id}.", status_code=303)
@@ -3447,7 +3522,7 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     # Real seconds left before get_active_pending_payment_for_order (the
     # actual guard - see _checkout) stops blocking a retry - drives the
@@ -3479,7 +3554,7 @@ def order_pay_checkout(request: Request, order_id: str, provider: str = Form(...
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["status"] != "pending_payment":
         return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
@@ -3494,7 +3569,7 @@ def order_surcharge_page(request: Request, order_id: str, notice: str | None = N
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     # Same real countdown as order_pay.html - see that route's comment.
     pending_retry_after_s = None
@@ -3520,7 +3595,7 @@ def order_surcharge_checkout(request: Request, order_id: str, provider: str = Fo
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     order = db.get_order(order_id)
-    if not order or order["client_id"] != user["id"]:
+    if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["difficulty_surcharge_status"] != "pending_approval":
         return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
@@ -3541,7 +3616,7 @@ def view_receipt(request: Request, receipt_id: str):
     receipt = db.get_receipt(receipt_id)
     if not receipt:
         return HTMLResponse("Receipt not found.", status_code=404)
-    if user["role"] != "staff" and receipt["client_id"] != user["id"]:
+    if user["role"] != "staff" and receipt["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Receipt not found.", status_code=404)
     client = db.get_user(receipt["client_id"])
     order = db.get_order(receipt["order_id"]) if receipt["order_id"] else None
@@ -3942,7 +4017,7 @@ def download_style_guide(request: Request, order_id: str):
     order = db.get_order(order_id)
     if not order:
         return HTMLResponse("Not found.", status_code=404)
-    if user["role"] == "client" and order["client_id"] != user["id"]:
+    if user["role"] == "client" and order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Not found.", status_code=404)
     if not order["style_guide_path"] or not Path(order["style_guide_path"]).exists():
         return HTMLResponse("No style guide on this order.", status_code=404)
@@ -3957,7 +4032,7 @@ def download_deliverable(request: Request, order_id: str, kind: str):
     order = db.get_order(order_id)
     if not order:
         return HTMLResponse("Not found.", status_code=404)
-    if user["role"] == "client" and order["client_id"] != user["id"]:
+    if user["role"] == "client" and order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Not found.", status_code=404)
 
     # The one hard rule: process, but don't download until it's paid for -
@@ -3976,7 +4051,7 @@ def download_deliverable(request: Request, order_id: str, kind: str):
             # a download - that's true regardless of status or which file
             # kind is being asked for.
             return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
-        plan = billing.effective_plan(user, db.get_subscription(user["id"]))
+        plan = billing.effective_plan(user, db.get_subscription(user["client_scope_id"]))
         has_video = billing.PLANS[plan]["video_deliverables"] or db.order_has_addon(order, "video_deliverables")
         if kind in ("burned", "dubbed") and not has_video:
             return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)

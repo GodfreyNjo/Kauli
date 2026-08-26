@@ -137,6 +137,27 @@ CREATE TABLE IF NOT EXISTS subscriptions (
 -- payment provider, and is what we send them as the transaction reference
 -- (Paystack's `reference`, M-Pesa's `AccountReference`). provider_reference
 -- is THEIRS, filled in once confirmed, and is UNIQUE - that constraint is
+-- Team accounts: a client can invite teammates to see and act on the
+-- SAME orders/billing, without any of orders/payments/subscriptions
+-- changing what client_id they point to. member_user_id is NULL until
+-- the invite is accepted (the invitee may not have a Kauli account yet -
+-- see accept_team_invite, called right after their real Supabase
+-- signup/login); status stays a real audit trail rather than deleting
+-- rows on removal. A user can be an accepted member of at most one
+-- owner (enforced in code, not a DB constraint - see
+-- get_team_owner_for_member's ORDER BY/LIMIT 1, kept simple since this
+-- is a real but small feature, not multi-org SaaS).
+CREATE TABLE IF NOT EXISTS team_members (
+    id TEXT PRIMARY KEY,
+    owner_client_id TEXT NOT NULL,
+    member_user_id TEXT,
+    invited_email TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',   -- 'pending' | 'accepted' | 'removed'
+    invited_at REAL NOT NULL,
+    accepted_at REAL,
+    FOREIGN KEY (owner_client_id) REFERENCES users(id)
+);
+
 -- the actual double-payment guard: even if a webhook fires twice for the
 -- same provider transaction, the second insert/update is rejected at the
 -- database level, not just "trusted" to only happen once.
@@ -863,6 +884,94 @@ def get_user(user_id: str):
     row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     conn.close()
     return row
+
+
+# --------------------------------------------------------- team accounts ----
+def get_team_owner_for_member(user_id: str) -> str | None:
+    """The real client account whose orders/billing this user should see,
+    if they're an ACCEPTED team member of someone else's account - None
+    if they're not on anyone's team (the overwhelmingly common case,
+    checked on every client-portal request via app.py's current_user, so
+    this stays a single cheap indexed lookup, never a join across every
+    route that needs it)."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT owner_client_id FROM team_members WHERE member_user_id = ? AND status = 'accepted' "
+        "ORDER BY accepted_at DESC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return row["owner_client_id"] if row else None
+
+
+def create_team_invite(owner_client_id: str, invited_email: str) -> str:
+    """Real client-initiated invite (Settings page) - no account required
+    yet for the invitee; accept_team_invite links it up the moment they
+    actually sign up or log in with this email."""
+    invite_id = uuid.uuid4().hex[:12]
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO team_members (id, owner_client_id, member_user_id, invited_email, status, invited_at) "
+        "VALUES (?, ?, NULL, ?, 'pending', ?)",
+        (invite_id, owner_client_id, invited_email.strip().lower(), time.time()),
+    )
+    conn.commit()
+    conn.close()
+    return invite_id
+
+
+def accept_team_invite(user_id: str, email: str) -> bool:
+    """Called right after a real Supabase login/signup (same spot
+    get_or_create_user's CRM-conversion check runs) - links this user's
+    real account to any pending invite sent to their email, so they get
+    access the moment they actually have a Kauli login, not before.
+    Returns True if a real invite was accepted."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM team_members WHERE invited_email = ? AND status = 'pending' "
+        "ORDER BY invited_at DESC LIMIT 1",
+        (email.strip().lower(),),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+    conn.execute(
+        "UPDATE team_members SET member_user_id = ?, status = 'accepted', accepted_at = ? WHERE id = ?",
+        (user_id, time.time(), row["id"]),
+    )
+    conn.commit()
+    conn.close()
+    return True
+
+
+def list_team_members(owner_client_id: str):
+    """Everyone on this account's team, pending or accepted, newest
+    first - the real roster shown on Settings. 'removed' rows are
+    excluded, not just hidden, so a removed-then-reinvited email doesn't
+    show two confusing rows for what the owner sees as one relationship."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT team_members.*, users.email AS member_email, users.display_name AS member_name "
+        "FROM team_members LEFT JOIN users ON team_members.member_user_id = users.id "
+        "WHERE owner_client_id = ? AND status != 'removed' ORDER BY invited_at DESC",
+        (owner_client_id,),
+    ).fetchall()
+    conn.close()
+    return rows
+
+
+def remove_team_member(owner_client_id: str, team_member_row_id: str) -> None:
+    """Scoped to owner_client_id in the WHERE clause itself, not just
+    checked by the caller first - a removal request can never touch a
+    row belonging to a different account no matter what id someone
+    passes in."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE team_members SET status = 'removed' WHERE id = ? AND owner_client_id = ?",
+        (team_member_row_id, owner_client_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 def get_or_create_user(user_id: str, email: str, default_role: str, display_name: str | None = None,

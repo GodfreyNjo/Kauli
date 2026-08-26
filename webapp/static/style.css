@@ -698,6 +698,8 @@ tbody tr:hover { background: var(--hover); }
 .status-completed::before { background: var(--ok); }
 .status-pending { color: var(--warn); background: var(--warn-soft); }
 .status-pending::before { background: var(--warn); }
+.status-accepted { color: var(--ok); background: var(--ok-soft); }
+.status-accepted::before { background: var(--ok); }
 .status-qualified, .status-proposal { color: var(--info); background: var(--info-soft); }
 .status-qualified::before, .status-proposal::before { background: var(--info); }
 .status-new, .status-contacted { color: var(--warn); background: var(--warn-soft); }

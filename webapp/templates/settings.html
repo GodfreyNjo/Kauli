@@ -62,6 +62,49 @@
 </div>
 
 <div class="card" style="max-width:480px;">
+  <h2 style="margin-top:0;">Team</h2>
+  {% if team_notice %}<p class="ok">{{ team_notice }}</p>{% endif %}
+  {% if team_error %}<p class="error">{{ team_error }}</p>{% endif %}
+  {% if is_team_owner %}
+    <p class="muted" style="font-size:0.85rem; margin-top:0;">Invite teammates to see and manage the same
+       orders and billing as you - they sign in with their own email/password, no shared logins.</p>
+    <form method="post" action="/settings/team/invite" style="margin-bottom:14px;">
+      <label>Invite by email
+        <input type="email" name="email" placeholder="teammate@example.com" required>
+      </label>
+      <button type="submit" class="secondary">Send invite</button>
+    </form>
+    {% if team_members %}
+    <table>
+      <thead><tr><th>Email</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for m in team_members %}
+        <tr>
+          <td>{{ m['member_email'] or m['invited_email'] }}</td>
+          <td><span class="status status-{{ m['status'] }}">{{ m['status'] }}</span></td>
+          <td>
+            <form method="post" action="/settings/team/remove" style="margin:0;">
+              <input type="hidden" name="member_id" value="{{ m['id'] }}">
+              <button type="submit" class="row-action-btn" title="Remove"
+                      onclick="return confirm('Remove this person from your team?');">&times;</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="muted" style="font-size:0.82rem;">Nobody invited yet.</p>
+    {% endif %}
+  {% else %}
+    <p class="muted" style="font-size:0.85rem; margin-top:0;">
+      You're on {{ team_owner_name or 'another account' }}'s team - you see and manage the same orders and
+      billing as them. Only they can invite or remove people.
+    </p>
+  {% endif %}
+</div>
+
+<div class="card" style="max-width:480px;">
   <h2 style="margin-top:0;">Your data</h2>
   {% if deletion_requested %}
     <p class="ok">✓ Deletion request received - we'll follow up by email once it's handled.</p>
