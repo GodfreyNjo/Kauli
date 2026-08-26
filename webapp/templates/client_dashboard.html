@@ -392,7 +392,7 @@
     }
     function applyFilters() {
       var q = (searchInput.value || '').trim().toLowerCase();
-      document.querySelectorAll('.project-card').forEach(function (card) {
+      document.querySelectorAll('.order-row').forEach(function (card) {
         var folderOk = !wantedFolder || card.dataset.folder === wantedFolder;
         var bucketOk = matchesBucket(card.dataset.status);
         var searchOk = !q || card.dataset.searchText.includes(q);
@@ -422,51 +422,69 @@
     }
   })();
 </script>
-<div class="project-cards">
+<div style="overflow-x:auto;">
+<table class="orders-table">
+  <thead>
+    <tr>
+      <th>Order</th>
+      <th>Service</th>
+      <th>Status</th>
+      <th>Created</th>
+      <th>Due date</th>
+      <th>Total</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
   {% for o in orders %}
-  <article class="project-card" data-folder="{{ o['folder_name'] or '' }}" data-status="{{ o['status'] }}"
-            data-search-text="{{ (o['original_filename'] ~ ' ' ~ (o['folder_name'] or ''))|lower }}">
-    <div class="project-card-top">
-      <div class="project-card-name">
-        {{ o['original_filename'] }}
-        {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
-      </div>
+  {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
+  <tr class="order-row" data-folder="{{ o['folder_name'] or '' }}" data-status="{{ o['status'] }}"
+      data-search-text="{{ (o['original_filename'] ~ ' ' ~ (o['folder_name'] or ''))|lower }}">
+    <td>
+      <a href="/client/orders/{{ o['id'] }}" class="order-table-name">{{ o['original_filename'] }}</a>
+      {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
+      <br>
+      <span class="muted" style="font-size:0.78rem;">
+        {% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}
+      </span>
+    </td>
+    <td>
+      {% if o['service_level'] %}
+        {{ service_levels[o['service_level']]['name'] if o['service_level'] in service_levels else o['service_level']|capitalize }}
+      {% else %}
+        <span class="muted">Analysis in progress&hellip;</span>
+      {% endif %}
+    </td>
+    <td>
       <span class="status status-{{ o['status'] }}">{{ o['status']|client_status_label }}</span>
-    </div>
-    <div class="project-card-bottom">
-      <div class="project-card-pills">
-        {% if o['folder_name'] %}<span class="meta-pill">{{ o['folder_name'] }}</span>{% endif %}
-        <span class="meta-pill">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</span>
-        {% if o['service_level'] %}
-        <span class="meta-pill">{{ service_levels[o['service_level']]['name'] if o['service_level'] in service_levels else o['service_level']|capitalize }}</span>
-        {% else %}
-        <span class="meta-pill pending">Analysis in progress&hellip;</span>
-        {% endif %}
-        <span class="meta-pill{{ ' cost-pill' if o['cost_usd'] else '' }}">
-          {% if o['status'] == 'pending_payment' %}
-            <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay now</a>
-          {% elif o['cost_usd'] %}
-            ${{ "%.2f"|format(o['cost_usd']) }}
-          {% else %}
-            Trial credit
-          {% endif %}
-        </span>
-        {% if o['difficulty_surcharge_status'] == 'pending_approval' %}
-        <span class="meta-pill">
-          <a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Additional charge pending</a>
-        </span>
-        {% endif %}
-        {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
-        {% if ts and o['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
+      {% if o['difficulty_surcharge_status'] == 'pending_approval' %}
+        <br><a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill" style="margin-top:4px; display:inline-block;">Additional charge pending</a>
+      {% endif %}
+    </td>
+    <td class="muted">{{ o['created_at']|timestamp_to_str }}</td>
+    <td>
+      {% if ts and o['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
         <span class="deadline-pill deadline-{{ ts['level'] }}">
-          {% if ts['overdue'] %}Running behind{% else %}Due {{ o['deadline_at']|int|timestamp_to_date }}{% endif %}
+          {% if ts['overdue'] %}Running behind{% else %}{{ o['deadline_at']|int|timestamp_to_date }}{% endif %}
         </span>
-        {% endif %}
-      </div>
-      <a href="/client/orders/{{ o['id'] }}" class="row-action-btn" title="View">&rarr;</a>
-    </div>
-  </article>
+      {% else %}
+        <span class="muted">&mdash;</span>
+      {% endif %}
+    </td>
+    <td>
+      {% if o['status'] == 'pending_payment' %}
+        <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
+      {% elif o['cost_usd'] %}
+        ${{ "%.2f"|format(o['cost_usd']) }}
+      {% else %}
+        <span class="muted">Trial credit</span>
+      {% endif %}
+    </td>
+    <td><a href="/client/orders/{{ o['id'] }}" class="row-action-btn" title="View">&rarr;</a></td>
+  </tr>
   {% endfor %}
+  </tbody>
+</table>
 </div>
 {% endif %}
 {% endblock %}

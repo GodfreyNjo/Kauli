@@ -513,6 +513,7 @@ tr.clickable-row:focus-visible { outline: 2px solid var(--accent); outline-offse
 .edited-pct-low { color: var(--err); background: var(--err-soft); }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.order-table-name { font-weight: 600; color: var(--heading-ink); }
 th, td { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--border-subtle); }
 th { color: var(--faint); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.03em; }
 tbody tr:hover { background: var(--hover); }
