@@ -3168,8 +3168,18 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
     db.mark_read(user["id"], order_id)
 
     outdir = Path(order["outdir"])
+    # Real bug this fixes: the downloads list used to show every possible
+    # deliverable (dubbed audio, subtitles) on EVERY order regardless of
+    # what was actually purchased - a transcription-only client (mt=tts=
+    # stub by design, see billing.SERVICE_LEVELS) would see "Dubbed audio"
+    # and subtitle links for a translation/dub that never happened. Same
+    # billing.SERVICE_LEVELS lookup already used to gate the Ereri stage-
+    # picker and the workflow stepper - one source of truth for "what did
+    # this order actually include."
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     return templates.TemplateResponse(request, "order_detail.html", {
         "user": user, "order": order, "job": job, "role": "client", "messages": messages,
+        "has_translation": order_level["mt"], "has_dub": order_level["tts"],
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "receipt": db.get_receipt_for_order(order_id),
@@ -4241,6 +4251,20 @@ def download_deliverable(request: Request, order_id: str, kind: str):
         has_video = billing.PLANS[plan]["video_deliverables"] or db.order_has_addon(order, "video_deliverables")
         if kind in ("burned", "dubbed") and not has_video:
             return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
+        # Real enforcement, not just a hidden UI button - a transcription-
+        # only or translation-only order's mt/tts providers are set to
+        # 'stub' by design (billing.SERVICE_LEVELS), but kauli.pipeline.run
+        # still unconditionally WRITES subs_*.srt/.vtt and dub_*.wav either
+        # way (stub content, not real translated subtitles or real dub
+        # audio) - those files genuinely exist on disk and were
+        # downloadable by direct URL even with the matching button removed
+        # from order_detail.html. A client only ever gets a deliverable
+        # that was actually part of what they bought.
+        order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+        if kind in ("srt", "vtt") and not order_level["mt"]:
+            return HTMLResponse("This order doesn't include translated subtitles.", status_code=404)
+        if kind in ("audio", "burned", "dubbed") and not order_level["tts"]:
+            return HTMLResponse("This order doesn't include a dubbed audio/video deliverable.", status_code=404)
 
     files = {
         "audio": f"dub_{order['target_lang']}.wav",

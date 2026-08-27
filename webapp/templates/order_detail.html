@@ -155,21 +155,28 @@
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p class="ok">Ready. Download your files below.</p>
     <div class="downloads">
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/audio">Dubbed audio (.wav)</a>
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
+      {% if has_translation %}
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/srt">Subtitles (.srt)</a>
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/vtt">Subtitles (.vtt)</a>
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
+      {% endif %}
+      {% if has_dub %}
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/audio">Dubbed audio (.wav)</a>
       {% if burned_ready %}
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/burned">Video with burned-in captions</a>
       {% endif %}
       {% if dubbed_ready %}
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Dubbed video</a>
       {% endif %}
+      {% endif %}
     </div>
-    {% if not burned_ready and not dubbed_ready %}
+    {% if has_dub and not burned_ready and not dubbed_ready %}
     <p class="muted" style="margin-top:8px;">Need a captioned or dubbed video file instead of just audio?
        Ask us in the message thread below - available on Premium and up, or as a paid add-on on your
        next order.</p>
+    {% elif not has_dub %}
+    <p class="muted" style="margin-top:8px;">Want a dubbed audio/video version of this? Ask us in the
+       message thread below, or submit a new order with Full dub selected.</p>
     {% endif %}
   {% endif %}
 </div>
