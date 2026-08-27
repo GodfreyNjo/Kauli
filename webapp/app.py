@@ -1051,6 +1051,12 @@ MARKETING_FAQ = [
           "voice, so the same character keeps the same voice for the whole video instead of one generic "
           "voice reading every line. It's a real editorial step our team handles as part of every dub, not "
           "an extra you have to request."},
+    {"q": "Do you create deepfakes, or make someone say something they didn't actually say?",
+     "a": "No. Voice cloning at Kauli only ever translates what a speaker actually said in the source "
+          "recording into another language, in their own voice - there's no feature to type new or "
+          "different text and have it spoken in a cloned voice. We require confirmed rights and consent "
+          "before cloning any speaker's voice, and we refuse or cancel any order intended to impersonate "
+          "someone or fabricate statements they never made."},
 ]
 
 

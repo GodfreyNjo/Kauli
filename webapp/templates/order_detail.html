@@ -105,7 +105,9 @@
     <div class="modal-warning" style="font-size:0.85rem;">
       This order doesn't have voice-cloning consent on file. We won't clone any speaker's voice on this
       order unless you grant it - only needed if you specifically want the dub to sound like the original
-      speaker rather than one of our standard voices.
+      speaker rather than one of our standard voices. Voice cloning is only ever used to translate what
+      the speaker actually said, never to put new words in their voice - see our
+      <a href="/terms#deepfakes" target="_blank" rel="noopener">no-deepfakes policy</a>.
       <form method="post" action="/client/orders/{{ order['id'] }}/grant-voice-clone-consent" style="margin-top:10px;">
         <button type="submit" class="secondary">I confirm I have the rights and consent to voice cloning on this order</button>
       </form>
