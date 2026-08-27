@@ -119,7 +119,11 @@
     <p><a class="btn" href="/staff/orders/{{ order['id'] }}/editor">Open Ereri →</a></p>
     {% if order['status'] != 'ready_for_delivery' and order['status'] != 'delivered' %}
     <form method="post" action="/staff/orders/{{ order['id'] }}/approve">
-      <button type="submit" class="approve">Approve &amp; mark ready for delivery</button>
+      <button type="submit" class="approve"
+        {% if job and job.edited_pct < 100 %}
+        onclick="return confirm('Only {{ job.edited_pct }}% of segments are confirmed edited. Approving ships it to the client anyway - are you sure every segment has actually been reviewed?');"
+        {% endif %}
+      >Approve &amp; mark ready for delivery</button>
     </form>
     {% else %}
       <p class="ok">Approved - client can download.</p>

@@ -5228,19 +5228,17 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
     order = db.get_order(order_id)
     if not order:
         return HTMLResponse("Order not found.", status_code=404)
-    job = _load_job(order)
-    # The real gate - not just the queue's "% Edited" column showing the
-    # number, this is the actual enforcement point. Nothing ships until
-    # every real speech segment has been through at least one save (see
-    # Job.edited_pct) - a segment that was already correct still needs a
-    # human to confirm it, not just have it silently assumed fine because
-    # nobody happened to touch it.
-    pct = job.edited_pct if job else 0
-    if pct < 100:
-        return RedirectResponse(
-            f"/staff/orders/{order_id}?error=Only+{pct}%25+of+segments+are+confirmed+edited+-+"
-            f"every+segment+needs+at+least+one+save+in+Ereri+before+this+can+ship.",
-            status_code=303)
+    # Staff clicking "Approve" is the real, final sign-off - not the %
+    # edited figure. This used to hard-block approval below 100% edited;
+    # a real complaint changed that: an editor/QA who's actually reviewed
+    # the whole order and is confident in it gets to make that call
+    # themselves, full stop, rather than the system second-guessing a
+    # human's own explicit "I'm done" with an error page. %edited is still
+    # real, still shown everywhere it always was (the queue, this page) -
+    # just informational from here on, not a blocker. The button's own
+    # confirm() (staff_review.html/editor.html) still surfaces the real
+    # number before a genuinely low-%-edited approval goes through, so
+    # it's a deliberate choice, not an accidental click.
     db.update_order_status(order_id, "ready_for_delivery")
     order = db.get_order(order_id)
     if order:

@@ -16,8 +16,9 @@
       <form method="post" action="/staff/orders/{{ order['id'] }}/approve" class="split-btn" id="approve-split-btn">
         <button type="button" class="approve split-btn-icon" id="approve-split-toggle" title="Finish job" aria-label="Finish job options">&#10003;</button>
         <div class="split-btn-menu" id="approve-split-menu" hidden>
-          <button type="submit" name="next" value="">Finish job</button>
-          <button type="submit" name="next" value="next_job">Finish and load next job</button>
+          {% set finish_confirm = "return confirm('Only " ~ job.edited_pct ~ "% of segments are confirmed edited. Approving ships it to the client anyway - are you sure every segment has actually been reviewed?');" if job and job.edited_pct < 100 else "" %}
+          <button type="submit" name="next" value="" {% if finish_confirm %}onclick="{{ finish_confirm }}"{% endif %}>Finish job</button>
+          <button type="submit" name="next" value="next_job" {% if finish_confirm %}onclick="{{ finish_confirm }}"{% endif %}>Finish and load next job</button>
         </div>
       </form>
       {% endif %}
