@@ -431,7 +431,9 @@
         </button>
         <div class="stage-picker-menu" id="stage-picker-menu" hidden>
           <button type="button" class="stage-picker-item active" data-step="source" data-label="1. {{ source_lang_name }} source">1. {{ source_lang_name }} source</button>
+          {% if has_translation %}
           <button type="button" class="stage-picker-item" data-step="target" data-label="2. {{ target_lang_name }} translation">2. {{ target_lang_name }} translation{% if stale_translation_count %} <span class="stale-count-badge" title="{{ stale_translation_count }} segment{{ 's' if stale_translation_count != 1 }} translated before a later source correction">{{ stale_translation_count }} out of sync</span>{% endif %}</button>
+          {% endif %}
           {% for step in workflow_steps %}
             {% if step['key'] == 'voice' %}
             <button type="button" class="stage-picker-item" data-step="voice"

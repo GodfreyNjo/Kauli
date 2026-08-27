@@ -5326,8 +5326,20 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     # display order, not insertion order (which would jump around as
     # segments get corrected).
     distinct_speakers = sorted({s.speaker_id for s in job.segments if s.speaker_id})
+    # Real bug this fixes: the stage-picker's "2. {target} translation"
+    # tab used to show unconditionally, on every order - for a real
+    # transcription-only order (billing.SERVICE_LEVELS["transcribe"]["mt"]
+    # is False, so MT never runs and every segment's spoken/literal is
+    # untouched stub passthrough of the SOURCE text), that tab showed the
+    # Swahili source verbatim mislabeled as an "English translation" -
+    # confirmed live, this is exactly what workflow_steps_for_order
+    # already gets right for the progress stepper (it only lists a
+    # translation step when the service level actually includes one);
+    # the stage-picker just never consulted the same fact.
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     return templates.TemplateResponse(request, "editor.html", {
         "user": user, "order": order, "job": job,
+        "has_translation": order_level["mt"], "has_dub": order_level["tts"],
         "source_lang_name": SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"]),
         "target_lang_name": SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]),
         # The alt+p pluralize shortcut (editor.js:pluralizeWord) is a real
