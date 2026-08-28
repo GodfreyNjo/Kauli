@@ -567,6 +567,12 @@ def init_db() -> None:
         conn.execute("ALTER TABLE users ADD COLUMN default_service_level TEXT")
         conn.execute("ALTER TABLE users ADD COLUMN default_rush INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE users ADD COLUMN default_addon_video INTEGER NOT NULL DEFAULT 0")
+    if "staff_notes" not in existing_user_cols:
+        # Internal-only context a staff member jots about this client
+        # account (a real CRM basic - "prefers WhatsApp", "sensitive
+        # deadline last time", whatever's actually worth remembering) -
+        # never shown to the client themselves, only on /staff/clients.
+        conn.execute("ALTER TABLE users ADD COLUMN staff_notes TEXT")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1045,6 +1051,57 @@ def list_team_members(owner_client_id: str):
     ).fetchall()
     conn.close()
     return rows
+
+
+# --------------------------------------------------- staff: client roster ----
+def list_clients_for_staff(search: str | None = None):
+    """Every real, top-level client account (never a teammate - those live
+    under their owner's own Team tab, same scope rule client_scope_id
+    already uses everywhere else) with real aggregate stats, for
+    /staff/clients. Search matches display_name or email, case-insensitive,
+    substring - deliberately simple, this is a handful of real accounts,
+    not thousands."""
+    conn = get_conn()
+    query = """
+        SELECT users.*,
+               COUNT(DISTINCT orders.id) AS order_count,
+               COALESCE(SUM(CASE WHEN payments.status = 'completed' THEN payments.amount_usd END), 0) AS total_spent_usd,
+               MAX(orders.created_at) AS last_order_at
+        FROM users
+        LEFT JOIN orders ON orders.client_id = users.id
+        LEFT JOIN payments ON payments.user_id = users.id
+        WHERE users.role = 'client'
+          AND users.id NOT IN (
+              SELECT member_user_id FROM team_members
+              WHERE status = 'accepted' AND member_user_id IS NOT NULL
+          )
+    """
+    params: list = []
+    if search:
+        query += " AND (users.display_name LIKE ? OR users.email LIKE ?)"
+        like = f"%{search.strip()}%"
+        params += [like, like]
+    query += " GROUP BY users.id ORDER BY users.created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return rows
+
+
+def set_client_staff_notes(client_id: str, notes: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET staff_notes = ? WHERE id = ?", (notes.strip() or None, client_id))
+    conn.commit()
+    conn.close()
+
+
+def reopen_account(user_id: str) -> None:
+    """The staff-side counterpart to close_account - there was previously
+    no way back in once a client closed their own account, even if they
+    emailed asking to be reopened."""
+    conn = get_conn()
+    conn.execute("UPDATE users SET account_status = 'active' WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 
 def remove_team_member(owner_client_id: str, team_member_row_id: str) -> None:

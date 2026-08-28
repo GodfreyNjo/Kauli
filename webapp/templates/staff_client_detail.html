@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}{{ client['display_name'] or client['email'] }}{% endblock %}
+{% block content %}
+<p class="muted" style="margin:0 0 4px; font-size:0.82rem;"><a href="/staff/clients">Clients</a> / {{ client['display_name'] or client['email'] }}</p>
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+  <h1 style="margin:0;">{{ client['display_name'] or client['email'] }}
+    {% if client['account_status'] == 'closed' %}<span class="status status-closed">Closed</span>{% endif %}
+  </h1>
+  <a href="mailto:{{ client['email'] }}" class="btn secondary">Email</a>
+</div>
+{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+<div class="settings-layout" style="margin-top:16px;">
+  <nav class="settings-nav">
+    <a href="/staff/clients/{{ client['id'] }}?tab=overview" class="{{ 'active' if tab == 'overview' }}">Overview</a>
+    <a href="/staff/clients/{{ client['id'] }}?tab=orders" class="{{ 'active' if tab == 'orders' }}">Orders</a>
+    <a href="/staff/clients/{{ client['id'] }}?tab=team" class="{{ 'active' if tab == 'team' }}">Team</a>
+    <a href="/staff/clients/{{ client['id'] }}?tab=billing" class="{{ 'active' if tab == 'billing' }}">Billing</a>
+    <a href="/staff/clients/{{ client['id'] }}?tab=settings" class="{{ 'active' if tab == 'settings' }}">Settings</a>
+  </nav>
+
+  <div class="settings-panel">
+  {% if tab == 'overview' %}
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="stat-value">{{ stats['in_progress'] }}</div><div class="stat-label">In progress</div></div>
+      <div class="stat-tile"><div class="stat-value">{{ stats['in_review'] }}</div><div class="stat-label">In review</div></div>
+      <div class="stat-tile"><div class="stat-value">{{ stats['needs_you'] }}</div><div class="stat-label">Needs client</div></div>
+      <div class="stat-tile ok"><div class="stat-value">{{ stats['completed'] }}</div><div class="stat-label">Completed</div></div>
+      <div class="stat-tile"><div class="stat-value">${{ "%.0f"|format(stats['total_spent_usd']) }}</div><div class="stat-label">Total spent</div></div>
+    </div>
+    <div class="card">
+      <h2 style="margin-top:0;">Account</h2>
+      <table>
+        <tbody>
+          <tr><td class="muted">Email</td><td>{{ client['email'] }}</td></tr>
+          <tr><td class="muted">Plan</td><td>{{ plans[plan]['name'] }}</td></tr>
+          <tr><td class="muted">Free minutes remaining (this month)</td><td>{{ "%.1f"|format(free_minutes_remaining) }} min</td></tr>
+          <tr><td class="muted">Prepaid wallet credits</td><td>{{ wallet_credits }}</td></tr>
+          <tr><td class="muted">Marketing email</td><td>{{ 'Opted in' if client['marketing_consent'] else 'Not opted in' }}</td></tr>
+          <tr><td class="muted">Joined</td><td>{{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+    {% if client['staff_notes'] %}
+    <div class="card internal-card">
+      <h2 style="margin-top:0;">Notes</h2>
+      <p style="white-space:pre-wrap; margin:0;">{{ client['staff_notes'] }}</p>
+      <p class="muted" style="font-size:0.76rem; margin-top:10px;">Internal only - edit on the Settings tab.</p>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {% if tab == 'orders' %}
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>File</th><th>Service</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+          {% for o in orders %}
+          <tr>
+            <td class="ellipsis-cell">{{ o['original_filename'] }}</td>
+            <td class="muted">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</td>
+            <td><span class="status status-{{ o['status'] }}">{{ o['status']|replace('_', ' ') }}</span></td>
+            <td class="muted">{{ o['created_at']|int|timestamp_to_str }}</td>
+            <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-chip">Open &rarr;</a></td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="muted" style="padding:20px 24px;">No orders yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if tab == 'team' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Team</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Everyone with access to this account's orders
+         and billing - managed by the client themselves from their own Settings.</p>
+      {% if team_members %}
+      <table>
+        <thead><tr><th>Email</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for m in team_members %}
+          <tr>
+            <td>{{ m['member_email'] or m['invited_email'] }}</td>
+            <td><span class="status status-{{ m['status'] }}">{{ m['status'] }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted" style="font-size:0.82rem;">No teammates invited - just this account.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if tab == 'billing' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Payment history</h2>
+      {% if payments %}
+      <table>
+        <thead><tr><th>Date</th><th>Amount</th><th>Provider</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for p in payments %}
+          <tr>
+            <td class="muted">{{ p['created_at']|int|timestamp_to_str }}</td>
+            <td>${{ "%.2f"|format(p['amount_usd']) }}</td>
+            <td class="muted" style="text-transform:capitalize;">{{ p['provider'] }}</td>
+            <td><span class="status status-{{ p['status'] }}">{{ p['status'] }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted" style="font-size:0.82rem;">No payments on file yet.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if tab == 'settings' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Internal notes</h2>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Never shown to the client - just for you.</p>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/notes">
+        <textarea name="notes" rows="4" placeholder="Preferences, context, anything worth remembering&hellip;">{{ client['staff_notes'] or '' }}</textarea>
+        <button type="submit" class="secondary" style="margin-top:10px;">Save notes</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">API &amp; webhook</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Read-only here - the client manages these
+         themselves from their own Settings. Keys are hashed; nobody, including staff, can see a live key
+         after it's generated.</p>
+      <table>
+        <tbody>
+          <tr><td class="muted">API key</td><td>{% if api_key_row %}Active (<code>{{ api_key_row['key_prefix'] }}&hellip;</code>){% else %}None{% endif %}</td></tr>
+          <tr><td class="muted">Webhook</td><td>{{ webhook_row['url'] if webhook_row else 'None' }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="border-color:var(--err);">
+      <h2 style="margin-top:0; color:var(--err);">Account status</h2>
+      {% if client['account_status'] == 'closed' %}
+      <p class="muted" style="font-size:0.85rem;">This account is closed - they can't sign in. Order history is untouched.</p>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/reopen">
+        <button type="submit" class="secondary">Reopen account</button>
+      </form>
+      {% else %}
+      <p class="muted" style="font-size:0.85rem;">Closing blocks sign-in without touching order/payment history -
+         the same effect as the client closing it themselves.</p>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/close">
+        <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
+                onclick="return confirm('Close this client\'s account? They won\'t be able to sign in until reopened.');">
+          Close account
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  {% endif %}
+  </div>
+</div>
+{% endblock %}

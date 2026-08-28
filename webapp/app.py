@@ -4374,6 +4374,98 @@ def download_style_guide(request: Request, order_id: str):
     return FileResponse(order["style_guide_path"], filename=order["style_guide_filename"])
 
 
+# ----------------------------------------------------- staff: clients ----
+# The real, existing-account counterpart to /staff/leads (leads are people
+# who HAVEN'T signed up yet). Deliberately scoped down from the fuller
+# mockup this was built against: no Organizations/Workload/SLAs/Analytics/
+# Reports/Glossary/Style-guide-library/Audit-Log pages, since none of that
+# exists yet as real, backing functionality - see this session's own
+# reasoning at the time. What's here (Overview/Orders/Team/Billing/
+# Settings) is real, built on data that already exists elsewhere in this
+# app, just not previously assembled into one place for staff.
+@app.get("/staff/clients", response_class=HTMLResponse)
+def staff_clients(request: Request, q: str | None = None):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    # A handful of real accounts, not thousands - one subscription lookup
+    # per row is fine here and keeps list_clients_for_staff's own query
+    # simple, rather than joining a whole extra table for it.
+    rows = []
+    for c in db.list_clients_for_staff(search=q):
+        c = dict(c)
+        c["plan"] = billing.effective_plan(c, db.get_subscription_current(c["id"]))
+        rows.append(c)
+    return templates.TemplateResponse(request, "staff_clients.html", {
+        "user": user, "clients": rows, "q": q or "", "plans": billing.PLANS,
+    })
+
+
+_STAFF_CLIENT_TABS = ("overview", "orders", "team", "billing", "settings")
+
+
+@app.get("/staff/clients/{client_id}", response_class=HTMLResponse)
+def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
+                         notice: str | None = None, error: str | None = None):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    client = db.get_user(client_id)
+    if not client or client["role"] != "client":
+        return HTMLResponse("Client not found.", status_code=404)
+    if tab not in _STAFF_CLIENT_TABS:
+        tab = "overview"
+    subscription = db.get_subscription_current(client_id)
+    return templates.TemplateResponse(request, "staff_client_detail.html", {
+        "user": user, "client": client, "tab": tab, "notice": notice, "error": error,
+        "stats": db.client_dashboard_stats(client_id),
+        "plan": billing.effective_plan(client, subscription), "plans": billing.PLANS,
+        "wallet_credits": db.wallet_credits_remaining(client_id),
+        "free_minutes_remaining": billing.free_minutes_remaining(subscription),
+        "orders": db.list_orders_for_client(client_id) if tab == "orders" else [],
+        "team_members": db.list_team_members(client_id) if tab == "team" else [],
+        "payments": db.list_payments_for_user(client_id) if tab == "billing" else [],
+        "api_key_row": db.get_client_api_key(client_id) if tab == "settings" else None,
+        "webhook_row": db.get_client_webhook(client_id) if tab == "settings" else None,
+    })
+
+
+@app.post("/staff/clients/{client_id}/notes")
+def staff_client_save_notes(request: Request, client_id: str, notes: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    if not db.get_user(client_id):
+        return HTMLResponse("Client not found.", status_code=404)
+    db.set_client_staff_notes(client_id, notes)
+    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Notes+saved.", status_code=303)
+
+
+@app.post("/staff/clients/{client_id}/reopen")
+def staff_client_reopen(request: Request, client_id: str):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    if not db.get_user(client_id):
+        return HTMLResponse("Client not found.", status_code=404)
+    db.reopen_account(client_id)
+    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Account+reopened.", status_code=303)
+
+
+@app.post("/staff/clients/{client_id}/close")
+def staff_client_close(request: Request, client_id: str):
+    """The staff-initiated counterpart to a client's own self-service
+    close (Settings > Security) - for when the request comes in by email/
+    WhatsApp instead of through the account itself."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    if not db.get_user(client_id):
+        return HTMLResponse("Client not found.", status_code=404)
+    db.close_account(client_id)
+    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Account+closed.", status_code=303)
+
+
 # --------------------------------------------- public API / integrations ----
 # Lets a client's own systems (a portal, a script, Zapier/Make) reach Kauli
 # without a browser session: an API key for pulling order status, and a

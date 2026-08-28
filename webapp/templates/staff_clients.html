@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Clients{% endblock %}
+{% block content %}
+<h1>Clients</h1>
+<p class="muted" style="margin-top:0;">Every real account, not a prospect - see <a href="/staff/leads">CRM</a>
+   for people who haven't signed up yet.</p>
+
+<form method="get" action="/staff/clients" style="max-width:360px; margin-bottom:16px;">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search name or email&hellip;">
+</form>
+
+<div class="card" style="padding:0;">
+  <table>
+    <thead><tr><th>Client</th><th>Plan</th><th>Orders</th><th>Total spent</th><th>Joined</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for c in clients %}
+      <tr>
+        <td>
+          <a href="/staff/clients/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
+          <br><span class="muted" style="font-size:0.78rem;">{{ c['email'] }}</span>
+        </td>
+        <td><span class="source-badge">{{ plans[c['plan']]['name'] }}</span></td>
+        <td>{{ c['order_count'] }}</td>
+        <td>${{ "%.2f"|format(c['total_spent_usd']) }}</td>
+        <td class="muted">{{ c['created_at']|int|timestamp_to_str if c['created_at'] else '-' }}</td>
+        <td>
+          {% if c['account_status'] == 'closed' %}<span class="status status-closed">Closed</span>
+          {% else %}<span class="status status-accepted">Active</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted" style="padding:20px 24px;">
+        {% if q %}No clients match "{{ q }}".{% else %}No client accounts yet.{% endif %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

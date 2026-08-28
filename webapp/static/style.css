@@ -881,6 +881,10 @@ tbody tr:hover { background: var(--hover); }
 /* payment history (Billing page) */
 .status-completed { color: var(--ok); background: var(--ok-soft); }
 .status-completed::before { background: var(--ok); }
+
+/* client account status (Staff > Clients) */
+.status-closed { color: var(--err); background: var(--err-soft); }
+.status-closed::before { background: var(--err); }
 .status-pending { color: var(--warn); background: var(--warn-soft); }
 .status-pending::before { background: var(--warn); }
 .status-accepted { color: var(--ok); background: var(--ok-soft); }
