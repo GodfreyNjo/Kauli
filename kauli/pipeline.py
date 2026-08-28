@@ -544,12 +544,30 @@ def run(
     mt_provider = get_mt(mt)
     cps = timing.DEFAULT_CPS.get(target_lang, 14.0)
 
-    for seg in job.segments:
+    for i, seg in enumerate(job.segments):
         if seg.segment_type == "gap":
             continue  # nothing to translate - a human tags these manually in Ereri
         if seg.spoken:
             continue  # resumed with a real translation already - a retry never re-spends an MT call either
         translate_segment(seg, mt_provider, source_lang, target_lang, cps, all_segments=job.segments)
+        # Real cost bug this closes: translation used to only ever get
+        # saved to the manifest ONCE, after every segment in the whole job
+        # finished - a crash, timeout, worker restart, or a deploy
+        # restarting the container partway through a long job (hundreds of
+        # segments, real minutes of real paid API calls) lost every
+        # translation done so far, with nothing to resume from - exactly
+        # what resume=True above exists to prevent, just one save point
+        # too late. A real order hit this: stuck on manifest status
+        # "transcribing" with every segment's translation empty despite a
+        # completed-looking dub file, because the interrupted attempt that
+        # produced it never got past this loop's old single end-of-loop
+        # save. Checkpointing periodically means an interruption only ever
+        # costs the segments translated since the last checkpoint, not the
+        # whole job - the next resume attempt picks up from real spend, not
+        # from zero.
+        if (i + 1) % 10 == 0:
+            job.cost_usd = resumed_cost_usd + getattr(mt_provider, "total_cost_usd", 0.0)
+            job.save(out / "manifest.json")
     # Same real "log it, don't hide it" rule the ASR fallback above
     # follows - get_mt() may have silently switched to a backup MT
     # provider mid-order (see ResilientMT); the manifest needs a real
