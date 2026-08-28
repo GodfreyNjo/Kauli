@@ -5602,7 +5602,17 @@ def staff_jobs(request: Request):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
-    orders = db.list_all_orders()
+    # Real "no payment, no pipeline" rule: an unpaid order was already
+    # never sent to worker.submit_job (see create_order/_activate_payment)
+    # - the AI/editor queue never touches one either way. What this line
+    # closes is a real, separate gap: pending_payment orders were still
+    # showing up IN this view, inflating the Total count and cluttering
+    # the All tab with rows nobody can (or should) act on - there's
+    # nothing for staff to do with an unpaid order; it's the client's own
+    # dashboard that shows them the real "pay now"/retry flow. Left alone
+    # in staff_ops's revenue reporting below (a different, legitimate use:
+    # seeing how many checkouts got abandoned is a real ops metric).
+    orders = [o for o in db.list_all_orders() if o["status"] != "pending_payment"]
     unread = db.unread_order_ids(user["id"], include_internal=True)
     now = time.time()
     # Real single-operator reality (see the "one staff role for now"
