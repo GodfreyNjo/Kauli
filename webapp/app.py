@@ -1974,6 +1974,19 @@ def help_page(request: Request):
     })
 
 
+@app.get("/docs/api", response_class=HTMLResponse)
+def docs_api(request: Request):
+    """API/webhook reference for the integrations feature (see /settings'
+    Developer card) - real endpoints, real example payloads, nothing
+    aspirational."""
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "docs_api.html", {
+        "user": user, "theme": "dark" if user["role"] == "staff" else "light",
+    })
+
+
 @app.get("/staff/guide", response_class=HTMLResponse)
 def staff_guide(request: Request):
     """The long-form editor guide + style guide - the Guide tab inside
