@@ -111,7 +111,7 @@ def wrap_email_html(body_html: str, cta_text: str | None = None, cta_url: str | 
 
 
 def send_email(to: str, subject: str, html_body: str, text_body: str | None = None,
-                tags: list[str] | None = None) -> tuple[bool, str]:
+                tags: list[str] | None = None, sender_name: str = "Kauli Operations") -> tuple[bool, str]:
     """Returns (ok, detail) - detail is Brevo's messageId on success, or a
     human-readable reason on failure. Never raises: a flaky or misconfigured
     provider should degrade to the manual "queued, staff forwards it"
@@ -123,11 +123,18 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     rewriting, not something this app has to build); tags are what let a
     LATER query (get_open_stats_for_tag) ask "how many of the emails
     tagged 'newsletter-<id>' were opened" instead of Kauli trying to
-    build its own tracking pixel from scratch."""
+    build its own tracking pixel from scratch.
+
+    sender_name: same real BREVO_FROM_EMAIL address for every send (that's
+    the one domain-verified sender Brevo will actually let this account
+    send from) - only the display name changes, so an internal alert
+    ("Kauli Marketing" - new lead/signup notices) reads as visibly
+    different from a client-facing send ("Kauli Operations") in an inbox,
+    without needing a second verified sender identity."""
     if not email_configured():
         return False, "email not configured (BREVO_API_KEY / BREVO_FROM_EMAIL not set)"
     payload = {
-        "sender": {"name": "Kauli Operations", "email": os.environ["BREVO_FROM_EMAIL"]},
+        "sender": {"name": sender_name, "email": os.environ["BREVO_FROM_EMAIL"]},
         "to": [{"email": to}],
         "subject": subject,
         "htmlContent": html_body,

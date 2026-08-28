@@ -44,6 +44,19 @@ FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - transcription-only, preview-on
 # until a real paid order covers it.
 FREE_MINUTES_SERVICE_LEVEL = "transcribe"
 
+# A real $1 Paystack charge, required once before a client's FIRST free
+# minute is ever spent (see app.py's create_order gate) - confirms a real
+# card, not a throwaway signup farming the free allowance every month
+# from a fresh account. Not a fee: the $1 becomes real wallet credit the
+# moment it's paid (see app.py's _activate_payment "trial_verification"
+# branch), automatically applied to whatever real order they submit
+# next, the same wallet-credit mechanism a real top-up already uses.
+# Paystack only, not M-Pesa - MPESA_ENV is still "sandbox" on the real
+# server (confirmed live), so a real client's real phone number would
+# just fail against it; Paystack is the one provider actually confirmed
+# live (PAYSTACK_LIVE_MODE=true, a real sk_live_ key present).
+TRIAL_VERIFICATION_FEE_USD = 1.00
+
 # A monthly subscription layered ON TOP of per-minute usage - not an
 # alternative to it. It buys a discount on the per-minute rates above, plus
 # feature access (translation quality, video deliverables, turnaround,

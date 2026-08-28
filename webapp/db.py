@@ -573,6 +573,17 @@ def init_db() -> None:
         # deadline last time", whatever's actually worth remembering) -
         # never shown to the client themselves, only on /staff/clients.
         conn.execute("ALTER TABLE users ADD COLUMN staff_notes TEXT")
+    if "trial_verified_at" not in existing_user_cols:
+        # Real-person gate before a client's free minutes can be spent -
+        # see billing.TRIAL_VERIFICATION_FEE_USD. Every account that
+        # already exists at the moment this migration runs is grandfathered
+        # in (set to right now, not left NULL) - they already used the free
+        # allowance under the old rules, or are staff/voice-actor rows this
+        # was never meant to gate in the first place; retroactively
+        # blocking real, already-onboarded accounts the first time this
+        # ships would be a real regression, not a fraud fix.
+        conn.execute("ALTER TABLE users ADD COLUMN trial_verified_at REAL")
+        conn.execute("UPDATE users SET trial_verified_at = ? WHERE trial_verified_at IS NULL", (time.time(),))
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1090,6 +1101,20 @@ def list_clients_for_staff(search: str | None = None):
 def set_client_staff_notes(client_id: str, notes: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE users SET staff_notes = ? WHERE id = ?", (notes.strip() or None, client_id))
+    conn.commit()
+    conn.close()
+
+
+def set_trial_verified(user_id: str) -> None:
+    """Only ever set once, never cleared - see the trial_verified_at
+    migration's own comment. Idempotent on purpose: a duplicate webhook
+    delivery for the same completed payment just sets the same value
+    again, not an error."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET trial_verified_at = ? WHERE id = ? AND trial_verified_at IS NULL",
+        (time.time(), user_id),
+    )
     conn.commit()
     conn.close()
 

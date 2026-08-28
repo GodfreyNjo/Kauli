@@ -1263,6 +1263,63 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
 
 
 
+# Same real personal inbox worker.py's own CONTACT_EMAIL constant uses
+# for this exact purpose (that module can't import this one - circular -
+# so it keeps its own copy) - internal ops alerts go to Godfrey directly,
+# never the public hello@ support alias these functions are announcing
+# activity ABOUT, not activity sent TO.
+INTERNAL_NOTIFY_EMAIL = "kahunyurogodfrey@gmail.com"
+
+
+def _notify_internal_new_signup(user, base_url: str = "") -> None:
+    """Real-time ops alert the instant a new CLIENT account is actually
+    created (called from the same was_new branch _queue_welcome_message
+    already fires from, in both /login and /signup) - staff/voice-actor
+    account creation isn't a marketing event, so this is only ever called
+    for role == 'client'. Fire-and-forget like every other mailer call in
+    this file: a flaky send here must never block the signup itself."""
+    if not mailer.email_configured():
+        return
+    name = (user["display_name"] or user["email"].split("@")[0]).strip()
+    link = f"{base_url.rstrip('/')}/staff/clients/{user['id']}" if base_url else f"/staff/clients/{user['id']}"
+    subject = f"New Kauli signup: {name}"
+    body = f"New client account created.\n\nName: {name}\nEmail: {user['email']}\n\n{link}"
+    html = (
+        f'<p style="margin:0 0 14px;">New client account created.</p>'
+        f'<p style="margin:0 0 14px;">Name: {name}<br>Email: {user["email"]}</p>'
+    )
+    html = mailer.wrap_email_html(html, cta_text="View account", cta_url=link, base_url=base_url)
+    mailer.send_email(INTERNAL_NOTIFY_EMAIL, subject, html, body, sender_name="Kauli Marketing")
+
+
+def _notify_internal_new_lead(lead_id: str, name: str, email: str, org_type: str | None,
+                               volume_estimate: str | None, base_url: str = "") -> None:
+    """Same real-time ops alert, for the website contact form
+    (request_callback) instead of an account signup - a lead is often the
+    FIRST real signal a prospect exists, well before (or instead of) them
+    ever creating an account."""
+    if not mailer.email_configured():
+        return
+    link = f"{base_url.rstrip('/')}/staff/leads/{lead_id}" if base_url else f"/staff/leads/{lead_id}"
+    subject = f"New Kauli lead: {name}"
+    detail_lines = f"Name: {name}\nEmail: {email}\n"
+    if org_type:
+        detail_lines += f"Organization type: {org_type}\n"
+    if volume_estimate:
+        detail_lines += f"Estimated volume: {volume_estimate}\n"
+    body = f"New website lead.\n\n{detail_lines}\n{link}"
+    html_detail = f'<p style="margin:0 0 14px;">Name: {name}<br>Email: {email}'
+    if org_type:
+        html_detail += f'<br>Organization type: {org_type}'
+    if volume_estimate:
+        html_detail += f'<br>Estimated volume: {volume_estimate}'
+    html_detail += '</p>'
+    html = mailer.wrap_email_html(
+        f'<p style="margin:0 0 14px;">New website lead.</p>{html_detail}',
+        cta_text="View lead", cta_url=link, base_url=base_url)
+    mailer.send_email(INTERNAL_NOTIFY_EMAIL, subject, html, body, sender_name="Kauli Marketing")
+
+
 def _queue_welcome_message(user, base_url: str = "") -> None:
     if db.has_onboarding_message(user["id"], "welcome"):
         return  # already queued once for this account - don't duplicate on a second login
@@ -1606,10 +1663,12 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
         return templates.TemplateResponse(request, "marketing.html",
             _marketing_context(lead_error="Please select your estimated volume and organization type."),
             status_code=400)
-    db.create_lead(name, email, phone.strip() or None, company.strip() or None,
-                    message.strip() or None, preferred_time.strip() or None,
-                    volume_estimate=volume_estimate.strip() or None, org_type=org_type.strip() or None,
-                    personal_email_flag=_is_personal_email_domain(email))
+    lead_id = db.create_lead(name, email, phone.strip() or None, company.strip() or None,
+                              message.strip() or None, preferred_time.strip() or None,
+                              volume_estimate=volume_estimate.strip() or None, org_type=org_type.strip() or None,
+                              personal_email_flag=_is_personal_email_domain(email))
+    _notify_internal_new_lead(lead_id, name, email, org_type.strip() or None, volume_estimate.strip() or None,
+                               base_url=str(request.base_url))
     # Redirect (not a direct render) so refreshing the confirmation page
     # never re-submits the form - standard POST/redirect/GET.
     return RedirectResponse("/?sent=1#book", status_code=303)
@@ -1720,6 +1779,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
             db.link_voice_actor_user(email, user["id"])  # consumed - same idea, see that function's comment
         if role == "client":  # the welcome message is written for a client, not a new staff account
             _queue_welcome_message(user, base_url=str(request.base_url))
+            _notify_internal_new_signup(user, base_url=str(request.base_url))
     request.session["user_id"] = user["id"]
     # Clicking a deep link from an email (an order, a receipt, billing)
     # while logged out used to always land back on the generic dashboard
@@ -1777,6 +1837,7 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
             db.link_voice_actor_user(email, user["id"])
         if role == "client":
             _queue_welcome_message(user, base_url=str(request.base_url))
+            _notify_internal_new_signup(user, base_url=str(request.base_url))
     request.session["user_id"] = user["id"]
     return RedirectResponse(_safe_next(next), status_code=303)
 
@@ -3151,6 +3212,16 @@ def create_order(
     # this call returns, whether or not the rest of this order ends up
     # needing payment.
     if service_level == billing.FREE_MINUTES_SERVICE_LEVEL:
+        # Real-person gate before the first free minute is ever actually
+        # spent - see billing.TRIAL_VERIFICATION_FEE_USD's own comment for
+        # why this exists and what it costs the client (nothing real: it
+        # becomes real wallet credit, not a fee). Checked BEFORE reserving
+        # anything, and only when there's real free-minutes value still on
+        # the table to protect - once trial_verified_at is set it's set
+        # forever, so this never asks again, including on next month's
+        # free-minutes refill.
+        if not user["trial_verified_at"] and billing.free_minutes_remaining(subscription) > 0:
+            return RedirectResponse("/client/verify-trial", status_code=303)
         free_cap = billing.FREE_MINUTES_PER_MONTH + (subscription["bonus_minutes"] or 0.0 if subscription else 0.0)
         free_minutes_for_this_order = db.reserve_free_minutes(user["client_scope_id"], minutes, free_cap)
     else:
@@ -3536,6 +3607,36 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     })
 
 
+@app.get("/client/verify-trial", response_class=HTMLResponse)
+def client_verify_trial(request: Request, error: str | None = None):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    if user["trial_verified_at"]:
+        return RedirectResponse("/client", status_code=303)
+    return templates.TemplateResponse(request, "verify_trial.html", {
+        "user": user, "error": error, "fee_usd": billing.TRIAL_VERIFICATION_FEE_USD,
+        "paystack_configured": billing.paystack_configured(),
+    })
+
+
+@app.post("/client/verify-trial/pay")
+def client_verify_trial_pay(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    if user["trial_verified_at"]:
+        return RedirectResponse("/client", status_code=303)
+    # Paystack only - M-Pesa (MPESA_ENV) is still sandbox on the real
+    # server, so a real client's real phone number would just fail
+    # against it. See billing.TRIAL_VERIFICATION_FEE_USD's own comment.
+    if not billing.paystack_configured():
+        return RedirectResponse("/client/verify-trial?error=Payment+isn%27t+configured+yet+-+contact+us.",
+                                 status_code=303)
+    return _checkout(request, user, "paystack", "trial_verification", billing.TRIAL_VERIFICATION_FEE_USD,
+                      None, "", "/client", "/client/verify-trial", payment_kind="trial_verification")
+
+
 @app.post("/client/billing/wallet")
 def buy_wallet_credits(request: Request, package: str = Form(""), provider: str = Form(...),
                         phone: str = Form(""), custom_minutes: str = Form("")):
@@ -3666,6 +3767,14 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         credits = float(payment_kind.split(":", 1)[1])
         db.add_wallet_credits(payment["user_id"], credits)
         description = f"Prepaid credits top-up - {credits:.0f} credits"
+    elif payment_kind == "trial_verification":
+        # The $1 becomes real wallet credit, not a fee - see
+        # billing.TRIAL_VERIFICATION_FEE_USD's own comment. Same
+        # add_wallet_credits call a real top-up uses, so it shows up and
+        # spends exactly the same way on their next real order.
+        db.add_wallet_credits(payment["user_id"], billing.usd_to_credits(payment["amount_usd"]))
+        db.set_trial_verified(payment["user_id"])
+        description = "Free trial verification - credited to your account"
     else:
         db.set_subscription_plan(payment["user_id"], payment["plan"], billing.PLAN_PERIOD_DAYS)
         description = f"{billing.PLANS[payment['plan']]['name']} plan subscription"
@@ -3726,6 +3835,23 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     return True
 
 
+def _note_payment_failure(client_id: str, order_id: str | None, provider: str, reason: str) -> None:
+    """Real, automatic paper trail on a payment failure - never silently
+    dropped, never left for staff to notice on their own. Appends to the
+    same staff_notes field the client detail page's Settings tab already
+    shows (see /staff/clients/{id}), so this shows up exactly where staff
+    would already look, next to whatever they've manually noted about
+    this account - never overwrites it. Counts recent failures so a
+    one-off card decline and a client genuinely stuck read differently at
+    a glance, without a separate escalation system to build and
+    maintain."""
+    recent = db.count_recent_failed_payments(client_id, hours=48)
+    order_ref = f" (order {order_id})" if order_id else ""
+    persists = f" - {recent} failed attempts in the last 48h, worth reaching out" if recent >= 2 else ""
+    db.append_client_staff_note(
+        client_id, f"Payment failed via {provider}{order_ref}: {reason}.{persists}")
+
+
 def _checkout(request: Request, user, provider: str, plan: str, amount_usd: float,
               order_id: str | None, phone: str, success_redirect: str, back_url: str,
               payment_kind: str = "order"):
@@ -3761,6 +3887,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url)
         if "error" in result:
             db.fail_payment(payment_id)
+            _note_payment_failure(user["client_scope_id"], order_id, "Paystack", result["error"])
             return RedirectResponse(f"{back_url}?error={result['error']}", status_code=303)
         # Stashed so a client who lands back on this page while this
         # payment is still "pending" (see order_pay_page) gets a real
@@ -3784,6 +3911,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         result = billing.mpesa_stk_push(phone.strip(), amount_kes, payment_id, callback_url)
         if "error" in result:
             db.fail_payment(payment_id)
+            _note_payment_failure(user["client_scope_id"], order_id, "M-Pesa", result["error"])
             return RedirectResponse(f"{back_url}?error={result['error']}", status_code=303)
         db.update_payment_meta(payment_id, json.dumps({
             "phone": phone.strip(), "rate_source": rate_source,
@@ -4027,6 +4155,8 @@ async def mpesa_webhook(request: Request):
         _activate_payment(payment, str(receipt or checkout_request_id), base_url=str(request.base_url))
     else:
         db.fail_payment(payment["id"])
+        _note_payment_failure(payment["user_id"], payment["order_id"], "M-Pesa",
+                               stk.get("ResultDesc") or f"result code {result_code}")
     return JSONResponse({"ok": True})
 
 
@@ -4058,9 +4188,11 @@ async def calendly_webhook(request: Request):
         return JSONResponse({"ok": True})  # malformed/unexpected shape - don't 500 on Calendly's retry
     notes_parts = [f"{qa.get('question', '')}: {qa.get('answer', '')}"
                    for qa in payload.get("questions_and_answers", []) if qa.get("answer")]
-    db.create_lead(name, email, phone=None, company=None,
-                    message="Booked a call via Calendly." + ("\n" + "\n".join(notes_parts) if notes_parts else ""),
-                    preferred_time=None, source="calendly")
+    lead_id = db.create_lead(
+        name, email, phone=None, company=None,
+        message="Booked a call via Calendly." + ("\n" + "\n".join(notes_parts) if notes_parts else ""),
+        preferred_time=None, source="calendly")
+    _notify_internal_new_lead(lead_id, name, email, None, None, base_url=str(request.base_url))
     return JSONResponse({"ok": True})
 
 

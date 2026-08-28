@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Verify your free trial{% endblock %}
+{% block content %}
+<div class="card" style="max-width:480px; margin:0 auto;">
+  <h1 style="margin-top:0;">One quick step before your free minutes</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  <p class="muted">To keep the free trial real for everyone, we ask for a small, real payment
+     confirmation before your first free order - it's not a fee.</p>
+
+  <ul style="margin:0 0 20px; padding-left:20px; line-height:1.7;">
+    <li>We charge <strong>${{ "%.2f"|format(fee_usd) }}</strong> to a real card via Paystack.</li>
+    <li>The full amount is credited straight back to your Kauli wallet - it's yours, not ours.</li>
+    <li>It's automatically applied to your next paid order, same as any prepaid credit.</li>
+    <li>This only ever happens once. After this, your free minutes just work.</li>
+  </ul>
+
+  {% if not paystack_configured %}
+  <p class="error">Payment isn't configured on this server yet - contact us and we'll sort your trial out directly.</p>
+  {% else %}
+  <form method="post" action="/client/verify-trial/pay">
+    <button type="submit">Verify with card - ${{ "%.2f"|format(fee_usd) }}</button>
+  </form>
+  {% endif %}
+
+  <p class="muted" style="font-size:0.82rem; margin-top:16px; margin-bottom:0;">
+    Prefer not to? Email or WhatsApp us and we'll happily verify you a different way.
+  </p>
+</div>
+{% endblock %}
