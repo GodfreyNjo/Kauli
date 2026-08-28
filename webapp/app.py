@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import re
 import secrets
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -25,7 +27,7 @@ import traceback
 import uuid
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import httpx
 import yt_dlp
@@ -1885,8 +1887,10 @@ def settings_webhook_save(request: Request, url: str = Form(...)):
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
         return RedirectResponse("/login")
     url = url.strip()
-    if url and not (url.startswith("https://") or url.startswith("http://")):
-        return RedirectResponse("/settings?team_error=Webhook+URL+must+start+with+https%3A%2F%2F", status_code=303)
+    if url and not _is_safe_webhook_url(url):
+        return RedirectResponse(
+            "/settings?team_error=That+URL+isn%27t+allowed+-+use+a+real%2C+public+https%3A%2F%2F+address",
+            status_code=303)
     db.set_client_webhook(user["id"], url)
     return RedirectResponse("/settings", status_code=303)
 
@@ -4363,9 +4367,12 @@ def _deliverable_denied_reason(order, kind: str) -> str | None:
 
 
 @app.get("/api/v1/deliverables/{order_id}/{kind}")
-def api_signed_deliverable(order_id: str, kind: str, expires: int, sig: str):
+def api_signed_deliverable(request: Request, order_id: str, kind: str, expires: int, sig: str):
     """The URL _deliverable_link hands out - real, but only valid until
     `expires` and only for the exact order_id/kind it was signed for."""
+    allowed, retry_after = rate_limit.check(f"deliverable:{rate_limit.client_ip(request)}", limit=60, window_s=60)
+    if not allowed:
+        return HTMLResponse(f"Too many requests - try again in {retry_after}s.", status_code=429)
     if time.time() > expires:
         return HTMLResponse("This link has expired.", status_code=403)
     if not hmac.compare_digest(_sign_deliverable(order_id, kind, expires), sig):
@@ -4415,8 +4422,23 @@ def _order_to_api_dict(request: Request, order) -> dict:
     }
 
 
+def _api_rate_limited(request: Request) -> JSONResponse | None:
+    """Shared guard for every /api/v1 route - keyed on IP since a request
+    can arrive with no key at all (or a wrong one), same reasoning as the
+    login brute-force guard above. Generous enough for real integration
+    use (polling a handful of orders a minute) while still ruling out
+    someone hammering the endpoint trying to guess a valid key."""
+    allowed, retry_after = rate_limit.check(f"api:{rate_limit.client_ip(request)}", limit=120, window_s=60)
+    if not allowed:
+        return JSONResponse({"error": f"rate limited - try again in {retry_after}s"}, status_code=429)
+    return None
+
+
 @app.get("/api/v1/orders/{order_id}")
 def api_get_order(request: Request, order_id: str):
+    limited = _api_rate_limited(request)
+    if limited:
+        return limited
     client_id = _client_id_from_api_key(request)
     if not client_id:
         return JSONResponse({"error": "invalid or missing API key - use Authorization: Bearer <key>"},
@@ -4429,6 +4451,9 @@ def api_get_order(request: Request, order_id: str):
 
 @app.get("/api/v1/orders")
 def api_list_orders(request: Request, limit: int = 25):
+    limited = _api_rate_limited(request)
+    if limited:
+        return limited
     client_id = _client_id_from_api_key(request)
     if not client_id:
         return JSONResponse({"error": "invalid or missing API key - use Authorization: Bearer <key>"},
@@ -4436,6 +4461,27 @@ def api_list_orders(request: Request, limit: int = 25):
     limit = max(1, min(limit, 100))
     rows = db.list_orders_for_client(client_id)[:limit]
     return JSONResponse({"orders": [_order_to_api_dict(request, o) for o in rows]})
+
+
+def _is_safe_webhook_url(url: str) -> bool:
+    """Blocks the obvious SSRF path: a client pointing their webhook at
+    something on Kauli's own network (localhost, the Docker gateway, an
+    internal service, a cloud metadata endpoint) so that WE end up making
+    a request to it on their behalf. Checks the hostname's resolved IP,
+    not just the literal string, since "not localhost" alone is trivially
+    dodged by anything that resolves there. Not fully DNS-rebinding-proof
+    (the same hostname could resolve differently between this check and
+    the actual send) - a real gap, worth a proper allow/deny-listing
+    HTTP client if this ever needs to be airtight, but this closes the
+    easy version of the attack, which is what actually matters here."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        ip = ipaddress.ip_address(socket.gethostbyname(parsed.hostname))
+        return not (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast)
+    except (ValueError, OSError):
+        return False
 
 
 def _fire_client_webhook(request: Request, order, event: str = "order.ready") -> None:
@@ -4451,13 +4497,24 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
     hook = db.get_client_webhook(order["client_id"])
     if not hook:
         return
+    # Re-checked at send time, not just when the URL was saved - closes
+    # the gap where DNS for an already-saved hostname later resolves
+    # somewhere internal (rebinding), or a URL saved before this check
+    # existed never got validated at all.
+    if not _is_safe_webhook_url(hook["url"]):
+        db.log_webhook_delivery(order["client_id"], order["id"], event, False, None,
+                                 "webhook URL failed the safety check at send time")
+        return
     payload = {"event": event, "order": _order_to_api_dict(request, order)}
     body = json.dumps(payload, separators=(",", ":")).encode()
     ts = str(int(time.time()))
     sig = hmac.new(hook["secret"].encode(), f"{ts}.".encode() + body, hashlib.sha256).hexdigest()
     try:
         resp = httpx.post(
-            hook["url"], content=body, timeout=10.0,
+            hook["url"], content=body, timeout=10.0, follow_redirects=False,
+            # follow_redirects=False on purpose - a redirect could otherwise
+            # be used to steer this request somewhere internal after the
+            # safety check above already passed on the original URL.
             headers={"Content-Type": "application/json", "X-Kauli-Timestamp": ts,
                      "X-Kauli-Signature": f"sha256={sig}"},
         )
