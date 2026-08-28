@@ -9,6 +9,8 @@ later phases get built for real. Run with:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -25,6 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
+import httpx
 import yt_dlp
 from fastapi import Body, FastAPI, Request, UploadFile, Form, File
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse, Response
@@ -1836,12 +1839,76 @@ def settings_form(request: Request, team_notice: str | None = None, team_error: 
     if user["role"] == "client" and not is_team_owner:
         owner = db.get_user(user["client_scope_id"])
         team_owner_name = owner["display_name"] or owner["email"] if owner else None
+    # API keys/webhooks are account-level, same ownership scope as team
+    # management above - only the real account owner manages them.
+    api_key_row = db.get_client_api_key(user["id"]) if is_team_owner else None
+    webhook_row = db.get_client_webhook(user["id"]) if is_team_owner else None
+    webhook_deliveries = db.list_webhook_deliveries(user["id"], limit=8) if is_team_owner else []
+    # Shown once, right after generation - popped from the session so a
+    # page refresh (or anyone else who later views this page) never sees
+    # the real key again, only its stored hash can ever confirm a match.
+    new_api_key = request.session.pop("_new_api_key", None)
     return templates.TemplateResponse(request, "settings.html", {
         "user": user, "saved": False, "error": None,
         "theme": "dark" if user["role"] == "staff" else "light",
         "is_team_owner": is_team_owner, "team_members": team_members, "team_owner_name": team_owner_name,
         "team_notice": team_notice, "team_error": team_error,
+        "api_key_row": api_key_row, "new_api_key": new_api_key,
+        "webhook_row": webhook_row, "webhook_deliveries": webhook_deliveries,
     })
+
+
+@app.post("/settings/api-key/generate")
+def settings_api_key_generate(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    raw_key = "kauli_live_" + secrets.token_urlsafe(32)
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    db.set_client_api_key(user["id"], key_hash, raw_key[:18])
+    request.session["_new_api_key"] = raw_key
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/api-key/revoke")
+def settings_api_key_revoke(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.revoke_client_api_key(user["id"])
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/webhook")
+def settings_webhook_save(request: Request, url: str = Form(...)):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    url = url.strip()
+    if url and not (url.startswith("https://") or url.startswith("http://")):
+        return RedirectResponse("/settings?team_error=Webhook+URL+must+start+with+https%3A%2F%2F", status_code=303)
+    db.set_client_webhook(user["id"], url)
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/webhook/regenerate-secret")
+def settings_webhook_regenerate_secret(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    hook = db.get_client_webhook(user["id"])
+    if hook:
+        db.set_client_webhook(user["id"], hook["url"], secret=uuid.uuid4().hex)
+    return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/settings/webhook/delete")
+def settings_webhook_delete(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.delete_client_webhook(user["id"])
+    return RedirectResponse("/settings", status_code=303)
 
 
 @app.post("/settings/team/invite")
@@ -4227,6 +4294,179 @@ def download_style_guide(request: Request, order_id: str):
     return FileResponse(order["style_guide_path"], filename=order["style_guide_filename"])
 
 
+# --------------------------------------------- public API / integrations ----
+# Lets a client's own systems (a portal, a script, Zapier/Make) reach Kauli
+# without a browser session: an API key for pulling order status, and a
+# webhook for having Kauli push the moment an order's ready, instead of the
+# caller having to poll. Read-only on purpose for this pass - order
+# SUBMISSION still only happens through the upload wizard, whose pricing/
+# free-minutes/wallet-credit logic (see the route above this comment block)
+# is real, load-bearing, and not something to fork into a second
+# implementation without a dedicated pass of its own.
+
+# Derived from the session secret rather than a second required env var,
+# but hashed with a fixed, distinct label first so a signed deliverable
+# link's HMAC key is never literally the same bytes as the session-signing
+# key - a leaked link signature reveals nothing usable against sessions.
+_LINK_SECRET = hashlib.sha256(f"{_session_secret}:deliverable-link".encode()).digest()
+
+
+def _sign_deliverable(order_id: str, kind: str, expires_at: int) -> str:
+    msg = f"{order_id}:{kind}:{expires_at}".encode()
+    return hmac.new(_LINK_SECRET, msg, hashlib.sha256).hexdigest()
+
+
+def _deliverable_link(request: Request, order_id: str, kind: str, ttl_seconds: int = 7 * 24 * 3600) -> str:
+    """A signed, time-limited download URL that needs no login - what the
+    webhook payload and the /api/v1/orders/{id} response hand back instead
+    of a link only a logged-in browser could use."""
+    expires_at = int(time.time()) + ttl_seconds
+    sig = _sign_deliverable(order_id, kind, expires_at)
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/api/v1/deliverables/{order_id}/{kind}?expires={expires_at}&sig={sig}"
+
+
+def _deliverable_filename(order, kind: str) -> str | None:
+    return {
+        "audio": f"dub_{order['target_lang']}.wav",
+        "srt": f"subs_{order['target_lang']}.srt",
+        "vtt": f"subs_{order['target_lang']}.vtt",
+        "transcript": f"transcript_{order['source_lang']}.srt",
+        "burned": f"burned_captions_{order['target_lang']}.mp4",
+        "dubbed": f"dubbed_video_{order['target_lang']}.mp4",
+    }.get(kind)
+
+
+def _deliverable_denied_reason(order, kind: str) -> str | None:
+    """None if `kind` is really part of what this order bought and is
+    safe to hand over right now, else the real reason it isn't. Same
+    substantive rules as download_deliverable below, re-derived from the
+    order itself (order['tier'] - the plan it was actually billed under,
+    not whatever the client's plan happens to be today) rather than a
+    live user/session, since a signed link or an API key call has neither -
+    a signature alone is never enough to serve something never bought."""
+    if order["status"] not in db.TERMINAL_OK_STATUSES:
+        return "This order isn't ready yet."
+    if order["is_free_preview"]:
+        return "Free-tier orders are preview-only, not downloadable."
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    if kind in ("srt", "vtt") and not order_level["mt"]:
+        return "This order doesn't include translated subtitles."
+    if kind == "audio" and not order_level["tts"]:
+        return "This order doesn't include a dubbed audio deliverable."
+    if kind in ("burned", "dubbed"):
+        has_video = (billing.PLANS.get(order["tier"], {}).get("video_deliverables")
+                     or db.order_has_addon(order, "video_deliverables"))
+        if not order_level["tts"] or not has_video:
+            return "This order doesn't include a video deliverable."
+    return None
+
+
+@app.get("/api/v1/deliverables/{order_id}/{kind}")
+def api_signed_deliverable(order_id: str, kind: str, expires: int, sig: str):
+    """The URL _deliverable_link hands out - real, but only valid until
+    `expires` and only for the exact order_id/kind it was signed for."""
+    if time.time() > expires:
+        return HTMLResponse("This link has expired.", status_code=403)
+    if not hmac.compare_digest(_sign_deliverable(order_id, kind, expires), sig):
+        return HTMLResponse("Invalid or tampered link.", status_code=403)
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Not found.", status_code=404)
+    denied = _deliverable_denied_reason(order, kind)
+    if denied:
+        return HTMLResponse(denied, status_code=404)
+    filename = _deliverable_filename(order, kind)
+    if not filename:
+        return HTMLResponse("Unknown file.", status_code=404)
+    path = Path(order["outdir"]) / filename
+    if not path.exists():
+        return HTMLResponse("Not ready yet.", status_code=404)
+    return FileResponse(str(path), filename=filename)
+
+
+def _client_id_from_api_key(request: Request) -> str | None:
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer "):
+        return None
+    raw_key = auth[7:].strip()
+    if not raw_key:
+        return None
+    key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
+    client_id = db.find_client_by_api_key_hash(key_hash)
+    if client_id:
+        db.touch_api_key_last_used(client_id)
+    return client_id
+
+
+def _order_to_api_dict(request: Request, order) -> dict:
+    deliverables = {}
+    if _deliverable_denied_reason(order, "transcript") is None:
+        deliverables["transcript"] = _deliverable_link(request, order["id"], "transcript")
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    for kind in ("srt", "vtt", "audio", "burned", "dubbed"):
+        if order_level["mt" if kind in ("srt", "vtt") else "tts"] and _deliverable_denied_reason(order, kind) is None:
+            deliverables[kind] = _deliverable_link(request, order["id"], kind)
+    return {
+        "id": order["id"], "status": order["status"], "original_filename": order["original_filename"],
+        "service_level": order["service_level"], "source_lang": order["source_lang"],
+        "target_lang": order["target_lang"], "created_at": order["created_at"],
+        "ready": order["status"] in db.TERMINAL_OK_STATUSES, "deliverables": deliverables,
+    }
+
+
+@app.get("/api/v1/orders/{order_id}")
+def api_get_order(request: Request, order_id: str):
+    client_id = _client_id_from_api_key(request)
+    if not client_id:
+        return JSONResponse({"error": "invalid or missing API key - use Authorization: Bearer <key>"},
+                             status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != client_id:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+    return JSONResponse(_order_to_api_dict(request, order))
+
+
+@app.get("/api/v1/orders")
+def api_list_orders(request: Request, limit: int = 25):
+    client_id = _client_id_from_api_key(request)
+    if not client_id:
+        return JSONResponse({"error": "invalid or missing API key - use Authorization: Bearer <key>"},
+                             status_code=401)
+    limit = max(1, min(limit, 100))
+    rows = db.list_orders_for_client(client_id)[:limit]
+    return JSONResponse({"orders": [_order_to_api_dict(request, o) for o in rows]})
+
+
+def _fire_client_webhook(request: Request, order, event: str = "order.ready") -> None:
+    """Real outbound POST, fired once, right when the client-facing 'order
+    ready' email/notification already go out (see staff_approve below). No
+    retry queue - this is a single solo-operator server, not infrastructure
+    for one; a failed delivery is logged (see webhook_deliveries) and the
+    client can always still see the same info by calling GET
+    /api/v1/orders/{id} or just using the dashboard, so nothing is actually
+    lost if a webhook attempt fails. Errors are swallowed - a client's
+    misconfigured or offline endpoint must never break the real approval
+    flow it's hanging off of."""
+    hook = db.get_client_webhook(order["client_id"])
+    if not hook:
+        return
+    payload = {"event": event, "order": _order_to_api_dict(request, order)}
+    body = json.dumps(payload, separators=(",", ":")).encode()
+    ts = str(int(time.time()))
+    sig = hmac.new(hook["secret"].encode(), f"{ts}.".encode() + body, hashlib.sha256).hexdigest()
+    try:
+        resp = httpx.post(
+            hook["url"], content=body, timeout=10.0,
+            headers={"Content-Type": "application/json", "X-Kauli-Timestamp": ts,
+                     "X-Kauli-Signature": f"sha256={sig}"},
+        )
+        db.log_webhook_delivery(order["client_id"], order["id"], event, 200 <= resp.status_code < 300,
+                                 resp.status_code)
+    except httpx.HTTPError as exc:
+        db.log_webhook_delivery(order["client_id"], order["id"], event, False, None, str(exc)[:300])
+
+
 @app.get("/client/orders/{order_id}/download/{kind}")
 def download_deliverable(request: Request, order_id: str, kind: str):
     user = current_user(request)
@@ -5291,6 +5531,7 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
     order = db.get_order(order_id)
     if order:
         worker.notify_client_order_ready(order, base_url=str(request.base_url))
+        _fire_client_webhook(request, order, "order.ready")
     if next == "next_job":
         nxt = db.next_order_needing_review(order_id)
         if nxt:

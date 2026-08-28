@@ -433,6 +433,55 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_at REAL,
     FOREIGN KEY (recipient_id) REFERENCES users(id)
 );
+
+-- Lets a client's own systems (or Zapier/Make) call Kauli's read-only API
+-- instead of the browser UI. One key per client account (client_id here is
+-- always the team-owner account, same scope team_members shares) - only the
+-- SHA-256 hash is ever stored; the real key is shown once, at generation
+-- time, in app.py's settings route and never written to the database or a
+-- log. key_prefix is just enough of the real value (never secret on its
+-- own) for the settings page to show "which key is this" without being
+-- able to show the real thing again.
+CREATE TABLE IF NOT EXISTS client_api_keys (
+    client_id TEXT PRIMARY KEY,
+    key_hash TEXT NOT NULL UNIQUE,
+    key_prefix TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    last_used_at REAL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+
+-- A client-configured URL that gets a real, signed POST the moment one of
+-- their orders reaches ready_for_delivery (see worker.notify_client_order_ready).
+-- Unlike the API key's hash-only storage, `secret` is kept in plain text
+-- here on purpose - the client needs the same value back to verify our
+-- signature (HMAC-SHA256 over the request body) on their end, the same way
+-- Stripe/GitHub webhook secrets work.
+CREATE TABLE IF NOT EXISTS client_webhooks (
+    client_id TEXT PRIMARY KEY,
+    url TEXT NOT NULL,
+    secret TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+
+-- A real, visible log of every webhook attempt - so a client (or Godfrey,
+-- debugging on their behalf) can see whether a delivery actually happened
+-- rather than just hoping. One attempt per event, no retry queue yet (see
+-- app.py's _fire_client_webhook docstring) - ok is 0/1, status_code is NULL
+-- on a connection-level failure (timeout, DNS, refused).
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    order_id TEXT NOT NULL,
+    event TEXT NOT NULL,
+    sent_at REAL NOT NULL,
+    ok INTEGER NOT NULL DEFAULT 0,
+    status_code INTEGER,
+    error TEXT,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
 """
 
 def get_conn() -> sqlite3.Connection:
@@ -1423,6 +1472,113 @@ def mark_all_notifications_read(user_id: str) -> None:
     )
     conn.commit()
     conn.close()
+
+
+# --------------------------------------------------- API keys / webhooks ----
+def set_client_api_key(client_id: str, key_hash: str, key_prefix: str) -> None:
+    """Generating a new key always replaces any old one for this account -
+    there's only ever one live key per client, so "regenerate" doubles as
+    "revoke the old one", same as most API-key UIs (Stripe, GitHub tokens)."""
+    conn = get_conn()
+    now = time.time()
+    conn.execute(
+        """INSERT INTO client_api_keys (client_id, key_hash, key_prefix, created_at, last_used_at)
+           VALUES (?, ?, ?, ?, NULL)
+           ON CONFLICT(client_id) DO UPDATE SET
+             key_hash = excluded.key_hash, key_prefix = excluded.key_prefix,
+             created_at = excluded.created_at, last_used_at = NULL""",
+        (client_id, key_hash, key_prefix, now),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_client_api_key(client_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM client_api_keys WHERE client_id = ?", (client_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def revoke_client_api_key(client_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM client_api_keys WHERE client_id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def find_client_by_api_key_hash(key_hash: str) -> str | None:
+    conn = get_conn()
+    row = conn.execute("SELECT client_id FROM client_api_keys WHERE key_hash = ?", (key_hash,)).fetchone()
+    conn.close()
+    return row["client_id"] if row else None
+
+
+def touch_api_key_last_used(client_id: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE client_api_keys SET last_used_at = ? WHERE client_id = ?", (time.time(), client_id))
+    conn.commit()
+    conn.close()
+
+
+def set_client_webhook(client_id: str, url: str, secret: str | None = None) -> str:
+    """Sets/updates the URL. secret is only ever generated once - passing
+    None (the normal case, from the settings form which only collects a
+    URL) keeps whatever secret already exists so the client's own
+    signature-verification code doesn't silently break; only a fresh
+    generate_secret action passes a real new one. Returns the secret that
+    ended up in effect, since the caller may not have had one to begin
+    with."""
+    conn = get_conn()
+    now = time.time()
+    existing = conn.execute("SELECT secret FROM client_webhooks WHERE client_id = ?", (client_id,)).fetchone()
+    effective_secret = secret or (existing["secret"] if existing else None) or uuid.uuid4().hex
+    conn.execute(
+        """INSERT INTO client_webhooks (client_id, url, secret, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(client_id) DO UPDATE SET
+             url = excluded.url, secret = excluded.secret, updated_at = excluded.updated_at""",
+        (client_id, url, effective_secret, now, now),
+    )
+    conn.commit()
+    conn.close()
+    return effective_secret
+
+
+def get_client_webhook(client_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM client_webhooks WHERE client_id = ?", (client_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def delete_client_webhook(client_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM client_webhooks WHERE client_id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def log_webhook_delivery(client_id: str, order_id: str, event: str, ok: bool,
+                          status_code: int | None, error: str | None = None) -> None:
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO webhook_deliveries (id, client_id, order_id, event, sent_at, ok, status_code, error)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (uuid.uuid4().hex, client_id, order_id, event, time.time(), 1 if ok else 0, status_code, error),
+    )
+    conn.commit()
+    conn.close()
+
+
+def list_webhook_deliveries(client_id: str, limit: int = 10):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT * FROM webhook_deliveries WHERE client_id = ? ORDER BY sent_at DESC LIMIT ?",
+        (client_id, limit),
+    ).fetchall()
+    conn.close()
+    return rows
 
 
 def promote_to_staff(user_id: str) -> bool:

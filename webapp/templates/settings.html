@@ -104,6 +104,90 @@
   {% endif %}
 </div>
 
+{% if is_team_owner %}
+<div class="card" style="max-width:560px;">
+  <h2 style="margin-top:0;">Developer / integrations</h2>
+  <p class="muted" style="font-size:0.85rem; margin-top:0;">Let your own systems talk to Kauli directly -
+     an API key to check order status and pull deliverable links without logging in, and a webhook so we
+     tell you the moment an order's ready instead of you polling for it.</p>
+
+  <h3 style="margin:18px 0 8px; font-size:0.92rem;">API key</h3>
+  {% if new_api_key %}
+  <p class="ok" style="margin-bottom:6px;">Copy this now - it won't be shown again.</p>
+  <code style="display:block; padding:10px 12px; background:var(--surface-2); border-radius:8px;
+               font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ new_api_key }}</code>
+  {% elif api_key_row %}
+  <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">
+    Key <code>{{ api_key_row['key_prefix'] }}&hellip;</code> &middot; created {{ api_key_row['created_at']|int|timestamp_to_str }}
+    {% if api_key_row['last_used_at'] %} &middot; last used {{ api_key_row['last_used_at']|int|timestamp_to_str }}
+    {% else %} &middot; never used yet{% endif %}
+  </p>
+  {% else %}
+  <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">No API key yet.</p>
+  {% endif %}
+  <form method="post" action="/settings/api-key/generate" style="display:inline;">
+    <button type="submit" class="secondary"
+            {% if api_key_row %}onclick="return confirm('Generate a new key? The current one stops working immediately.');"{% endif %}>
+      {{ 'Regenerate' if api_key_row else 'Generate API key' }}
+    </button>
+  </form>
+  {% if api_key_row %}
+  <form method="post" action="/settings/api-key/revoke" style="display:inline; margin-left:8px;">
+    <button type="submit" class="row-action-btn" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
+  </form>
+  {% endif %}
+  <p class="muted" style="font-size:0.78rem; margin-top:12px;">
+    <code>GET /api/v1/orders/{id}</code> and <code>GET /api/v1/orders</code>, with header
+    <code>Authorization: Bearer &lt;your key&gt;</code>. Returns status and signed, time-limited links to
+    only the deliverables that order actually paid for.
+  </p>
+
+  <h3 style="margin:22px 0 8px; font-size:0.92rem;">Webhook</h3>
+  <p class="muted" style="font-size:0.82rem; margin-top:0;">We'll POST here the moment an order reaches
+     "ready for delivery" - signed the same way Stripe/GitHub sign theirs, so you can verify it really
+     came from Kauli.</p>
+  <form method="post" action="/settings/webhook">
+    <label>Webhook URL
+      <input type="url" name="url" placeholder="https://your-system.example.com/hooks/kauli"
+             value="{{ webhook_row['url'] if webhook_row else '' }}">
+    </label>
+    <button type="submit" class="secondary">{{ 'Update' if webhook_row else 'Save' }} webhook</button>
+  </form>
+  {% if webhook_row %}
+  <p class="muted" style="font-size:0.82rem; margin:12px 0 4px;">Signing secret (used to verify
+     <code>X-Kauli-Signature</code> - HMAC-SHA256 of <code>timestamp.body</code>):</p>
+  <code style="display:block; padding:10px 12px; background:var(--surface-2); border-radius:8px;
+               font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ webhook_row['secret'] }}</code>
+  <form method="post" action="/settings/webhook/regenerate-secret" style="display:inline;">
+    <button type="submit" class="secondary" onclick="return confirm('Regenerate the signing secret? Update your verification code with the new one first.');">Regenerate secret</button>
+  </form>
+  <form method="post" action="/settings/webhook/delete" style="display:inline; margin-left:8px;">
+    <button type="submit" class="row-action-btn" onclick="return confirm('Remove your webhook?');">Remove</button>
+  </form>
+
+  {% if webhook_deliveries %}
+  <h4 style="margin:18px 0 8px; font-size:0.84rem;">Recent deliveries</h4>
+  <table>
+    <thead><tr><th>Order</th><th>Event</th><th>Result</th><th>Sent</th></tr></thead>
+    <tbody>
+      {% for d in webhook_deliveries %}
+      <tr>
+        <td class="muted" style="font-size:0.8rem;">{{ d['order_id'][:8] }}&hellip;</td>
+        <td class="muted" style="font-size:0.8rem;">{{ d['event'] }}</td>
+        <td>
+          {% if d['ok'] %}<span class="ok" style="font-size:0.8rem;">✓ {{ d['status_code'] }}</span>
+          {% else %}<span class="error" style="font-size:0.8rem;">✕ {{ d['status_code'] or d['error'] or 'failed' }}</span>{% endif %}
+        </td>
+        <td class="muted" style="font-size:0.8rem;">{{ d['sent_at']|int|timestamp_to_str }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="card" style="max-width:480px;">
   <h2 style="margin-top:0;">Your data</h2>
   {% if deletion_requested %}
