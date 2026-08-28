@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block theme %}dark{% endblock %}
 {% block body_class %}m-public{% endblock %}
-{% block title %}Kauli by Forge Media Services{% endblock %}
+{% block title %}Swahili &amp; Kikuyu Dubbing, Translation and Subtitles{% endblock %}
 {% block head_extra %}
 <meta name="description" content="Swahili and Kikuyu to English dubbing, translation and subtitles - AI-drafted in minutes, verified line-by-line by a human editor before delivery. Transparent per-minute pricing, no bundled credits, more Kenyan languages on the way.">
 <meta property="og:title" content="Kauli - Swahili, Kikuyu and English dubbing and translation">
@@ -14,13 +14,24 @@
 {
   "@context": "https://schema.org",
   "@type": "Organization",
-  "name": "Kauli by Forge Media Services",
+  "name": "Kauli",
+  "alternateName": "Kauli by Forge Media Services",
   "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/",
   "logo": "{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png",
   "email": "{{ email }}",
   "telephone": "{{ phone_tel }}",
   "areaServed": "KE",
-  "paymentAccepted": "Card, M-Pesa"
+  "paymentAccepted": "Card, M-Pesa",
+  "founder": { "@type": "Person", "name": "Godfrey Njoroge" },
+  "parentOrganization": { "@type": "Organization", "name": "Forge Media Services" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "Kauli",
+  "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/"
 }
 </script>
 <script type="application/ld+json">
