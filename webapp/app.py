@@ -2754,7 +2754,21 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
         "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
+        "show_tour": not user["onboarding_tour_seen_at"],
     })
+
+
+@app.post("/client/tour/seen")
+def client_tour_seen(request: Request):
+    """Fired once, whether the tour was finished or skipped - either way
+    it's real, informed "don't show me this again", not just a page
+    unload. Never blocks on this - a client's dashboard doesn't wait on
+    it, see static/tour.js."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    db.set_tour_seen(user["id"])
+    return JSONResponse({"ok": True})
 
 
 def _client_dashboard_error(request: Request, user, error: str, form_values: dict | None = None,
@@ -2790,6 +2804,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
         "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
+        "show_tour": not user["onboarding_tour_seen_at"],
     })
 
 

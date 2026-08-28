@@ -593,6 +593,18 @@ def init_db() -> None:
         # staff_clients.html for how the three states render differently.
         conn.execute("ALTER TABLE users ADD COLUMN signup_ip TEXT")
         conn.execute("ALTER TABLE users ADD COLUMN signup_ip_is_datacenter INTEGER")
+    if "onboarding_tour_seen_at" not in existing_user_cols:
+        # Real server-side flag for the first-visit dashboard walkthrough
+        # (see client_dashboard.html/static/tour.js) - server-side, not
+        # just localStorage, so it survives a cleared browser and shows
+        # the same "already seen it" state on any device they log in
+        # from. Every existing account is grandfathered as already-seen
+        # for the same reason trial_verified_at is: a tour aimed at a
+        # brand-new user popping up for someone who's used Kauli for
+        # weeks already would be a regression, not onboarding help.
+        conn.execute("ALTER TABLE users ADD COLUMN onboarding_tour_seen_at REAL")
+        conn.execute(
+            "UPDATE users SET onboarding_tour_seen_at = ? WHERE onboarding_tour_seen_at IS NULL", (time.time(),))
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1168,6 +1180,19 @@ def set_signup_ip_datacenter_flag(user_id: str, is_datacenter: bool) -> None:
     default, not written as False."""
     conn = get_conn()
     conn.execute("UPDATE users SET signup_ip_is_datacenter = ? WHERE id = ?", (int(is_datacenter), user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_tour_seen(user_id: str) -> None:
+    """Set the first time the client dashboard tour finishes OR is
+    skipped - either way it's "don't show this again", not just
+    "completed". Never cleared."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE users SET onboarding_tour_seen_at = ? WHERE id = ? AND onboarding_tour_seen_at IS NULL",
+        (time.time(), user_id),
+    )
     conn.commit()
     conn.close()
 

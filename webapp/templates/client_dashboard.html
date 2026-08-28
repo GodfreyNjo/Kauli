@@ -279,6 +279,26 @@
 </div>
 
 <script src="/static/client_wizard.js?v={{ static_version('client_wizard.js') }}"></script>
+{% if show_tour %}
+<script src="/static/tour.js?v={{ static_version('tour.js') }}"></script>
+<script>
+  (function () {
+    function markSeen() {
+      fetch("/client/tour/seen", { method: "POST" }).catch(function () {});
+    }
+    // The real "first successful action" only - upload, tell us the
+    // languages, then continue - not a tour of every field on this page.
+    KauliTour.start([
+      { target: "#dropzone", title: "Start here",
+        text: "Upload the audio or video file you want transcribed, translated, or dubbed." },
+      { target: "#source-lang-select", title: "Tell us the languages",
+        text: "Pick what language it's actually in, and what you want it translated or dubbed into." },
+      { target: "#wizard-next", title: "See your real cost",
+        text: "Click Next to pick what you need and see the exact cost before you commit to anything." }
+    ], { onDone: markSeen });
+  })();
+</script>
+{% endif %}
 
 <div class="card" style="margin-top:32px;">
   <h2 style="margin-top:0;">YouTube auto-import</h2>

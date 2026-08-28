@@ -2689,3 +2689,45 @@ body.m-public form .btn:not(.secondary):hover {
 .switch input:checked + .switch-track::before { transform: translateX(17px); }
 .switch input:focus-visible + .switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch input:disabled + .switch-track { opacity: 0.5; cursor: not-allowed; }
+
+/* --------------------------------------------------- onboarding tour ---- */
+/* The "spotlight" is one positioned, transparent box whose box-shadow
+   covers the entire viewport except itself - a real, standard technique,
+   not a second overlay element to keep in sync. */
+.tour-overlay {
+  position: fixed; inset: 0; z-index: 9000; pointer-events: none;
+}
+.tour-overlay::before {
+  content: ""; position: fixed;
+  left: var(--tour-x, 0); top: var(--tour-y, 0);
+  width: var(--tour-w, 0); height: var(--tour-h, 0);
+  border-radius: 8px; box-shadow: 0 0 0 9999px rgba(10, 10, 12, 0.72);
+  transition: left 0.2s ease, top 0.2s ease, width 0.2s ease, height 0.2s ease;
+  outline: 2px solid var(--accent);
+}
+.tour-tooltip {
+  position: fixed; z-index: 9001; max-width: 300px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+  pointer-events: auto;
+}
+.tour-tooltip-title { font-weight: 700; margin-bottom: 6px; }
+.tour-tooltip-text { font-size: 0.86rem; color: var(--muted); line-height: 1.5; }
+.tour-tooltip-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; gap: 10px;
+}
+.tour-tooltip-progress { font-size: 0.76rem; color: var(--faint); }
+.tour-tooltip-actions { display: flex; gap: 8px; }
+.tour-skip {
+  background: none; border: none; color: var(--muted); font-size: 0.82rem;
+  cursor: pointer; padding: 4px 6px;
+}
+.tour-next {
+  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 999px;
+  padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
+}
+.tour-next:hover { background: var(--accent-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .tour-overlay::before { transition: none; }
+}
