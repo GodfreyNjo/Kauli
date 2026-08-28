@@ -181,6 +181,19 @@ class Job:
     # guess is a default, never the only way to set this.
     speaker_voice_names: dict[str, str] = field(default_factory=dict)
 
+    # seg.speaker_id -> whether THIS speaker's lines appear in the
+    # delivered subtitle file - a real request: a documentary with a
+    # Swahili subject and an English narrator often only wants the
+    # subject subtitled, not the narrator or a music-only "speaker". A
+    # speaker_id missing from this dict is INCLUDED by default (so a
+    # normal single/no-diarization order behaves exactly as before this
+    # existed) - only an EXPLICIT False, set by a human in Ereri
+    # (webapp/app.py's editor_set_speaker_subtitle_inclusion), ever
+    # excludes one. kauli.subtitles.to_srt/to_vtt are what actually apply
+    # this - see their own docstrings for why this is a real filter, not
+    # a re-transcription.
+    speaker_subtitle_included: dict[str, bool] = field(default_factory=dict)
+
     # ---- quality rollups ----
     @property
     def fit_rate(self) -> float:

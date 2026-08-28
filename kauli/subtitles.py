@@ -62,6 +62,19 @@ def _wrap_caption_text(text: str) -> str:
     return "\n".join(lines)
 
 
+def _speaker_included(job: Job, seg) -> bool:
+    """A real, explicit exclusion, not a re-transcription - see
+    Job.speaker_subtitle_included's own docstring. A segment with no
+    speaker_id (diarization never ran, or it's a gap) is always included;
+    a speaker_id missing from the dict is included by default too - only
+    a human explicitly toggling a speaker off in Ereri ever removes their
+    lines from the delivered caption file (e.g. a documentary that wants
+    the local Swahili subject subtitled but not the English narrator)."""
+    if not seg.speaker_id:
+        return True
+    return job.speaker_subtitle_included.get(seg.speaker_id, True)
+
+
 def to_srt(job: Job, source: bool = False) -> str:
     # source_final_text, not source_transcript - a human's correction to
     # the ASR output must win here too, same as final_text already does
@@ -69,10 +82,14 @@ def to_srt(job: Job, source: bool = False) -> str:
     # real bug: a staff correction to the Swahili text would never reach
     # the delivered transcript file, no matter how carefully it was edited.
     out = []
-    for i, seg in enumerate(job.segments, start=1):
+    i = 0
+    for seg in job.segments:
+        if not _speaker_included(job, seg):
+            continue
         text = seg.source_final_text if source else seg.final_text
         if not text.strip():
             continue
+        i += 1
         out.append(f"{i}\n{_ts(seg.start_ms)} --> {_ts(_display_end_ms(seg))}\n{_wrap_caption_text(text.strip())}\n")
     return "\n".join(out)
 
@@ -80,6 +97,8 @@ def to_srt(job: Job, source: bool = False) -> str:
 def to_vtt(job: Job, source: bool = False) -> str:
     out = ["WEBVTT", ""]
     for seg in job.segments:
+        if not _speaker_included(job, seg):
+            continue
         text = seg.source_final_text if source else seg.final_text
         if not text.strip():
             continue

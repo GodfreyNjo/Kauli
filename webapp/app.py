@@ -5395,6 +5395,7 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
         "distinct_speakers": distinct_speakers,
         "speaker_voices": job.speaker_voices,
         "speaker_voice_names": job.speaker_voice_names,
+        "speaker_subtitle_included": job.speaker_subtitle_included,
         "azure_voice_labels": _AZURE_VOICE_LABELS,
         "notice": notice,
         # Real raw deliverable text, not a re-rendering of it - the exact
@@ -6030,6 +6031,42 @@ def editor_assign_speaker_voice_azure(request: Request, order_id: str, speaker_i
     return RedirectResponse(
         f"/staff/orders/{order_id}/editor?notice=Assigned+{quote(_AZURE_VOICE_LABELS[voice_name])}+to+"
         f"{quote(speaker_id)}.", status_code=303)
+
+
+@app.post("/staff/orders/{order_id}/speaker-subtitle-inclusion")
+def editor_set_speaker_subtitle_inclusion(request: Request, order_id: str, speaker_id: str = Form(...),
+                                           included: str = Form(...)):
+    """Real request: a documentary with a Swahili subject and an English
+    narrator often only wants the SUBJECT subtitled, not the narrator -
+    on-screen text for the local speaker's own words, nothing cluttering
+    the screen while the narrator (already understandable to an English
+    audience) is talking. This is a real filter applied at export time
+    (see kauli.subtitles.to_srt/to_vtt), never a re-transcription or a
+    dropped segment - the segment, its text, and its audio are untouched;
+    only whether it appears in the delivered subs_*.srt/.vtt changes.
+    Deliberately NOT automatic: Kauli doesn't yet detect which language
+    each individual speaker is using (source_lang/target_lang are per-
+    ORDER, not per-segment), so there's no reliable signal to guess this
+    from - a human decides, same as every other speaker-level choice in
+    Ereri."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order:
+        return HTMLResponse("Order not found.", status_code=404)
+    job = _load_job(order)
+    if job is None:
+        return HTMLResponse("Job not processed yet.", status_code=404)
+    job.speaker_subtitle_included[speaker_id] = (included == "1")
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(to_srt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"subs_{order['target_lang']}.vtt").write_text(to_vtt(job), encoding="utf-8")
+    (Path(order["outdir"]) / f"transcript_{order['source_lang']}.srt").write_text(
+        to_srt(job, source=True), encoding="utf-8")
+    verb = "Included" if included == "1" else "Excluded"
+    return RedirectResponse(
+        f"/staff/orders/{order_id}/editor?notice={verb}+{quote(speaker_id)}+in+subtitles.", status_code=303)
 
 
 # ------------------------------------------------------- youtube polling ----

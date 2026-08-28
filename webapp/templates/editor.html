@@ -330,6 +330,25 @@
         {% endfor %}
         {% endif %}
 
+        {% if distinct_speakers %}
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Subtitles by speaker</p>
+        <p class="muted" style="font-size:0.78rem; margin-top:0;">Real request: a documentary with a local
+           Swahili speaker and an English narrator often only needs the local speaker subtitled. Excluding a
+           speaker here removes only their lines from the delivered .srt/.vtt - their audio and translation
+           are untouched.</p>
+        {% for spk in distinct_speakers %}
+        {% set included = speaker_subtitle_included.get(spk, True) %}
+        <form method="post" action="/staff/orders/{{ order['id'] }}/speaker-subtitle-inclusion" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">
+          <input type="hidden" name="speaker_id" value="{{ spk }}">
+          <input type="hidden" name="included" value="{{ '0' if included else '1' }}">
+          <strong style="font-size:0.85rem; min-width:90px; flex:1;">{{ spk }}</strong>
+          <button type="submit" class="secondary" style="font-size:0.78rem; padding:5px 10px;">
+            {{ 'Subtitled - click to exclude' if included else 'Excluded - click to include' }}
+          </button>
+        </form>
+        {% endfor %}
+        {% endif %}
+
         <p class="muted" style="margin:14px 0 4px; font-weight:650;">Bulk actions</p>
         <form method="post" action="/staff/orders/{{ order['id'] }}/detect-gaps" style="margin-bottom:8px;">
           <button type="submit" class="secondary">Detect non-speech gaps</button>
