@@ -12,7 +12,7 @@
   <p class="muted" style="font-size:0.86rem;">Every request needs your API key as a Bearer token. Keys are
      account-wide (same scope as your team), and there's only ever one live key - generating a new one
      retires the old.</p>
-  <pre style="background:var(--surface-2); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.82rem;">Authorization: Bearer kauli_live_&hellip;</pre>
+  <pre style="background:var(--hover); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.82rem;">Authorization: Bearer kauli_live_&hellip;</pre>
   <p class="muted" style="font-size:0.82rem;">A missing or invalid key returns <code>401</code>. Requests are
      rate-limited (120/minute per IP) - a burst over that returns <code>429</code> with a
      <code>retry_after</code>-style message.</p>
@@ -23,12 +23,12 @@
   <p class="muted" style="font-size:0.86rem;">Returns the order's real status plus a
      <code>deliverables</code> object - only the files that order actually paid for, each a signed URL
      valid for 7 days that needs no login to use.</p>
-  <pre style="background:var(--surface-2); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.82rem;">GET /api/v1/orders/{order_id}
+  <pre style="background:var(--hover); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.82rem;">GET /api/v1/orders/{order_id}
 Authorization: Bearer kauli_live_&hellip;</pre>
   <p class="muted" style="font-size:0.82rem; margin-bottom:4px;">Example response - a translate-only order,
      ready, so it has <code>srt</code>/<code>vtt</code> but no <code>audio</code> (that order never bought
      dubbing):</p>
-  <pre style="background:var(--surface-2); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">{
+  <pre style="background:var(--hover); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">{
   "id": "36155eb8be",
   "status": "ready_for_delivery",
   "ready": true,
@@ -52,7 +52,7 @@ Authorization: Bearer kauli_live_&hellip;</pre>
   <p class="muted" style="font-size:0.86rem;">Set a URL in <a href="/settings">Settings</a> and we'll POST
      to it the moment an order reaches "ready for delivery" - no polling needed. Must be a real, public
      <code>https://</code> address; anything resolving to a private/internal network is rejected.</p>
-  <pre style="background:var(--surface-2); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">POST &lt;your URL&gt;
+  <pre style="background:var(--hover); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">POST &lt;your URL&gt;
 Content-Type: application/json
 X-Kauli-Timestamp: 1787760000
 X-Kauli-Signature: sha256=&lt;hex digest&gt;
@@ -60,7 +60,7 @@ X-Kauli-Signature: sha256=&lt;hex digest&gt;
 {"event": "order.ready", "order": { &hellip;same shape as GET /api/v1/orders/{id} above&hellip; }}</pre>
   <p class="muted" style="font-size:0.82rem;">Verify it really came from Kauli by recomputing the signature
      yourself and comparing (never with <code>==</code> - use a constant-time compare):</p>
-  <pre style="background:var(--surface-2); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">import hmac, hashlib
+  <pre style="background:var(--hover); padding:12px 14px; border-radius:8px; overflow-x:auto; font-size:0.78rem;">import hmac, hashlib
 
 expected = hmac.new(
     your_webhook_secret.encode(),

@@ -3,222 +3,339 @@
 {% block title %}Settings{% endblock %}
 {% block content %}
 <h1>Settings</h1>
-<p class="muted" style="margin-top:0;">Your name and photo appear wherever Kauli shows who did what -
-   order history, review notes, delivery records.</p>
+<p class="muted" style="margin-top:0;">Manage your account, preferences and defaults.</p>
 
-<div class="card" style="max-width:480px;">
-  {% if saved %}<p class="ok">✓ Saved</p>{% endif %}
-  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+<div class="settings-layout">
+  <nav class="settings-nav">
+    <a href="/settings?tab=general" class="{{ 'active' if tab == 'general' }}">General</a>
+    {% if user['role'] == 'client' %}
+    <a href="/settings?tab=defaults" class="{{ 'active' if tab == 'defaults' }}">Language &amp; order defaults</a>
+    <a href="/settings?tab=notifications" class="{{ 'active' if tab == 'notifications' }}">Notifications</a>
+    {% if is_team_owner %}
+    <a href="/settings?tab=integrations" class="{{ 'active' if tab == 'integrations' }}">API &amp; integrations</a>
+    {% endif %}
+    <a href="/settings?tab=team" class="{{ 'active' if tab == 'team' }}">Team</a>
+    <a href="/client/billing">Billing</a>
+    {% endif %}
+    <a href="/settings?tab=security" class="{{ 'active' if tab == 'security' }}">Security</a>
+  </nav>
 
-  <form method="post" action="/settings" enctype="multipart/form-data">
-    <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-      <div class="avatar-upload" id="avatar-upload" tabindex="0" role="button" title="Change profile photo">
-        {% if user['avatar_path'] %}
-          <img src="/avatar/{{ user['id'] }}" alt="" id="avatar-upload-preview">
-        {% else %}
-          <div class="avatar" id="avatar-upload-preview" style="width:100%;height:100%;font-size:1.3rem;">{{ user['display_name'][0]|upper }}</div>
-        {% endif %}
-        <div class="avatar-upload-overlay">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.5A1.5 1.5 0 0 1 9.4 3.7h5.2a1.5 1.5 0 0 1 1.3.8L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6"/>
-            <circle cx="12" cy="13" r="3.4" stroke="currentColor" stroke-width="1.6"/>
-          </svg>
+  <div class="settings-panel">
+  {% if tab == 'general' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Account information</h2>
+      {% if saved %}<p class="ok">✓ Saved</p>{% endif %}
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <form method="post" action="/settings" enctype="multipart/form-data">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+          <div class="avatar-upload" id="avatar-upload" tabindex="0" role="button" title="Change profile photo">
+            {% if user['avatar_path'] %}
+              <img src="/avatar/{{ user['id'] }}" alt="" id="avatar-upload-preview">
+            {% else %}
+              <div class="avatar" id="avatar-upload-preview" style="width:100%;height:100%;font-size:1.3rem;">{{ user['display_name'][0]|upper }}</div>
+            {% endif %}
+            <div class="avatar-upload-overlay">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M4 8a2 2 0 0 1 2-2h1.2l.9-1.5A1.5 1.5 0 0 1 9.4 3.7h5.2a1.5 1.5 0 0 1 1.3.8L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" stroke="currentColor" stroke-width="1.6"/>
+                <circle cx="12" cy="13" r="3.4" stroke="currentColor" stroke-width="1.6"/>
+              </svg>
+            </div>
+            <input type="file" name="avatar" id="avatar-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none;">
+          </div>
+          <div>
+            <div style="font-size:0.86rem; font-weight:600;">Profile photo</div>
+            <div class="muted" style="font-size:0.78rem;">Click your photo to change it. PNG, JPEG or WebP.</div>
+          </div>
         </div>
-        <input type="file" name="avatar" id="avatar-upload-input" accept="image/png,image/jpeg,image/webp" style="display:none;">
-      </div>
-      <div>
-        <div style="font-size:0.86rem; font-weight:600;">Profile photo</div>
-        <div class="muted" style="font-size:0.78rem;">Click your photo to change it. PNG, JPEG or WebP.</div>
-      </div>
+
+        <label>Full name
+          <input type="text" name="display_name" value="{{ user['display_name'] }}" required>
+        </label>
+        <label>Email address
+          <input type="email" value="{{ user['email'] }}" disabled style="opacity:0.6;">
+        </label>
+        <p class="muted" style="font-size:0.76rem; margin-top:-8px;">Changing your sign-in email isn't
+           self-service yet - email or WhatsApp us and we'll handle it directly.</p>
+        <label>Role
+          <input type="text" value="{{ user['role'] }}" disabled style="opacity:0.6; text-transform:capitalize;">
+        </label>
+
+        <button type="submit">Save changes</button>
+      </form>
+    </div>
+  {% endif %}
+
+  {% if tab == 'defaults' and user['role'] == 'client' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Language &amp; order defaults</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Preselected the next time you start a new
+         order - personal to you, not shared with teammates on this account. You can still change any of
+         these on the order itself, every time.</p>
+      {% if defaults_saved %}<p class="ok">✓ Saved</p>{% endif %}
+      <form method="post" action="/settings/order-defaults">
+        <div class="row">
+          <label>Default source language
+            <select name="source_lang">
+              <option value="">- No default -</option>
+              {% for code, label in source_languages.items() %}
+              <option value="{{ code }}" {% if user['default_source_lang'] == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Default target language
+            <select name="target_lang">
+              <option value="">- No default -</option>
+              <option value="en" {% if user['default_target_lang'] == 'en' %}selected{% endif %}>English</option>
+              <option value="sw" {% if user['default_target_lang'] == 'sw' %}selected{% endif %}>Swahili</option>
+            </select>
+          </label>
+        </div>
+        <label>Default service
+          <select name="service_level">
+            <option value="">- No default -</option>
+            {% for key, level in service_levels.items() %}
+            <option value="{{ key }}" {% if user['default_service_level'] == key %}selected{% endif %}>{{ level['name'] }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="auth-checkbox-row" style="margin:14px 0;">
+          <input type="checkbox" name="addon_video" value="1" {% if user['default_addon_video'] %}checked{% endif %}>
+          <span>Default to adding video deliverables (burned captions + dubbed video) when my plan doesn't already include them</span>
+        </label>
+        <label class="auth-checkbox-row" style="margin:0 0 16px;">
+          <input type="checkbox" name="rush" value="1" {% if user['default_rush'] %}checked{% endif %}>
+          <span>Default to marking new orders as rush (+{{ (rush_surcharge_pct * 100)|round|int if rush_surcharge_pct else 50 }}%)</span>
+        </label>
+        <button type="submit" class="secondary">Save defaults</button>
+      </form>
+    </div>
+  {% endif %}
+
+  {% if tab == 'notifications' and user['role'] == 'client' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Notifications</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Order status, receipts and security emails
+         are always sent - they're how the account actually works, not something to opt out of. This is
+         only about anything beyond that.</p>
+      <form method="post" action="/settings/marketing-consent">
+        <div class="switch-row">
+          <div>
+            <div class="switch-row-label">Order updates</div>
+            <div class="switch-row-desc">When a status changes or a delivery's ready. Always on.</div>
+          </div>
+          <label class="switch"><input type="checkbox" checked disabled><span class="switch-track"></span></label>
+        </div>
+        <div class="switch-row">
+          <div>
+            <div class="switch-row-label">Promotions &amp; tips</div>
+            <div class="switch-row-desc">Occasional Kauli tips and updates - opt-in only.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" name="marketing_consent" value="1" onchange="this.form.requestSubmit()"
+                   {% if user['marketing_consent'] %}checked{% endif %}>
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <div class="switch-row">
+          <div>
+            <div class="switch-row-label">Security &amp; account notices</div>
+            <div class="switch-row-desc">Password changes, login issues. Always on.</div>
+          </div>
+          <label class="switch"><input type="checkbox" checked disabled><span class="switch-track"></span></label>
+        </div>
+        <noscript><button type="submit" class="secondary" style="margin-top:12px;">Save</button></noscript>
+      </form>
+    </div>
+  {% endif %}
+
+  {% if tab == 'integrations' and is_team_owner %}
+    <div class="card">
+      <h2 style="margin-top:0;">API &amp; integrations</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Let your own systems talk to Kauli directly -
+         an API key to check order status and pull deliverable links without logging in, and a webhook so we
+         tell you the moment an order's ready instead of you polling for it.
+         <a href="/docs/api">Full docs &amp; code examples &rarr;</a></p>
+
+      <h3 style="margin:18px 0 8px; font-size:0.92rem;">API key</h3>
+      {% if new_api_key %}
+      <p class="ok" style="margin-bottom:6px;">Copy this now - it won't be shown again.</p>
+      <code style="display:block; padding:10px 12px; background:var(--hover); border-radius:8px;
+                   font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ new_api_key }}</code>
+      {% elif api_key_row %}
+      <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">
+        Key <code>{{ api_key_row['key_prefix'] }}&hellip;</code> &middot; created {{ api_key_row['created_at']|int|timestamp_to_str }}
+        {% if api_key_row['last_used_at'] %} &middot; last used {{ api_key_row['last_used_at']|int|timestamp_to_str }}
+        {% else %} &middot; never used yet{% endif %}
+      </p>
+      {% else %}
+      <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">No API key yet.</p>
+      {% endif %}
+      <form method="post" action="/settings/api-key/generate" style="display:inline;">
+        <button type="submit" class="secondary"
+                {% if api_key_row %}onclick="return confirm('Generate a new key? The current one stops working immediately.');"{% endif %}>
+          {{ 'Regenerate' if api_key_row else 'Generate API key' }}
+        </button>
+      </form>
+      {% if api_key_row %}
+      <form method="post" action="/settings/api-key/revoke" style="display:inline; margin-left:8px;">
+        <button type="submit" class="row-action-btn" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
+      </form>
+      {% endif %}
+      <p class="muted" style="font-size:0.78rem; margin-top:12px;">
+        <code>GET /api/v1/orders/{id}</code> and <code>GET /api/v1/orders</code>, with header
+        <code>Authorization: Bearer &lt;your key&gt;</code>. Returns status and signed, time-limited links to
+        only the deliverables that order actually paid for.
+      </p>
+
+      <h3 style="margin:22px 0 8px; font-size:0.92rem;">Webhook</h3>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">We'll POST here the moment an order reaches
+         "ready for delivery" - signed the same way Stripe/GitHub sign theirs, so you can verify it really
+         came from Kauli.</p>
+      {% if webhook_error %}<p class="error">{{ webhook_error }}</p>{% endif %}
+      <form method="post" action="/settings/webhook">
+        <label>Webhook URL
+          <input type="url" name="url" placeholder="https://your-system.example.com/hooks/kauli"
+                 value="{{ webhook_row['url'] if webhook_row else '' }}">
+        </label>
+        <button type="submit" class="secondary">{{ 'Update' if webhook_row else 'Save' }} webhook</button>
+      </form>
+      {% if webhook_row %}
+      <p class="muted" style="font-size:0.82rem; margin:12px 0 4px;">Signing secret (used to verify
+         <code>X-Kauli-Signature</code> - HMAC-SHA256 of <code>timestamp.body</code>):</p>
+      <code style="display:block; padding:10px 12px; background:var(--hover); border-radius:8px;
+                   font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ webhook_row['secret'] }}</code>
+      <form method="post" action="/settings/webhook/regenerate-secret" style="display:inline;">
+        <button type="submit" class="secondary" onclick="return confirm('Regenerate the signing secret? Update your verification code with the new one first.');">Regenerate secret</button>
+      </form>
+      <form method="post" action="/settings/webhook/delete" style="display:inline; margin-left:8px;">
+        <button type="submit" class="row-action-btn" onclick="return confirm('Remove your webhook?');">Remove</button>
+      </form>
+
+      {% if webhook_deliveries %}
+      <h4 style="margin:18px 0 8px; font-size:0.84rem;">Recent deliveries</h4>
+      <table>
+        <thead><tr><th>Order</th><th>Event</th><th>Result</th><th>Sent</th></tr></thead>
+        <tbody>
+          {% for d in webhook_deliveries %}
+          <tr>
+            <td class="muted" style="font-size:0.8rem;">{{ d['order_id'][:8] }}&hellip;</td>
+            <td class="muted" style="font-size:0.8rem;">{{ d['event'] }}</td>
+            <td>
+              {% if d['ok'] %}<span class="ok" style="font-size:0.8rem;">✓ {{ d['status_code'] }}</span>
+              {% else %}<span class="error" style="font-size:0.8rem;">✕ {{ d['status_code'] or d['error'] or 'failed' }}</span>{% endif %}
+            </td>
+            <td class="muted" style="font-size:0.8rem;">{{ d['sent_at']|int|timestamp_to_str }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if tab == 'team' and user['role'] == 'client' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Team</h2>
+      {% if team_notice %}<p class="ok">{{ team_notice }}</p>{% endif %}
+      {% if team_error %}<p class="error">{{ team_error }}</p>{% endif %}
+      {% if is_team_owner %}
+        <p class="muted" style="font-size:0.85rem; margin-top:0;">Invite teammates to see and manage the same
+           orders and billing as you - they sign in with their own email/password, no shared logins.</p>
+        <form method="post" action="/settings/team/invite" style="margin-bottom:14px;">
+          <label>Invite by email
+            <input type="email" name="email" placeholder="teammate@example.com" required>
+          </label>
+          <button type="submit" class="secondary">Send invite</button>
+        </form>
+        {% if team_members %}
+        <table>
+          <thead><tr><th>Email</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {% for m in team_members %}
+            <tr>
+              <td>{{ m['member_email'] or m['invited_email'] }}</td>
+              <td><span class="status status-{{ m['status'] }}">{{ m['status'] }}</span></td>
+              <td>
+                <form method="post" action="/settings/team/remove" style="margin:0;">
+                  <input type="hidden" name="member_id" value="{{ m['id'] }}">
+                  <button type="submit" class="row-action-btn" title="Remove"
+                          onclick="return confirm('Remove this person from your team?');">&times;</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="muted" style="font-size:0.82rem;">Nobody invited yet.</p>
+        {% endif %}
+      {% else %}
+        <p class="muted" style="font-size:0.85rem; margin-top:0;">
+          You're on {{ team_owner_name or 'another account' }}'s team - you see and manage the same orders and
+          billing as them. Only they can invite or remove people.
+        </p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if tab == 'security' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Password</h2>
+      {% if password_saved %}<p class="ok">✓ Password updated</p>{% endif %}
+      {% if password_error %}<p class="error">{{ password_error }}</p>{% endif %}
+      <form method="post" action="/settings/change-password">
+        <label>Current password
+          <input type="password" name="current_password" required autocomplete="current-password">
+        </label>
+        <label>New password
+          <input type="password" name="new_password" required autocomplete="new-password">
+        </label>
+        <label>Confirm new password
+          <input type="password" name="confirm_password" required autocomplete="new-password">
+        </label>
+        <button type="submit" class="secondary">Update password</button>
+      </form>
+      <p class="muted" style="font-size:0.76rem; margin-top:12px;">Two-factor authentication isn't available
+         yet - if that's something you need, let us know.</p>
     </div>
 
-    <label>Name
-      <input type="text" name="display_name" value="{{ user['display_name'] }}" required>
-    </label>
-    <label>Email
-      <input type="email" value="{{ user['email'] }}" disabled style="opacity:0.6;">
-    </label>
-    <label>Role
-      <input type="text" value="{{ user['role'] }}" disabled style="opacity:0.6; text-transform:capitalize;">
-    </label>
+    {% if user['role'] == 'client' %}
+    <div class="card">
+      <h2 style="margin-top:0;">Your data</h2>
+      {% if deletion_requested %}
+        <p class="ok">✓ Deletion request received - we'll follow up by email once it's handled.</p>
+      {% else %}
+        <p class="muted" style="font-size:0.85rem; margin-top:0;">We don't auto-delete anything - a real
+           person reviews every request (order/payment records sometimes need to stick around a little
+           longer for accounting reasons). See our <a href="/privacy">privacy policy</a> for what we keep.</p>
+        <form method="post" action="/settings/request-deletion">
+          <button type="submit" class="secondary">Request my data be deleted</button>
+        </form>
+      {% endif %}
+    </div>
 
-    <button type="submit">Save changes</button>
-  </form>
-</div>
-
-{% if user['role'] == 'client' %}
-<div class="card" style="max-width:480px;">
-  <h2 style="margin-top:0;">Communication preferences</h2>
-  <p class="muted" style="font-size:0.85rem; margin-top:0;">Service emails (order status, receipts,
-     security) are sent regardless - they're how the account actually works, not something to opt out of.
-     This is only about anything beyond that.</p>
-  <form method="post" action="/settings/marketing-consent">
-    <label class="auth-checkbox-row" style="margin-bottom:14px;">
-      <input type="checkbox" name="marketing_consent" value="1" {% if user['marketing_consent'] %}checked{% endif %}>
-      <span>Send me occasional Kauli tips and updates</span>
-    </label>
-    <button type="submit" class="secondary">Save preference</button>
-  </form>
-</div>
-
-<div class="card" style="max-width:480px;">
-  <h2 style="margin-top:0;">Team</h2>
-  {% if team_notice %}<p class="ok">{{ team_notice }}</p>{% endif %}
-  {% if team_error %}<p class="error">{{ team_error }}</p>{% endif %}
-  {% if is_team_owner %}
-    <p class="muted" style="font-size:0.85rem; margin-top:0;">Invite teammates to see and manage the same
-       orders and billing as you - they sign in with their own email/password, no shared logins.</p>
-    <form method="post" action="/settings/team/invite" style="margin-bottom:14px;">
-      <label>Invite by email
-        <input type="email" name="email" placeholder="teammate@example.com" required>
-      </label>
-      <button type="submit" class="secondary">Send invite</button>
-    </form>
-    {% if team_members %}
-    <table>
-      <thead><tr><th>Email</th><th>Status</th><th></th></tr></thead>
-      <tbody>
-        {% for m in team_members %}
-        <tr>
-          <td>{{ m['member_email'] or m['invited_email'] }}</td>
-          <td><span class="status status-{{ m['status'] }}">{{ m['status'] }}</span></td>
-          <td>
-            <form method="post" action="/settings/team/remove" style="margin:0;">
-              <input type="hidden" name="member_id" value="{{ m['id'] }}">
-              <button type="submit" class="row-action-btn" title="Remove"
-                      onclick="return confirm('Remove this person from your team?');">&times;</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="muted" style="font-size:0.82rem;">Nobody invited yet.</p>
+    <div class="card" style="border-color:var(--err);">
+      <h2 style="margin-top:0; color:var(--err);">Close my account</h2>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <p class="muted" style="font-size:0.85rem;">You won't be able to sign in afterward. Your order history
+         stays as it is unless you separately request deletion above - closing your account isn't the same
+         as deleting your data.</p>
+      <form method="post" action="/settings/close-account">
+        <label>Type your email ({{ user['email'] }}) to confirm
+          <input type="email" name="confirm_text" required placeholder="{{ user['email'] }}">
+        </label>
+        <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
+                onclick="return confirm('Close your Kauli account? You won\'t be able to sign back in.');">
+          Close my account
+        </button>
+      </form>
+    </div>
     {% endif %}
-  {% else %}
-    <p class="muted" style="font-size:0.85rem; margin-top:0;">
-      You're on {{ team_owner_name or 'another account' }}'s team - you see and manage the same orders and
-      billing as them. Only they can invite or remove people.
-    </p>
   {% endif %}
+  </div>
 </div>
 
-{% if is_team_owner %}
-<div class="card" style="max-width:560px;">
-  <h2 style="margin-top:0;">Developer / integrations</h2>
-  <p class="muted" style="font-size:0.85rem; margin-top:0;">Let your own systems talk to Kauli directly -
-     an API key to check order status and pull deliverable links without logging in, and a webhook so we
-     tell you the moment an order's ready instead of you polling for it.
-     <a href="/docs/api">Full docs &amp; code examples &rarr;</a></p>
-
-  <h3 style="margin:18px 0 8px; font-size:0.92rem;">API key</h3>
-  {% if new_api_key %}
-  <p class="ok" style="margin-bottom:6px;">Copy this now - it won't be shown again.</p>
-  <code style="display:block; padding:10px 12px; background:var(--surface-2); border-radius:8px;
-               font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ new_api_key }}</code>
-  {% elif api_key_row %}
-  <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">
-    Key <code>{{ api_key_row['key_prefix'] }}&hellip;</code> &middot; created {{ api_key_row['created_at']|int|timestamp_to_str }}
-    {% if api_key_row['last_used_at'] %} &middot; last used {{ api_key_row['last_used_at']|int|timestamp_to_str }}
-    {% else %} &middot; never used yet{% endif %}
-  </p>
-  {% else %}
-  <p class="muted" style="font-size:0.82rem; margin:0 0 10px;">No API key yet.</p>
-  {% endif %}
-  <form method="post" action="/settings/api-key/generate" style="display:inline;">
-    <button type="submit" class="secondary"
-            {% if api_key_row %}onclick="return confirm('Generate a new key? The current one stops working immediately.');"{% endif %}>
-      {{ 'Regenerate' if api_key_row else 'Generate API key' }}
-    </button>
-  </form>
-  {% if api_key_row %}
-  <form method="post" action="/settings/api-key/revoke" style="display:inline; margin-left:8px;">
-    <button type="submit" class="row-action-btn" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
-  </form>
-  {% endif %}
-  <p class="muted" style="font-size:0.78rem; margin-top:12px;">
-    <code>GET /api/v1/orders/{id}</code> and <code>GET /api/v1/orders</code>, with header
-    <code>Authorization: Bearer &lt;your key&gt;</code>. Returns status and signed, time-limited links to
-    only the deliverables that order actually paid for.
-  </p>
-
-  <h3 style="margin:22px 0 8px; font-size:0.92rem;">Webhook</h3>
-  <p class="muted" style="font-size:0.82rem; margin-top:0;">We'll POST here the moment an order reaches
-     "ready for delivery" - signed the same way Stripe/GitHub sign theirs, so you can verify it really
-     came from Kauli.</p>
-  <form method="post" action="/settings/webhook">
-    <label>Webhook URL
-      <input type="url" name="url" placeholder="https://your-system.example.com/hooks/kauli"
-             value="{{ webhook_row['url'] if webhook_row else '' }}">
-    </label>
-    <button type="submit" class="secondary">{{ 'Update' if webhook_row else 'Save' }} webhook</button>
-  </form>
-  {% if webhook_row %}
-  <p class="muted" style="font-size:0.82rem; margin:12px 0 4px;">Signing secret (used to verify
-     <code>X-Kauli-Signature</code> - HMAC-SHA256 of <code>timestamp.body</code>):</p>
-  <code style="display:block; padding:10px 12px; background:var(--surface-2); border-radius:8px;
-               font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ webhook_row['secret'] }}</code>
-  <form method="post" action="/settings/webhook/regenerate-secret" style="display:inline;">
-    <button type="submit" class="secondary" onclick="return confirm('Regenerate the signing secret? Update your verification code with the new one first.');">Regenerate secret</button>
-  </form>
-  <form method="post" action="/settings/webhook/delete" style="display:inline; margin-left:8px;">
-    <button type="submit" class="row-action-btn" onclick="return confirm('Remove your webhook?');">Remove</button>
-  </form>
-
-  {% if webhook_deliveries %}
-  <h4 style="margin:18px 0 8px; font-size:0.84rem;">Recent deliveries</h4>
-  <table>
-    <thead><tr><th>Order</th><th>Event</th><th>Result</th><th>Sent</th></tr></thead>
-    <tbody>
-      {% for d in webhook_deliveries %}
-      <tr>
-        <td class="muted" style="font-size:0.8rem;">{{ d['order_id'][:8] }}&hellip;</td>
-        <td class="muted" style="font-size:0.8rem;">{{ d['event'] }}</td>
-        <td>
-          {% if d['ok'] %}<span class="ok" style="font-size:0.8rem;">✓ {{ d['status_code'] }}</span>
-          {% else %}<span class="error" style="font-size:0.8rem;">✕ {{ d['status_code'] or d['error'] or 'failed' }}</span>{% endif %}
-        </td>
-        <td class="muted" style="font-size:0.8rem;">{{ d['sent_at']|int|timestamp_to_str }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-  {% endif %}
-</div>
-{% endif %}
-
-<div class="card" style="max-width:480px;">
-  <h2 style="margin-top:0;">Your data</h2>
-  {% if deletion_requested %}
-    <p class="ok">✓ Deletion request received - we'll follow up by email once it's handled.</p>
-  {% else %}
-    <p class="muted" style="font-size:0.85rem; margin-top:0;">We don't auto-delete anything - a real
-       person reviews every request (order/payment records sometimes need to stick around a little
-       longer for accounting reasons). See our <a href="/privacy">privacy policy</a> for what we keep.</p>
-    <form method="post" action="/settings/request-deletion">
-      <button type="submit" class="secondary">Request my data be deleted</button>
-    </form>
-  {% endif %}
-</div>
-
-<div class="card" style="max-width:480px; border-color:var(--err);">
-  <h2 style="margin-top:0; color:var(--err);">Close my account</h2>
-  <p class="muted" style="font-size:0.85rem;">You won't be able to sign in afterward. Your order history
-     stays as it is unless you separately request deletion above - closing your account isn't the same
-     as deleting your data.</p>
-  <form method="post" action="/settings/close-account">
-    <label>Type your email ({{ user['email'] }}) to confirm
-      <input type="email" name="confirm_text" required placeholder="{{ user['email'] }}">
-    </label>
-    <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
-            onclick="return confirm('Close your Kauli account? You won\'t be able to sign back in.');">
-      Close my account
-    </button>
-  </form>
-</div>
-{% endif %}
 <script>
   (function () {
     var wrap = document.getElementById("avatar-upload");

@@ -554,6 +554,19 @@ def init_db() -> None:
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent_at REAL")
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent_ip TEXT")
+    if "default_source_lang" not in existing_user_cols:
+        # Personal, not account-wide (unlike marketing_consent/API keys/
+        # webhooks, which are the account owner's call) - a teammate on a
+        # shared team account might genuinely work a different language
+        # pair than the owner, so these live on the individual user row and
+        # only ever prefill the NEW-order wizard's own fields (see
+        # app.py's client_dashboard) - never silently applied to an order
+        # itself, which always uses whatever the wizard actually submitted.
+        conn.execute("ALTER TABLE users ADD COLUMN default_source_lang TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN default_target_lang TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN default_service_level TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN default_rush INTEGER NOT NULL DEFAULT 0")
+        conn.execute("ALTER TABLE users ADD COLUMN default_addon_video INTEGER NOT NULL DEFAULT 0")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1138,6 +1151,21 @@ def set_marketing_consent(user_id: str, consent: bool, ip: str | None) -> None:
     conn.close()
 
 
+def set_order_defaults(user_id: str, source_lang: str | None, target_lang: str | None,
+                        service_level: str | None, rush: bool, addon_video: bool) -> None:
+    """Only ever prefills app.py's client_dashboard wizard - see
+    default_source_lang's schema comment above for why this is per-user,
+    not account-wide."""
+    conn = get_conn()
+    conn.execute(
+        """UPDATE users SET default_source_lang = ?, default_target_lang = ?, default_service_level = ?,
+           default_rush = ?, default_addon_video = ? WHERE id = ?""",
+        (source_lang, target_lang, service_level, int(rush), int(addon_video), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
 def update_profile(user_id: str, display_name: str, avatar_path: str | None = None) -> None:
     """avatar_path=None leaves the existing photo alone (this is 'update
     display name, optionally also replace the photo', not a full overwrite -
@@ -1183,6 +1211,15 @@ def create_deletion_request(user_id: str) -> str:
     conn.commit()
     conn.close()
     return request_id
+
+
+def has_pending_deletion_request(user_id: str) -> bool:
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT 1 FROM data_deletion_requests WHERE user_id = ? AND status = 'pending' LIMIT 1", (user_id,)
+    ).fetchone()
+    conn.close()
+    return row is not None
 
 
 def list_deletion_requests(status: str | None = "pending"):

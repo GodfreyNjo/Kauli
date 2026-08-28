@@ -1826,11 +1826,19 @@ def notifications_mark_all_read(request: Request):
 
 
 # ------------------------------------------------------------- settings ----
+_SETTINGS_TABS = ("general", "defaults", "notifications", "integrations", "team", "security")
+
+
 @app.get("/settings", response_class=HTMLResponse)
-def settings_form(request: Request, team_notice: str | None = None, team_error: str | None = None):
+def settings_form(request: Request, tab: str = "general", team_notice: str | None = None,
+                   team_error: str | None = None, defaults_saved: bool = False,
+                   password_error: str | None = None, password_saved: bool = False,
+                   saved: bool = False, error: str | None = None, webhook_error: str | None = None):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
+    if tab not in _SETTINGS_TABS:
+        tab = "general"
     # is_team_owner: this client is NOT themselves an accepted member of
     # someone else's team - only the real account owner can invite/remove
     # people, never a teammate (who might not even be trusted with who
@@ -1851,12 +1859,17 @@ def settings_form(request: Request, team_notice: str | None = None, team_error: 
     # the real key again, only its stored hash can ever confirm a match.
     new_api_key = request.session.pop("_new_api_key", None)
     return templates.TemplateResponse(request, "settings.html", {
-        "user": user, "saved": False, "error": None,
+        "user": user, "saved": saved, "error": error, "tab": tab,
         "theme": "dark" if user["role"] == "staff" else "light",
         "is_team_owner": is_team_owner, "team_members": team_members, "team_owner_name": team_owner_name,
         "team_notice": team_notice, "team_error": team_error,
         "api_key_row": api_key_row, "new_api_key": new_api_key,
         "webhook_row": webhook_row, "webhook_deliveries": webhook_deliveries,
+        "defaults_saved": defaults_saved, "password_error": password_error, "password_saved": password_saved,
+        "source_languages": SOURCE_LANGUAGES, "service_levels": billing.SERVICE_LEVELS,
+        "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
+        "deletion_requested": db.has_pending_deletion_request(user["id"]) if user["role"] == "client" else False,
+        "webhook_error": webhook_error,
     })
 
 
@@ -1869,7 +1882,7 @@ def settings_api_key_generate(request: Request):
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     db.set_client_api_key(user["id"], key_hash, raw_key[:18])
     request.session["_new_api_key"] = raw_key
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
 @app.post("/settings/api-key/revoke")
@@ -1878,7 +1891,7 @@ def settings_api_key_revoke(request: Request):
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
         return RedirectResponse("/login")
     db.revoke_client_api_key(user["id"])
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
 @app.post("/settings/webhook")
@@ -1889,10 +1902,10 @@ def settings_webhook_save(request: Request, url: str = Form(...)):
     url = url.strip()
     if url and not _is_safe_webhook_url(url):
         return RedirectResponse(
-            "/settings?team_error=That+URL+isn%27t+allowed+-+use+a+real%2C+public+https%3A%2F%2F+address",
+            "/settings?tab=integrations&webhook_error=That+URL+isn%27t+allowed+-+use+a+real%2C+public+https%3A%2F%2F+address",
             status_code=303)
     db.set_client_webhook(user["id"], url)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
 @app.post("/settings/webhook/regenerate-secret")
@@ -1903,7 +1916,7 @@ def settings_webhook_regenerate_secret(request: Request):
     hook = db.get_client_webhook(user["id"])
     if hook:
         db.set_client_webhook(user["id"], hook["url"], secret=uuid.uuid4().hex)
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
 @app.post("/settings/webhook/delete")
@@ -1912,7 +1925,58 @@ def settings_webhook_delete(request: Request):
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
         return RedirectResponse("/login")
     db.delete_client_webhook(user["id"])
-    return RedirectResponse("/settings", status_code=303)
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
+
+
+@app.post("/settings/order-defaults")
+def settings_order_defaults(request: Request, source_lang: str = Form(""), target_lang: str = Form(""),
+                             service_level: str = Form(""), rush: str = Form(""),
+                             addon_video: str = Form("")):
+    """Personal to whoever's logged in, not account-wide - see
+    db.set_order_defaults's docstring. Only ever prefills the wizard (see
+    client_dashboard below); an invalid/blank choice just means "no
+    default", never an error - this is a convenience, not a required
+    field anywhere."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    db.set_order_defaults(
+        user["id"],
+        source_lang=source_lang if source_lang in SOURCE_LANGUAGES else None,
+        target_lang=target_lang if target_lang in ("en", "sw") else None,
+        service_level=service_level if service_level in billing.SERVICE_LEVELS else None,
+        rush=bool(rush), addon_video=bool(addon_video),
+    )
+    return RedirectResponse("/settings?tab=defaults&defaults_saved=1", status_code=303)
+
+
+@app.post("/settings/change-password")
+def settings_change_password(request: Request, current_password: str = Form(...),
+                              new_password: str = Form(...), confirm_password: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    # Same brute-force guard as /login - this route re-authenticates with
+    # the current password internally (see change_password's docstring),
+    # so it's just as guessable a target as the login form itself.
+    allowed, retry_after = rate_limit.check(f"login:{user['email']}", limit=8, window_s=60)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=security&password_error=Too+many+attempts+-+try+again+in+{retry_after}s",
+            status_code=303)
+    if new_password != confirm_password:
+        return RedirectResponse("/settings?tab=security&password_error=New+passwords+don%27t+match",
+                                 status_code=303)
+    policy_errors = supabase_auth.password_policy_errors(new_password, email=user["email"])
+    if policy_errors:
+        return RedirectResponse(
+            f"/settings?tab=security&password_error=Password+needs%3A+{quote(', '.join(policy_errors))}",
+            status_code=303)
+    ok, error = supabase_auth.change_password(user["email"], current_password, new_password)
+    if not ok:
+        return RedirectResponse(f"/settings?tab=security&password_error={quote(error or 'Something went wrong.')}",
+                                 status_code=303)
+    return RedirectResponse("/settings?tab=security&password_saved=1", status_code=303)
 
 
 @app.post("/settings/team/invite")
@@ -1925,15 +1989,15 @@ def settings_team_invite(request: Request, email: str = Form(...)):
     # enough to block a teammate from inviting people onto an account
     # that isn't theirs to manage.
     if user["client_scope_id"] != user["id"]:
-        return RedirectResponse("/settings", status_code=303)
+        return RedirectResponse("/settings?tab=team", status_code=303)
     email = email.strip().lower()
     if not email or "@" not in email:
-        return RedirectResponse("/settings?team_error=Enter+a+real+email+address.", status_code=303)
+        return RedirectResponse("/settings?tab=team&team_error=Enter+a+real+email+address.", status_code=303)
     if email == user["email"].strip().lower():
-        return RedirectResponse("/settings?team_error=That%27s+your+own+email.", status_code=303)
+        return RedirectResponse("/settings?tab=team&team_error=That%27s+your+own+email.", status_code=303)
     existing = [m for m in db.list_team_members(user["id"]) if m["invited_email"] == email]
     if existing:
-        return RedirectResponse("/settings?team_error=Already+invited.", status_code=303)
+        return RedirectResponse("/settings?tab=team&team_error=Already+invited.", status_code=303)
     db.create_team_invite(user["id"], email)
     # Real email, not just a DB row - an invite nobody's told about isn't
     # an invite. Reuses the same mailer/wrap_email_html every other
@@ -1949,7 +2013,7 @@ def settings_team_invite(request: Request, email: str = Form(...)):
         mailer.send_email(email, f"{user['display_name'] or 'A Kauli client'} invited you to their team", html, inner)
     except Exception:
         pass  # the invite row itself is what matters - acceptance is checked at login regardless of this email landing
-    return RedirectResponse("/settings?team_notice=Invite+sent.", status_code=303)
+    return RedirectResponse("/settings?tab=team&team_notice=Invite+sent.", status_code=303)
 
 
 @app.post("/settings/team/remove")
@@ -1958,7 +2022,7 @@ def settings_team_remove(request: Request, member_id: str = Form(...)):
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
         return RedirectResponse("/login")
     db.remove_team_member(user["id"], member_id)
-    return RedirectResponse("/settings?team_notice=Removed.", status_code=303)
+    return RedirectResponse("/settings?tab=team&team_notice=Removed.", status_code=303)
 
 
 @app.get("/help", response_class=HTMLResponse)
@@ -2390,11 +2454,9 @@ def settings_save(request: Request, display_name: str = Form(...),
         return RedirectResponse("/login")
 
     display_name = display_name.strip()
-    theme = "dark" if user["role"] == "staff" else "light"
     if not display_name:
-        return templates.TemplateResponse(request, "settings.html", {
-            "user": user, "saved": False, "error": "Name can't be empty.", "theme": theme,
-        })
+        empty_name_msg = "Name can't be empty."
+        return RedirectResponse(f"/settings?tab=general&error={quote(empty_name_msg)}", status_code=303)
 
     avatar_path = None
     if avatar is not None and avatar.filename:
@@ -2408,17 +2470,14 @@ def settings_save(request: Request, display_name: str = Form(...),
             _size, _sha256, head = upload_security.stream_save_with_limits(
                 avatar, tmp_dest, upload_security.MAX_AVATAR_BYTES)
         except upload_security.UploadRejected as exc:
-            return templates.TemplateResponse(request, "settings.html", {
-                "user": user, "saved": False, "error": str(exc), "theme": theme,
-            })
+            return RedirectResponse(f"/settings?tab=general&error={quote(str(exc))}", status_code=303)
         mime = upload_security.sniff_image_type(head)
         ext = ALLOWED_AVATAR_TYPES.get(mime)
         if not ext:
             tmp_dest.unlink(missing_ok=True)
-            return templates.TemplateResponse(request, "settings.html", {
-                "user": user, "saved": False,
-                "error": "Photo must be a real PNG, JPEG, or WebP file.", "theme": theme,
-            })
+            return RedirectResponse(
+                f"/settings?tab=general&error={quote('Photo must be a real PNG, JPEG, or WebP file.')}",
+                status_code=303)
         # Clear any previous photo under a different extension first, so
         # switching from a .png to a .jpg doesn't leave the old one behind
         # for /avatar/{id} to find first.
@@ -2429,10 +2488,7 @@ def settings_save(request: Request, display_name: str = Form(...),
         avatar_path = str(dest)
 
     db.update_profile(user["id"], display_name, avatar_path)
-    user = db.get_user(user["id"])  # re-fetch so the page reflects what was just saved
-    return templates.TemplateResponse(request, "settings.html", {
-        "user": user, "saved": True, "error": None, "theme": theme,
-    })
+    return RedirectResponse("/settings?tab=general&saved=1", status_code=303)
 
 
 @app.post("/settings/marketing-consent")
@@ -2446,11 +2502,7 @@ def settings_marketing_consent(request: Request, marketing_consent: str = Form("
         return RedirectResponse("/login")
     db.set_marketing_consent(user["id"], bool(marketing_consent),
                               request.client.host if request.client else None)
-    user = db.get_user(user["id"])
-    return templates.TemplateResponse(request, "settings.html", {
-        "user": user, "saved": True, "error": None,
-        "theme": "dark" if user["role"] == "staff" else "light",
-    })
+    return RedirectResponse("/settings?tab=notifications&saved=1", status_code=303)
 
 
 @app.post("/settings/close-account")
@@ -2463,12 +2515,10 @@ def settings_close_account(request: Request, confirm_text: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
-    theme = "light"
     if confirm_text.strip().lower() != user["email"].strip().lower():
-        return templates.TemplateResponse(request, "settings.html", {
-            "user": user, "saved": False, "theme": theme,
-            "error": "Type your email exactly to confirm closing your account.",
-        })
+        return RedirectResponse(
+            f"/settings?tab=security&error={quote('Type your email exactly to confirm closing your account.')}",
+            status_code=303)
     db.close_account(user["id"])
     request.session.clear()
     return RedirectResponse("/login?notice=account_closed", status_code=303)
@@ -2484,10 +2534,7 @@ def settings_request_deletion(request: Request):
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     db.create_deletion_request(user["id"])
-    return templates.TemplateResponse(request, "settings.html", {
-        "user": user, "saved": False, "error": None, "theme": "light",
-        "deletion_requested": True,
-    })
+    return RedirectResponse("/settings?tab=security", status_code=303)
 
 
 @app.get("/avatar/{user_id}")
@@ -2592,9 +2639,25 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
     # fake/reused upload); pre-fills the same wizard fields the error path
     # already uses, so submitting is the one real click of picking a
     # different target language.
+    # Real per-user defaults (see /settings' "defaults" tab) prefill the
+    # wizard, same as any real form remembering your last real choices - a
+    # reorder's own explicit values (from order_detail.html's "process in
+    # another language") still win over these, they're just the starting
+    # point when there's nothing more specific in play.
     reorder_form_values = {}
+    if user["default_source_lang"]:
+        reorder_form_values["source_lang"] = user["default_source_lang"]
+    if user["default_target_lang"]:
+        reorder_form_values["target_lang"] = user["default_target_lang"]
+    if user["default_service_level"]:
+        reorder_form_values["service_level"] = user["default_service_level"]
+    if user["default_rush"]:
+        reorder_form_values["rush"] = "1"
+    if user["default_addon_video"]:
+        reorder_form_values["addon_video_deliverables"] = "1"
     if reorder_youtube_url:
-        reorder_form_values = {"youtube_url": reorder_youtube_url, "source_lang": reorder_source_lang or "sw"}
+        reorder_form_values["youtube_url"] = reorder_youtube_url
+        reorder_form_values["source_lang"] = reorder_source_lang or "sw"
     return templates.TemplateResponse(request, "client_dashboard.html", {
         "user": user, "orders": orders, "unread": unread, "anthropic_available": anthropic_available,
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,

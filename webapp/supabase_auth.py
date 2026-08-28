@@ -175,6 +175,26 @@ def sign_in(email: str, password: str):
         return None, str(exc)  # or the friendly one _with_timeout_retry raised
 
 
+def change_password(email: str, current_password: str, new_password: str):
+    """For a logged-in user changing their password from Settings -
+    different path from set_new_password below (that one consumes a
+    recovery-link token; this one re-authenticates with the CURRENT
+    password instead). Needed either way: this app's own session cookie
+    only ever stores our local user id (see app.py's /login), never a
+    Supabase access token, so there's nothing to reuse here - and even if
+    there were, requiring the current password again is the right call
+    for changing it, not a workaround. Returns (ok, error_message_or_None)."""
+    session, error = sign_in(email, current_password)
+    if error or not session:
+        return False, "Your current password is incorrect."
+    try:
+        get_client().auth.set_session(session.access_token, session.refresh_token)
+        get_client().auth.update_user({"password": new_password})
+        return True, None
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+
 def request_password_reset(email: str, redirect_to: str) -> None:
     """Fire-and-forget - deliberately swallows every error. Surfacing
     "no account with that email" would let anyone enumerate which emails
