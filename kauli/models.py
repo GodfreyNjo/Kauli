@@ -3,6 +3,7 @@ we add fields when we actually need them, not before."""
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 from dataclasses import dataclass, field, asdict
@@ -239,8 +240,28 @@ class Job:
         return d
 
     def save(self, path: str) -> None:
-        with open(path, "w", encoding="utf-8") as f:
+        # Atomic write - real bug this closes: a plain open(path, "w")
+        # truncates the file the instant it's opened, so anything reading
+        # manifest.json (a concurrent editor request, a status check) or
+        # anything that crashes/gets killed mid-write (a container
+        # restart, an OOM kill) can catch it as a half-written, invalid
+        # JSON file. That used to only matter once per job, at the single
+        # end-of-run save - now that pipeline.run() checkpoints the
+        # manifest every 10 segments during translation (see that
+        # function's own comment on why), this path gets hit dozens of
+        # times per real job, and a corrupt manifest is worse than a
+        # missing one: resume=True's own Job.load() call catches the
+        # parse failure and falls back to a full fresh run, re-billing
+        # the paid ASR provider it was specifically trying to avoid
+        # re-billing. Write to a temp file in the same directory first,
+        # then atomically rename over the real path (os.replace is atomic
+        # on the same filesystem, which same-directory guarantees) - a
+        # reader always sees either the complete old version or the
+        # complete new one, never a partial one.
+        tmp_path = f"{path}.tmp-{uuid.uuid4().hex[:8]}"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=2, ensure_ascii=False)
+        os.replace(tmp_path, path)
 
     @classmethod
     def load(cls, path: str) -> "Job":
