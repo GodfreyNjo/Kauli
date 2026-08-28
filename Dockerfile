@@ -22,9 +22,36 @@ FROM python:3.12-slim AS base
 # extraction, video muxing) - not optional, most of the pipeline shells
 # out to it directly. curl: fetches the Piper voice models below.
 # build-essential: sentencepiece/some transformers deps need to compile.
+# clamav: the real malware scanner webapp/upload_security.py's
+# scan_for_malware() has been coded against since the upload-security
+# work, but was never actually installed anywhere - confirmed live, it
+# was silently running in the documented fail-open "not scanned" mode
+# this whole time. Deliberately just `clamav` (clamscan + freshclam),
+# not `clamav-daemon` (clamdscan) - a persistent clamd daemon needs its
+# own process supervision inside a single-CMD container for a speed
+# advantage (10-30s saved per scan) that doesn't matter at Kauli's real
+# upload volume; scan_for_malware() already prefers clamdscan and falls
+# back to clamscan on its own, so this is a real, working choice within
+# what the existing code already supports, not a compromise.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg curl build-essential \
+    ffmpeg curl build-essential clamav \
     && rm -rf /var/lib/apt/lists/*
+
+# Real virus definitions, downloaded at build time so the image boots
+# with a working database from the first request - not left for a slow/
+# flaky first-run download to block (or silently skip) the very first
+# real upload. The Debian clamav package ships freshclam.conf with a
+# literal "Example" line specifically so it refuses to run until a human
+# has reviewed the config - real, well-known gotcha, not this project's
+# quirk; stripping it is the standard fix, not a security shortcut, the
+# rest of the shipped config (official ClamAV mirror) is fine as-is.
+# `|| true` on freshclam itself: a build-time network hiccup shouldn't
+# fail the whole image build over a scanner database - the entrypoint
+# below refreshes it again at every real container start anyway, so an
+# image that shipped with a stale (or even day-zero-empty) database
+# self-heals on the next deploy or restart, both of which happen often
+# in this project's real deploy cadence.
+RUN sed -i '/^Example/d' /etc/clamav/freshclam.conf && (freshclam --quiet || true)
 
 WORKDIR /app
 
@@ -94,4 +121,13 @@ EXPOSE 8000
 # production). Single worker: matches worker.py's own "one job at a
 # time" design - see this file's header comment on why this image is
 # meant to run as exactly one instance, not N behind a load balancer.
-CMD ["uvicorn", "webapp.app:app", "--host", "0.0.0.0", "--port", "8000"]
+#
+# freshclam runs again here, in the background (`&`, not blocking
+# startup), on every real container start - refreshes the virus
+# definitions baked in at build time without making a deploy or restart
+# wait on a database download, and self-heals a build that shipped with
+# a stale/missing one. `exec` hands PID 1 to uvicorn directly once it
+# starts, not the shell - real signal handling (SIGTERM on `docker stop`
+# reaches uvicorn itself for a clean shutdown, not a wrapper shell that
+# swallows it).
+CMD ["sh", "-c", "freshclam --quiet >/tmp/freshclam.log 2>&1 & exec uvicorn webapp.app:app --host 0.0.0.0 --port 8000"]
