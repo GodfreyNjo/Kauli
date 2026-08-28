@@ -40,7 +40,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -1271,6 +1271,25 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
 INTERNAL_NOTIFY_EMAIL = "kahunyurogodfrey@gmail.com"
 
 
+def _capture_signup_ip_intel(user_id: str, request: Request) -> None:
+    """Real IP captured synchronously (cheap, one DB write) - the actual
+    datacenter check runs in a background thread since the FIRST call in
+    this process does a real network fetch (see ip_intel.py) that must
+    never add latency to an actual signup/login response. Fire-and-
+    forget: a failed or slow check just leaves signup_ip_is_datacenter
+    NULL, which staff_clients.html already renders as "not checked",
+    never as a false negative."""
+    ip = rate_limit.client_ip(request)
+    db.set_signup_ip(user_id, ip)
+
+    def _check():
+        result = ip_intel.is_datacenter_ip(ip)
+        if result is not None:
+            db.set_signup_ip_datacenter_flag(user_id, result)
+
+    threading.Thread(target=_check, daemon=True, name=f"ip-intel-{user_id}").start()
+
+
 def _notify_internal_new_signup(user, base_url: str = "") -> None:
     """Real-time ops alert the instant a new CLIENT account is actually
     created (called from the same was_new branch _queue_welcome_message
@@ -1780,6 +1799,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
         if role == "client":  # the welcome message is written for a client, not a new staff account
             _queue_welcome_message(user, base_url=str(request.base_url))
             _notify_internal_new_signup(user, base_url=str(request.base_url))
+            _capture_signup_ip_intel(user["id"], request)
     request.session["user_id"] = user["id"]
     # Clicking a deep link from an email (an order, a receipt, billing)
     # while logged out used to always land back on the generic dashboard
@@ -1838,6 +1858,7 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
         if role == "client":
             _queue_welcome_message(user, base_url=str(request.base_url))
             _notify_internal_new_signup(user, base_url=str(request.base_url))
+            _capture_signup_ip_intel(user["id"], request)
     request.session["user_id"] = user["id"]
     return RedirectResponse(_safe_next(next), status_code=303)
 
@@ -4568,6 +4589,7 @@ def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
         "payments": db.list_payments_for_user(client_id) if tab == "billing" else [],
         "api_key_row": db.get_client_api_key(client_id) if tab == "settings" else None,
         "webhook_row": db.get_client_webhook(client_id) if tab == "settings" else None,
+        "trial_payment": db.get_trial_verification_payment(client_id) if tab == "settings" else None,
     })
 
 
@@ -4605,6 +4627,43 @@ def staff_client_close(request: Request, client_id: str):
         return HTMLResponse("Client not found.", status_code=404)
     db.close_account(client_id)
     return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Account+closed.", status_code=303)
+
+
+@app.post("/staff/clients/{client_id}/refund-trial-verification")
+def staff_refund_trial_verification(request: Request, client_id: str):
+    """A genuine last resort - real money back to a real client's card,
+    for when onboarding hasn't worked out despite staff actually trying.
+    Manual, staff-only, never automatic: there's no computable "we tried
+    hard enough" signal, that's a real human judgment call. Refunds the
+    $1 charge on Paystack's side, and claws back whatever's left of the
+    matching wallet credit (never below zero - if they already spent it
+    on a real order, that part just isn't recoverable, which is fine;
+    the point is not double-crediting them, not chasing spent money)."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    client = db.get_user(client_id)
+    if not client:
+        return HTMLResponse("Client not found.", status_code=404)
+    payment = db.get_trial_verification_payment(client_id)
+    if not payment:
+        return RedirectResponse(
+            f"/staff/clients/{client_id}?tab=settings&error=No+trial-verification+payment+found+for+this+client.",
+            status_code=303)
+    if payment["refunded_at"]:
+        return RedirectResponse(
+            f"/staff/clients/{client_id}?tab=settings&error=Already+refunded.", status_code=303)
+    result = billing.paystack_refund(payment["provider_reference"])
+    if not result["ok"]:
+        return RedirectResponse(
+            f"/staff/clients/{client_id}?tab=settings&error=Refund+failed%3A+{quote(result['error'])}",
+            status_code=303)
+    db.mark_payment_refunded(payment["id"], payment["provider_reference"])
+    db.consume_wallet_credits(client_id, billing.usd_to_credits(payment["amount_usd"]))
+    return RedirectResponse(
+        f"/staff/clients/{client_id}?tab=settings&notice=Refund+submitted+to+Paystack+"
+        f"({quote(result['status'])})+-+it+can+take+a+few+days+to+reach+their+card.",
+        status_code=303)
 
 
 # --------------------------------------------- public API / integrations ----

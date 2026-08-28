@@ -18,6 +18,10 @@
       <tr>
         <td>
           <a href="/staff/clients/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
+          {% if c['signup_ip_is_datacenter'] %}
+          <span class="status status-pending_payment" style="font-size:0.68rem;"
+                title="Signed up from a known cloud/hosting IP ({{ c['signup_ip'] }}) - a real signal worth a look, not proof of anything on its own.">Datacenter IP</span>
+          {% endif %}
           <br><span class="muted" style="font-size:0.78rem;">{{ c['email'] }}</span>
         </td>
         <td><span class="source-badge">{{ plans[c['plan']]['name'] }}</span></td>

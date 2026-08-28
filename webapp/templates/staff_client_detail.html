@@ -40,6 +40,11 @@
           <tr><td class="muted">Prepaid wallet credits</td><td>{{ wallet_credits }}</td></tr>
           <tr><td class="muted">Marketing email</td><td>{{ 'Opted in' if client['marketing_consent'] else 'Not opted in' }}</td></tr>
           <tr><td class="muted">Joined</td><td>{{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }}</td></tr>
+          <tr><td class="muted">Signup IP</td><td>
+            {{ client['signup_ip'] or 'Not recorded' }}
+            {% if client['signup_ip_is_datacenter'] == 1 %}<span class="status status-pending_payment" style="font-size:0.68rem;">Datacenter IP</span>
+            {% elif client['signup_ip_is_datacenter'] == 0 %}<span class="muted" style="font-size:0.78rem;">(looks residential)</span>{% endif %}
+          </td></tr>
         </tbody>
       </table>
     </div>
@@ -141,6 +146,27 @@
         </tbody>
       </table>
     </div>
+
+    {% if trial_payment %}
+    <div class="card">
+      <h2 style="margin-top:0;">Trial verification</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">${{ "%.2f"|format(trial_payment['amount_usd']) }}
+         charged {{ trial_payment['completed_at']|int|timestamp_to_str if trial_payment['completed_at'] else '-' }},
+         credited straight to their wallet.
+         {% if trial_payment['refunded_at'] %}Refunded {{ trial_payment['refunded_at']|int|timestamp_to_str }}.{% endif %}</p>
+      {% if not trial_payment['refunded_at'] %}
+      <p class="muted" style="font-size:0.82rem;">Last resort only - after you've actually tried to get them
+         onboarded and it hasn't worked out. Refunds the charge to their card and claws back whatever's left
+         of the matching wallet credit (not what they've already spent).</p>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/refund-trial-verification">
+        <button type="submit" class="secondary"
+                onclick="return confirm('Refund the $1 trial-verification charge to their card? This should only be used as a last resort.');">
+          Refund trial verification
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
 
     <div class="card" style="border-color:var(--err);">
       <h2 style="margin-top:0; color:var(--err);">Account status</h2>

@@ -451,6 +451,37 @@ def paystack_verify_webhook_signature(raw_body: bytes, signature_header: str | N
     return hmac.compare_digest(expected, signature_header)
 
 
+def paystack_refund(transaction_reference: str) -> dict:
+    """Real refund via Paystack's own /refund endpoint - a staff-only,
+    manual, last-resort action (see app.py's staff_refund_trial_
+    verification), not something a client ever triggers themselves.
+    Amount omitted on purpose: Paystack defaults to refunding the FULL
+    original transaction amount when it's left out, which is always
+    correct here (the $1 trial-verification charge is never partially
+    refunded). Refunds are queued for processing on Paystack's side, not
+    instant - the real response reflects that ("pending"), which is
+    surfaced to staff as-is rather than presented as already-done.
+    Returns {"ok": True, "status": ..., "detail": dict} on success,
+    {"ok": False, "error": ...} on failure."""
+    key = _paystack_key()
+    if not key:
+        return {"ok": False, "error": "Paystack isn't configured (PAYSTACK_SECRET_KEY missing)."}
+    try:
+        resp = httpx.post(
+            "https://api.paystack.co/refund",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"transaction": transaction_reference},
+            timeout=15,
+        )
+        data = resp.json()
+        if not data.get("status"):
+            return {"ok": False, "error": data.get("message", "Paystack rejected the refund request.")}
+        refund_data = data.get("data", {})
+        return {"ok": True, "status": refund_data.get("status", "pending"), "detail": refund_data}
+    except Exception as exc:
+        return {"ok": False, "error": f"Couldn't reach Paystack: {exc}"}
+
+
 # --------------------------------------------------------------- m-pesa ----
 MPESA_BASE = {
     "sandbox": "https://sandbox.safaricom.co.ke",

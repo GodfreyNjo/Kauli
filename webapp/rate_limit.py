@@ -37,10 +37,23 @@ def check(key: str, limit: int, window_s: float) -> tuple[bool, int]:
 
 
 def client_ip(request) -> str:
-    """Best-effort real client IP - trusts X-Forwarded-For only because
-    this demo has no reverse proxy in front of it stripping/setting that
-    header itself; a real deployment behind one needs to trust only the
-    proxy's own hop, not blindly the whole header."""
+    """Best-effort real client IP. Real bug this closes: kauli-forgemedia.com
+    is genuinely behind Cloudflare now (confirmed live - server: cloudflare
+    on every response), which appends its own observed IP to whatever
+    X-Forwarded-For a client already sent rather than replacing it - the
+    old `split(",")[0]` here returned the CLIENT'S OWN, attacker-
+    controlled first hop, not Cloudflare's real one. Anyone could set
+    X-Forwarded-For themselves and sail straight past every IP-keyed rate
+    limit (login, signup, the contact form) using one real connection.
+    cf-connecting-ip is Cloudflare's own header, set from its actual TCP
+    connection to the visitor - a client can send one too, but Cloudflare
+    overwrites it with the real value before proxying the request through,
+    so it can't be spoofed the way X-Forwarded-For can. Falls back to the
+    old behavior only when a request genuinely isn't arriving via
+    Cloudflare (local/direct testing)."""
+    cf_ip = request.headers.get("cf-connecting-ip")
+    if cf_ip:
+        return cf_ip.strip()
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         return forwarded.split(",")[0].strip()

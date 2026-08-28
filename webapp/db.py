@@ -584,6 +584,15 @@ def init_db() -> None:
         # ships would be a real regression, not a fraud fix.
         conn.execute("ALTER TABLE users ADD COLUMN trial_verified_at REAL")
         conn.execute("UPDATE users SET trial_verified_at = ? WHERE trial_verified_at IS NULL", (time.time(),))
+    if "signup_ip" not in existing_user_cols:
+        # Real, honest fraud-triage signal - see ip_intel.py's own module
+        # docstring for exactly what this does and doesn't prove.
+        # signup_ip_is_datacenter is nullable on purpose: NULL means "not
+        # checked yet / couldn't check", never treated the same as 0
+        # ("checked, looks like a real residential IP") - see
+        # staff_clients.html for how the three states render differently.
+        conn.execute("ALTER TABLE users ADD COLUMN signup_ip TEXT")
+        conn.execute("ALTER TABLE users ADD COLUMN signup_ip_is_datacenter INTEGER")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -593,6 +602,16 @@ def init_db() -> None:
         # or cloud storage exists here.
         conn.execute("ALTER TABLE payments ADD COLUMN receipt_path TEXT")
         conn.execute("ALTER TABLE payments ADD COLUMN staff_note TEXT")
+    if "refunded_at" not in existing_payment_cols:
+        # A refund is a real, separate event layered on top of a real
+        # completed payment - status stays 'completed' (the charge really
+        # did happen), this just records that it was later reversed.
+        # Built for the $1 trial-verification charge specifically (see
+        # staff_refund_trial_verification) - a genuine last resort when a
+        # client's onboarding hasn't worked out despite staff actually
+        # trying, not an automated/client-facing refund button.
+        conn.execute("ALTER TABLE payments ADD COLUMN refunded_at REAL")
+        conn.execute("ALTER TABLE payments ADD COLUMN refund_reference TEXT")
     existing_receipt_cols = {row["name"] for row in conn.execute("PRAGMA table_info(receipts)")}
     if "line_items_json" not in existing_receipt_cols:
         # Real per-service breakdown (see orders.cost_breakdown_json above),
@@ -1101,6 +1120,54 @@ def list_clients_for_staff(search: str | None = None):
 def set_client_staff_notes(client_id: str, notes: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE users SET staff_notes = ? WHERE id = ?", (notes.strip() or None, client_id))
+    conn.commit()
+    conn.close()
+
+
+def append_client_staff_note(client_id: str, note: str) -> None:
+    """One dated, auto-generated line added to the TOP of a client's
+    staff notes, never replacing whatever a human already typed there -
+    see set_client_staff_notes for the manual-edit path (the textarea on
+    /staff/clients/{id}?tab=settings) this must never clobber. Used for
+    real automatic events worth a staff member seeing next time they look
+    at this account (see app.py's _note_payment_failure), not a full
+    activity log - keep call sites to genuinely note-worthy real events."""
+    conn = get_conn()
+    row = conn.execute("SELECT staff_notes FROM users WHERE id = ?", (client_id,)).fetchone()
+    existing = (row["staff_notes"] or "").strip() if row else ""
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    line = f"[{stamp}] {note}"
+    combined = f"{line}\n{existing}" if existing else line
+    conn.execute("UPDATE users SET staff_notes = ? WHERE id = ?", (combined, client_id))
+    conn.commit()
+    conn.close()
+
+
+def count_recent_failed_payments(user_id: str, hours: float = 48) -> int:
+    conn = get_conn()
+    cutoff = time.time() - hours * 3600
+    n = conn.execute(
+        "SELECT COUNT(*) FROM payments WHERE user_id = ? AND status = 'failed' AND created_at >= ?",
+        (user_id, cutoff),
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def set_signup_ip(user_id: str, ip: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET signup_ip = ? WHERE id = ?", (ip, user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_signup_ip_datacenter_flag(user_id: str, is_datacenter: bool) -> None:
+    """Set once, from the background check ip_intel.is_datacenter_ip runs
+    right after signup - see app.py's callers. Never called with an
+    unknown (None) result; that's just left as the column's real NULL
+    default, not written as False."""
+    conn = get_conn()
+    conn.execute("UPDATE users SET signup_ip_is_datacenter = ? WHERE id = ?", (int(is_datacenter), user_id))
     conn.commit()
     conn.close()
 
@@ -2712,6 +2779,31 @@ def find_pending_mpesa_payment(checkout_request_id: str):
     ).fetchone()
     conn.close()
     return row
+
+
+def get_trial_verification_payment(client_id: str):
+    """The real, completed $1 Paystack charge for this client, if one
+    exists - what staff_refund_trial_verification looks up before issuing
+    a real refund. Newest first, though there should only ever be one per
+    account (trial_verified_at is set exactly once)."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM payments WHERE user_id = ? AND status = 'completed' "
+        "AND meta LIKE '%\"kind\": \"trial_verification\"%' ORDER BY completed_at DESC LIMIT 1",
+        (client_id,),
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def mark_payment_refunded(payment_id: str, refund_reference: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        "UPDATE payments SET refunded_at = ?, refund_reference = ? WHERE id = ?",
+        (time.time(), refund_reference, payment_id),
+    )
+    conn.commit()
+    conn.close()
 
 
 # -------------------------------------------------------- client feedback ----
