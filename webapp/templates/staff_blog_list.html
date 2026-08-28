@@ -21,7 +21,7 @@
 
 <div class="card" style="padding:0; margin-top:16px;">
   <table>
-    <thead><tr><th>Title</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+    <thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Updated</th><th></th></tr></thead>
     <tbody>
       {% for post in posts %}
       <tr>
@@ -31,6 +31,7 @@
           {% if post['medium_url'] %}<br><a href="{{ post['medium_url'] }}" target="_blank" rel="noopener" class="muted" style="font-size:0.76rem;">✓ On Medium →</a>{% endif %}
         </td>
         <td><span class="source-badge">{{ post['status'] }}</span></td>
+        <td>{{ post['views'] or 0 }}</td>
         <td class="muted">{{ post['updated_at']|int|timestamp_to_str }}</td>
         <td style="display:flex; gap:6px; flex-wrap:wrap;">
           {% if post['status'] == 'published' %}
@@ -60,7 +61,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="4" class="muted" style="padding:20px 24px;">No posts yet.</td></tr>
+      <tr><td colspan="5" class="muted" style="padding:20px 24px;">No posts yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

@@ -1401,6 +1401,7 @@ def blog_post(request: Request, slug: str):
     post = db.get_blog_post_by_slug(slug, published_only=True)
     if not post:
         return HTMLResponse("Post not found.", status_code=404)
+    db.increment_blog_post_views(post["id"])
     author = db.get_user(post["author_id"]) if post["author_id"] else None
     return templates.TemplateResponse(request, "blog_post.html", {
         **_marketing_context(home="/"),
@@ -4411,10 +4412,21 @@ def staff_newsletter_form(request: Request, notice: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
+    history = db.list_newsletters()
+    # Real open/click counts from Brevo's own event log (see mailer.
+    # get_open_stats_for_tag's docstring) - only for the most recent few,
+    # not the whole history on every page load: each one is 3 real API
+    # calls, and Brevo's own event-report window only covers 90 days back
+    # anyway, so an old newsletter's stats would come back empty regardless.
+    open_stats = {}
+    for n in history[:10]:
+        stats = mailer.get_open_stats_for_tag(f"newsletter-{n['id']}")
+        if stats is not None:
+            open_stats[n["id"]] = stats
     return templates.TemplateResponse(request, "staff_newsletter.html", {
         "user": user, "notice": notice,
         "posts": db.list_blog_posts(published_only=True),
-        "history": db.list_newsletters(),
+        "history": history, "open_stats": open_stats,
         "recipient_count": len(db.list_marketing_opted_in_clients()),
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
     })
@@ -4474,6 +4486,12 @@ def staff_newsletter_send(request: Request, subject: str = Form(...), blog_post_
         ("Read the full article →", post_url) if post_url else ("Read our latest posts", f"{base_url}/blog")
     )
 
+    # Generated before the send loop, not after - see db.create_newsletter_
+    # record's own comment on why: this exact id is the real Brevo tag
+    # every send below carries, which is what lets a later "how many
+    # opened this newsletter" query find them again.
+    newsletter_id = uuid.uuid4().hex[:12]
+    send_tag = f"newsletter-{newsletter_id}"
     recipients = db.list_marketing_opted_in_clients()
     sent_count = 0
     for client in recipients:
@@ -4483,13 +4501,13 @@ def staff_newsletter_send(request: Request, subject: str = Form(...), blog_post_
             footer_note=f'You\'re getting this because you opted in to Kauli updates. '
                         f'<a href="{unsub_url}" style="color:{mailer.BRAND_MUTED};">Unsubscribe</a> anytime.',
         )
-        ok, _ = mailer.send_email(client["email"], subject, html)
+        ok, _ = mailer.send_email(client["email"], subject, html, tags=[send_tag])
         if ok:
             sent_count += 1
 
     db.create_newsletter_record(subject, blog_post_id or None, feature_update.strip(),
                                  industry_trend_text.strip(), industry_trend_url.strip(),
-                                 user["id"], sent_count)
+                                 user["id"], sent_count, newsletter_id=newsletter_id)
     return RedirectResponse(
         f"/staff/newsletter?notice=Sent+to+{sent_count}+of+{len(recipients)}+opted-in+clients.", status_code=303)
 

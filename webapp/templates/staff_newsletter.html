@@ -50,18 +50,25 @@
 <h2 style="margin-top:32px;">Send history</h2>
 <div class="card" style="padding:0; margin-top:12px;">
   <table>
-    <thead><tr><th>Subject</th><th>Blog post</th><th>Recipients</th><th>Sent by</th><th>Date</th></tr></thead>
+    <thead><tr><th>Subject</th><th>Blog post</th><th>Recipients</th><th>Opened</th><th>Sent by</th><th>Date</th></tr></thead>
     <tbody>
       {% for n in history %}
+      {% set stats = open_stats.get(n['id']) %}
       <tr>
         <td>{{ n['subject'] }}</td>
         <td class="muted">{{ n['blog_post_title'] or '-' }}</td>
         <td>{{ n['recipient_count'] }}</td>
+        <td>
+          {% if stats %}
+            {{ stats['opened'] }} / {{ stats['delivered'] }}
+            {% if stats['delivered'] %}<span class="muted">({{ (100 * stats['opened'] / stats['delivered'])|round|int }}%)</span>{% endif %}
+          {% else %}<span class="muted" title="Only tracked for the 10 most recent sends, and only within Brevo's own 90-day event window">-</span>{% endif %}
+        </td>
         <td class="muted">{{ n['sent_by_name'] or '-' }}</td>
         <td class="muted">{{ n['created_at']|int|timestamp_to_str }}</td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted" style="padding:20px 24px;">No newsletters sent yet.</td></tr>
+      <tr><td colspan="6" class="muted" style="padding:20px 24px;">No newsletters sent yet.</td></tr>
       {% endfor %}
     </tbody>
   </table>

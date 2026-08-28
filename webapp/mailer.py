@@ -110,12 +110,20 @@ def wrap_email_html(body_html: str, cta_text: str | None = None, cta_url: str | 
 </div>"""
 
 
-def send_email(to: str, subject: str, html_body: str, text_body: str | None = None) -> tuple[bool, str]:
+def send_email(to: str, subject: str, html_body: str, text_body: str | None = None,
+                tags: list[str] | None = None) -> tuple[bool, str]:
     """Returns (ok, detail) - detail is Brevo's messageId on success, or a
     human-readable reason on failure. Never raises: a flaky or misconfigured
     provider should degrade to the manual "queued, staff forwards it"
     fallback, not crash whatever just triggered the send (a payment
-    webhook, in every current caller)."""
+    webhook, in every current caller).
+
+    tags: real Brevo send tags, not decorative - Brevo already tracks
+    open/click/bounce for every email it sends (their own pixel/link
+    rewriting, not something this app has to build); tags are what let a
+    LATER query (get_open_stats_for_tag) ask "how many of the emails
+    tagged 'newsletter-<id>' were opened" instead of Kauli trying to
+    build its own tracking pixel from scratch."""
     if not email_configured():
         return False, "email not configured (BREVO_API_KEY / BREVO_FROM_EMAIL not set)"
     payload = {
@@ -126,6 +134,8 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     }
     if text_body:
         payload["textContent"] = text_body
+    if tags:
+        payload["tags"] = tags
     try:
         resp = httpx.post(
             BREVO_API_URL, json=payload, timeout=10.0,
@@ -139,3 +149,52 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
         return True, resp.json().get("messageId", "sent")
     except Exception:
         return True, "sent"
+
+
+BREVO_EVENTS_URL = "https://api.brevo.com/v3/smtp/statistics/events"
+
+
+def get_open_stats_for_tag(tag: str, days: int = 90) -> dict | None:
+    """Real open/click counts for every email sent with this tag, straight
+    from Brevo's own event log - not a homegrown tracking pixel (Brevo
+    already rewrites links and embeds its own open-tracking pixel in
+    every HTML email it sends; this just asks for what it already
+    recorded). Returns None on any failure (not configured, network
+    error, bad response) - a caller shows "not available" rather than a
+    fabricated zero. days is capped at 90, Brevo's own real limit for
+    this endpoint."""
+    if not email_configured():
+        return None
+    days = max(1, min(days, 90))
+    try:
+        opened = httpx.get(
+            BREVO_EVENTS_URL, params={"tags": tag, "event": "opened", "days": days, "limit": 2500},
+            timeout=10.0, headers={"api-key": os.environ["BREVO_API_KEY"], "Accept": "application/json"},
+        )
+        delivered = httpx.get(
+            BREVO_EVENTS_URL, params={"tags": tag, "event": "delivered", "days": days, "limit": 2500},
+            timeout=10.0, headers={"api-key": os.environ["BREVO_API_KEY"], "Accept": "application/json"},
+        )
+        clicked = httpx.get(
+            BREVO_EVENTS_URL, params={"tags": tag, "event": "clicks", "days": days, "limit": 2500},
+            timeout=10.0, headers={"api-key": os.environ["BREVO_API_KEY"], "Accept": "application/json"},
+        )
+    except httpx.HTTPError:
+        return None
+    if opened.status_code >= 300 or delivered.status_code >= 300:
+        return None
+    # A recipient who opens twice (checks the email, reads it again later)
+    # produces two events for the same messageId - de-duplicated here so
+    # "opened" means "N distinct recipients opened it", the number that's
+    # actually meaningful, not a raw event count.
+    def _distinct_message_ids(resp) -> set:
+        try:
+            events = resp.json().get("events", [])
+        except Exception:
+            return set()
+        return {e.get("messageId") for e in events if e.get("messageId")}
+    return {
+        "delivered": len(_distinct_message_ids(delivered)),
+        "opened": len(_distinct_message_ids(opened)),
+        "clicked": len(_distinct_message_ids(clicked)) if clicked.status_code < 300 else 0,
+    }
