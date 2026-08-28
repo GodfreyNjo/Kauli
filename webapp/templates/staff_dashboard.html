@@ -1,21 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Production Queue{% endblock %}
 {% block content %}
-<script>
-  (function () {
-    var REFRESH_MS = 30000;
-    function isTyping() {
-      var el = document.activeElement;
-      return !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
-    }
-    function tick() {
-      if (isTyping()) { setTimeout(tick, REFRESH_MS); return; }
-      location.reload();
-    }
-    setTimeout(tick, REFRESH_MS);
-  })();
-</script>
-
 <div class="overview-header">
   <h1>Production Queue</h1>
   <p class="muted" style="margin-top:2px;">All jobs across Kauli. Monitor progress and keep deliveries on schedule.</p>

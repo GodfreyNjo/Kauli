@@ -1,34 +1,6 @@
 {% extends "base.html" %}
 {% block title %}My orders{% endblock %}
 {% block content %}
-{% set has_active_order = orders | selectattr('status', 'in', ['queued', 'processing', 'awaiting_review', 'pending_payment', 'editor_returned']) | list | length > 0 %}
-{% if has_active_order %}
-<script>
-  // Same gentle live-update pattern as an individual order page - only
-  // runs at all while something here is actually in progress. Guards
-  // against more than just active typing: a reload here would also
-  // silently reset the order wizard above back to step 1, losing a
-  // picked file or completed steps even if focus isn't in a text field
-  // right that second - so this also defers while the wizard shows any
-  // real in-progress state (a file chosen, or already past step 1).
-  (function () {
-    var REFRESH_MS = 20000;
-    function wizardInProgress() {
-      var fileInput = document.getElementById("file-input");
-      if (fileInput && fileInput.files && fileInput.files.length > 0) return true;
-      var pane1 = document.querySelector('.wizard-pane[data-pane="1"]');
-      if (pane1 && pane1.hidden) return true; // moved past step 1
-      var el = document.activeElement;
-      return !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
-    }
-    function tick() {
-      if (wizardInProgress()) { setTimeout(tick, REFRESH_MS); return; }
-      location.reload();
-    }
-    setTimeout(tick, REFRESH_MS);
-  })();
-</script>
-{% endif %}
 <div class="card wizard-card">
   <h1>Submit a new order</h1>
   {% if error %}

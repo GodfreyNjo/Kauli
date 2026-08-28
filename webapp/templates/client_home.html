@@ -1,24 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-{% if stats['in_progress'] > 0 or stats['in_review'] > 0 %}
-<script>
-  // No wizard on this page to worry about interrupting - just the
-  // standard "don't fire while someone's actively typing" guard.
-  (function () {
-    var REFRESH_MS = 20000;
-    function isTyping() {
-      var el = document.activeElement;
-      return !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
-    }
-    function tick() {
-      if (isTyping()) { setTimeout(tick, REFRESH_MS); return; }
-      location.reload();
-    }
-    setTimeout(tick, REFRESH_MS);
-  })();
-</script>
-{% endif %}
 <h1 style="margin-bottom:2px;">{{ greeting }}, {{ user['display_name'] or user['email'].split('@')[0] }}</h1>
 <p class="muted" style="margin-top:0;">Here's what's happening with your orders.</p>
 

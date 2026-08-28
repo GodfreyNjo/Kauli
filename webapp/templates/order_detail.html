@@ -1,28 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Order {{ order['id'] }}{% endblock %}
 {% block content %}
-{% if order['status'] in ['queued', 'processing', 'awaiting_review'] %}
-<script>
-  // Real bug this replaces: a flat <meta http-equiv="refresh" content="4">
-  // reloaded this page every 4 seconds NO MATTER WHAT - including while a
-  // client had a reply half-typed in the message box below, silently
-  // wiping it. Same live-status idea, much less disruptive: a longer
-  // interval, and it defers (never fires) while focus is in a text field,
-  // rechecking instead of just reloading out from under someone typing.
-  (function () {
-    var REFRESH_MS = 20000;
-    function isTyping() {
-      var el = document.activeElement;
-      return !!el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT");
-    }
-    function tick() {
-      if (isTyping()) { setTimeout(tick, REFRESH_MS); return; }
-      location.reload();
-    }
-    setTimeout(tick, REFRESH_MS);
-  })();
-</script>
-{% endif %}
 
 <div class="card">
   <a href="/client" class="breadcrumb">&larr; back to my orders</a>
