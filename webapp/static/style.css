@@ -1136,6 +1136,33 @@ tbody tr:hover { background: var(--hover); }
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
 }
+/* Leading icon (email/password) + trailing show/hide toggle - the input
+   itself keeps its normal pill styling above, just with room carved out
+   on each side for whichever real control sits there. */
+.auth-input-icon-group { position: relative; display: block; }
+.auth-input-icon-group .auth-input-icon {
+  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+  width: 17px; height: 17px; color: var(--faint); pointer-events: none;
+}
+.auth-input-icon-group input { padding-left: 44px !important; width: 100%; }
+.auth-input-icon-group input.auth-password-input { padding-right: 42px !important; }
+.auth-password-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 30px; height: 30px; background: none; border: none; border-radius: 50%;
+  color: var(--faint); cursor: pointer; font-size: 0.95rem; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.auth-password-toggle:hover { color: var(--ink); background: var(--hover); }
+.auth-password-toggle.showing { color: var(--accent); }
+
+.auth-help-link {
+  position: absolute; top: 24px; right: 32px; font-size: 0.84rem; color: var(--muted); z-index: 2;
+}
+.auth-help-link span { color: var(--accent); font-weight: 600; text-decoration: none; }
+.auth-help-link span:hover { text-decoration: underline; }
+@media (max-width: 860px) { .auth-help-link { position: static; display: block; text-align: right; padding: 16px 20px 0; } }
+
+.auth-brand-logo { display: block; height: 34px; width: auto; margin: 0 auto; }
 .auth-card button[type="submit"] {
   border-radius: 999px; box-shadow: 0 4px 12px -4px var(--accent);
 }
@@ -1155,7 +1182,7 @@ body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover);
    matches how 3Play Media's own login page is actually laid out. Both
    panels use the page's own dark-theme tokens now (not hardcoded hex)
    since the whole page commits to dark here, not just one panel. */
-.auth-shell { min-height: 100vh; display: flex; }
+.auth-shell { min-height: 100vh; display: flex; position: relative; }
 .auth-form-panel {
   flex: 1 1 54%; display: flex; align-items: center; justify-content: center;
   padding: 40px 24px;
@@ -1190,8 +1217,24 @@ body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover);
   font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
   padding: 6px 14px; border-radius: 999px;
 }
+/* Real logo overlay on the real photo (see .auth-illustration-photo's own
+   comment on the image itself) - a light backdrop under it since the logo's
+   dark wordmark needs contrast against whatever's directly behind it in
+   the photo, which varies by crop. */
+.auth-illustration-logo {
+  position: absolute; top: 14px; left: 14px; height: 26px; width: auto;
+  padding: 6px 10px; background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-radius: 8px; backdrop-filter: blur(2px);
+}
 .auth-brand-copy h2 { font-size: 1.3rem; margin: 0 0 12px; }
 .auth-brand-copy p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; margin: 0 0 14px; }
+.auth-feature-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.auth-feature-list li { padding-left: 22px; position: relative; font-size: 0.84rem; }
+.auth-feature-list li::before {
+  content: "✓"; position: absolute; left: 0; top: 1px; color: var(--accent); font-weight: 700; font-size: 0.8rem;
+}
+.auth-feature-list li strong { display: block; color: var(--ink); font-weight: 650; }
+.auth-feature-list li span { color: var(--muted); }
 .auth-brand-link { font-size: 0.86rem; font-weight: 600; color: var(--accent); text-decoration: none; }
 .auth-brand-link:hover { text-decoration: underline; }
 @media (max-width: 860px) {

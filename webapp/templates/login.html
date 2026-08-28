@@ -5,11 +5,14 @@
 {% block title %}Log in{% endblock %}
 {% block content %}
 <div class="auth-shell">
+  <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="auth-help-link">Need help? <span>Contact support</span></a>
   <div class="auth-form-panel">
     <div class="auth-form-inner">
       <div class="auth-brand">
-        <div class="wordmark">KAULI</div>
-        <div class="sub-wordmark">Forge Media Services</div>
+        <picture>
+          <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+          <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="auth-brand-logo" width="301" height="81">
+        </picture>
       </div>
 
       <div class="auth-card">
@@ -20,11 +23,18 @@
           {% if mode == 'signin' and notice %}<p class="ok">{{ notice }}</p>{% endif %}
           <form method="post" action="/login">
             <input type="hidden" name="next" value="{{ next or '' }}">
-            <label>Email
-              <input type="email" name="email" required {% if mode != 'signup' %}autofocus{% endif %}>
+            <label>Email address
+              <span class="auth-input-icon-group">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <input type="email" name="email" placeholder="you@example.com" required {% if mode != 'signup' %}autofocus{% endif %}>
+              </span>
             </label>
             <label>Password
-              <input type="password" name="password" required minlength="6">
+              <span class="auth-input-icon-group">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                <input type="password" name="password" required minlength="6" class="auth-password-input">
+                <button type="button" class="auth-password-toggle" aria-label="Show password">&#128065;</button>
+              </span>
             </label>
             <p class="auth-forgot"><a href="/forgot-password">Forgot your password?</a></p>
             <button type="submit">Sign in</button>
@@ -40,11 +50,18 @@
           {% if mode == 'signup' and error %}<p class="error">{{ error }}</p>{% endif %}
           <form method="post" action="/signup" id="signup-form">
             <input type="hidden" name="next" value="{{ next or '' }}">
-            <label>Email
-              <input type="email" name="email" value="{{ email or '' }}" required {% if mode == 'signup' %}autofocus{% endif %}>
+            <label>Email address
+              <span class="auth-input-icon-group">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <input type="email" name="email" value="{{ email or '' }}" placeholder="you@example.com" required {% if mode == 'signup' %}autofocus{% endif %}>
+              </span>
             </label>
             <label>Password
-              <input type="password" name="password" id="signup-password" required minlength="{{ password_min_length }}">
+              <span class="auth-input-icon-group">
+                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+                <input type="password" name="password" id="signup-password" required minlength="{{ password_min_length }}" class="auth-password-input">
+                <button type="button" class="auth-password-toggle" aria-label="Show password">&#128065;</button>
+              </span>
             </label>
             <ul class="password-checklist" id="signup-password-checklist">
               <li data-rule="length">At least {{ password_min_length }} characters</li>
@@ -71,6 +88,10 @@
   <div class="auth-brand-panel" aria-hidden="true">
     <div class="auth-illustration-card auth-illustration-photo" role="img"
          aria-label="A Kauli editor at work in a studio, reviewing an audio waveform on screen">
+      <picture>
+        <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+        <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="auth-illustration-logo">
+      </picture>
       <span class="auth-illustration-badge">AI Drafted, Human Verified</span>
     </div>
     <div class="auth-brand-copy">
@@ -78,11 +99,31 @@
       <p>Swahili, Kikuyu and English - transcription, translation and dubbing. Every AI-drafted line is
          checked word-by-word by a human editor before it ships, and pricing stays per-minute with no
          bundled credits.</p>
+      <ul class="auth-feature-list">
+        <li><strong>AI-drafted, human-verified</strong><span>Fast AI drafts perfected by real linguists and editors.</span></li>
+        <li><strong>Local languages, industry-grade quality</strong><span>Swahili, Kikuyu and English, done properly.</span></li>
+        <li><strong>Transparent, per-minute pricing</strong><span>No bundled credits, no surprise fees.</span></li>
+      </ul>
       <a href="/#how" class="auth-brand-link">See how it works →</a>
     </div>
   </div>
 </div>
 <script>
+  // Show/hide toggle on every password field on this page (sign-in and
+  // sign-up each have their own) - a real, tested pattern, not decorative:
+  // toggling type between "password"/"text" is the standard way to do
+  // this without a second hidden input or losing the browser's own
+  // autofill/paste behavior.
+  document.querySelectorAll('.auth-password-toggle').forEach(function (btn) {
+    var input = btn.previousElementSibling;
+    btn.addEventListener('click', function () {
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+      btn.classList.toggle('showing', !showing);
+    });
+  });
+
   document.querySelectorAll('[data-show]').forEach(function (a) {
     a.addEventListener('click', function () {
       document.getElementById('panel-signin').hidden = a.dataset.show !== 'panel-signin';
