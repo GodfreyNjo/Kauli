@@ -3331,9 +3331,18 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
     # picker and the workflow stepper - one source of truth for "what did
     # this order actually include."
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    # Same real entitlement/source checks _maybe_auto_render_video_
+    # deliverables uses to decide whether to auto-generate these - lets
+    # the page tell "still generating, check back" (entitled, has a real
+    # video, just not rendered yet) apart from "not included" (never
+    # true), instead of one generic "ask us" for both.
+    has_video_deliverables = (billing.PLANS.get(order["tier"], {}).get("video_deliverables")
+                               or db.order_has_addon(order, "video_deliverables"))
+    has_video_source = is_video_file(order["audio_path"]) or bool(order["source_youtube_id"])
     return templates.TemplateResponse(request, "order_detail.html", {
         "user": user, "order": order, "job": job, "role": "client", "messages": messages,
         "has_translation": order_level["mt"], "has_dub": order_level["tts"],
+        "has_video_deliverables": has_video_deliverables, "has_video_source": has_video_source,
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "receipt": db.get_receipt_for_order(order_id),
@@ -4755,13 +4764,88 @@ def download_deliverable(request: Request, order_id: str, kind: str):
     return FileResponse(str(path), filename=filename)
 
 
+def _render_video_deliverable_for_order(order, kind: str) -> None:
+    """The actual render, shared by the manual staff button below and the
+    automatic post-approval trigger (see _maybe_auto_render_video_
+    deliverables). Raises on any real problem - callers decide what that
+    means for them (an HTTP error for a human waiting on the button; a
+    logged warning for the background auto-trigger, which must never take
+    down the thread it runs on)."""
+    outdir = Path(order["outdir"])
+    if is_video_file(order["audio_path"]):
+        video_path = Path(order["audio_path"])
+    elif order["source_youtube_id"]:
+        # The one place that ever fetches the actual YouTube video - see
+        # fetch_youtube_video's own docstring - so this only happens for
+        # an order that actually needs it (real video-deliverable
+        # entitlement), not on every YouTube-sourced order.
+        video_path = fetch_youtube_video(order["source_youtube_id"], outdir / "video_cache")
+    else:
+        raise ValueError("no video source - audio-only upload")
+
+    if kind == "burned":
+        srt_path = outdir / f"subs_{order['target_lang']}.srt"
+        if not srt_path.exists():
+            raise FileNotFoundError("subtitles aren't ready yet")
+        render_burned_captions(video_path, srt_path, outdir / f"burned_captions_{order['target_lang']}.mp4")
+    elif kind == "dubbed":
+        dub_path = outdir / f"dub_{order['target_lang']}.wav"
+        if not dub_path.exists():
+            raise FileNotFoundError("dubbed audio isn't ready yet")
+        render_dubbed_video(video_path, dub_path, outdir / f"dubbed_video_{order['target_lang']}.mp4")
+    else:
+        raise ValueError(f"unknown render kind: {kind}")
+
+
+def _maybe_auto_render_video_deliverables(order) -> None:
+    """Fires the moment an order's approved (see staff_approve) for any
+    order that actually bought video deliverables and has a real video
+    source - closes a real gap where approval could go through without
+    staff remembering the separate manual "Generate burned-in captions"/
+    "Generate dubbed video" buttons on staff_review, leaving a client
+    stuck seeing "ask us" for something they already paid for.
+
+    Runs in a background thread, not inline in the request: burned-in
+    captions specifically re-encode the whole video (ffmpeg's subtitles
+    filter can't use -c:v copy), which is real minutes for a longer file -
+    approve shouldn't hang waiting on that, or risk a proxy timeout.
+    order_detail.html shows an honest "still generating" state for
+    burned/dubbed specifically until the file actually lands; the rest of
+    the delivery (transcript/subtitles/dubbed audio) is available right
+    away regardless."""
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    if not order_level["tts"]:
+        return  # not a dub order - nothing to burn captions onto or dub in the first place
+    has_video_deliverables = (billing.PLANS.get(order["tier"], {}).get("video_deliverables")
+                               or db.order_has_addon(order, "video_deliverables"))
+    if not has_video_deliverables:
+        return
+    if not (is_video_file(order["audio_path"]) or order["source_youtube_id"]):
+        return  # audio-only upload - nothing to burn captions onto or dub
+
+    outdir = Path(order["outdir"])
+    pending = [
+        kind for kind in ("burned", "dubbed")
+        if not (outdir / f"{'burned_captions' if kind == 'burned' else 'dubbed_video'}_{order['target_lang']}.mp4").exists()
+    ]
+    if not pending:
+        return  # staff already generated these manually during review
+
+    def _run():
+        for kind in pending:
+            try:
+                _render_video_deliverable_for_order(order, kind)
+            except Exception as exc:  # noqa: BLE001 - one kind failing must never take the thread (or the other kind) down
+                api_log.warning(f"auto video-deliverable render failed for order {order['id']} ({kind}): {exc}")
+
+    threading.Thread(target=_run, daemon=True, name=f"video-render-{order['id']}").start()
+
+
 @app.post("/staff/orders/{order_id}/render/{kind}")
 def render_video_deliverable(request: Request, order_id: str, kind: str):
-    """Video-based delivery formats: burned-in captions or a dubbed video.
-    Only staff-triggered (not automatic) since it's a real ffmpeg render -
-    seconds for a short clip, real time for a long one - and, for a
-    YouTube-sourced order, the one place that ever fetches the actual
-    video (see fetch_youtube_video's docstring)."""
+    """The manual staff button on staff_review - same underlying render
+    as the automatic trigger above, just synchronous and HTTP-error-
+    reporting since a human's waiting on it."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -4771,29 +4855,12 @@ def render_video_deliverable(request: Request, order_id: str, kind: str):
     if not order:
         return HTMLResponse("Order not found.", status_code=404)
 
-    outdir = Path(order["outdir"])
     try:
-        if is_video_file(order["audio_path"]):
-            video_path = Path(order["audio_path"])
-        elif order["source_youtube_id"]:
-            video_path = fetch_youtube_video(order["source_youtube_id"], outdir / "video_cache")
-        else:
-            return HTMLResponse(
-                "This order has no video source (audio-only upload) - "
-                "nothing to burn captions onto or dub.", status_code=400)
-
-        if kind == "burned":
-            srt_path = outdir / f"subs_{order['target_lang']}.srt"
-            if not srt_path.exists():
-                return HTMLResponse("Subtitles aren't ready yet.", status_code=400)
-            render_burned_captions(video_path, srt_path, outdir / f"burned_captions_{order['target_lang']}.mp4")
-        else:
-            dub_path = outdir / f"dub_{order['target_lang']}.wav"
-            if not dub_path.exists():
-                return HTMLResponse("Dubbed audio isn't ready yet.", status_code=400)
-            render_dubbed_video(video_path, dub_path, outdir / f"dubbed_video_{order['target_lang']}.mp4")
+        _render_video_deliverable_for_order(order, kind)
     except subprocess.CalledProcessError as exc:
         return HTMLResponse(f"ffmpeg render failed: {exc}", status_code=500)
+    except (ValueError, FileNotFoundError) as exc:
+        return HTMLResponse(str(exc), status_code=400)
     except Exception as exc:
         return HTMLResponse(f"Render failed: {exc}", status_code=500)
 
@@ -5757,6 +5824,7 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
     if order:
         worker.notify_client_order_ready(order, base_url=str(request.base_url))
         _fire_client_webhook(request, order, "order.ready")
+        _maybe_auto_render_video_deliverables(order)
     if next == "next_job":
         nxt = db.next_order_needing_review(order_id)
         if nxt:

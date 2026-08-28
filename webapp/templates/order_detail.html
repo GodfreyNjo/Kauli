@@ -150,7 +150,14 @@
       {% endif %}
       {% endif %}
     </div>
-    {% if has_dub and not burned_ready and not dubbed_ready %}
+    {% if has_dub and has_video_deliverables and has_video_source and not burned_ready and not dubbed_ready %}
+    <p class="muted" style="margin-top:8px;">Your captioned/dubbed video file is being generated - this
+       happens automatically once an order's approved, no need to ask. Longer videos take a few minutes;
+       refresh this page shortly.</p>
+    {% elif has_dub and has_video_deliverables and not has_video_source %}
+    <p class="muted" style="margin-top:8px;">This order was submitted as audio only, so there's no video
+       to burn captions onto or dub - the dubbed audio above is the full deliverable for this one.</p>
+    {% elif has_dub and not has_video_deliverables %}
     <p class="muted" style="margin-top:8px;">Need a captioned or dubbed video file instead of just audio?
        Ask us in the message thread below - available on Premium and up, or as a paid add-on on your
        next order.</p>
