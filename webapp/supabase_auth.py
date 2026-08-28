@@ -10,10 +10,33 @@ from __future__ import annotations
 
 import os
 import re
+import time
 
+import httpx
 from supabase import create_client, Client
+from supabase.lib.client_options import SyncClientOptions
 
 _client: Client | None = None
+
+# The installed supabase-py's own default timeouts only cover the
+# Postgrest/Storage/Functions sub-clients (ClientOptions.postgrest_client_timeout
+# etc.) - the Auth/GoTrue sub-client has no timeout field of its own. Passing
+# a custom httpx.Client via ClientOptions.httpx_client is the real, supported
+# way to give it one (confirmed by reading the installed package's own source
+# - Client._init_supabase_auth_client forwards client_options.httpx_client
+# straight into the GoTrue client as its http_client).
+#
+# Live testing against the real Supabase project traced the actual failure:
+# real requests normally come back in well under a second (a deliberately
+# throttled invalid-password response took ~3s), but the client's pooled
+# connection occasionally goes stale and one request hangs until it's read
+# timeout - then every request after that, on a fresh connection, is fast
+# again. So the fix is two parts: a timeout long enough to never cut off a
+# genuinely slow-but-real response, and a single automatic retry (see
+# _with_timeout_retry below) so a stale connection doesn't force the user to
+# manually resubmit the form, which is what "succeeds after several
+# attempts" was actually them doing by hand.
+_AUTH_TIMEOUT = httpx.Timeout(15.0, connect=8.0)
 
 # Comma-separated allowlist of emails that get the 'staff' role on first
 # login. Everyone else defaults to 'client'. Set this in .env to your own
@@ -83,8 +106,44 @@ def get_client() -> Client:
                 "SUPABASE_URL / SUPABASE_ANON_KEY not set in .env - "
                 "real auth can't work without them."
             )
-        _client = create_client(url, key)
+        options = SyncClientOptions(httpx_client=httpx.Client(timeout=_AUTH_TIMEOUT))
+        _client = create_client(url, key, options=options)
     return _client
+
+
+def _is_timeout(exc: Exception) -> bool:
+    """True for a real network timeout (worth a silent retry and a friendly
+    message), False for anything else (e.g. "Invalid login credentials",
+    which is meaningful to the user and should keep surfacing as-is)."""
+    if isinstance(exc, httpx.TimeoutException):
+        return True
+    return "timed out" in str(exc).lower()
+
+
+_TIMEOUT_MESSAGE = (
+    "We couldn't reach the login service in time. This is usually a brief "
+    "network blip - please try again."
+)
+
+
+def _with_timeout_retry(call):
+    """Runs `call` once, and once more if the first attempt was a genuine
+    timeout - matching what people were already doing by hand (the user's
+    own report: "log in succeeds after several attempts"). A second, real
+    timeout is reported with a friendly message instead of the raw
+    exception text; any other error is returned untouched."""
+    try:
+        return call()
+    except Exception as exc:  # noqa: BLE001
+        if not _is_timeout(exc):
+            raise
+        time.sleep(0.5)
+        try:
+            return call()
+        except Exception as exc2:  # noqa: BLE001
+            if _is_timeout(exc2):
+                raise TimeoutError(_TIMEOUT_MESSAGE) from exc2
+            raise
 
 
 def role_for_email(email: str) -> str:
@@ -97,19 +156,23 @@ def sign_up(email: str, password: str):
     is on and the account needs an email click before it can log in - that
     is normal Supabase behaviour, not a bug."""
     try:
-        res = get_client().auth.sign_up({"email": email, "password": password})
+        res = _with_timeout_retry(
+            lambda: get_client().auth.sign_up({"email": email, "password": password})
+        )
         return res.session, None
-    except Exception as exc:  # noqa: BLE001 - surface Supabase's own message
-        return None, str(exc)
+    except Exception as exc:  # noqa: BLE001 - surfaces Supabase's own message,
+        return None, str(exc)  # or the friendly one _with_timeout_retry raised
 
 
 def sign_in(email: str, password: str):
     """Returns (session_or_None, error_message_or_None)."""
     try:
-        res = get_client().auth.sign_in_with_password({"email": email, "password": password})
+        res = _with_timeout_retry(
+            lambda: get_client().auth.sign_in_with_password({"email": email, "password": password})
+        )
         return res.session, None
-    except Exception as exc:  # noqa: BLE001
-        return None, str(exc)
+    except Exception as exc:  # noqa: BLE001 - surfaces Supabase's own message,
+        return None, str(exc)  # or the friendly one _with_timeout_retry raised
 
 
 def request_password_reset(email: str, redirect_to: str) -> None:
