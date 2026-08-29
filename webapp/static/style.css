@@ -1120,19 +1120,21 @@ tbody tr:hover { background: var(--hover); }
    utility pages (forgot/reset password) keep the separate, simpler
    centered .auth-card above, on the app's normal theme - not worth this
    much branding real estate for a one-field form.
-   Deliberately its own literal palette (--auth-*), not the shared
-   --accent/--ink tokens above: this page's blue has nothing to do with
-   the rust accent used through the rest of the app or the olive used on
-   the marketing site, so reusing --accent here would mean this page's
-   look silently changes if either of those ever does. */
+   Its own literal --auth-* palette for bg/border/ink/muted (not the
+   shared --accent/--ink tokens above, since the rust accent used through
+   the rest of the app has nothing to do with this page's light, brand-
+   forward look). The one accent color IS the shared brand olive though -
+   var(--accent3), the same one the marketing site's cta-olive buttons use
+   - referenced live rather than copied as a literal hex, so if the brand
+   olive ever changes this page follows it instead of drifting stale. */
 .auth-shell {
   --auth-bg: #f6f6f8;
   --auth-border: #e3e3e9;
   --auth-ink: #16213e;
   --auth-muted: #667085;
   --auth-placeholder: #9aa1b1;
-  --auth-blue: #2f5fd8;
-  --auth-blue-hover: #2650b8;
+  --auth-accent: var(--accent3);
+  --auth-accent-hover: var(--accent3-hover);
   min-height: 100vh; display: flex; position: relative; background: var(--auth-bg);
 }
 .auth-form-panel {
@@ -1151,10 +1153,10 @@ tbody tr:hover { background: var(--hover); }
 .auth-tab {
   background: none; border: none; cursor: pointer; font: inherit;
   display: flex; align-items: center; gap: 8px;
-  font-size: 1.02rem; font-weight: 600; color: var(--auth-blue);
+  font-size: 1.02rem; font-weight: 600; color: var(--auth-accent);
   padding: 0 0 16px; margin-bottom: -1px; border-bottom: 3px solid transparent;
 }
-.auth-tab.active { color: var(--auth-ink); border-bottom-color: var(--auth-blue); }
+.auth-tab.active { color: var(--auth-ink); border-bottom-color: var(--auth-accent); }
 .auth-tab-icon { width: 17px; height: 17px; flex-shrink: 0; }
 
 .auth-shell h1 { font-size: 1.5rem; margin: 0 0 6px; color: var(--auth-ink); }
@@ -1167,8 +1169,8 @@ tbody tr:hover { background: var(--hover); }
 }
 .auth-shell input::placeholder { color: var(--auth-placeholder); }
 .auth-shell input:focus {
-  outline: none; border-color: var(--auth-blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--auth-blue) 15%, transparent);
+  outline: none; border-color: var(--auth-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--auth-accent) 15%, transparent);
 }
 .auth-input-icon-group { position: relative; display: block; }
 .auth-input-icon-group input.auth-password-input { padding-right: 46px; }
@@ -1180,18 +1182,18 @@ tbody tr:hover { background: var(--hover); }
 }
 .auth-password-toggle svg { width: 19px; height: 19px; }
 .auth-password-toggle:hover { color: var(--auth-ink); background: #f0f1f4; }
-.auth-password-toggle.showing { color: var(--auth-blue); }
+.auth-password-toggle.showing { color: var(--auth-accent); }
 .auth-forgot { text-align: left; margin: -8px 0 22px; }
-.auth-forgot a { font-size: 0.88rem; color: var(--auth-blue); text-decoration: none; }
+.auth-forgot a { font-size: 0.88rem; color: var(--auth-accent); text-decoration: none; }
 .auth-forgot a:hover { text-decoration: underline; }
 .auth-shell button[type="submit"] {
   width: 100%; text-align: center; padding: 14px; margin-top: 4px;
-  border: none; border-radius: 10px; background: var(--auth-blue); color: #fff;
+  border: none; border-radius: 10px; background: var(--auth-accent); color: #fff;
   font-size: 1rem; font-weight: 700; box-shadow: none;
 }
-.auth-shell button[type="submit"]:hover { background: var(--auth-blue-hover); }
+.auth-shell button[type="submit"]:hover { background: var(--auth-accent-hover); }
 .auth-consent { font-size: 0.82rem; color: var(--auth-muted); text-align: center; margin: 20px 0 0; line-height: 1.5; }
-.auth-consent a { color: var(--auth-blue); text-decoration: underline; }
+.auth-consent a { color: var(--auth-accent); text-decoration: underline; }
 .auth-checkbox-row {
   display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 22px;
   font-size: 0.85rem; color: var(--auth-muted); line-height: 1.4; cursor: pointer;
@@ -1203,14 +1205,22 @@ tbody tr:hover { background: var(--hover); }
    this page's blue on check, no custom-markup checkbox needed. */
 .auth-checkbox-row input[type="checkbox"] {
   width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0;
-  accent-color: var(--auth-blue); cursor: pointer;
+  accent-color: var(--auth-accent); cursor: pointer;
 }
 .auth-checkbox-row span { min-width: 0; }
 
+/* align-items: flex-start + the same 64px top padding as .auth-form-panel
+   (not center) - both columns' content needs to start at the same y, not
+   just happen to look aligned at one particular viewport height. Centering
+   this card vertically while the form stays top-aligned would only ever
+   coincidentally line up the logo and the photo on a viewport exactly tall
+   enough to make the (shorter) card's centered position land near the
+   (taller) form's fixed top offset - true on some window sizes, visibly
+   off on others. */
 .auth-brand-panel {
   flex: 0 0 46%; max-width: 620px; min-width: 340px;
-  display: flex; align-items: center; justify-content: center;
-  padding: 48px; background: var(--auth-bg); border-left: 1px solid var(--auth-border);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 64px 48px 48px; background: var(--auth-bg); border-left: 1px solid var(--auth-border);
 }
 .auth-showcase-card {
   width: 100%; max-width: 460px; background: #fff; border-radius: 20px; overflow: hidden;
@@ -1244,7 +1254,7 @@ tbody tr:hover { background: var(--hover); }
 .auth-showcase-body { padding: 28px 30px 32px; }
 .auth-showcase-body h2 { font-size: 1.3rem; font-weight: 700; color: var(--auth-ink); margin: 0 0 12px; line-height: 1.3; }
 .auth-showcase-body p { font-size: 0.92rem; color: var(--auth-muted); line-height: 1.6; margin: 0 0 16px; }
-.auth-brand-link { font-size: 0.9rem; font-weight: 700; color: var(--auth-blue); text-decoration: none; }
+.auth-brand-link { font-size: 0.9rem; font-weight: 700; color: var(--auth-accent); text-decoration: none; }
 .auth-brand-link:hover { text-decoration: underline; }
 @media (max-width: 900px) {
   .auth-brand-panel { display: none; }
