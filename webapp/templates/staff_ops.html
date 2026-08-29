@@ -153,6 +153,36 @@
   </div>
 </div>
 
+<h2>Client funnel &amp; friction <span class="muted" style="font-weight:400; font-size:0.8rem;">(signups from the last {{ days }} days, tracked through to today)</span></h2>
+<p class="muted" style="margin-top:0;">Where real signups actually get stuck, not just how many orders exist - each
+   row is clients from this window who reached that stage. Wizard-step events only started logging when this
+   shipped, so older cohorts will show 0 there even if they went on to order - that's a real gap in the history,
+   not a friction point.</p>
+<div class="card" style="padding:0; overflow-x:auto; margin-bottom:20px;">
+  <table>
+    <thead><tr><th>Stage</th><th>Clients</th><th>% of signups</th></tr></thead>
+    <tbody>
+      {% set stages = [
+        ('Signed up', funnel['signups']),
+        ('Verified trial ($1 charge)', funnel['trial_verified']),
+        ('Opened the order wizard', funnel['wizard_step1']),
+        ('Reached step 2 (languages)', funnel['wizard_step2']),
+        ('Reached step 3 (review cost)', funnel['wizard_step3']),
+        ('Submitted the wizard', funnel['wizard_submitted']),
+        ('Order actually created', funnel['orders_created']),
+        ('Paid for an order', funnel['orders_paid']),
+      ] %}
+      {% for label, n in stages %}
+      <tr{% if funnel['signups'] and n == 0 %} class="muted"{% endif %}>
+        <td>{{ label }}</td>
+        <td>{{ n }}</td>
+        <td>{{ "%.0f"|format((n / funnel['signups'] * 100) if funnel['signups'] else 0) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
 <h2>Queue health <span class="muted" style="font-weight:400; font-size:0.8rem;">(live snapshot)</span></h2>
 <div class="status-breakdown" style="margin-bottom:20px;">
   {% for s in ['pending_payment', 'queued', 'processing', 'awaiting_review', 'editor_returned', 'ready_for_delivery', 'returned_to_client', 'failed', 'dead_letter'] %}

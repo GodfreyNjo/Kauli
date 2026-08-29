@@ -12,7 +12,7 @@
 
 <div class="card" style="padding:0;">
   <table>
-    <thead><tr><th>Client</th><th>Plan</th><th>Orders</th><th>Total spent</th><th>Joined</th><th>Status</th></tr></thead>
+    <thead><tr><th>Client</th><th>Plan</th><th>Orders</th><th>Total spent</th><th>Joined</th><th>Last seen</th><th>Status</th></tr></thead>
     <tbody>
       {% for c in clients %}
       <tr>
@@ -28,13 +28,14 @@
         <td>{{ c['order_count'] }}</td>
         <td>${{ "%.2f"|format(c['total_spent_usd']) }}</td>
         <td class="muted">{{ c['created_at']|int|timestamp_to_str if c['created_at'] else '-' }}</td>
+        <td class="muted">{{ c['last_seen_at']|time_ago }}</td>
         <td>
           {% if c['account_status'] == 'closed' %}<span class="status status-closed">Closed</span>
           {% else %}<span class="status status-accepted">Active</span>{% endif %}
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="6" class="muted" style="padding:20px 24px;">
+      <tr><td colspan="7" class="muted" style="padding:20px 24px;">
         {% if q %}No clients match "{{ q }}".{% else %}No client accounts yet.{% endif %}
       </td></tr>
       {% endfor %}

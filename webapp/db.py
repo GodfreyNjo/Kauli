@@ -482,6 +482,23 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
     error TEXT,
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
+
+-- Real, in-house friction signal: which step of the order wizard a client
+-- actually reached, and whether they went on to submit - see
+-- static/client_wizard.js's showStep()/finalizeOrder() for what fires
+-- these. This is the one piece of "where do people get stuck" nothing
+-- else in the app already covers (staff_ops's stale_orders/turnaround
+-- stats cover orders that exist; this covers the wizard visits that
+-- never became one). Never sent anywhere outside this database - see
+-- app.py's /client/wizard-event route.
+CREATE TABLE IF NOT EXISTS wizard_step_events (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    step TEXT NOT NULL,   -- '1' | '2' | '3' | 'submitted'
+    created_at REAL NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_wizard_step_events_client ON wizard_step_events(client_id, created_at);
 """
 
 def get_conn() -> sqlite3.Connection:
@@ -605,6 +622,15 @@ def init_db() -> None:
         conn.execute("ALTER TABLE users ADD COLUMN onboarding_tour_seen_at REAL")
         conn.execute(
             "UPDATE users SET onboarding_tour_seen_at = ? WHERE onboarding_tour_seen_at IS NULL", (time.time(),))
+    if "last_seen_at" not in existing_user_cols:
+        # Real "is this account still active" signal for staff - touched
+        # (throttled, see app.py's current_user) on any authenticated
+        # request, client or staff. NULL on purpose for every existing
+        # account rather than backfilled to "now" - unlike the grandfathers
+        # above, a false "last seen: just now" for someone who hasn't
+        # actually logged in since this shipped would be misleading, not
+        # just harmless; "never recorded yet" is the honest starting state.
+        conn.execute("ALTER TABLE users ADD COLUMN last_seen_at REAL")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1206,6 +1232,32 @@ def set_trial_verified(user_id: str) -> None:
     conn.execute(
         "UPDATE users SET trial_verified_at = ? WHERE id = ? AND trial_verified_at IS NULL",
         (time.time(), user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def touch_last_seen(user_id: str, ts: float | None = None) -> None:
+    """Cheap, real last-activity stamp - see the last_seen_at migration's
+    own comment. Called from app.py's current_user(), throttled there to
+    roughly once per 5 minutes per session so this isn't a write on every
+    single page load."""
+    conn = get_conn()
+    conn.execute("UPDATE users SET last_seen_at = ? WHERE id = ?", (ts if ts is not None else time.time(), user_id))
+    conn.commit()
+    conn.close()
+
+
+def log_wizard_step(client_id: str, step: str) -> None:
+    """One real row per wizard-step reach - see the wizard_step_events
+    table comment for why this exists. step is whatever
+    static/client_wizard.js actually sent ('1'/'2'/'3'/'submitted') -
+    not validated against a fixed list here, so a step added to the
+    wizard later doesn't also need a matching db.py change."""
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO wizard_step_events (id, client_id, step, created_at) VALUES (?, ?, ?, ?)",
+        (str(uuid.uuid4()), client_id, step, time.time()),
     )
     conn.commit()
     conn.close()
@@ -3544,6 +3596,70 @@ def orders_created_since(days: int) -> int:
     n = conn.execute("SELECT COUNT(*) FROM orders WHERE created_at >= ?", (cutoff,)).fetchone()[0]
     conn.close()
     return n
+
+
+def client_funnel_stats(days: int = 30):
+    """Real, in-house conversion funnel for /staff/ops - built entirely
+    from data this app already has (users, orders, payments) plus the new
+    wizard_step_events log (see static/client_wizard.js). Cohort-based:
+    every stage counts clients who SIGNED UP within the window and
+    reached that stage at any point since (not just within the window) -
+    the honest way to answer "did this batch of signups actually
+    convert", not just a raw activity count. Team members are excluded,
+    same scope rule as list_clients_for_staff - they never see the
+    wizard or place their own orders, so counting them would only pad
+    the "never started" end with people who were never really a lead."""
+    cutoff = time.time() - days * 86400
+    conn = get_conn()
+    team_member_filter = """
+        users.id NOT IN (
+            SELECT member_user_id FROM team_members
+            WHERE status = 'accepted' AND member_user_id IS NOT NULL
+        )
+    """
+    signups = conn.execute(
+        f"SELECT COUNT(*) FROM users WHERE role = 'client' AND created_at >= ? AND {team_member_filter}",
+        (cutoff,),
+    ).fetchone()[0]
+    trial_verified = conn.execute(
+        f"""SELECT COUNT(*) FROM users
+            WHERE role = 'client' AND created_at >= ? AND trial_verified_at IS NOT NULL
+              AND {team_member_filter}""",
+        (cutoff,),
+    ).fetchone()[0]
+    wizard_reached = {}
+    for step in ("1", "2", "3", "submitted"):
+        wizard_reached[step] = conn.execute(
+            f"""SELECT COUNT(DISTINCT users.id) FROM users
+                JOIN wizard_step_events ON wizard_step_events.client_id = users.id
+                WHERE users.role = 'client' AND users.created_at >= ? AND wizard_step_events.step = ?
+                  AND {team_member_filter}""",
+            (cutoff, step),
+        ).fetchone()[0]
+    orders_created = conn.execute(
+        f"""SELECT COUNT(DISTINCT users.id) FROM users
+            JOIN orders ON orders.client_id = users.id
+            WHERE users.role = 'client' AND users.created_at >= ? AND {team_member_filter}""",
+        (cutoff,),
+    ).fetchone()[0]
+    orders_paid = conn.execute(
+        f"""SELECT COUNT(DISTINCT users.id) FROM users
+            JOIN payments ON payments.user_id = users.id
+            WHERE users.role = 'client' AND users.created_at >= ? AND payments.status = 'completed'
+              AND {team_member_filter}""",
+        (cutoff,),
+    ).fetchone()[0]
+    conn.close()
+    return {
+        "signups": signups,
+        "trial_verified": trial_verified,
+        "wizard_step1": wizard_reached["1"],
+        "wizard_step2": wizard_reached["2"],
+        "wizard_step3": wizard_reached["3"],
+        "wizard_submitted": wizard_reached["submitted"],
+        "orders_created": orders_created,
+        "orders_paid": orders_paid,
+    }
 
 
 def revenue_summary(days: int = 30):

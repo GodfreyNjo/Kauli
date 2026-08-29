@@ -80,8 +80,31 @@
     });
   }
 
+  // ------------------------------------------------------ friction log ----
+  // Real, in-house signal of where clients actually get stuck - see
+  // db.log_wizard_step / db.client_funnel_stats and /staff/ops. Never
+  // sent anywhere outside this app's own database. sendBeacon (fire-and-
+  // forget, survives the page unloading) when available, a keepalive
+  // fetch otherwise - either way this must never be able to slow down or
+  // break the wizard itself, hence the try/catch and the empty .catch.
+  function logWizardEvent(step) {
+    try {
+      var body = "step=" + encodeURIComponent(step);
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/client/wizard-event", new Blob([body], { type: "application/x-www-form-urlencoded" }));
+      } else if (window.fetch) {
+        fetch("/client/wizard-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: body, keepalive: true,
+        }).catch(function () {});
+      }
+    } catch (e) { /* friction logging must never break the actual wizard */ }
+  }
+
   function showStep(n) {
     currentStep = n;
+    logWizardEvent(String(n));
     $all(".wizard-pane").forEach((p) => { p.hidden = Number(p.dataset.pane) !== n; });
     $all(".wizard-step").forEach((s) => {
       const stepNum = Number(s.dataset.step);
@@ -403,7 +426,7 @@
         // so the saved upload_key is spent and safe to forget. An error
         // (no redirect) leaves it in place so "Continue with this file"
         // is still there for a genuine retry.
-        if (landedUrl !== "/client") clearResumableUpload();
+        if (landedUrl !== "/client") { clearResumableUpload(); logWizardEvent("submitted"); }
         history.replaceState(null, "", landedUrl);
         document.open();
         document.write(xhr.responseText);

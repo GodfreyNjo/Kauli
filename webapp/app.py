@@ -380,6 +380,25 @@ templates.env.filters["timestamp_to_str"] = lambda ts: datetime.fromtimestamp(ts
 # 15:48" is fine for an activity feed, not for something someone might file
 # for their own records.
 templates.env.filters["timestamp_to_date"] = lambda ts: datetime.fromtimestamp(ts).strftime("%B %d, %Y")
+
+
+def _time_ago(ts: float | None) -> str:
+    """"Never" for a real NULL (see users.last_seen_at's migration comment
+    on why that's not backfilled) - never fabricates a "just now" for an
+    account this app genuinely has no record of. Coarse on purpose (days,
+    not seconds) - staff scanning a client list need "is this account
+    still coming back", not a live countdown."""
+    if not ts:
+        return "never"
+    s = max(0, time.time() - ts)
+    if s < 3600:
+        return f"{max(1, int(s // 60))}m ago"
+    if s < 86400:
+        return f"{int(s // 3600)}h ago"
+    return f"{int(s // 86400)}d ago"
+
+
+templates.env.filters["time_ago"] = _time_ago
 # Single source of truth for the signup-form hint text - defined once
 # alongside the actual policy in supabase_auth.py, not retyped per route.
 templates.env.globals["password_policy_hint"] = supabase_auth.PASSWORD_POLICY_HINT
@@ -501,6 +520,17 @@ def current_user(request: Request):
         request.session.clear()
         return None
     request.session["last_seen"] = time.time()  # touch -> resets the idle clock
+    # Separate from the session-idle touch above: a real, durable
+    # last_seen_at on the user row itself, so staff can see "is this
+    # account still active" days or weeks later, not just within one
+    # session. Throttled to roughly once per 5 minutes per session (not
+    # every single request) - a SQLite write on every page load would be
+    # real, needless load for a signal that doesn't need second-level
+    # precision. See db.touch_last_seen and the staff friction view.
+    _last_touch = request.session.get("last_seen_at_touch", 0)
+    if time.time() - _last_touch > 300:
+        db.touch_last_seen(user["id"])
+        request.session["last_seen_at_touch"] = time.time()
     # Team accounts: an accepted team member sees/acts on the OWNER's
     # orders and billing, never their own (they have no orders of their
     # own at all, most likely) - client_scope_id is the id every
@@ -2910,6 +2940,27 @@ class _LocalFileAdapter:
     def __init__(self, path: Path, filename: str):
         self.file = open(path, "rb")
         self.filename = filename
+
+
+@app.post("/client/wizard-event")
+def client_wizard_event(request: Request, step: str = Form(...)):
+    """Real friction signal, nothing else in the app already covers: which
+    step of the order wizard a client actually reached before leaving,
+    logged from static/client_wizard.js's showStep()/finalizeOrder().
+    Fire-and-forget by design (sendBeacon/no-op on failure on the JS
+    side) - a dropped or delayed log entry should never block or slow
+    down the wizard itself. Staff-only aggregate view: db.client_funnel_
+    stats, surfaced on /staff/ops. Silently accepts an unknown step
+    string rather than 400ing - a future wizard step added on the
+    frontend shouldn't need a matching backend change just to not error."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"ok": False}, status_code=401)
+    step = (step or "").strip()[:20]
+    if not step:
+        return JSONResponse({"ok": False}, status_code=400)
+    db.log_wizard_step(user["client_scope_id"], step)
+    return JSONResponse({"ok": True})
 
 
 @app.post("/client/orders/presign-upload")
@@ -5686,6 +5737,7 @@ def staff_ops(request: Request, days: int = 30):
         "ops_triage": db.list_orders_needing_ops_triage(),
         "ai_spend_today": ai_spend_today,
         "ai_spend_alert_threshold": ai_spend_alert_threshold,
+        "funnel": db.client_funnel_stats(days=days),
     })
 
 

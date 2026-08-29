@@ -40,6 +40,7 @@
           <tr><td class="muted">Prepaid wallet credits</td><td>{{ wallet_credits }}</td></tr>
           <tr><td class="muted">Marketing email</td><td>{{ 'Opted in' if client['marketing_consent'] else 'Not opted in' }}</td></tr>
           <tr><td class="muted">Joined</td><td>{{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }}</td></tr>
+          <tr><td class="muted">Last seen</td><td>{{ client['last_seen_at']|time_ago }}</td></tr>
           <tr><td class="muted">Signup IP</td><td>
             {{ client['signup_ip'] or 'Not recorded' }}
             {% if client['signup_ip_is_datacenter'] == 1 %}<span class="status status-pending_payment" style="font-size:0.68rem;">Datacenter IP</span>
