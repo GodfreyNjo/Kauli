@@ -2,6 +2,10 @@
 {% block theme %}dark{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}Terms of Service{% endblock %}
+{% block head_extra %}
+{% include "_ga.html" %}
+{% endblock %}
+{% block cookie_notice_text %}{% include "_cookie_notice_ga.html" %}{% endblock %}
 {% block content %}
 {% include "_nav.html" %}
 

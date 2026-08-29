@@ -2,6 +2,10 @@
 {% block theme %}dark{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}Privacy Policy{% endblock %}
+{% block head_extra %}
+{% include "_ga.html" %}
+{% endblock %}
+{% block cookie_notice_text %}{% include "_cookie_notice_ga.html" %}{% endblock %}
 {% block content %}
 {% include "_nav.html" %}
 
@@ -64,9 +68,16 @@
     <p>We use <strong>Cloudflare Web Analytics</strong> to see aggregate traffic to this site (roughly how
        many people visit, which pages, which country). It's cookieless by design - Cloudflare's own
        description is that it doesn't use any client-side state (no cookies, no local storage, no
-       fingerprinting) and doesn't track you across other sites. We don't run Google Analytics, Meta Pixel,
-       or any other cookie-based analytics or advertising script on this site. If that ever changes, this
-       section will say so and we'll ask first where the law requires it.</p>
+       fingerprinting) and doesn't track you across other sites.</p>
+    <p>We also run <strong>Google Analytics</strong> on our public marketing pages (the homepage, blog,
+       solution pages, and these legal pages) - not inside the logged-in client or staff app, where none of
+       your order, file, or account activity is ever sent to it. Google Analytics sets its own cookies and
+       uses them to tell us things like which pages get read, roughly where visitors are coming from, and
+       which content leads people to sign up, so we can improve the site. It does not receive your name,
+       email, phone number, or anything from your Kauli account. You can opt out of Google Analytics
+       tracking entirely with Google's <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">browser add-on</a>,
+       or decline non-essential cookies generally in your browser settings. We don't run Meta Pixel or any
+       advertising/retargeting script on this site.</p>
 
     <h2>5. Security</h2>
     <p>Every upload is checked against its real file signature (not just trusted by its filename), scanned
