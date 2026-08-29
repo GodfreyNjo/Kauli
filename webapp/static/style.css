@@ -1216,17 +1216,24 @@ tbody tr:hover { background: var(--hover); }
   width: 100%; max-width: 460px; background: #fff; border-radius: 20px; overflow: hidden;
   box-shadow: 0 24px 48px -16px color-mix(in srgb, var(--auth-ink) 32%, transparent);
 }
-/* Placeholder crop of the same real photo used on the old dark login (see
-   git history) - that version has the monitor deliberately blurred and a
-   second wordmark baked into the top-left corner, both wrong for this
-   tighter card crop. Needs the new, uncropped source photo (the one this
-   redesign's mock actually shows, with real content on the monitor and no
-   baked-in logo) swapped in here - flagged in chat, not silently shipped
-   as final. */
+/* login-showcase.jpg is a real crop of the same photo the old dark login
+   used (login-bg.jpg, untouched, still whatever else might reference it) -
+   not a new photo. That source has a second wordmark baked into the top-
+   left corner and a deliberately-blurred monitor (see login-bg.jpg's own
+   git history), both wrong for this tighter card. Neither is fixable via
+   background-position alone: the source is wide enough relative to this
+   box that cover-cropping only ever trims ~11% of the width, nowhere near
+   enough to crop a corner logo that spans ~25% of it. So this is a real
+   pre-cropped derivative (crop box y:195-1024, x:0-1150 of the original -
+   below the wordmark, before the empty dead space past the monitor),
+   aspect-ratio set to match that crop exactly so cover applies no further
+   distortion. Still a placeholder, not the actual new photo the redesign
+   mock shows (real content on the monitor, no baked-in logo) - flagged in
+   chat, not shipped as final. */
 .auth-showcase-photo {
-  position: relative; aspect-ratio: 4 / 3;
-  background-image: url('/static/login-bg.jpg');
-  background-size: cover; background-position: 38% 30%;
+  position: relative; aspect-ratio: 1150 / 829;
+  background-image: url('/static/login-showcase.jpg');
+  background-size: cover; background-position: center;
 }
 .auth-showcase-badge {
   position: absolute; top: 16px; right: 16px;
