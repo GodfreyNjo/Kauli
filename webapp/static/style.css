@@ -1150,9 +1150,16 @@ tbody tr:hover { background: var(--hover); }
    above) now that switching modes is the page's primary top-level choice,
    not an afterthought under the form. */
 .auth-tabs { display: flex; gap: 36px; border-bottom: 1px solid var(--auth-border); margin: 0 0 36px; }
+/* border-radius: 0 and margin: 0 explicitly override the global `button`
+   rule's border-radius/margin-top (style.css's own base button styles) -
+   without them the active underline below inherits a rounded bottom-left/
+   bottom-right corner from that radius, which visibly eats into the
+   straight edge and makes it read as shorter than the tab's own text.
+   Real bug, seen live: the underline rendered as a short, rounded arc
+   instead of a crisp line spanning the word. */
 .auth-tab {
-  background: none; border: none; cursor: pointer; font: inherit;
-  display: flex; align-items: center; gap: 8px;
+  background: none; border: none; border-radius: 0; cursor: pointer; font: inherit;
+  display: flex; align-items: center; gap: 8px; margin: 0;
   font-size: 1.02rem; font-weight: 600; color: var(--auth-accent);
   padding: 0 0 16px; margin-bottom: -1px; border-bottom: 3px solid transparent;
 }
