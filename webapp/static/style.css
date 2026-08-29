@@ -1089,11 +1089,11 @@ tbody tr:hover { background: var(--hover); }
 }
 .auth-switch a { color: var(--accent); text-decoration: none; font-weight: 600; cursor: pointer; }
 .auth-panel[hidden] { display: none; }
-.auth-forgot { text-align: left; margin: -10px 0 14px; }
-.auth-forgot a { font-size: 0.82rem; color: var(--muted); text-decoration: none; }
-.auth-forgot a:hover { color: var(--accent); text-decoration: underline; }
-.auth-consent { font-size: 0.75rem; color: var(--faint); text-align: left; margin: 16px 0 0; line-height: 1.5; }
-.auth-consent a { color: var(--muted); text-decoration: underline; }
+/* auth-forgot/auth-consent below are the .auth-shell (login.html) versions
+   - scoped there, not left as bare rules, because they now use the split-
+   screen's own local --auth-* palette (see .auth-shell's own comment), not
+   the shared --accent/--muted tokens .auth-card (forgot/reset password)
+   still uses. */
 /* Live feedback as the client types - found missing via real client
    testing ("doesn't give a green light as they type"). Starts neutral
    (grey, no check/x) before anything's typed, turns green the instant a
@@ -1113,135 +1113,133 @@ tbody tr:hover { background: var(--hover); }
 .password-checklist li.unmet { color: var(--err); }
 .password-checklist li.unmet::before { content: "✕"; }
 
-.auth-checkbox-row {
-  display: flex; align-items: flex-start; gap: 10px; margin: 16px 0 24px;
-  font-size: 0.82rem; color: var(--muted); line-height: 1.4; cursor: pointer;
+/* ------------------------------------------------- auth split-screen --- */
+/* Login only (see login.html) - a light, committed brand look independent
+   of the app's own theme (block theme/theme_locked - same reasoning the
+   old dark version used, just light now per the 2026-08-30 redesign). The
+   utility pages (forgot/reset password) keep the separate, simpler
+   centered .auth-card above, on the app's normal theme - not worth this
+   much branding real estate for a one-field form.
+   Deliberately its own literal palette (--auth-*), not the shared
+   --accent/--ink tokens above: this page's blue has nothing to do with
+   the rust accent used through the rest of the app or the olive used on
+   the marketing site, so reusing --accent here would mean this page's
+   look silently changes if either of those ever does. */
+.auth-shell {
+  --auth-bg: #f6f6f8;
+  --auth-border: #e3e3e9;
+  --auth-ink: #16213e;
+  --auth-muted: #667085;
+  --auth-placeholder: #9aa1b1;
+  --auth-blue: #2f5fd8;
+  --auth-blue-hover: #2650b8;
+  min-height: 100vh; display: flex; position: relative; background: var(--auth-bg);
 }
-/* The bug: global `input { width: 100%; }` (style.css's base input rule)
-   was inherited here too - inside a flex row that made the checkbox claim
-   the FULL row width, squeezing the label text beside it down to a sliver
-   that wrapped for 15+ lines and visually broke out of the card. width:
-   auto + a fixed box size is the actual fix; accent-color reskins the
-   native control to the brand color on check, no custom-markup checkbox
-   needed for that. */
-.auth-checkbox-row input[type="checkbox"] {
-  width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0;
-  accent-color: var(--accent); cursor: pointer;
+.auth-form-panel {
+  flex: 1 1 54%; display: flex; align-items: flex-start; justify-content: center;
+  padding: 64px 40px;
 }
-.auth-checkbox-row span { min-width: 0; }
-/* Pill-shaped inputs on auth forms specifically, not every input site-wide -
-   scoped to .auth-card so the staff/client tool forms elsewhere keep their
-   normal rectangular fields. Focus state is a soft accent glow instead of a
-   heavy solid border. */
-.auth-card input, .auth-card select, .auth-card textarea {
-  border-radius: 999px; padding: 11px 20px;
+.auth-form-inner { width: 100%; max-width: 420px; }
+.auth-shell .auth-brand { text-align: left; margin: 0 0 48px; }
+.auth-shell .auth-brand-logo { height: 42px; width: auto; margin: 0; }
+
+/* Login/Sign up tabs - replace the old bottom-of-card text switch (still
+   used as-is by forgot/reset's simple "Back to sign in" link, untouched
+   above) now that switching modes is the page's primary top-level choice,
+   not an afterthought under the form. */
+.auth-tabs { display: flex; gap: 36px; border-bottom: 1px solid var(--auth-border); margin: 0 0 36px; }
+.auth-tab {
+  background: none; border: none; cursor: pointer; font: inherit;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 1.02rem; font-weight: 600; color: var(--auth-blue);
+  padding: 0 0 16px; margin-bottom: -1px; border-bottom: 3px solid transparent;
 }
-.auth-card input:focus, .auth-card select:focus, .auth-card textarea:focus {
-  outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent);
+.auth-tab.active { color: var(--auth-ink); border-bottom-color: var(--auth-blue); }
+.auth-tab-icon { width: 17px; height: 17px; flex-shrink: 0; }
+
+.auth-shell h1 { font-size: 1.5rem; margin: 0 0 6px; color: var(--auth-ink); }
+.auth-shell .auth-sub { color: var(--auth-muted); font-size: 0.9rem; margin: 0 0 24px; }
+.auth-field { display: block; margin-bottom: 20px; }
+.auth-field-label { display: block; font-weight: 700; font-size: 0.92rem; color: var(--auth-ink); margin-bottom: 8px; }
+.auth-shell input[type="email"], .auth-shell input[type="password"] {
+  width: 100%; background: #fff; border: 1px solid var(--auth-border); border-radius: 10px;
+  padding: 13px 16px; font-size: 0.95rem; color: var(--auth-ink);
 }
-/* Leading icon (email/password) + trailing show/hide toggle - the input
-   itself keeps its normal pill styling above, just with room carved out
-   on each side for whichever real control sits there. */
+.auth-shell input::placeholder { color: var(--auth-placeholder); }
+.auth-shell input:focus {
+  outline: none; border-color: var(--auth-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--auth-blue) 15%, transparent);
+}
 .auth-input-icon-group { position: relative; display: block; }
-.auth-input-icon-group .auth-input-icon {
-  position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
-  width: 17px; height: 17px; color: var(--faint); pointer-events: none;
-}
-.auth-input-icon-group input { padding-left: 44px !important; width: 100%; }
-.auth-input-icon-group input.auth-password-input { padding-right: 42px !important; }
+.auth-input-icon-group input.auth-password-input { padding-right: 46px; }
 .auth-password-toggle {
   position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-  width: 30px; height: 30px; background: none; border: none; border-radius: 50%;
-  color: var(--faint); cursor: pointer; font-size: 0.95rem; line-height: 1;
+  width: 32px; height: 32px; background: none; border: none; border-radius: 50%;
+  color: var(--auth-placeholder); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
-.auth-password-toggle:hover { color: var(--ink); background: var(--hover); }
-.auth-password-toggle.showing { color: var(--accent); }
-
-.auth-help-link {
-  position: absolute; top: 24px; right: 32px; font-size: 0.84rem; color: var(--muted); z-index: 2;
+.auth-password-toggle svg { width: 19px; height: 19px; }
+.auth-password-toggle:hover { color: var(--auth-ink); background: #f0f1f4; }
+.auth-password-toggle.showing { color: var(--auth-blue); }
+.auth-forgot { text-align: left; margin: -8px 0 22px; }
+.auth-forgot a { font-size: 0.88rem; color: var(--auth-blue); text-decoration: none; }
+.auth-forgot a:hover { text-decoration: underline; }
+.auth-shell button[type="submit"] {
+  width: 100%; text-align: center; padding: 14px; margin-top: 4px;
+  border: none; border-radius: 10px; background: var(--auth-blue); color: #fff;
+  font-size: 1rem; font-weight: 700; box-shadow: none;
 }
-.auth-help-link span { color: var(--accent); font-weight: 600; text-decoration: none; }
-.auth-help-link span:hover { text-decoration: underline; }
-@media (max-width: 860px) { .auth-help-link { position: static; display: block; text-align: right; padding: 16px 20px 0; } }
-
-.auth-brand-logo { display: block; height: 34px; width: auto; margin: 0 auto; }
-.auth-card button[type="submit"] {
-  border-radius: 999px; box-shadow: 0 4px 12px -4px var(--accent);
+.auth-shell button[type="submit"]:hover { background: var(--auth-blue-hover); }
+.auth-consent { font-size: 0.82rem; color: var(--auth-muted); text-align: center; margin: 20px 0 0; line-height: 1.5; }
+.auth-consent a { color: var(--auth-blue); text-decoration: underline; }
+.auth-checkbox-row {
+  display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 22px;
+  font-size: 0.85rem; color: var(--auth-muted); line-height: 1.4; cursor: pointer;
 }
-
-/* Login page only (body.auth-page - see login.html's body_class block):
-   swap the accent to the same olive used on the marketing site's buttons,
-   instead of the rust ("Claude") accent used everywhere else in the app.
-   Cascades into every var(--accent) use below - submit buttons, focus
-   glow, links, the illustration badge - without hunting each one down. */
-body.auth-page { --accent: var(--accent3); --accent-hover: var(--accent3-hover); }
-
-/* ------------------------------------------------- auth split-screen --- */
-/* Login only (block theme dark - see login.html) - the utility pages
-   (forgot/reset password) keep the simpler single centered .auth-card on
-   the app's normal light theme, not worth the branding real estate for a
-   one-field form. Form panel first/left, brand panel second/right -
-   matches how 3Play Media's own login page is actually laid out. Both
-   panels use the page's own dark-theme tokens now (not hardcoded hex)
-   since the whole page commits to dark here, not just one panel. */
-.auth-shell { min-height: 100vh; display: flex; position: relative; }
-.auth-form-panel {
-  flex: 1 1 54%; display: flex; align-items: center; justify-content: center;
-  padding: 40px 24px;
+/* The bug this width:auto fixes: global `input { width: 100%; }` was
+   inherited here too - inside a flex row that made the checkbox claim the
+   FULL row width, squeezing the label text beside it down to a sliver
+   that wrapped for 15+ lines. accent-color reskins the native control to
+   this page's blue on check, no custom-markup checkbox needed. */
+.auth-checkbox-row input[type="checkbox"] {
+  width: 18px; height: 18px; margin: 1px 0 0; flex-shrink: 0;
+  accent-color: var(--auth-blue); cursor: pointer;
 }
-.auth-form-inner { width: 100%; max-width: 380px; }
+.auth-checkbox-row span { min-width: 0; }
+
 .auth-brand-panel {
-  flex: 0 0 42%; max-width: 560px; min-width: 320px;
-  display: flex; flex-direction: column; justify-content: center; gap: 32px;
-  padding: 44px 40px; background: var(--panel); border-left: 1px solid var(--border-subtle);
+  flex: 0 0 46%; max-width: 620px; min-width: 340px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px; background: var(--auth-bg); border-left: 1px solid var(--auth-border);
 }
-.auth-illustration-card {
-  background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 16px;
-  padding: 28px; color: var(--accent); position: relative;
+.auth-showcase-card {
+  width: 100%; max-width: 460px; background: #fff; border-radius: 20px; overflow: hidden;
+  box-shadow: 0 24px 48px -16px color-mix(in srgb, var(--auth-ink) 32%, transparent);
 }
-.auth-illustration-card svg { width: 100%; height: auto; display: block; }
-/* Real, Kauli-branded photo (not stock), full frame kept - the monitor in
-   the source image showed a fabricated dashboard mockup (invented job
-   data, a workflow that doesn't match Kauli's real one), so that region is
-   pre-blurred into an unreadable glow rather than cropped out - see the
-   image-prep note in the repo. Aspect-ratio matches the source exactly so
-   background-size:cover doesn't distort it. No text sits on top of the
-   image itself (the badge has its own solid pill background), so no
-   dark-overlay/contrast treatment is needed. */
-.auth-illustration-photo {
-  aspect-ratio: 1535 / 1024; padding: 0;
+/* Placeholder crop of the same real photo used on the old dark login (see
+   git history) - that version has the monitor deliberately blurred and a
+   second wordmark baked into the top-left corner, both wrong for this
+   tighter card crop. Needs the new, uncropped source photo (the one this
+   redesign's mock actually shows, with real content on the monitor and no
+   baked-in logo) swapped in here - flagged in chat, not silently shipped
+   as final. */
+.auth-showcase-photo {
+  position: relative; aspect-ratio: 4 / 3;
   background-image: url('/static/login-bg.jpg');
-  background-size: cover; background-position: center;
+  background-size: cover; background-position: 38% 30%;
 }
-.auth-illustration-badge {
-  position: absolute; top: 14px; right: 14px;
-  background: var(--accent); color: var(--accent-ink);
-  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
-  padding: 6px 14px; border-radius: 999px;
+.auth-showcase-badge {
+  position: absolute; top: 16px; right: 16px;
+  background: var(--auth-ink); color: #fff;
+  font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  padding: 7px 14px; border-radius: 999px;
 }
-/* Real logo overlay on the real photo (see .auth-illustration-photo's own
-   comment on the image itself) - a light backdrop under it since the logo's
-   dark wordmark needs contrast against whatever's directly behind it in
-   the photo, which varies by crop. */
-.auth-illustration-logo {
-  position: absolute; top: 14px; left: 14px; height: 26px; width: auto;
-  padding: 6px 10px; background: color-mix(in srgb, var(--surface) 88%, transparent);
-  border-radius: 8px; backdrop-filter: blur(2px);
-}
-.auth-brand-copy h2 { font-size: 1.3rem; margin: 0 0 12px; }
-.auth-brand-copy p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; margin: 0 0 14px; }
-.auth-feature-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.auth-feature-list li { padding-left: 22px; position: relative; font-size: 0.84rem; }
-.auth-feature-list li::before {
-  content: "✓"; position: absolute; left: 0; top: 1px; color: var(--accent); font-weight: 700; font-size: 0.8rem;
-}
-.auth-feature-list li strong { display: block; color: var(--ink); font-weight: 650; }
-.auth-feature-list li span { color: var(--muted); }
-.auth-brand-link { font-size: 0.86rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+.auth-showcase-body { padding: 28px 30px 32px; }
+.auth-showcase-body h2 { font-size: 1.3rem; font-weight: 700; color: var(--auth-ink); margin: 0 0 12px; line-height: 1.3; }
+.auth-showcase-body p { font-size: 0.92rem; color: var(--auth-muted); line-height: 1.6; margin: 0 0 16px; }
+.auth-brand-link { font-size: 0.9rem; font-weight: 700; color: var(--auth-blue); text-decoration: none; }
 .auth-brand-link:hover { text-decoration: underline; }
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .auth-brand-panel { display: none; }
 }
 

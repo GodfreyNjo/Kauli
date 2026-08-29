@@ -1,11 +1,10 @@
 {% extends "base.html" %}
-{% block theme %}dark{% endblock %}
+{% block theme %}light{% endblock %}
 {% block theme_locked %}1{% endblock %}
 {% block body_class %}auth-page{% endblock %}
 {% block title %}Log in{% endblock %}
 {% block content %}
 <div class="auth-shell">
-  <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="auth-help-link">Need help? <span>Contact support</span></a>
   <div class="auth-form-panel">
     <div class="auth-form-inner">
       <div class="auth-brand">
@@ -15,96 +14,93 @@
         </picture>
       </div>
 
-      <div class="auth-card">
-        <div class="auth-panel" id="panel-signin" {% if mode == 'signup' %}hidden{% endif %}>
-          <h1>Welcome back</h1>
-          <p class="auth-sub">Sign in to your production workspace.</p>
-          {% if mode == 'signin' and error %}<p class="error">{{ error }}</p>{% endif %}
-          {% if mode == 'signin' and notice %}<p class="ok">{{ notice }}</p>{% endif %}
-          <form method="post" action="/login">
-            <input type="hidden" name="next" value="{{ next or '' }}">
-            <label>Email address
-              <span class="auth-input-icon-group">
-                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <input type="email" name="email" placeholder="you@example.com" required {% if mode != 'signup' %}autofocus{% endif %}>
-              </span>
-            </label>
-            <label>Password
-              <span class="auth-input-icon-group">
-                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-                <input type="password" name="password" required minlength="6" class="auth-password-input">
-                <button type="button" class="auth-password-toggle" aria-label="Show password">&#128065;</button>
-              </span>
-            </label>
-            <p class="auth-forgot"><a href="/forgot-password">Forgot your password?</a></p>
-            <button type="submit">Sign in</button>
-            <p class="auth-consent">By signing in, you agree to Kauli's <a href="/terms">Terms of Service</a>
-               and <a href="/privacy">Privacy Policy</a>.</p>
-          </form>
-          <p class="auth-switch">Don't have an account? <a data-show="panel-signup">Create one</a></p>
-        </div>
+      <div class="auth-tabs">
+        <button type="button" class="auth-tab {{ 'active' if mode != 'signup' else '' }}" data-show="panel-signin">Login</button>
+        <button type="button" class="auth-tab {{ 'active' if mode == 'signup' else '' }}" data-show="panel-signup">
+          <svg class="auth-tab-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            <circle cx="8" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/>
+            <path d="M19 8v6M22 11h-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          Sign up
+        </button>
+      </div>
 
-        <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
-          <h1>Create your account</h1>
-          <p class="auth-sub">Get access to your Kauli workspace.</p>
-          {% if mode == 'signup' and error %}<p class="error">{{ error }}</p>{% endif %}
-          <form method="post" action="/signup" id="signup-form">
-            <input type="hidden" name="next" value="{{ next or '' }}">
-            <label>Email address
-              <span class="auth-input-icon-group">
-                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M4 7l8 6 8-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <input type="email" name="email" value="{{ email or '' }}" placeholder="you@example.com" required {% if mode == 'signup' %}autofocus{% endif %}>
-              </span>
-            </label>
-            <label>Password
-              <span class="auth-input-icon-group">
-                <svg class="auth-input-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-                <input type="password" name="password" id="signup-password" required minlength="{{ password_min_length }}" class="auth-password-input">
-                <button type="button" class="auth-password-toggle" aria-label="Show password">&#128065;</button>
-              </span>
-            </label>
-            <ul class="password-checklist" id="signup-password-checklist">
-              <li data-rule="length">At least {{ password_min_length }} characters</li>
-              <li data-rule="lower">A lowercase letter</li>
-              <li data-rule="upper">An uppercase letter</li>
-              <li data-rule="digit">A number</li>
-              <li data-rule="symbol">A symbol (e.g. ! @ # $ %)</li>
-            </ul>
-            <label class="auth-checkbox-row">
-              <input type="checkbox" name="marketing_consent" value="1" {% if marketing_consent %}checked{% endif %}>
-              <span>Also send me occasional Kauli tips and updates. Unsubscribe anytime.</span>
-            </label>
-            <button type="submit">Create account</button>
-            <p class="auth-consent">By creating an account, you agree to Kauli's <a href="/terms">Terms of
-               Service</a> and <a href="/privacy">Privacy Policy</a>, and to receive service emails needed
-               to run your account (order status, receipts, security alerts).</p>
-          </form>
-          <p class="auth-switch">Already have an account? <a data-show="panel-signin">Sign in</a></p>
-        </div>
+      <div class="auth-panel" id="panel-signin" {% if mode == 'signup' %}hidden{% endif %}>
+        {% if mode == 'signin' and error %}<p class="error">{{ error }}</p>{% endif %}
+        {% if mode == 'signin' and notice %}<p class="ok">{{ notice }}</p>{% endif %}
+        <form method="post" action="/login">
+          <input type="hidden" name="next" value="{{ next or '' }}">
+          <label class="auth-field">
+            <span class="auth-field-label">Email</span>
+            <input type="email" name="email" placeholder="Email address" required {% if mode != 'signup' %}autofocus{% endif %}>
+          </label>
+          <label class="auth-field">
+            <span class="auth-field-label">Password</span>
+            <span class="auth-input-icon-group">
+              <input type="password" name="password" placeholder="Password" required minlength="6" class="auth-password-input">
+              <button type="button" class="auth-password-toggle" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
+              </button>
+            </span>
+          </label>
+          <p class="auth-forgot"><a href="/forgot-password">Forgot your password?</a></p>
+          <button type="submit">Log In</button>
+          <p class="auth-consent">By signing in, you agree to Kauli's <a href="/terms">Terms of Service</a>,
+             <a href="/privacy">Privacy Policy</a>, and <a href="/privacy#cookies">Cookie Policy</a>.</p>
+        </form>
+      </div>
+
+      <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
+        {% if mode == 'signup' and error %}<p class="error">{{ error }}</p>{% endif %}
+        <form method="post" action="/signup" id="signup-form">
+          <input type="hidden" name="next" value="{{ next or '' }}">
+          <label class="auth-field">
+            <span class="auth-field-label">Email</span>
+            <input type="email" name="email" value="{{ email or '' }}" placeholder="Email address" required {% if mode == 'signup' %}autofocus{% endif %}>
+          </label>
+          <label class="auth-field">
+            <span class="auth-field-label">Password</span>
+            <span class="auth-input-icon-group">
+              <input type="password" name="password" id="signup-password" placeholder="Password" required minlength="{{ password_min_length }}" class="auth-password-input">
+              <button type="button" class="auth-password-toggle" aria-label="Show password">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
+              </button>
+            </span>
+          </label>
+          <ul class="password-checklist" id="signup-password-checklist">
+            <li data-rule="length">At least {{ password_min_length }} characters</li>
+            <li data-rule="lower">A lowercase letter</li>
+            <li data-rule="upper">An uppercase letter</li>
+            <li data-rule="digit">A number</li>
+            <li data-rule="symbol">A symbol (e.g. ! @ # $ %)</li>
+          </ul>
+          <label class="auth-checkbox-row">
+            <input type="checkbox" name="marketing_consent" value="1" {% if marketing_consent %}checked{% endif %}>
+            <span>Also send me occasional Kauli tips and updates. Unsubscribe anytime.</span>
+          </label>
+          <button type="submit">Create account</button>
+          <p class="auth-consent">By creating an account, you agree to Kauli's <a href="/terms">Terms of
+             Service</a>, <a href="/privacy">Privacy Policy</a>, and <a href="/privacy#cookies">Cookie
+             Policy</a>, and to receive service emails needed to run your account (order status, receipts,
+             security alerts).</p>
+        </form>
       </div>
     </div>
   </div>
 
   <div class="auth-brand-panel" aria-hidden="true">
-    <div class="auth-illustration-card auth-illustration-photo" role="img"
-         aria-label="A Kauli editor at work in a studio, reviewing an audio waveform on screen">
-      <picture>
-        <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
-        <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="auth-illustration-logo">
-      </picture>
-      <span class="auth-illustration-badge">AI Drafted, Human Verified</span>
-    </div>
-    <div class="auth-brand-copy">
-      <h2>Built for real broadcast and NGO work</h2>
-      <p>Swahili, Kikuyu and English - transcription, translation and dubbing. Every AI-drafted line is
-         checked word-by-word by a human editor before it ships, and pricing stays per-minute with no
-         bundled credits.</p>
-      <ul class="auth-feature-list">
-        <li><strong>AI-drafted, human-verified</strong><span>Fast AI drafts perfected by real linguists and editors.</span></li>
-        <li><strong>Local languages, industry-grade quality</strong><span>Swahili, Kikuyu and English, done properly.</span></li>
-        <li><strong>Transparent, per-minute pricing</strong><span>No bundled credits, no surprise fees.</span></li>
-      </ul>
-      <a href="/#how" class="auth-brand-link">See how it works →</a>
+    <div class="auth-showcase-card">
+      <div class="auth-showcase-photo" role="img"
+           aria-label="A Kauli editor at work in a studio, reviewing an audio waveform on screen">
+        <span class="auth-showcase-badge">AI Drafted, Human Verified</span>
+      </div>
+      <div class="auth-showcase-body">
+        <h2>Built for real broadcast and NGO work.</h2>
+        <p>Swahili, Kikuyu and English transcription, translation and dubbing. AI-drafted, human-verified
+           for accuracy and industry-grade quality.</p>
+        <a href="/#how" class="auth-brand-link">Learn more →</a>
+      </div>
     </div>
   </div>
 </div>
@@ -124,10 +120,16 @@
     });
   });
 
-  document.querySelectorAll('[data-show]').forEach(function (a) {
-    a.addEventListener('click', function () {
-      document.getElementById('panel-signin').hidden = a.dataset.show !== 'panel-signin';
-      document.getElementById('panel-signup').hidden = a.dataset.show !== 'panel-signup';
+  // Login/Sign up tabs - one mechanism drives both which panel shows and
+  // which tab reads as active, so the two can never fall out of sync.
+  document.querySelectorAll('[data-show]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var target = el.dataset.show;
+      document.getElementById('panel-signin').hidden = target !== 'panel-signin';
+      document.getElementById('panel-signup').hidden = target !== 'panel-signup';
+      document.querySelectorAll('.auth-tab').forEach(function (tab) {
+        tab.classList.toggle('active', tab.dataset.show === target);
+      });
     });
   });
 
