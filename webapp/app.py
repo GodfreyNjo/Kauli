@@ -1710,6 +1710,18 @@ def privacy_page(request: Request):
     return templates.TemplateResponse(request, "privacy.html", _marketing_context(home="/"))
 
 
+@app.get("/formatting-standards", response_class=HTMLResponse)
+def formatting_standards_page(request: Request):
+    """Client-safe explanation of how a delivered transcript/caption/dub is
+    formatted by default - real output-facing conventions only, not
+    Ereri's internal editing mechanics (that's /staff/guide). Public, no
+    login redirect - same treatment as /privacy and /terms - so a client
+    can review this before deciding whether our defaults are right for
+    them or whether to pick different options / upload their own style
+    guide at order time."""
+    return templates.TemplateResponse(request, "formatting_standards.html", _marketing_context(home="/"))
+
+
 # ------------------------------------------------------------ lead qual ----
 # Triage signal only, not a gate - a free-email lead still becomes a real
 # lead (see request_callback below). Real early NGOs/individual decision

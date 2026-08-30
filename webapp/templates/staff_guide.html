@@ -37,6 +37,7 @@
     <li><a href="#ereri-editing">Editing in Ereri - speaker IDs, sync, paragraphs, spell check &amp; sentence length</a></li>
     <li><a href="#grammar">Grammar reference - sentence structure, common mistakes &amp; house spellings</a></li>
     <li><a href="#punctuation">Punctuation reference</a></li>
+    <li><a href="#dubbing-ids">Dubbing - speaker IDs &amp; formatting</a></li>
     <li><a href="#shipping">Saving, approving &amp; the 100%-edited gate</a></li>
     <li><a href="#shortcuts">Keyboard shortcuts, condensed</a></li>
     <li><a href="#trouble">If Ereri seems broken</a></li>
@@ -502,8 +503,59 @@
   </dl>
 </div>
 
+<div class="card" id="dubbing-ids">
+  <h2>17. Dubbing - speaker IDs &amp; formatting</h2>
+  <p>This section only applies to an order that produces a dub - a real voice track gets synthesized from
+     whatever's tagged with each speaker ID. For a transcription/caption-only order, sections 6 and 14's
+     general speaker ID guidance is all that applies.</p>
+  <dl>
+    <dt>A speaker ID must be genuinely unique, for the whole file</dt>
+    <dd>Once you've assigned an ID to a speaker, never reuse it for a different person, even much later in
+        the same file. This isn't just a readability convention here - the Job tab's Speakers panel assigns
+        exactly one dub voice per distinct <code>speaker_id</code> string
+        (<code>distinct_speakers = sorted({s.speaker_id for s in job.segments if s.speaker_id})</code> - a
+        plain set of the literal strings, nothing fuzzier). Reuse an ID for two different people and Ereri
+        can't tell them apart - both get the same dub voice, silently, with nothing on screen to warn you it
+        happened.</dd>
+    <dt>Named speakers</dt>
+    <dd>Use the full name where it's known or reasonably determinable from the file. If two speakers share a
+        first name and you don't have last names, number the first name rather than leaving them ambiguous:
+        <code>JOHN 1:</code> / <code>JOHN 2:</code>.</dd>
+    <dt>Unnamed speakers</dt>
+    <dd>Prefer a role-based ID over a bare generic one wherever the file actually supports it -
+        <code>REPORTER:</code>, <code>DOCTOR:</code>, <code>OFFICER:</code>, <code>DRIVER:</code>,
+        <code>STUDENT:</code> - falling back to <code>SPEAKER:</code>/<code>MAN:</code>/<code>WOMAN:</code>
+        only when no role can be inferred. Keep an ID as short as it can be while staying unambiguous -
+        <code>OFFICER</code>, not <code>OFFICER OF THE COURT</code>; <code>911</code>, not
+        <code>911 OPERATOR</code>.</dd>
+    <dt>Always number multiple unidentified speakers - no exception past seven</dt>
+    <dd>Section 14's general speaker ID guidance allows dropping numbers on unnamed speakers once there are
+        more than seven, when numbering would confuse a human reader more than it helps. For a dub,
+        don't do that: keep a number on every distinct unidentified speaker no matter how many there are,
+        since each number is a real, separate voice slot, not just a reading aid - two unnumbered
+        <code>SPEAKER:</code> tags for two different real people collapse to one voice between them, exactly
+        like the point above.</dd>
+    <dt>An ID stays the same for that person for the whole file</dt>
+    <dd>If <code>MAN 1</code> goes quiet for a long stretch and comes back later, he's still
+        <code>MAN 1</code> - re-tagging him under a new number at that point would hand him a new, different
+        dub voice for no reason.</dd>
+    <dt>Formatting for a dub's text specifically</dt>
+    <dd>Don't transcribe background lyrics into a segment headed for dubbing, even if the order's brief
+        otherwise asked for song lyrics elsewhere - music playing underneath dialogue isn't something a dub
+        voice should ever end up trying to sing. And never type a parenthetical stage direction into a
+        segment's text - <code>(ON PHONE)</code>, <code>(VOICEOVER)</code>, <code>(WHISPERING)</code>,
+        <code>(SARCASTICALLY)</code> and the like. Ereri already strips a <code>[bracketed]</code> tag like
+        <code>[MUSIC]</code> before it reaches the TTS engine - captioned, never spoken
+        (<code>strip_bracket_tags_for_tts</code> in <code>kauli/pipeline.py</code>) - but that function only
+        matches square brackets, not parentheses. Type <code>(ON PHONE)</code> into a segment and the dub
+        voice will synthesize and speak those words aloud, literally. Leave the direction out of the text
+        entirely - if it matters to a caption reader, a bracket tag is the only form that's actually safe to
+        use.</dd>
+  </dl>
+</div>
+
 <div class="card" id="shipping">
-  <h2>17. Saving, approving &amp; the 100%-edited gate</h2>
+  <h2>18. Saving, approving &amp; the 100%-edited gate</h2>
   <p>Everything saves itself - a segment autosaves a couple of seconds after you stop typing, and the topbar
      always shows whether everything's saved. <kbd>ctrl</kbd>+<kbd>s</kbd> forces it immediately;
      <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd> also re-renders that segment's audio.</p>
@@ -516,7 +568,7 @@
 </div>
 
 <div class="card" id="shortcuts">
-  <h2>18. Keyboard shortcuts, condensed</h2>
+  <h2>19. Keyboard shortcuts, condensed</h2>
   <p class="muted" style="margin-top:0;">The full, current list - with the reasoning for anything that isn't
      on the key you'd expect - always lives in the <strong>Shortcuts</strong> tab inside Ereri itself, since
      that one's guaranteed to match whatever's actually bound. The ones worth having memorized:</p>
@@ -532,7 +584,7 @@
 </div>
 
 <div class="card" id="trouble">
-  <h2>19. If Ereri seems broken</h2>
+  <h2>20. If Ereri seems broken</h2>
   <p>Tabs not switching, macros not responding, shortcuts not firing - almost always a stale cached copy of
      the editor's script fighting a newer page underneath it. <strong>Hard refresh first</strong>
      (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>r</kbd>, or <kbd>ctrl</kbd>+<kbd>F5</kbd>) before assuming
@@ -543,7 +595,7 @@
 </div>
 
 <div class="card" id="contact" style="text-align:center;">
-  <h2>20. Who to ask</h2>
+  <h2>21. Who to ask</h2>
   <p class="muted">A real person reads these, not a support queue.</p>
   <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
     <a href="mailto:{{ contact_email }}" class="btn secondary">Email</a>

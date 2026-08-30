@@ -214,6 +214,9 @@
           <div><strong>Full verbatim</strong><p>Every false start, stutter and filler word, exactly as spoken - for legal/research use.</p></div>
         </label>
       </fieldset>
+      <p class="muted" style="font-size:0.82rem; margin-top:-8px;">Not sure which one you need, or want to
+         see exactly how we punctuate, label speakers and format captions by default before deciding?
+         <a href="/formatting-standards" target="_blank" rel="noopener">See our formatting standards →</a></p>
 
       <details class="accordion" {% if form_values.get('instr_transcribe_lyrics') or form_values.get('instr_use_italics') or form_values.get('instr_existing_subs', 'ignore') != 'ignore' or form_values.get('instr_no_audio', 'tag') != 'tag' or form_values.get('instr_wrong_language', 'tag') != 'tag' or form_values.get('instr_instrumental_only', 'tag') != 'tag' or form_values.get('instr_notes') %}open{% endif %}>
         <summary>+ Advanced settings (optional)</summary>
@@ -255,7 +258,10 @@
           <label style="margin-top:4px;">Style guide or reference file (optional)
             <input type="file" name="style_guide">
           </label>
-          <p class="muted" style="margin-top:-8px;">Terminology, names, brand standards - anything that helps us transcribe and dub this more accurately.</p>
+          <p class="muted" style="margin-top:-8px;">Terminology, names, brand standards - anything that helps us transcribe and dub this more accurately. Want something different from our own
+             <a href="/formatting-standards" target="_blank" rel="noopener">default formatting</a>? Upload
+             your own style guide here and we'll follow it instead, wherever the two disagree - you'll be
+             able to see it was received and re-download it from this order's page.</p>
 
           <label>Anything else we should know?
             <textarea name="instr_notes" rows="2">{{ form_values.get('instr_notes', '') }}</textarea>

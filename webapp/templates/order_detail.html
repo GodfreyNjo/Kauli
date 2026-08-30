@@ -40,6 +40,32 @@
     </form>
   </details>
 
+  <details style="margin-top:6px;">
+    <summary class="muted" style="cursor:pointer; font-size:0.85rem; display:inline-block;">
+      Your formatting instructions for this order &raquo;
+    </summary>
+    <div style="margin-top:10px; font-size:0.85rem;">
+      <dl style="margin:0;">
+        <dt>Transcript style</dt>
+        <dd>{{ {'clean_read': 'Clean read', 'verbatim_light': 'Verbatim, lightly cleaned', 'verbatim': 'Full verbatim'}.get(order['instr_verbatim_level'], order['instr_verbatim_level']) }}</dd>
+        <dt>Speaker labels</dt>
+        <dd>{{ 'Labeled' if order['instr_speaker_ids'] else 'Not labeled' }}</dd>
+        <dt>Italics</dt>
+        <dd>{{ 'Used for on-screen text / narration' if order['instr_use_italics'] else 'Not requested' }}</dd>
+        <dt>Song lyrics</dt>
+        <dd>{{ 'Transcribed' if order['instr_transcribe_lyrics'] else 'Skipped' }}</dd>
+        {% if order['style_guide_path'] %}
+        <dt>Your style guide</dt>
+        <dd>✓ Received - <a href="/orders/{{ order['id'] }}/style-guide">{{ order['style_guide_filename'] }} (re-download) →</a>. We follow this over our own defaults wherever the two disagree.</dd>
+        {% endif %}
+      </dl>
+      <p class="muted" style="margin:10px 0 0;">These are exactly what was submitted with this order -
+         <a href="/formatting-standards" target="_blank" rel="noopener">see our default formatting standards
+         →</a> for what applies wherever you didn't specify something above. Want any of this changed for
+         this order? Say so in the message thread below.</p>
+    </div>
+  </details>
+
   {% set ts = tat_status(order['tat_start_at'], order['deadline_at']) %}
   {% if ts and order['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
   <div style="margin-top:14px;">
