@@ -29,6 +29,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
+  <!-- Clash Grotesk (Fontshare/Indian Type Foundry, free for commercial use
+       under their FFL license - confirmed at fontshare.com/licenses/itf-ffl
+       before adding this) - display headline face on the marketing pages
+       only (see --font-display in style.css), matching what 3Play Media's
+       own site actually uses for headings. Rev.com's headline face
+       (Degular Display) is a paid commercial license, not something to
+       embed without Rev's own license, so that one isn't used here. Body
+       text stays Inter everywhere - both Rev and 3Play already use Inter
+       for their own body copy, so that was already the same font. -->
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&display=swap">
   <link rel="stylesheet" href="/static/style.css?v={{ static_version('style.css') }}">
   {% block head_extra %}{% endblock %}
   <!-- Cloudflare Web Analytics - cookieless, no personal data, see Privacy Policy -->

@@ -75,6 +75,16 @@
 
   --font-ui: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "IBM Plex Mono", Consolas, monospace;
+  /* Marketing headlines only (see .m-hero h1 / h2.m-h2 below) - matches
+     3Play Media's own real heading face (confirmed live: their h1 computes
+     to ClashGrotesk-Semibold), free for commercial use under Fontshare's
+     ITF FFL license. Rev.com's own heading face (Degular Display) is a
+     paid commercial license, not something to embed without Rev's own
+     license, so that one was skipped. --font-ui (Inter) stays untouched
+     for the app's UI/sidebar/nav text at every size, and for body copy
+     everywhere - both Rev and 3Play already use Inter for their own body
+     text, so that was already the same font before this change. */
+  --font-display: "Clash Grotesk", var(--font-ui);
 }
 
 html[data-theme="dark"] {
@@ -1897,7 +1907,16 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
   text-transform: uppercase; color: var(--accent); background: var(--accent-soft);
   padding: 5px 14px; border-radius: var(--radius-pill); margin-bottom: 20px;
 }
-.m-hero h1 { font-size: clamp(2rem, 4.2vw, 3.1rem); line-height: 1.15; font-weight: 700; margin: 0 0 18px; max-width: 820px; margin-inline: auto; }
+.m-hero h1 {
+  font-family: var(--font-display); font-size: clamp(2rem, 4.2vw, 3.1rem); line-height: 1.15;
+  font-weight: 600; margin: 0 0 18px; max-width: 820px; margin-inline: auto;
+}
+/* By class, not `h2.m-h2` (see the pre-existing .m-section h2.m-h2 rule
+   below) - privacy.html/terms.html use <h1 class="m-h2"> for their page
+   title, which that tag-qualified selector never matched anyway. This
+   applies the display face correctly to every real .m-h2 heading on the
+   site regardless of which tag it happens to be on. */
+.m-h2 { font-family: var(--font-display); font-weight: 600; }
 .m-payg-badge {
   display: inline-block; font-size: 0.76rem; font-weight: 650; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--accent); background: var(--accent-soft);

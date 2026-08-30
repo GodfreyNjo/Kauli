@@ -314,12 +314,23 @@ async def add_trace_id(request: Request, call_next):
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com "
-    "https://www.youtube.com; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-    "font-src 'self' https://fonts.gstatic.com; "
+    "https://www.youtube.com https://www.googletagmanager.com; "
+    # style-src/font-src: api.fontshare.com serves the @font-face CSS itself
+    # (style-src), cdn.fontshare.com serves the actual woff2/woff/ttf files
+    # it points at (font-src) - same split as the existing Google Fonts
+    # pair (fonts.googleapis.com serves CSS, fonts.gstatic.com serves files).
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; "
+    "font-src 'self' https://fonts.gstatic.com https://cdn.fontshare.com; "
     "img-src 'self' data: https://i.ytimg.com; "
+    # google-analytics.com/analytics.google.com: real bug found and fixed
+    # 2026-08-30 - GA's own script (script-src above) was allowed to load,
+    # but the actual hit it sends on every pageview was still silently
+    # blocked here the whole time, on every visitor who'd accepted
+    # analytics cookies. Confirmed live via a real CSP violation in the
+    # console before this fix, confirmed gone after it.
     "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com "
-    "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com; "
+    "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com "
+    "https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; "
     "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com; "
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
     "form-action 'self' https://checkout.paystack.com"
