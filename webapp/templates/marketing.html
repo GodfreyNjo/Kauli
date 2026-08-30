@@ -824,20 +824,60 @@
 
     var shown = false;
     var actedOn = false;
+    // Real "actually looked at what we offer" gate, not just time-on-page -
+    // neither trigger below is allowed to fire until this is true, whether
+    // that's the idle timer or someone abandoning the page outright. The
+    // real bug this fixes: exit intent alone was popping the instant
+    // someone's mouse drifted up, even on a visitor who'd read three lines
+    // of the hero and nothing else - that's someone who hasn't shown
+    // interest yet, not someone still deciding. Pricing is the real,
+    // concrete "looked at what we offer" marker (id="pricing" further down
+    // this same page) - scrolling that far means they actually went
+    // through how it works and who it's for first, not a percentage-of-
+    // page-height guess that means nothing if the page layout changes.
+    var engaged = false;
+    var pricingSection = document.getElementById("pricing");
+    if (pricingSection && window.IntersectionObserver) {
+      var engagementObserver = new IntersectionObserver(function (entries) {
+        if (entries[0].isIntersecting) {
+          engaged = true;
+          engagementObserver.disconnect();
+        }
+      });
+      engagementObserver.observe(pricingSection);
+    } else {
+      // No IntersectionObserver (very old browser) - fail toward not
+      // interrupting a real visitor rather than guessing they're engaged.
+      engaged = true;
+    }
+
     var IDLE_MS = 120000; // 2 real minutes of no activity, resets on any interaction below
-    var idleTimer = setTimeout(show, IDLE_MS);
     var ACTIVITY_EVENTS = ["mousemove", "scroll", "keydown", "touchstart", "click"];
+
+    // Not just setTimeout(show, IDLE_MS) - if 2 minutes idle elapses before
+    // engaged ever becomes true, show() correctly no-ops (see its own
+    // !engaged check), but a bare setTimeout(show, ...) would then be dead
+    // forever: nothing ever reschedules it, so a visitor who goes idle
+    // early, then later actually scrolls down and engages, would lose the
+    // idle trigger entirely (only exit-intent would still work for them).
+    // This keeps re-arming itself every IDLE_MS until it's actually engaged
+    // and idle at the same time.
+    function idleTick() {
+      if (!engaged) { idleTimer = setTimeout(idleTick, IDLE_MS); return; }
+      show();
+    }
+    var idleTimer = setTimeout(idleTick, IDLE_MS);
 
     function resetIdleTimer() {
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(show, IDLE_MS);
+      idleTimer = setTimeout(idleTick, IDLE_MS);
     }
     ACTIVITY_EVENTS.forEach(function (evt) {
       document.addEventListener(evt, resetIdleTimer, { passive: true });
     });
 
     function show() {
-      if (shown || actedOn) return;
+      if (shown || actedOn || !engaged) return;
       shown = true;
       overlay.hidden = false;
       sessionStorage.setItem(KEY, "1");
