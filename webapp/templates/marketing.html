@@ -776,23 +776,38 @@
 
 </div>
 
-<!-- Real dwell/exit-intent trial prompt - the same pattern Rev's own
-     pricing page uses ("stayed a while, hasn't acted yet"). Real offer
-     (the same {{ free_minutes|int }}-minute free trial the hero CTA
-     already promises, not a fabricated stat like a made-up "average
-     hours saved" claim with nothing behind it), shown at most once per
-     session, and never at all if the visitor already clicked a real
-     signup CTA - see the script below for exactly what suppresses it. -->
+<!-- Real trial prompt - same pattern Rev's own pricing page uses ("stayed
+     a while, hasn't acted"). Two genuine triggers, whichever fires first:
+     abandoning the page (exit intent - mouse heading up and out of the
+     viewport) or 2 real minutes of no activity at all (mouse, scroll, key,
+     touch - not just "2 minutes since the page loaded", which would fire
+     on someone actively reading the whole time). Real offer (the same
+     {{ free_minutes|int }}-minute free trial the hero CTA already
+     promises, not a fabricated stat like a made-up "average hours saved"
+     claim with nothing behind it), shown at most once per session, and
+     never at all if the visitor already clicked a real signup CTA - see
+     the script below for exactly what suppresses it. -->
 <div class="exit-popup-overlay" id="exit-popup-overlay" hidden>
   <div class="exit-popup-modal" role="dialog" aria-modal="true" aria-labelledby="exit-popup-title">
     <button type="button" class="exit-popup-close" id="exit-popup-close" aria-label="Close">&times;</button>
-    <div class="exit-popup-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M12 9v4l2.5 2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 2h6M12 2v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    <div class="exit-popup-icon-wrap">
+      <div class="exit-popup-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="6" width="16" height="15" rx="2.5" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M4 10.5h16" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M8 3.5v4M16 3.5v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          <circle cx="16.2" cy="16" r="4.3" fill="var(--exit-popup-bg, #fff)" stroke="currentColor" stroke-width="1.6"/>
+          <path d="M16.2 14v2.2l1.4 1.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
     </div>
-    <h2 id="exit-popup-title">Still deciding?</h2>
-    <p>Try Kauli with your first {{ free_minutes|int }} minutes free - no card required. See real,
-       human-verified results before you commit to anything.</p>
-    <a href="/login?mode=signup" class="btn cta-olive exit-popup-cta">Start free now</a>
+    <div class="exit-popup-body">
+      <h2 id="exit-popup-title">Still deciding?</h2>
+      <p class="exit-popup-lede">Try Kauli with your first {{ free_minutes|int }} minutes free -
+         no card required.</p>
+      <p class="exit-popup-sub">See real, human-verified results before you commit to anything.</p>
+      <a href="/login?mode=signup" class="btn cta-olive exit-popup-cta">Start free now</a>
+    </div>
   </div>
 </div>
 <script>
@@ -809,7 +824,17 @@
 
     var shown = false;
     var actedOn = false;
-    var dwellTimer = setTimeout(show, 45000);
+    var IDLE_MS = 120000; // 2 real minutes of no activity, resets on any interaction below
+    var idleTimer = setTimeout(show, IDLE_MS);
+    var ACTIVITY_EVENTS = ["mousemove", "scroll", "keydown", "touchstart", "click"];
+
+    function resetIdleTimer() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(show, IDLE_MS);
+    }
+    ACTIVITY_EVENTS.forEach(function (evt) {
+      document.addEventListener(evt, resetIdleTimer, { passive: true });
+    });
 
     function show() {
       if (shown || actedOn) return;
@@ -817,7 +842,10 @@
       overlay.hidden = false;
       sessionStorage.setItem(KEY, "1");
       document.removeEventListener("mouseleave", onMouseLeave);
-      clearTimeout(dwellTimer);
+      clearTimeout(idleTimer);
+      ACTIVITY_EVENTS.forEach(function (evt) {
+        document.removeEventListener(evt, resetIdleTimer);
+      });
     }
     function hide() { overlay.hidden = true; }
 
@@ -834,7 +862,10 @@
     });
 
     // Exit intent - desktop only, mouse heading up and out of the
-    // viewport (toward the tab bar/back button/closing the tab).
+    // viewport (toward the tab bar/back button/closing the tab). This is
+    // the real "abandoning the page" signal, independent of the idle
+    // timer above - fires immediately regardless of how long they'd been
+    // active right up until they moved to leave.
     function onMouseLeave(e) {
       if (e.clientY <= 0) show();
     }
