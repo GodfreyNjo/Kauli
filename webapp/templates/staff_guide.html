@@ -8,6 +8,16 @@
    inside Ereri itself is the quick version for while you're actually working. Open this in its own tab and
    keep it up alongside a real job the first few times through.</p>
 
+<div class="guide-search" role="search">
+  <input type="search" id="guide-search-input" placeholder="Search the guide - a word, a rule, a shortcut…" autocomplete="off" aria-label="Search this guide">
+  <div class="guide-search-controls" id="guide-search-controls" hidden>
+    <span id="guide-search-count" class="muted"></span>
+    <button type="button" id="guide-search-prev" title="Previous match (Shift+Enter)">&uarr;</button>
+    <button type="button" id="guide-search-next" title="Next match (Enter)">&darr;</button>
+    <button type="button" id="guide-search-clear" title="Clear search (Esc)">&times;</button>
+  </div>
+</div>
+
 <details class="m-blog-toc" open style="margin-bottom:20px;">
   <summary>Contents</summary>
   <ol>
@@ -540,4 +550,120 @@
     <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="btn cta-olive">WhatsApp</a>
   </div>
 </div>
+
+<script>
+  // Real in-page search across the whole guide - highlights every match in
+  // every section (not just the one the browser's own Ctrl+F would jump to
+  // first) with a match count and prev/next stepping between them. Scoped
+  // to the .card sections only - the Contents list above is navigation,
+  // not content, so it's left out of both the search and the highlighting.
+  (function () {
+    var input = document.getElementById("guide-search-input");
+    var controls = document.getElementById("guide-search-controls");
+    var countEl = document.getElementById("guide-search-count");
+    var prevBtn = document.getElementById("guide-search-prev");
+    var nextBtn = document.getElementById("guide-search-next");
+    var clearBtn = document.getElementById("guide-search-clear");
+    if (!input) return;
+    var cards = document.querySelectorAll(".card");
+
+    var marks = [];
+    var current = -1;
+
+    function clearHighlights() {
+      marks.forEach(function (mark) {
+        var parent = mark.parentNode;
+        if (!parent) return;
+        parent.replaceChild(document.createTextNode(mark.textContent), mark);
+        parent.normalize();
+      });
+      marks = [];
+      current = -1;
+    }
+
+    function highlight(query) {
+      clearHighlights();
+      if (!query) return;
+      var lower = query.toLowerCase();
+      cards.forEach(function (card) {
+        var walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, {
+          acceptNode: function (node) {
+            if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            var tag = node.parentNode && node.parentNode.nodeName;
+            if (tag === "SCRIPT" || tag === "STYLE" || tag === "MARK") return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          },
+        });
+        var textNodes = [];
+        var n;
+        while ((n = walker.nextNode())) textNodes.push(n);
+        textNodes.forEach(function (node) {
+          var text = node.nodeValue;
+          var lowerText = text.toLowerCase();
+          var idx = lowerText.indexOf(lower);
+          if (idx === -1) return;
+          var frag = document.createDocumentFragment();
+          var cursor = 0;
+          while (idx !== -1) {
+            frag.appendChild(document.createTextNode(text.slice(cursor, idx)));
+            var mark = document.createElement("mark");
+            mark.className = "guide-search-hit";
+            mark.textContent = text.slice(idx, idx + query.length);
+            frag.appendChild(mark);
+            marks.push(mark);
+            cursor = idx + query.length;
+            idx = lowerText.indexOf(lower, cursor);
+          }
+          frag.appendChild(document.createTextNode(text.slice(cursor)));
+          node.parentNode.replaceChild(frag, node);
+        });
+      });
+    }
+
+    function updateCount() {
+      countEl.textContent = marks.length ? (current + 1) + " of " + marks.length : "No matches";
+    }
+
+    function goTo(index) {
+      if (!marks.length) { updateCount(); return; }
+      if (current >= 0 && marks[current]) marks[current].classList.remove("guide-search-hit-current");
+      current = ((index % marks.length) + marks.length) % marks.length;
+      var mark = marks[current];
+      mark.classList.add("guide-search-hit-current");
+      mark.scrollIntoView({ block: "center", behavior: "smooth" });
+      updateCount();
+    }
+
+    var debounceTimer = null;
+    input.addEventListener("input", function () {
+      clearTimeout(debounceTimer);
+      var query = input.value.trim();
+      debounceTimer = setTimeout(function () {
+        highlight(query);
+        controls.hidden = !query;
+        if (query) marks.length ? goTo(0) : updateCount();
+      }, 150);
+    });
+
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        goTo(current + (e.shiftKey ? -1 : 1));
+      } else if (e.key === "Escape") {
+        input.value = "";
+        clearHighlights();
+        controls.hidden = true;
+      }
+    });
+
+    prevBtn.addEventListener("click", function () { goTo(current - 1); });
+    nextBtn.addEventListener("click", function () { goTo(current + 1); });
+    clearBtn.addEventListener("click", function () {
+      input.value = "";
+      clearHighlights();
+      controls.hidden = true;
+      input.focus();
+    });
+  })();
+</script>
 {% endblock %}
