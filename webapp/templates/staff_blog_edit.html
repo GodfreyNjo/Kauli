@@ -40,7 +40,8 @@
     </div>
   </details>
 
-  <form method="post" action="{{ '/staff/blog/' + post['id'] + '/edit' if post else '/staff/blog/new' }}" style="margin-top:20px;">
+  <form method="post" action="{{ '/staff/blog/' + post['id'] + '/edit' if post else '/staff/blog/new' }}"
+        enctype="multipart/form-data" style="margin-top:20px;">
     <label>Title
       <input type="text" name="title" id="blog-title-input" required value="{{ post['title'] if post else '' }}">
     </label>
@@ -50,6 +51,20 @@
     <label>Meta description (for search results and social previews, ~150 chars)
       <input type="text" name="description" id="blog-description-input" value="{{ post['description'] if post else '' }}" maxlength="300">
     </label>
+    {% if post %}
+    <label>Cover image (shown on the post and its card on /blog - real PNG/JPEG/WebP, up to 12MB)
+      <input type="file" name="cover_image" accept="image/png,image/jpeg,image/webp">
+    </label>
+    {% if post['cover_image_path'] %}
+    <div style="margin:-8px 0 16px; display:flex; align-items:center; gap:12px;">
+      <img src="/blog-cover/{{ post['id'] }}" alt="" style="height:64px; width:96px; object-fit:cover; border-radius:6px; border:1px solid var(--border-subtle);">
+      <label class="auth-checkbox-row" style="margin:0;">
+        <input type="checkbox" name="remove_cover_image" value="1">
+        <span>Remove this cover image</span>
+      </label>
+    </div>
+    {% endif %}
+    {% endif %}
     <label>Category
       <select name="category">
         <option value="">No category</option>

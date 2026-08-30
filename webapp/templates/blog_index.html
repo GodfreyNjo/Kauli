@@ -21,9 +21,24 @@
     <p class="muted">Nothing published yet - check back soon.</p>
     {% endif %}
 
-    <div class="m-blog-list">
+    {% if posts and blog_categories %}
+    <!-- Real client-side filter, not a server round-trip - this is a
+         handful of posts, not thousands, so there's nothing a query
+         string/page reload would buy over just toggling visibility. -->
+    <div class="m-blog-filters" role="tablist" aria-label="Filter posts by category">
+      <button type="button" class="m-blog-filter active" data-filter="">All</button>
+      {% for c in blog_categories %}
+      <button type="button" class="m-blog-filter" data-filter="{{ c }}">{{ c }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="m-blog-list" id="m-blog-list">
       {% for post in posts %}
-      <a href="/blog/{{ post['slug'] }}" class="m-blog-card">
+      <a href="/blog/{{ post['slug'] }}" class="m-blog-card" data-category="{{ post['category'] or '' }}">
+        {% if post['cover_image_path'] %}
+        <div class="m-blog-card-visual m-blog-card-photo" style="background-image:url('/blog-cover/{{ post['id'] }}');" aria-hidden="true"></div>
+        {% else %}
         <div class="m-blog-card-visual" data-category="{{ post['category'] or '' }}" aria-hidden="true">
           <svg viewBox="0 0 200 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
             <g fill="currentColor" opacity="0.5">
@@ -33,6 +48,7 @@
             </g>
           </svg>
         </div>
+        {% endif %}
         {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
         <h2>{{ post['title'] }}</h2>
         {% if post['description'] %}<p>{{ post['description'] }}</p>{% endif %}
@@ -40,8 +56,30 @@
       </a>
       {% endfor %}
     </div>
+    <p class="muted m-blog-empty-filter" id="m-blog-empty-filter" hidden>No posts in this category yet.</p>
   </div>
 </section>
+<script>
+  (function () {
+    var filters = document.querySelectorAll('.m-blog-filter');
+    var cards = document.querySelectorAll('#m-blog-list .m-blog-card');
+    var emptyMsg = document.getElementById('m-blog-empty-filter');
+    if (!filters.length || !cards.length) return;
+    filters.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        filters.forEach(function (b) { b.classList.toggle('active', b === btn); });
+        var wanted = btn.dataset.filter;
+        var visibleCount = 0;
+        cards.forEach(function (card) {
+          var match = !wanted || card.dataset.category === wanted;
+          card.style.display = match ? '' : 'none';
+          if (match) visibleCount++;
+        });
+        if (emptyMsg) emptyMsg.hidden = visibleCount > 0;
+      });
+    });
+  })();
+</script>
 
 {% include "_footer.html" %}
 {% endblock %}

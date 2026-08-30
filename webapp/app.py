@@ -54,7 +54,9 @@ UPLOAD_DIR = WEBAPP_DIR / "data" / "uploads"
 OUTPUT_DIR = WEBAPP_DIR / "data" / "output"
 AVATAR_DIR = WEBAPP_DIR / "data" / "avatars"
 RECEIPT_DIR = WEBAPP_DIR / "data" / "receipts"
+BLOG_COVER_DIR = WEBAPP_DIR / "data" / "blog_covers"
 ALLOWED_AVATAR_TYPES = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp"}
+ALLOWED_IMAGE_TYPES = ALLOWED_AVATAR_TYPES  # same real formats, shared for any plain-image upload (blog covers too)
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
 
 
@@ -1231,6 +1233,72 @@ SOLUTION_PAGES = {
         "cta_heading": "Try it on one lesson first",
         "cta_body": "Upload a real module or paste a YouTube link - no card required to try it.",
     },
+    # Service-vocabulary pages, not audience ones (the four above) - the
+    # real gap these fill: someone searching "voice over" or "closed
+    # captions" is describing the exact same real services (dubbing,
+    # subtitles) in different words, and neither term appeared anywhere on
+    # the existing pages (checked live before adding these). Same real
+    # facts as everywhere else, no new claims - just addressed in the
+    # vocabulary that visitor actually used to search.
+    "voice-over": {
+        "title": "Kauli - Swahili and Kikuyu voice over services, AI or a real human actor",
+        "meta_description": "Swahili, Kikuyu and English voice over - AI-synthesized by default, or a real "
+                             "human voice actor as an add-on. Consent required before any voice is cloned, "
+                             "human-reviewed before delivery, transparent per-minute pricing.",
+        "kicker": "Voice over services",
+        "h1": "Swahili and Kikuyu voice over, AI-fast or a real human actor",
+        "intro": "Every dub starts as an AI-synthesized voice over, checked line by line against the "
+                 "source audio by a real editor before it ships. Want a real human voice instead - a "
+                 "specific tone, a named voice actor - that's a real add-on, not a different product.",
+        "why_heading": "Built for real voice over work, not just text-to-speech",
+        "points": [
+            {"title": "AI voice over by default, human-reviewed",
+             "body": "Every dubbed track is synthesized and checked against the source audio before it's "
+                      "marked ready - not just auto-generated and shipped."},
+            {"title": "A real human voice actor, as an add-on",
+             "body": "Need a real person's voice, not a synthesized one? Add a real voice actor to any "
+                      "dub - priced per audio-minute, on top of the base rate."},
+            {"title": "Consent required before any voice is cloned",
+             "body": "If a dub needs to sound like a specific person - the original speaker, a known "
+                      "presenter - we require explicit confirmation of rights and consent before that "
+                      "ever runs. Never assumed."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process - no bundled credits. Your first few minutes are free to "
+                      "test the voice quality yourself, no card required."},
+        ],
+        "cta_heading": "Hear it on your own audio first",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+    },
+    "captioning": {
+        "title": "Kauli - Swahili and Kikuyu captioning and closed captions",
+        "meta_description": "Closed captions and subtitles in Swahili, Kikuyu and English, burned into the "
+                             "video or as a separate file - human-reviewed line by line, transparent "
+                             "per-minute pricing.",
+        "kicker": "Captioning and closed captions",
+        "h1": "Closed captions and subtitles, reviewed line by line before they ship",
+        "intro": "An AI draft gets the captions fast, but a real editor checks every line against the "
+                 "source audio before it's marked ready - burned into the video, or as a separate "
+                 "subtitle file, your choice.",
+        "why_heading": "Built for captions people actually rely on",
+        "points": [
+            {"title": "Every caption human-reviewed",
+             "body": "An AI draft is fast, but a real editor checks it against the source audio line by "
+                      "line before it's marked ready - accuracy matters when captions are how someone "
+                      "actually follows the content."},
+            {"title": "Burned-in or a separate file",
+             "body": "Captions burned directly into the video, or a standalone subtitle file to plug into "
+                      "your own player - included on Premium and Enterprise plans, or as a per-order "
+                      "add-on."},
+            {"title": "Swahili, Kikuyu and English",
+             "body": "Kikuyu captions go through real human transcription (no automated speech-recognition "
+                      "model supports it yet), not a lower-quality automated fallback."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process - no bundled credits. Your first few minutes are free to "
+                      "test the accuracy yourself, no card required."},
+        ],
+        "cta_heading": "See the accuracy on your own video",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+    },
 }
 
 
@@ -1515,6 +1583,7 @@ def blog_index(request: Request):
     return templates.TemplateResponse(request, "blog_index.html", {
         **_marketing_context(home="/"),
         "posts": db.list_blog_posts(published_only=True),
+        "blog_categories": db.BLOG_CATEGORIES,
     })
 
 
@@ -5409,7 +5478,8 @@ def staff_blog_edit_form(request: Request, post_id: str):
 
 @app.post("/staff/blog/{post_id}/edit")
 def staff_blog_update(request: Request, post_id: str, title: str = Form(...), slug: str = Form(""),
-                       description: str = Form(""), body_html: str = Form(...), category: str = Form("")):
+                       description: str = Form(""), body_html: str = Form(...), category: str = Form(""),
+                       cover_image: UploadFile | None = File(None), remove_cover_image: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -5424,7 +5494,45 @@ def staff_blog_update(request: Request, post_id: str, title: str = Form(...), sl
             "blog_categories": db.BLOG_CATEGORIES,
         })
     db.update_blog_post(post_id, slug, title, description.strip() or None, body_html, category=category.strip() or None)
+    # Same real magic-byte validation every other image upload in this app
+    # gets (see /settings' avatar handling) - client-supplied Content-Type
+    # is never trusted on its own.
+    if cover_image is not None and cover_image.filename:
+        BLOG_COVER_DIR.mkdir(parents=True, exist_ok=True)
+        tmp_dest = BLOG_COVER_DIR / f"{post_id}.tmp-{uuid.uuid4().hex[:8]}"
+        try:
+            _size, _sha256, head = upload_security.stream_save_with_limits(
+                cover_image, tmp_dest, upload_security.MAX_BLOG_COVER_BYTES)
+        except upload_security.UploadRejected as exc:
+            return RedirectResponse(f"/staff/blog/{post_id}/edit?error={quote(str(exc))}", status_code=303)
+        mime = upload_security.sniff_image_type(head)
+        ext = ALLOWED_IMAGE_TYPES.get(mime)
+        if not ext:
+            tmp_dest.unlink(missing_ok=True)
+            return RedirectResponse(
+                f"/staff/blog/{post_id}/edit?error={quote('Cover image must be a real PNG, JPEG, or WebP file.')}",
+                status_code=303)
+        for old in BLOG_COVER_DIR.glob(f"{post_id}.*"):
+            old.unlink(missing_ok=True)
+        dest = BLOG_COVER_DIR / f"{post_id}{ext}"
+        tmp_dest.rename(dest)
+        db.set_blog_post_cover_image(post_id, str(dest))
+    elif remove_cover_image == "1":
+        if post["cover_image_path"]:
+            Path(post["cover_image_path"]).unlink(missing_ok=True)
+        db.set_blog_post_cover_image(post_id, None)
     return RedirectResponse(f"/staff/blog/{post_id}/edit?saved=1", status_code=303)
+
+
+@app.get("/blog-cover/{post_id}")
+def blog_cover_image(post_id: str):
+    """Public - a blog post's cover image is meant to be seen (in the card,
+    the post itself, an og:image tag), not an authenticated asset like an
+    avatar. 404 rather than a broken image tag when a post has none."""
+    post = db.get_blog_post(post_id)
+    if not post or not post["cover_image_path"] or not Path(post["cover_image_path"]).exists():
+        return HTMLResponse("Not found.", status_code=404)
+    return FileResponse(post["cover_image_path"])
 
 
 @app.post("/staff/blog/{post_id}/publish")

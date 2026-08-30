@@ -339,6 +339,7 @@ def scan_video_for_explicit_content(video_path: str) -> tuple[bool, float, str]:
 
 
 MAX_AVATAR_BYTES = 8 * 1024 * 1024  # 8MB - plenty for a profile photo
+MAX_BLOG_COVER_BYTES = 12 * 1024 * 1024  # 12MB - a real hero/cover photo runs bigger than a profile thumbnail
 
 _IMAGE_SIGNATURES = [
     (b"\x89PNG\r\n\x1a\n", "image/png"),

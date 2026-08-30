@@ -7,7 +7,7 @@
 <meta property="og:title" content="{{ post['title'] }}">
 {% if post['description'] %}<meta property="og:description" content="{{ post['description'] }}">{% endif %}
 <meta property="og:type" content="article">
-<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png">
+<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-logo-full.png' }}">
 <link rel="icon" href="/static/kauli-icon.png">
 <script type="application/ld+json">
 {
@@ -32,6 +32,9 @@
     <p class="muted" style="font-size:0.8rem; margin-top:10px;">{{ author_name }} &middot;
        {% if post['published_at'] %}<time datetime="{{ published_at_iso }}">{{ post['published_at']|int|timestamp_to_str }}</time>{% else %}Draft{% endif %}</p>
     <h1 class="m-h2" style="text-align:left;">{{ post['title'] }}</h1>
+    {% if post['cover_image_path'] %}
+    <img src="/blog-cover/{{ post['id'] }}" alt="" class="m-blog-hero-image" loading="eager">
+    {% endif %}
 
     {% set post_url = request.url.scheme + '://' + request.url.netloc + '/blog/' + post['slug'] %}
     <div class="m-share-row">

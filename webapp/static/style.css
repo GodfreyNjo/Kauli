@@ -2348,6 +2348,18 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .status-dot .neutral { color: var(--faint); }
 
 /* /blog */
+/* Real client-side category filter (see blog_index.html's script) - a
+   handful of posts, not thousands, so toggling visibility beats a server
+   round-trip. */
+.m-blog-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.m-blog-filter {
+  background: none; border: 1px solid var(--border-subtle); color: var(--muted);
+  font-size: 0.82rem; font-weight: 600; padding: 6px 14px; border-radius: var(--radius-pill);
+  cursor: pointer; margin: 0;
+}
+.m-blog-filter:hover { border-color: var(--accent); color: var(--accent); background: none; }
+.m-blog-filter.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.m-blog-empty-filter { margin-top: 24px; text-align: center; }
 .m-blog-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 22px; margin-top: 24px; }
 .m-blog-card {
   display: block; text-decoration: none; color: inherit; transition: transform 0.15s ease, border-color 0.15s ease;
@@ -2363,6 +2375,9 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
   background: color-mix(in srgb, var(--muted) 12%, var(--bg)); color: var(--faint);
 }
 .m-blog-card-visual svg { width: 100%; height: 60%; display: block; }
+/* Real uploaded cover (see staff_blog_edit.html) instead of the generated
+   waveform placeholder above, when a post actually has one. */
+.m-blog-card-photo { background-size: cover; background-position: center; }
 .m-blog-card-visual[data-category="Localization"] { background: color-mix(in srgb, var(--accent3) 18%, var(--bg)); color: var(--accent3); }
 .m-blog-card-visual[data-category="Accessibility & Compliance"] { background: color-mix(in srgb, var(--accent2) 18%, var(--bg)); color: var(--accent2); }
 .m-blog-card-visual[data-category="Process & Quality"] { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); color: var(--accent); }
@@ -2387,6 +2402,10 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 }
 .m-share-row a:hover, .m-share-row .m-share-copy:hover { color: var(--accent); border-color: var(--accent); }
 .m-share-row .m-share-copy.copied { color: var(--ok); border-color: var(--ok); }
+.m-blog-hero-image {
+  display: block; width: 100%; max-height: 420px; object-fit: cover;
+  border-radius: var(--radius); margin: 20px 0 8px;
+}
 .m-blog-body { font-size: 1.125rem; line-height: 1.75; color: var(--ink); }
 .m-blog-toc {
   background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius);

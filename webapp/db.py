@@ -722,6 +722,14 @@ def init_db() -> None:
         # their own post while editing/QA-ing it isn't excluded - a small,
         # known overcount, not worth a session-tracking system to avoid.
         conn.execute("ALTER TABLE blog_posts ADD COLUMN views INTEGER NOT NULL DEFAULT 0")
+    if "cover_image_path" not in existing_blog_cols:
+        # A real uploaded image for the post card/hero - see upload_security's
+        # existing image-validation path (same real-signature/content checks
+        # every other upload in this app gets, not a rubber-stamped "trust
+        # the filename"). NULL is the honest common case for older posts
+        # written before this existed - blog_index.html/blog_post.html fall
+        # back to the generated SVG waveform card, never a broken <img>.
+        conn.execute("ALTER TABLE blog_posts ADD COLUMN cover_image_path TEXT")
     existing_upload_audit_cols = {row["name"] for row in conn.execute("PRAGMA table_info(upload_audit_log)")}
     if "content_safety_flagged" not in existing_upload_audit_cols:
         conn.execute("ALTER TABLE upload_audit_log ADD COLUMN content_safety_flagged INTEGER")
@@ -1537,6 +1545,15 @@ def set_blog_post_medium_url(post_id: str, medium_url: str) -> None:
 def set_blog_post_devto_url(post_id: str, devto_url: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE blog_posts SET devto_url = ? WHERE id = ?", (devto_url, post_id))
+    conn.commit()
+    conn.close()
+
+
+def set_blog_post_cover_image(post_id: str, path: str | None) -> None:
+    """path=None on purpose removes the cover image (a real "remove image"
+    action in the editor), not just an unused setter argument."""
+    conn = get_conn()
+    conn.execute("UPDATE blog_posts SET cover_image_path = ? WHERE id = ?", (path, post_id))
     conn.commit()
     conn.close()
 

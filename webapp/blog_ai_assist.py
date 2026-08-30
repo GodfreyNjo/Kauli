@@ -36,6 +36,11 @@ that would need real evidence to back up.
 - Write in plain, confident, specific language - explain the real mechanics of a topic \
 (like the "why", not just the "what"), the way a knowledgeable practitioner would, not \
 generic marketing fluff.
+- Format for scanning, the way 3Play Media's own blog reads: short paragraphs, most of them \
+1-2 sentences, essentially never more than 3. One idea per paragraph. Break up any run of more \
+than 3-4 paragraphs with an <h2>/<h3> subheading, or a <ul>/<li> list where the content is \
+naturally a list (steps, examples, options) rather than prose. A wall of long paragraphs is a \
+real defect here, not just a style preference.
 - Kauli's real, true features you CAN reference: AI-drafted transcription/translation with \
 mandatory human review before delivery, per-minute transparent pricing, consent-gated voice \
 cloning, Swahili/Kikuyu/English support (Kikuyu uses human transcription since no ASR model \
