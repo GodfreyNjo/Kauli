@@ -775,4 +775,74 @@
   {% include "_footer.html" %}
 
 </div>
+
+<!-- Real dwell/exit-intent trial prompt - the same pattern Rev's own
+     pricing page uses ("stayed a while, hasn't acted yet"). Real offer
+     (the same {{ free_minutes|int }}-minute free trial the hero CTA
+     already promises, not a fabricated stat like a made-up "average
+     hours saved" claim with nothing behind it), shown at most once per
+     session, and never at all if the visitor already clicked a real
+     signup CTA - see the script below for exactly what suppresses it. -->
+<div class="exit-popup-overlay" id="exit-popup-overlay" hidden>
+  <div class="exit-popup-modal" role="dialog" aria-modal="true" aria-labelledby="exit-popup-title">
+    <button type="button" class="exit-popup-close" id="exit-popup-close" aria-label="Close">&times;</button>
+    <div class="exit-popup-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="8" stroke="currentColor" stroke-width="1.7"/><path d="M12 9v4l2.5 2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 2h6M12 2v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+    </div>
+    <h2 id="exit-popup-title">Still deciding?</h2>
+    <p>Try Kauli with your first {{ free_minutes|int }} minutes free - no card required. See real,
+       human-verified results before you commit to anything.</p>
+    <a href="/login?mode=signup" class="btn cta-olive exit-popup-cta">Start free now</a>
+  </div>
+</div>
+<script>
+  (function () {
+    // sessionStorage, not a cookie - a per-tab "don't show this again this
+    // visit" flag, not tracking, so it isn't part of the cookie-consent
+    // gate (see base.html) at all.
+    var KEY = "kauli_trial_popup_shown";
+    if (sessionStorage.getItem(KEY)) return;
+
+    var overlay = document.getElementById("exit-popup-overlay");
+    var closeBtn = document.getElementById("exit-popup-close");
+    if (!overlay) return;
+
+    var shown = false;
+    var actedOn = false;
+    var dwellTimer = setTimeout(show, 45000);
+
+    function show() {
+      if (shown || actedOn) return;
+      shown = true;
+      overlay.hidden = false;
+      sessionStorage.setItem(KEY, "1");
+      document.removeEventListener("mouseleave", onMouseLeave);
+      clearTimeout(dwellTimer);
+    }
+    function hide() { overlay.hidden = true; }
+
+    // Someone clicking any real "start free" CTA already took the action
+    // this exists to prompt - suppress it rather than also throwing a
+    // popup in front of someone already mid-signup. Matches every real
+    // signup link on this page (hero, nav, demo section) since they all
+    // share this exact href.
+    document.querySelectorAll('a[href="/login?mode=signup"]').forEach(function (a) {
+      a.addEventListener("click", function () {
+        actedOn = true;
+        sessionStorage.setItem(KEY, "1");
+      });
+    });
+
+    // Exit intent - desktop only, mouse heading up and out of the
+    // viewport (toward the tab bar/back button/closing the tab).
+    function onMouseLeave(e) {
+      if (e.clientY <= 0) show();
+    }
+    document.addEventListener("mouseleave", onMouseLeave);
+
+    if (closeBtn) closeBtn.addEventListener("click", hide);
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) hide(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !overlay.hidden) hide(); });
+  })();
+</script>
 {% endblock %}

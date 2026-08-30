@@ -213,6 +213,38 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 .cookie-prefs-actions .btn:not(.secondary) { background: var(--accent3); }
 .cookie-prefs-actions .btn:not(.secondary):hover { background: var(--accent3-hover); }
 
+/* --------------------------------------------------------- exit popup --- */
+/* Homepage only (see marketing.html) - a real dwell/exit-intent trial
+   prompt, same pattern as Rev's own pricing page. Light card regardless of
+   the marketing page's own dark theme, same reasoning as the cookie-
+   preferences modal: a deliberate, considered decision surface reads
+   better as a clean light card than matching the page behind it. */
+.exit-popup-overlay {
+  position: fixed; inset: 0; z-index: 700;
+  background: rgba(15, 13, 26, 0.6);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.exit-popup-modal {
+  position: relative; width: 100%; max-width: 400px; background: #fff; color: #16213e;
+  border-radius: 20px; padding: 40px 32px 32px; text-align: center;
+  box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.35);
+}
+.exit-popup-close {
+  position: absolute; top: 14px; right: 14px; width: 32px; height: 32px;
+  background: none; border: none; border-radius: 50%; font-size: 1.3rem; line-height: 1;
+  color: #9aa1b1; cursor: pointer; margin: 0; padding: 0;
+}
+.exit-popup-close:hover { color: #16213e; background: #f0f1f4; }
+.exit-popup-icon {
+  width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 50%;
+  background: color-mix(in srgb, var(--accent3) 16%, transparent); color: var(--accent3);
+  display: flex; align-items: center; justify-content: center;
+}
+.exit-popup-icon svg { width: 28px; height: 28px; }
+.exit-popup-modal h2 { margin: 0 0 10px; font-size: 1.4rem; color: #16213e; }
+.exit-popup-modal p { margin: 0 0 22px; font-size: 0.92rem; color: #667085; line-height: 1.55; }
+.exit-popup-cta { width: 100%; text-align: center; padding: 13px; margin: 0; font-size: 0.96rem; }
+
 /* -------------------------------------------------------------- topbar --- */
 /* One consistent place for the account switcher, on every screen size and
    for every role - not a bare icon buried at the bottom of a sidebar
