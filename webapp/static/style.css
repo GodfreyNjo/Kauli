@@ -1308,6 +1308,22 @@ tbody tr:hover { background: var(--hover); }
   font-size: 1rem; font-weight: 700; box-shadow: none;
 }
 .auth-shell button[type="submit"]:hover { background: var(--auth-accent-hover); }
+/* Google's own real logo mark (see _google_g_icon.svg), white button with
+   a plain border - matches Google's own published button guidelines
+   (never recolor the "G", never put it on a colored fill) rather than an
+   invented style. */
+.auth-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 12px; margin: 0 0 20px; border-radius: 10px;
+  border: 1px solid var(--auth-border); background: #fff; color: var(--auth-ink);
+  font-size: 0.95rem; font-weight: 600; text-decoration: none;
+}
+.auth-google-btn:hover { background: #f8f9fa; text-decoration: none; }
+.auth-divider {
+  display: flex; align-items: center; gap: 12px; margin: 0 0 20px;
+  color: var(--auth-placeholder); font-size: 0.82rem;
+}
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--auth-border); }
 .auth-consent { font-size: 0.82rem; color: var(--auth-muted); text-align: center; margin: 20px 0 0; line-height: 1.5; }
 .auth-consent a { color: var(--auth-accent); text-decoration: underline; }
 .auth-checkbox-row {

@@ -29,6 +29,11 @@
       <div class="auth-panel" id="panel-signin" {% if mode == 'signup' %}hidden{% endif %}>
         {% if mode == 'signin' and error %}<p class="error">{{ error }}</p>{% endif %}
         {% if mode == 'signin' and notice %}<p class="ok">{{ notice }}</p>{% endif %}
+        <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
+          {% include "_google_g_icon.svg" %}
+          Continue with Google
+        </a>
+        <div class="auth-divider"><span>or</span></div>
         <form method="post" action="/login">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
@@ -53,6 +58,11 @@
 
       <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
         {% if mode == 'signup' and error %}<p class="error">{{ error }}</p>{% endif %}
+        <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
+          {% include "_google_g_icon.svg" %}
+          Continue with Google
+        </a>
+        <div class="auth-divider"><span>or</span></div>
         <form method="post" action="/signup" id="signup-form">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">

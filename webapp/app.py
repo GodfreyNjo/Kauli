@@ -1968,6 +1968,48 @@ def _safe_next(path: str | None) -> str:
     return "/"
 
 
+def _complete_auth_session(request: Request, session, next: str, marketing_consent: bool = False) -> RedirectResponse:
+    """The real provisioning that has to happen once Supabase confirms who
+    someone is, regardless of which door they came through - shared by
+    /login, /signup, and the Google OAuth callback below (extracted from
+    what used to be near-identical copies inside /login and /signup, which
+    is exactly the kind of thing that quietly drifts apart over time -
+    Google sign-in would have been a third copy). marketing_consent only
+    ever comes from the real signup checkbox; Google/email-login callers
+    just don't have one to set."""
+    email = session.user.email.strip().lower()
+    role, is_admin = _resolve_role_and_admin(email)
+    user, was_new = db.get_or_create_user(
+        session.user.id, email, default_role=role,
+        marketing_consent=marketing_consent, consent_ip=request.client.host if request.client else None,
+    )
+    # Not gated on was_new - an existing account can also accept a team
+    # invite sent to their email; this just needs to run once per login,
+    # which is exactly what it does (accept_team_invite is a no-op once
+    # there's no more 'pending' row for this email).
+    db.accept_team_invite(user["id"], email)
+    if was_new:
+        if is_admin:
+            db.set_user_admin(user["id"], True)
+        if role == "staff" and db.is_invited_staff(email):
+            db.remove_staff_invite(email)  # consumed - the invite did its job
+        if role == "voice_actor":
+            db.link_voice_actor_user(email, user["id"])  # consumed - same idea, see that function's comment
+        if role == "client":  # the welcome message is written for a client, not a new staff account
+            _queue_welcome_message(user, base_url=str(request.base_url))
+            _notify_internal_new_signup(user, base_url=str(request.base_url))
+            _capture_signup_ip_intel(user["id"], request)
+    request.session["user_id"] = user["id"]
+    # Clicking a deep link from an email (an order, a receipt, billing)
+    # while logged out used to always land back on the generic dashboard
+    # after signing in, losing where they actually meant to go - this
+    # sends them back to the real destination instead, same pattern every
+    # real app uses. _safe_next already rejected anything that isn't a
+    # real in-app path, so "/" (the normal role-based landing page) is
+    # the only fallback, never an open redirect.
+    return RedirectResponse(_safe_next(next), status_code=303)
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_form(request: Request, mode: str = "signin", notice: str | None = None, next: str | None = None):
     display_notice = None
@@ -2047,33 +2089,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
             "error": error or "Wrong email or password.", "notice": None, "mode": "signin",
             "next": _safe_next(next),
         })
-    role, is_admin = _resolve_role_and_admin(email)
-    user, was_new = db.get_or_create_user(session.user.id, email, default_role=role)
-    # Not gated on was_new - an existing account can also accept a team
-    # invite sent to their email; this just needs to run once per login,
-    # which is exactly what it does (accept_team_invite is a no-op once
-    # there's no more 'pending' row for this email).
-    db.accept_team_invite(user["id"], email)
-    if was_new:
-        if is_admin:
-            db.set_user_admin(user["id"], True)
-        if role == "staff" and db.is_invited_staff(email):
-            db.remove_staff_invite(email)  # consumed - the invite did its job
-        if role == "voice_actor":
-            db.link_voice_actor_user(email, user["id"])  # consumed - same idea, see that function's comment
-        if role == "client":  # the welcome message is written for a client, not a new staff account
-            _queue_welcome_message(user, base_url=str(request.base_url))
-            _notify_internal_new_signup(user, base_url=str(request.base_url))
-            _capture_signup_ip_intel(user["id"], request)
-    request.session["user_id"] = user["id"]
-    # Clicking a deep link from an email (an order, a receipt, billing)
-    # while logged out used to always land back on the generic dashboard
-    # after signing in, losing where they actually meant to go - this
-    # sends them back to the real destination instead, same pattern every
-    # real app uses. _safe_next already rejected anything that isn't a
-    # real in-app path, so "/" (the normal role-based landing page) is
-    # the only fallback, never an open redirect.
-    return RedirectResponse(_safe_next(next), status_code=303)
+    return _complete_auth_session(request, session, next)
 
 
 @app.post("/signup")
@@ -2107,25 +2123,56 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
             "notice": f"Account created for {email}. Check your email to confirm it, then log in.",
             "mode": "signin",  # once confirmed, they'll sign in - land them there
         })
-    role, is_admin = _resolve_role_and_admin(email)
-    user, was_new = db.get_or_create_user(
-        session.user.id, email, default_role=role,
-        marketing_consent=bool(marketing_consent), consent_ip=request.client.host if request.client else None,
-    )
-    db.accept_team_invite(user["id"], email)
-    if was_new:
-        if is_admin:
-            db.set_user_admin(user["id"], True)
-        if role == "staff" and db.is_invited_staff(email):
-            db.remove_staff_invite(email)
-        if role == "voice_actor":
-            db.link_voice_actor_user(email, user["id"])
-        if role == "client":
-            _queue_welcome_message(user, base_url=str(request.base_url))
-            _notify_internal_new_signup(user, base_url=str(request.base_url))
-            _capture_signup_ip_intel(user["id"], request)
-    request.session["user_id"] = user["id"]
-    return RedirectResponse(_safe_next(next), status_code=303)
+    return _complete_auth_session(request, session, next, marketing_consent=bool(marketing_consent))
+
+
+@app.get("/login/google")
+def login_google(request: Request, next: str = ""):
+    """Redirects to Supabase's own OAuth entry point, not Google directly -
+    Supabase (GoTrue) owns the actual OAuth exchange with Google (the real
+    client ID/secret live in the Supabase dashboard, never in this app's
+    own .env), then bounces back to our callback below with a real
+    session. Requires Google actually enabled as a provider in the
+    Supabase project's Authentication > Providers settings, and this app's
+    /auth/google/callback added to its Redirect URLs allowlist - real
+    external setup this route can't do by itself, and fails honestly with
+    a real error page (Supabase's own) rather than a silent loop if it
+    isn't done yet."""
+    supabase_url = os.environ.get("SUPABASE_URL")
+    if not supabase_url:
+        return RedirectResponse(f"/login?error={quote('Sign-in service is not configured.')}", status_code=303)
+    callback_url = str(request.base_url).rstrip("/") + "/auth/google/callback"
+    if next:
+        callback_url += f"?next={quote(_safe_next(next), safe='')}"
+    authorize_url = f"{supabase_url}/auth/v1/authorize?provider=google&redirect_to={quote(callback_url, safe='')}"
+    return RedirectResponse(authorize_url, status_code=303)
+
+
+@app.get("/auth/google/callback", response_class=HTMLResponse)
+def google_callback_page(request: Request):
+    """Supabase hands the real session back as a URL fragment
+    (#access_token=...&refresh_token=...), which never reaches this server
+    on its own - the exact same real mechanism reset_password.html already
+    documents and handles for the password-recovery link. This page's own
+    JS reads the fragment (and the ?next= this app added when it built the
+    redirect above) and forwards both to the POST route below as plain
+    form fields."""
+    return templates.TemplateResponse(request, "oauth_callback.html", {"error": None})
+
+
+@app.post("/auth/google/callback")
+def google_callback_submit(request: Request, access_token: str = Form(""), refresh_token: str = Form(""),
+                            next: str = Form("")):
+    if not access_token or not refresh_token:
+        return templates.TemplateResponse(request, "oauth_callback.html", {
+            "error": "That didn't come back from Google correctly - please try again.",
+        }, status_code=400)
+    session, error = supabase_auth.complete_oauth_session(access_token, refresh_token)
+    if error or not session:
+        return templates.TemplateResponse(request, "oauth_callback.html", {
+            "error": error or "That sign-in didn't work - please try again.",
+        }, status_code=400)
+    return _complete_auth_session(request, session, next)
 
 
 @app.get("/logout")

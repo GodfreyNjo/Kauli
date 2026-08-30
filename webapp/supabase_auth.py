@@ -175,6 +175,27 @@ def sign_in(email: str, password: str):
         return None, str(exc)  # or the friendly one _with_timeout_retry raised
 
 
+def complete_oauth_session(access_token: str, refresh_token: str):
+    """Returns (session_or_None, error_message_or_None) - same shape as
+    sign_in/sign_up, so app.py's Google callback route can hand the result
+    straight to the same post-auth provisioning every login goes through.
+    Used for the Google OAuth callback: Supabase hands the real tokens
+    back as a URL fragment (confirmed live - the same real behavior
+    reset_password.html's own comment already documents for the password-
+    recovery link, and OAuth redirects use the identical mechanism), which
+    never reaches this server directly - the callback page's own JS reads
+    it and forwards it here as plain form fields, same pattern as password
+    reset. set_session both validates the tokens are real (a forged pair
+    fails here) and refreshes them if the access token's already expired."""
+    try:
+        res = get_client().auth.set_session(access_token, refresh_token)
+        if not res.session:
+            return None, "That sign-in link is invalid or has expired. Try Google sign-in again."
+        return res.session, None
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)
+
+
 def change_password(email: str, current_password: str, new_password: str):
     """For a logged-in user changing their password from Settings -
     different path from set_new_password below (that one consumes a

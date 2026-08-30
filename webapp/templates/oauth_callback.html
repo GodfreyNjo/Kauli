@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Signing you in{% endblock %}
+{% block content %}
+<div class="centered-auth">
+  <div class="auth-brand">
+    <div class="wordmark">KAULI</div>
+    <div class="sub-wordmark">Forge Media Services</div>
+  </div>
+
+  <div class="auth-card" style="text-align:center;">
+    <div id="oauth-working">
+      <p class="auth-sub" style="margin:0;">Signing you in with Google&hellip;</p>
+    </div>
+    <div id="oauth-error" hidden>
+      {% if error %}<p class="error">{{ error }}</p>{% endif %}
+      <p class="error" id="oauth-error-text" hidden></p>
+      <p class="auth-switch"><a href="/login">Back to sign in</a></p>
+    </div>
+    <noscript><p class="error">This page needs JavaScript to complete Google sign-in - please enable it and
+       try again.</p></noscript>
+  </div>
+</div>
+
+<form method="post" action="/auth/google/callback" id="oauth-form" style="display:none;">
+  <input type="hidden" name="access_token" id="oauth-access-token">
+  <input type="hidden" name="refresh_token" id="oauth-refresh-token">
+  <input type="hidden" name="next" id="oauth-next">
+</form>
+<script>
+  (function () {
+    // Supabase hands the real session back in the URL fragment
+    // (#access_token=...&refresh_token=...) - the exact same real
+    // mechanism reset_password.html already relies on for its own
+    // recovery link, since a fragment never reaches the server on its
+    // own. Any error Google/Supabase reported instead shows up as
+    // ?error=... or #error=... depending on where in the chain it failed.
+    var hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    var queryParams = new URLSearchParams(window.location.search);
+    var accessToken = hashParams.get("access_token");
+    var refreshToken = hashParams.get("refresh_token");
+    var oauthError = hashParams.get("error_description") || hashParams.get("error")
+      || queryParams.get("error_description") || queryParams.get("error");
+    var nextParam = queryParams.get("next") || "";
+
+    var workingEl = document.getElementById("oauth-working");
+    var errorEl = document.getElementById("oauth-error");
+    var errorTextEl = document.getElementById("oauth-error-text");
+
+    {% if error %}
+    // A POST already told us server-side that these tokens didn't work -
+    // stay on the error state rather than looping back into the same
+    // fragment and trying again automatically.
+    workingEl.hidden = true;
+    errorEl.hidden = false;
+    {% else %}
+    if (oauthError) {
+      workingEl.hidden = true;
+      errorEl.hidden = false;
+      errorTextEl.hidden = false;
+      errorTextEl.textContent = "Google sign-in didn't complete: " + oauthError;
+    } else if (accessToken && refreshToken) {
+      document.getElementById("oauth-access-token").value = accessToken;
+      document.getElementById("oauth-refresh-token").value = refreshToken;
+      document.getElementById("oauth-next").value = nextParam;
+      // Don't leave the real tokens sitting in the visible URL/history any
+      // longer than needed - same real reasoning as reset_password.html.
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+      document.getElementById("oauth-form").submit();
+    } else {
+      workingEl.hidden = true;
+      errorEl.hidden = false;
+      errorTextEl.hidden = false;
+      errorTextEl.textContent = "That didn't come back from Google correctly - please try again.";
+    }
+    {% endif %}
+  })();
+</script>
+{% endblock %}
