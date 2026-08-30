@@ -234,14 +234,20 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   background: rgba(15, 13, 26, 0.6);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
+/* Sized against the real reference screenshot, not eyeballed - that
+   popup runs roughly 35% of viewport width and 80%+ of viewport height,
+   a substantial panel, not a small confirmation dialog. 400px/tight
+   padding read as a card lost in a large dark backdrop by comparison;
+   520px with generous padding throughout actually fills the screen the
+   way that reference does. */
 .exit-popup-modal {
-  position: relative; width: 100%; max-width: 400px; background: #fff; color: #16213e;
-  border-radius: 20px; overflow: hidden; text-align: center;
+  position: relative; width: 100%; max-width: 520px; background: #fff; color: #16213e;
+  border-radius: 24px; overflow: hidden; text-align: center;
   box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.35);
 }
 .exit-popup-close {
-  position: absolute; top: 14px; right: 14px; z-index: 2; width: 32px; height: 32px;
-  background: rgba(255, 255, 255, 0.6); border: none; border-radius: 50%; font-size: 1.3rem; line-height: 1;
+  position: absolute; top: 18px; right: 18px; z-index: 2; width: 36px; height: 36px;
+  background: rgba(255, 255, 255, 0.6); border: none; border-radius: 50%; font-size: 1.4rem; line-height: 1;
   color: #16213e; cursor: pointer; margin: 0; padding: 0; backdrop-filter: blur(2px);
 }
 .exit-popup-close:hover { background: #fff; }
@@ -249,23 +255,23 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
    popup (icon sits in a tinted zone at the top, copy + CTA on plain
    white below) - the app's real brand olive, not an arbitrary color. */
 .exit-popup-icon-wrap {
-  padding: 36px 32px 26px;
+  padding: 56px 44px 40px;
   background: linear-gradient(160deg, color-mix(in srgb, var(--accent3) 20%, #fff) 0%, #fff 100%);
 }
 .exit-popup-icon {
-  width: 60px; height: 60px; margin: 0 auto; border-radius: 50%; background: #fff; color: var(--accent3);
+  width: 84px; height: 84px; margin: 0 auto; border-radius: 50%; background: #fff; color: var(--accent3);
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--accent3) 55%, transparent);
 }
-.exit-popup-icon svg { width: 30px; height: 30px; }
-.exit-popup-body { padding: 24px 32px 32px; }
+.exit-popup-icon svg { width: 42px; height: 42px; }
+.exit-popup-body { padding: 32px 44px 44px; }
 .exit-popup-modal h2 {
-  margin: 0 0 12px; font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; color: #16213e;
+  margin: 0 0 16px; font-family: var(--font-display); font-size: 2rem; font-weight: 600; color: #16213e;
 }
-.exit-popup-lede { margin: 0 0 8px; font-size: 1rem; font-weight: 650; color: #16213e; line-height: 1.5; }
-.exit-popup-sub { margin: 0 0 24px; font-size: 0.88rem; color: #667085; line-height: 1.55; }
+.exit-popup-lede { margin: 0 0 10px; font-size: 1.15rem; font-weight: 650; color: #16213e; line-height: 1.5; }
+.exit-popup-sub { margin: 0 0 32px; font-size: 1rem; color: #667085; line-height: 1.55; }
 .exit-popup-cta {
-  width: 100%; text-align: center; padding: 15px; margin: 0; font-size: 1rem; font-weight: 700;
+  width: 100%; text-align: center; padding: 18px; margin: 0; font-size: 1.1rem; font-weight: 700;
   border-radius: 12px; box-shadow: 0 12px 26px -10px color-mix(in srgb, var(--accent3) 60%, transparent);
 }
 
