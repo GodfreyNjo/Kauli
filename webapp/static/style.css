@@ -2059,7 +2059,12 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
   .hero-arrow { animation: none; }
 }
 
-.m-section h2.m-h2 { font-size: 1.7rem; text-align: center; margin: 0 0 10px; }
+/* No font-size here on purpose - this selector's higher specificity
+   (.m-section h2.m-h2 beats the bare .m-h2 rule above) was silently
+   overriding the fluid clamp with this flat 1.7rem, the exact bug that
+   left section headings stuck at 27.2px instead of scaling like the
+   hero - confirmed live before this fix. */
+.m-section h2.m-h2 { text-align: center; margin: 0 0 10px; }
 .m-section p.m-lede { text-align: center; color: var(--muted); max-width: 620px; margin: 0 auto 44px; font-size: 1rem; line-height: 1.6; }
 
 /* Explicit 3-column desktop grid (2 rows of 3) rather than auto-fit - a
