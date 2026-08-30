@@ -2763,6 +2763,14 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
   background: var(--accent-soft); color: var(--ink);
   border-left: 3px solid var(--accent); border-radius: var(--radius-sm);
 }
+/* Same real "a mode is active" pattern as .voice-mode-banner above, own
+   accent color (--info) so the two are visually distinct at a glance
+   when either (or both) could be showing at once. */
+.italic-mode-banner {
+  margin-top: 10px; padding: 10px 14px; font-size: 0.8rem; line-height: 1.5;
+  background: var(--info-soft); color: var(--ink);
+  border-left: 3px solid var(--info); border-radius: var(--radius-sm);
+}
 .voice-picker { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .voice-picker[hidden] { display: none; }
 .voice-picker select { width: auto; flex: 1; min-width: 200px; margin: 0; }

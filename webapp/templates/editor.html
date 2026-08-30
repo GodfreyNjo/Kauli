@@ -127,6 +127,10 @@
         Playing the cloned, dubbed voice - this replaces {{ order['source_lang'] }} audio with what the
         client will actually hear. Edits here are still the {{ order['target_lang'] }} transcript.
       </div>
+      <div class="italic-mode-banner" id="italic-mode-banner" hidden>
+        <em>Italic mode on</em> - every cell you select from here gets italicized. Press Ctrl+Shift+I again
+        to turn it off (already-italicized cells stay that way either way).
+      </div>
       {% if order['tts'] != 'stub' %}
       <div class="voice-picker" id="voice-picker" hidden>
         <form method="post" action="/staff/orders/{{ order['id'] }}/dub-voice" id="voice-picker-form">
@@ -413,7 +417,8 @@
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>,</kbd><span>Capitalize the whole cell (always up, not a toggle)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>shift</kbd>+<kbd>u</kbd><span>Toggle case of the whole cell (either direction)</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>p</kbd><span>Pluralize (English only - {{ non_english_lang_name }} plurals need a manual edit)</span></div>
-        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>i</kbd><span>Toggle italics (real &lt;i&gt; markup, carries into SRT/VTT)</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>i</kbd><span>Toggle italics on the focused cell only</span></div>
+        <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>i</kbd><span>Italic mode - every cell you select from here on gets italicized, until you press it again</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>q</kbd><span>Prepend a quote mark</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>d</kbd><span>Add trailing -- for cut-off speech</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>n</kbd><span>Toggle [inaudible] tag</span></div>

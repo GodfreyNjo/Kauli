@@ -32,6 +32,13 @@
   let previewing = false;
   let macros = new Array(10).fill(""); // index 0-8 = Ctrl+1..Ctrl+9, index 9 = Ctrl+0
   let bookmarkedCells = new Set(); // personal markers, local only (see loadBookmarks) - not job data
+  // Ctrl+Shift+I toggles this - while true, every cell you focus (click,
+  // Tab, arrow into) gets italicized automatically, for marking a whole
+  // run of cells (a song, a foreign-language aside) without hitting Alt+I
+  // on each one individually. See bindShortcuts and the focusin listener
+  // it wires up below. Turning it off never un-italicizes anything - it
+  // only stops applying it to cells you land on next.
+  let italicModeActive = false;
 
   // Continuous-document model: cells from every segment live together in
   // one shared flow per step (see #flow-source/#flow-target in editor.html)
@@ -1038,6 +1045,34 @@
     markDirty(cell.dataset.segmentId);
   }
 
+  // Force-applies italics - idempotent (a cell already wrapped is left
+  // alone) rather than toggling, which is what italic MODE needs: landing
+  // on a cell that's already italic while the mode is on should keep it
+  // italic, not flip it back off the way the one-shot Alt+I toggle would.
+  function applyItalicsForced(cell) {
+    const trailing = /\s$/.test(cell.textContent) ? " " : "";
+    const t = cell.textContent.trim();
+    if (!t || /^<i>[\s\S]*<\/i>$/i.test(t)) return; // empty or already italic - nothing to do
+    cell.textContent = `<i>${t}</i>` + trailing;
+    markDirty(cell.dataset.segmentId);
+  }
+
+  function setItalicMode(on) {
+    italicModeActive = on;
+    const banner = $("#italic-mode-banner");
+    if (banner) banner.hidden = !on;
+  }
+
+  // Delegated (not a per-cell listener like buildCells' own focus binding)
+  // so it applies to every cell everywhere - both steps, cells rebuilt
+  // after a save/retranslate, macro-inserted cells - without needing to
+  // touch every place a cell gets created.
+  function bindItalicMode() {
+    document.addEventListener("focusin", (e) => {
+      if (italicModeActive && isEditingCell(e.target)) applyItalicsForced(e.target);
+    });
+  }
+
   function prependQuoteMark(cell) {
     const m = cell.textContent.match(/^(\s*)([\s\S]*)$/);
     cell.textContent = m[1] + '"' + m[2];
@@ -1625,6 +1660,16 @@
         openJobReturnModal();
         return;
       }
+      if (e.ctrlKey && e.shiftKey && key === "i") {
+        e.preventDefault();
+        setItalicMode(!italicModeActive);
+        // The cell already focused when the mode is switched on counts
+        // too, not just ones selected after - otherwise turning it on
+        // with your cursor already sitting on the first cell you want
+        // italicized would skip that exact cell.
+        if (italicModeActive && editing) applyItalicsForced(active);
+        return;
+      }
       if (e.altKey && key === "f") {
         e.preventDefault();
         const segmentId = active && active.dataset.segmentId;
@@ -2019,6 +2064,7 @@
     bindVoiceDirectionModal();
     bindApproveSplitButton();
     bindVoicePicker();
+    bindItalicMode();
     bindShortcuts();
   };
 })();
