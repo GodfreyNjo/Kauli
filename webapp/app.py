@@ -1968,6 +1968,21 @@ def _safe_next(path: str | None) -> str:
     return "/"
 
 
+def _public_base_url(request: Request) -> str:
+    """Prefer the real configured public URL (KAULI_PUBLIC_BASE_URL, the
+    same one worker.py already uses for its own no-request-object case)
+    over request.base_url, for any URL a third party validates against an
+    exact allowlist. Confirmed live: behind Cloudflare's tunnel, this app
+    sees the connecting peer as the Docker bridge gateway (172.17.0.1 in
+    every real request log), which uvicorn's ProxyHeadersMiddleware
+    doesn't trust by default - so request.base_url's scheme comes back as
+    the internal "http" hop, not the real external "https", and Supabase's
+    real redirect-URL allowlist match is exact, not scheme-agnostic. Falls
+    back to request.base_url for local dev, where that env var is
+    correctly left unset."""
+    return os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
+
+
 def _complete_auth_session(request: Request, session, next: str, marketing_consent: bool = False) -> RedirectResponse:
     """The real provisioning that has to happen once Supabase confirms who
     someone is, regardless of which door they came through - shared by
@@ -2035,7 +2050,7 @@ def forgot_password_submit(request: Request, email: str = Form("")):
     # unauthenticated, no CAPTCHA.
     allowed, retry_after = rate_limit.check(f"forgot:{rate_limit.client_ip(request)}", limit=5, window_s=600)
     if allowed and "@" in email:
-        redirect_to = str(request.base_url).rstrip("/") + "/reset-password"
+        redirect_to = _public_base_url(request) + "/reset-password"
         supabase_auth.request_password_reset(email, redirect_to)
     # Always the same response whether the email exists, was rate-limited,
     # or Supabase errored - see request_password_reset's docstring for why.
@@ -2141,7 +2156,7 @@ def login_google(request: Request, next: str = ""):
     supabase_url = os.environ.get("SUPABASE_URL")
     if not supabase_url:
         return RedirectResponse(f"/login?error={quote('Sign-in service is not configured.')}", status_code=303)
-    callback_url = str(request.base_url).rstrip("/") + "/auth/google/callback"
+    callback_url = _public_base_url(request) + "/auth/google/callback"
     if next:
         callback_url += f"?next={quote(_safe_next(next), safe='')}"
     authorize_url = f"{supabase_url}/auth/v1/authorize?provider=google&redirect_to={quote(callback_url, safe='')}"
