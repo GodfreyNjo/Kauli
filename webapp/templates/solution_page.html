@@ -71,6 +71,23 @@
     </div>
   </section>
 
+  {% if related_pages %}
+  <section class="m-section" id="related-services" style="border-top:1px solid var(--border-subtle);">
+    <div class="m-inner">
+      <h2 class="m-h2">Related services</h2>
+      <div class="m-related-grid">
+        {% for r in related_pages %}
+        <a href="/solutions/{{ r.slug }}" class="m-related-card">
+          <span class="m-related-kicker">{{ r.kicker }}</span>
+          <span class="m-related-h1">{{ r.h1 }}</span>
+          <span class="m-related-arrow">Learn more →</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
   {% include "_footer.html" %}
 </div>
 {% endblock %}

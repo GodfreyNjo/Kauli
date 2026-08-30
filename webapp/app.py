@@ -1146,6 +1146,7 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "See the quality for yourself, on your own material",
         "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-translation", "video-transcription", "captioning"],
     },
     "youtubers": {
         "title": "Kauli for YouTubers - dub or subtitle your videos into English or Swahili",
@@ -1175,6 +1176,7 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "Try it on your last upload",
         "cta_body": "Paste the link, or connect your channel for ongoing auto-import.",
+        "related": ["video-dubbing", "captioning", "voice-over"],
     },
     "media-broadcast": {
         "title": "Kauli for media and broadcast - subtitles and dubs on a real deadline",
@@ -1204,6 +1206,7 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "Talk to us about your next broadcast deadline",
         "cta_body": "Book a call, or start with a real clip to see the quality and turnaround for yourself.",
+        "related": ["video-dubbing", "captioning", "voice-over"],
     },
     "e-learning": {
         "title": "Kauli for e-learning - localize a course once, reuse it every cohort",
@@ -1232,6 +1235,7 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "Try it on one lesson first",
         "cta_body": "Upload a real module or paste a YouTube link - no card required to try it.",
+        "related": ["video-translation", "video-transcription", "video-localization"],
     },
     # Service-vocabulary pages, not audience ones (the four above) - the
     # real gap these fill: someone searching "voice over" or "closed
@@ -1268,6 +1272,7 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "Hear it on your own audio first",
         "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-dubbing", "captioning", "video-localization"],
     },
     "captioning": {
         "title": "Kauli - Swahili and Kikuyu captioning and closed captions",
@@ -1298,6 +1303,148 @@ SOLUTION_PAGES = {
         ],
         "cta_heading": "See the accuracy on your own video",
         "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-transcription", "voice-over", "video-localization"],
+    },
+    # Core commercial-intent pages - "video translation/dubbing/captioning/
+    # transcription services" are real, high-intent search terms distinct
+    # from the audience pages above and from voice-over/captioning's
+    # narrower vocabulary-synonym framing. Deliberately NOT built as
+    # separate /subtitle-translation, /video-subtitling, or /audio-
+    # transcription pages too, even though a pasted SEO doc suggested them -
+    # those would be near-duplicate content competing with captioning/
+    # video-transcription for the same real intent, which is a real
+    # keyword-cannibalization/thin-content risk, not a win. Also
+    # deliberately doesn't mention Somali, despite that doc repeatedly
+    # targeting "Somali dubbing" / "English to Somali" - Kauli does not
+    # support Somali (see SOURCE_LANGUAGES above: Swahili, English, Kikuyu
+    # only). Advertising a language this app cannot actually deliver would
+    # be a real problem the moment a Somali-speaking lead showed up, not
+    # just an SEO inaccuracy.
+    "video-translation": {
+        "title": "Kauli - Video translation services for Swahili, Kikuyu and English",
+        "meta_description": "Translate video and audio between Swahili, Kikuyu and English - a real "
+                             "editor checks every line against the source before delivery. "
+                             "Transparent per-minute pricing, based in Kenya.",
+        "kicker": "Video translation services",
+        "h1": "Video translation between Swahili, Kikuyu and English, checked line by line",
+        "intro": "An AI draft translates fast, but a real editor checks every line against the "
+                 "source audio before it's marked ready - a translated transcript, subtitles, or a "
+                 "fully dubbed track, whichever your video actually needs. Based in Kenya, built for "
+                 "Swahili, Kikuyu and English specifically, not a generic hundred-language tool.",
+        "why_heading": "Built for real translation work, not a generic tool",
+        "points": [
+            {"title": "Human-reviewed, not just machine-translated",
+             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+                      "line by line before it's marked ready - accuracy that matters when a "
+                      "mistranslation changes what was actually said."},
+            {"title": "Transcript, subtitles, or a full dub",
+             "body": "Pick the actual deliverable your video needs - a translated transcript for "
+                      "reading, subtitles for the video itself, or a fully dubbed track."},
+            {"title": "Swahili and Kikuyu specifically, not an afterthought",
+             "body": "Kikuyu goes through real human transcription and translation (no automated "
+                      "speech-recognition model supports it yet), not a lower-quality automated "
+                      "fallback bolted onto a tool built for other languages."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process - no bundled credits. Your first few minutes are "
+                      "free to test the accuracy yourself, no card required."},
+        ],
+        "cta_heading": "See the translation quality on your own video",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-transcription", "video-dubbing", "video-localization"],
+    },
+    "video-transcription": {
+        "title": "Kauli - Video and audio transcription services, Swahili, Kikuyu and English",
+        "meta_description": "Transcribe video or audio in Swahili, Kikuyu or English - AI-drafted, "
+                             "checked word-by-word by a real editor against the source before "
+                             "delivery. Transparent per-minute pricing, based in Kenya.",
+        "kicker": "Video and audio transcription",
+        "h1": "Video and audio transcription, checked word-by-word before it ships",
+        "intro": "An AI draft transcribes fast, but a real editor checks it against the source "
+                 "audio before it's marked ready - a clean read or a verbatim transcript, your "
+                 "choice, in Swahili, Kikuyu, or English.",
+        "why_heading": "Built for real transcription work",
+        "points": [
+            {"title": "Every transcript human-reviewed",
+             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+                      "word by word before it's marked ready - not just auto-generated and shipped."},
+            {"title": "Kikuyu goes through real human transcription",
+             "body": "No automated speech-recognition model supports Kikuyu yet - orders in Kikuyu "
+                      "go straight to a real human transcriber, not a lower-quality automated "
+                      "guess."},
+            {"title": "Clean read or verbatim, your choice",
+             "body": "A clean read strips filler words and false starts for readability; verbatim "
+                      "keeps every false start and filler word for a legal or research record - "
+                      "pick what your actual use case needs."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process - no bundled credits. Your first few minutes are "
+                      "free to test the accuracy yourself, no card required."},
+        ],
+        "cta_heading": "See the accuracy on your own audio",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-translation", "captioning", "video-localization"],
+    },
+    "video-dubbing": {
+        "title": "Kauli - Video dubbing services, Swahili, Kikuyu and English",
+        "meta_description": "Dub video into Swahili, Kikuyu or English - AI-synthesized by default, "
+                             "a real human voice actor as an add-on, human-reviewed before "
+                             "delivery. Transparent per-minute pricing, based in Kenya.",
+        "kicker": "Video dubbing services",
+        "h1": "Video dubbing into Swahili, Kikuyu or English, reviewed before it ships",
+        "intro": "Kauli pairs fast AI voice synthesis with a real editor on every order - a fully "
+                 "dubbed track, checked against the source audio line by line before it's marked "
+                 "ready. Want a real human voice instead of a synthesized one? That's a real "
+                 "add-on, not a different product.",
+        "why_heading": "Built for real dubbing work, not a one-click gimmick",
+        "points": [
+            {"title": "Every dub human-reviewed",
+             "body": "An AI-synthesized voice track is fast, but a real editor checks the "
+                      "translation and the audio against the source before it's marked ready."},
+            {"title": "Burned-in captions or a dubbed video file",
+             "body": "Get the dubbed audio track alone, or a full video with burned-in captions "
+                      "and the new dub - included on Premium and Enterprise plans, or as a "
+                      "per-order add-on."},
+            {"title": "Consent required before any voice is cloned",
+             "body": "If a dub needs to sound like the original speaker, we require explicit "
+                      "confirmation of rights and consent before that ever runs. Never assumed."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process - no bundled credits. Your first few minutes are "
+                      "free to test the quality yourself, no card required."},
+        ],
+        "cta_heading": "Hear it on your own video first",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["voice-over", "captioning", "video-localization"],
+    },
+    "video-localization": {
+        "title": "Kauli - Video localization services, Swahili, Kikuyu and English",
+        "meta_description": "Full video localization between Swahili, Kikuyu and English - "
+                             "transcription, translation, subtitles, captions or a full dub, all "
+                             "human-reviewed, from one team. Based in Kenya.",
+        "kicker": "Video localization services",
+        "h1": "One team for transcription, translation, subtitles, and dubbing",
+        "intro": "Localizing a video usually means several real steps - transcribe it, translate "
+                 "it, then subtitle or dub it. Kauli does all of it, from one order, with the same "
+                 "real editor checking every step against the source audio, not four different "
+                 "vendors to coordinate.",
+        "why_heading": "Every step, one real team",
+        "points": [
+            {"title": "Transcription, translation, subtitles, or a full dub",
+             "body": "Pick what your video actually needs, or combine them - a translated "
+                      "transcript, burned-in subtitles, or a fully dubbed track with captions."},
+            {"title": "Every order human-reviewed",
+             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+                      "line by line before it's marked ready, at every step, not just the final "
+                      "output."},
+            {"title": "Swahili, Kikuyu and English, done properly",
+             "body": "Kikuyu goes through real human transcription (no automated speech-"
+                      "recognition model supports it yet) - not an afterthought bolted onto a tool "
+                      "built for other languages."},
+            {"title": "Transparent per-minute pricing",
+             "body": "Pay for what you process, across however many steps your video actually "
+                      "needs - no bundled credits, first few minutes free to try."},
+        ],
+        "cta_heading": "See the full process on your own video",
+        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "related": ["video-translation", "video-dubbing", "captioning"],
     },
 }
 
@@ -1311,8 +1458,16 @@ def solution_page(request: Request, slug: str):
     if user:
         return RedirectResponse(
             "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
+    # Real internal linking between the real, related pages - "connect the
+    # services" rather than let each page dead-end. Silently skips any slug
+    # that isn't (shouldn't happen with the hardcoded lists above, but a
+    # typo here should never 500 a real page over a broken "related" link).
+    related_pages = [
+        {"slug": s, "kicker": SOLUTION_PAGES[s]["kicker"], "h1": SOLUTION_PAGES[s]["h1"]}
+        for s in page.get("related", []) if s in SOLUTION_PAGES
+    ]
     return templates.TemplateResponse(request, "solution_page.html",
-        {**_marketing_context(home="/"), "page": page})
+        {**_marketing_context(home="/"), "page": page, "related_pages": related_pages})
 
 
 def _marketing_context(sent: bool = False, lead_error: str | None = None, home: str = "") -> dict:
