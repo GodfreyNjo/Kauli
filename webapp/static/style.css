@@ -146,25 +146,72 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   letter-spacing: 0.02em;
 }
 
+/* Full-width dark utility bar, not a floating rounded card - deliberately
+   its own fixed literal palette (like the login page's --auth-* one),
+   independent of whether the page underneath is light or dark, so it
+   reads the same and stays legible everywhere it can appear (every page
+   on the site sets this one cookie). Olive Accept button - the app's real
+   brand color (var(--accent3)), not an arbitrary one. */
 .cookie-notice {
-  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 500;
-  max-width: 640px; margin: 0 auto;
-  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-  box-shadow: 0 12px 32px -10px rgba(0, 0, 0, 0.4);
-  padding: 14px 16px; align-items: center; gap: 14px; flex-wrap: wrap;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 500;
+  background: #1a1b2e; color: #e4e4ec;
+  box-shadow: 0 -8px 24px -10px rgba(0, 0, 0, 0.4);
+  padding: 16px 24px; align-items: center; gap: 20px; flex-wrap: wrap;
 }
-.cookie-notice p { margin: 0; font-size: 0.8rem; color: var(--muted); flex: 1; min-width: 220px; }
-.cookie-notice .btn { margin: 0; flex-shrink: 0; }
+.cookie-notice p { margin: 0; font-size: 0.86rem; color: #c7c8d6; flex: 1; min-width: 220px; line-height: 1.5; }
+.cookie-notice p a { color: #fff; text-decoration: underline; }
+.cookie-notice p a:hover { color: var(--accent3); }
+.cookie-notice .btn { margin: 0; flex-shrink: 0; background: var(--accent3); }
+.cookie-notice .btn:hover { background: var(--accent3-hover); }
 .cookie-notice-short { display: none; }
 @media (max-width: 640px) {
   /* Compact bottom-sheet on mobile - short copy, tighter padding, no
      220px min-width forcing the banner tall enough to eat a chunk of a
      short viewport. */
-  .cookie-notice { left: 10px; right: 10px; bottom: 10px; padding: 10px 12px; gap: 10px; }
-  .cookie-notice p { font-size: 0.76rem; min-width: 0; }
+  .cookie-notice { padding: 12px 16px; gap: 10px; }
+  .cookie-notice p { font-size: 0.8rem; min-width: 0; }
   .cookie-notice-full { display: none; }
   .cookie-notice-short { display: inline; }
 }
+
+/* ---------------------------------------------- cookie preferences --- */
+/* A normal light card (not the dark bar's palette) - this is a real
+   settings dialog someone opens deliberately, not an attention-grabbing
+   banner, so it matches the rest of the app's chrome instead of the
+   bar's fixed dark look. */
+.cookie-prefs-overlay {
+  position: fixed; inset: 0; z-index: 600;
+  background: rgba(15, 13, 26, 0.55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.cookie-prefs-modal {
+  width: 100%; max-width: 460px; background: var(--panel); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius); padding: 24px; max-height: 90vh; overflow-y: auto;
+}
+.cookie-prefs-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cookie-prefs-head h2 { margin: 0; font-size: 1.1rem; }
+.cookie-prefs-close {
+  background: none; border: none; font-size: 1.4rem; line-height: 1; color: var(--muted);
+  cursor: pointer; padding: 2px 6px; margin: 0;
+}
+.cookie-prefs-close:hover { color: var(--ink); background: none; }
+.cookie-prefs-row {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 14px 0; border-top: 1px solid var(--border-subtle);
+}
+.cookie-prefs-row strong { display: block; font-size: 0.92rem; margin-bottom: 4px; }
+.cookie-prefs-row p { margin: 0; font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+.cookie-prefs-row input[type="checkbox"] {
+  width: 18px; height: 18px; margin: 2px 0 0; flex-shrink: 0; accent-color: var(--accent3); cursor: pointer;
+}
+.cookie-prefs-row input[type="checkbox"]:disabled { opacity: 0.6; cursor: default; }
+.cookie-prefs-actions {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+.cookie-prefs-actions .btn { margin: 0; }
+.cookie-prefs-actions .btn:not(.secondary) { background: var(--accent3); }
+.cookie-prefs-actions .btn:not(.secondary):hover { background: var(--accent3-hover); }
 
 /* -------------------------------------------------------------- topbar --- */
 /* One consistent place for the account switcher, on every screen size and

@@ -1,12 +1,26 @@
 <!-- Google Analytics (GA4) - included only on the public marketing/blog/solution
      pages (see the m-public templates below), never in base.html itself, so it
-     never runs inside the logged-in client or staff app. What this collects and
-     why is disclosed at /privacy#cookies. -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-29L6CFPNEB"></script>
+     never runs inside the logged-in client or staff app.
+     Gated behind real cookie consent (see base.html's cookie-notice/
+     cookie-prefs script): this only DEFINES the loader, it never calls it. GA
+     doesn't actually load until the visitor has accepted analytics cookies -
+     either just now via the banner/preferences modal, or on a past visit
+     recorded in localStorage. What this collects and why is disclosed at
+     /privacy#cookies. -->
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-29L6CFPNEB');
+  window.__kauliGaId = 'G-29L6CFPNEB';
+  window.__kauliLoadGA = function () {
+    if (window.__kauliGaLoaded) return;
+    window.__kauliGaLoaded = true;
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + window.__kauliGaId;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    window.gtag = gtag;
+    gtag('js', new Date());
+    gtag('config', window.__kauliGaId);
+  };
 </script>
 <!-- End Google Analytics -->
