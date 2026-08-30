@@ -2673,8 +2673,15 @@ def settings_save(request: Request, display_name: str = Form(...),
         # Clear any previous photo under a different extension first, so
         # switching from a .png to a .jpg doesn't leave the old one behind
         # for /avatar/{id} to find first.
-        for old in AVATAR_DIR.glob(f"{user['id']}.*"):
-            old.unlink(missing_ok=True)
+        # Real bug this fixes, confirmed live: AVATAR_DIR.glob(f"{id}.*")
+        # also matches the tmp file itself (tmp_dest is named "{id}.tmp-
+        # xxxxxxxx" - glob's `*` matches the dot inside "tmp-xxxxxxxx" too,
+        # verified directly), so this loop deleted the just-written upload
+        # before the rename below could run, throwing a real
+        # FileNotFoundError on every single avatar upload. Explicit known
+        # extensions instead of a wildcard can never match the tmp file.
+        for ext_ in set(ALLOWED_AVATAR_TYPES.values()):
+            (AVATAR_DIR / f"{user['id']}{ext_}").unlink(missing_ok=True)
         dest = AVATAR_DIR / f"{user['id']}{ext}"
         tmp_dest.rename(dest)
         avatar_path = str(dest)
@@ -5512,8 +5519,14 @@ def staff_blog_update(request: Request, post_id: str, title: str = Form(...), sl
             return RedirectResponse(
                 f"/staff/blog/{post_id}/edit?error={quote('Cover image must be a real PNG, JPEG, or WebP file.')}",
                 status_code=303)
-        for old in BLOG_COVER_DIR.glob(f"{post_id}.*"):
-            old.unlink(missing_ok=True)
+        # Explicit known extensions, not a wildcard glob - see the identical
+        # real bug just fixed in /settings' avatar upload above:
+        # BLOG_COVER_DIR.glob(f"{post_id}.*") also matched tmp_dest itself
+        # ("{post_id}.tmp-xxxxxxxx"), deleting the just-written upload
+        # before the rename below could run. Confirmed live - this is the
+        # exact FileNotFoundError behind the "it's refusing" report.
+        for ext_ in set(ALLOWED_IMAGE_TYPES.values()):
+            (BLOG_COVER_DIR / f"{post_id}{ext_}").unlink(missing_ok=True)
         dest = BLOG_COVER_DIR / f"{post_id}{ext}"
         tmp_dest.rename(dest)
         db.set_blog_post_cover_image(post_id, str(dest))
