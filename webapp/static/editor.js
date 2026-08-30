@@ -1413,6 +1413,24 @@
   let dictionary = null; // Map<word, frequencyRank> (lower rank = more common), null until loaded
   let spellPopoverCell = null;
 
+  // Words a human has explicitly said aren't misspelled for this order (a
+  // name, a brand, deliberate slang) - persisted per-order in this browser,
+  // same pattern as macros. "Ignore" (below) only dismisses the flag on the
+  // one cell clicked; this is the real "Ignore All" the style guide expects -
+  // it also keeps the word from being (re-)flagged on any future spell-check
+  // run, not just the instances already on screen right now.
+  let ignoredWords = new Set();
+  function ignoredWordsStorageKey() { return `kauli_ignored_words_${ORDER_ID}`; }
+  function loadIgnoredWords() {
+    try {
+      const raw = localStorage.getItem(ignoredWordsStorageKey());
+      if (raw) ignoredWords = new Set(JSON.parse(raw));
+    } catch (e) { /* corrupt/blocked storage - just start empty */ }
+  }
+  function persistIgnoredWords() {
+    try { localStorage.setItem(ignoredWordsStorageKey(), JSON.stringify([...ignoredWords])); } catch (e) { /* ignore */ }
+  }
+
   async function loadDictionary() {
     try {
       const res = await fetch("/static/dictionary_en.txt");
@@ -1488,6 +1506,7 @@
     if (!dictionary) return false;
     const w = coreWord(text);
     if (!w) return false;
+    if (ignoredWords.has(w.toLowerCase())) return false;
     return !dictionary.has(w.toLowerCase());
   }
 
@@ -1571,16 +1590,40 @@
       none.textContent = "No suggestions - edit it directly";
       pop.appendChild(none);
     }
+    const ignoreRow = document.createElement("div");
+    ignoreRow.className = "spell-ignore-row";
     const ignoreBtn = document.createElement("button");
     ignoreBtn.type = "button";
     ignoreBtn.className = "spell-ignore";
     ignoreBtn.textContent = "Ignore";
+    ignoreBtn.title = "Dismiss just this one cell";
     ignoreBtn.addEventListener("mousedown", (e) => {
       e.preventDefault();
       cell.classList.remove("spell-flag");
       hideSpellPopover();
     });
-    pop.appendChild(ignoreBtn);
+    ignoreRow.appendChild(ignoreBtn);
+    // "Ignore All" - the real distinction the style guide draws: this word
+    // is correct everywhere in this order (a name, a brand, deliberate
+    // slang), not just in the cell you happened to click. Persists past
+    // this session and past future spell-check runs, not just the flags
+    // already on screen.
+    const ignoreAllBtn = document.createElement("button");
+    ignoreAllBtn.type = "button";
+    ignoreAllBtn.className = "spell-ignore spell-ignore-all";
+    ignoreAllBtn.textContent = matchCount > 1 ? `Ignore all (${matchCount})` : "Ignore all";
+    ignoreAllBtn.title = "Never flag this word again in this order";
+    ignoreAllBtn.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      ignoredWords.add(word.toLowerCase());
+      persistIgnoredWords();
+      $all("#flow-target .wordcell.spell-flag").forEach((c) => {
+        if (coreWord(c.textContent).toLowerCase() === word.toLowerCase()) c.classList.remove("spell-flag");
+      });
+      hideSpellPopover();
+    });
+    ignoreRow.appendChild(ignoreAllBtn);
+    pop.appendChild(ignoreRow);
 
     const rect = cell.getBoundingClientRect();
     const containerRect = pop.offsetParent ? pop.offsetParent.getBoundingClientRect() : { top: 0, left: 0 };
@@ -2053,6 +2096,7 @@
     bindSpeedPicker();
 
     loadMacros();
+    loadIgnoredWords();
     renderMacroTable();
 
     bindTabs();

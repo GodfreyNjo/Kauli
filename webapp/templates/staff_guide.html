@@ -22,6 +22,11 @@
     <li><a href="#overlap">Timing, stretching &amp; why a dub used to overlap itself</a></li>
     <li><a href="#voice">Voice cloning &amp; consent</a></li>
     <li><a href="#style">Caption &amp; transcript style rules</a></li>
+    <li><a href="#transcript-styles">Transcript styles - Clean Read, Verbatim &amp; Verbatim Light</a></li>
+    <li><a href="#editing-calls">Editing calls - speaker errors, filler words, false starts &amp; interjections</a></li>
+    <li><a href="#ereri-editing">Editing in Ereri - speaker IDs, sync, paragraphs, spell check &amp; sentence length</a></li>
+    <li><a href="#grammar">Grammar reference - sentence structure, common mistakes &amp; house spellings</a></li>
+    <li><a href="#punctuation">Punctuation reference</a></li>
     <li><a href="#shipping">Saving, approving &amp; the 100%-edited gate</a></li>
     <li><a href="#shortcuts">Keyboard shortcuts, condensed</a></li>
     <li><a href="#trouble">If Ereri seems broken</a></li>
@@ -252,12 +257,243 @@
     <dd>Prefix with <code>&gt;&gt;</code> (<kbd>alt</kbd>+<kbd>l</kbd>).</dd>
     <dt>Italics</dt>
     <dd>Only if the client brief asks for it (on-screen text or narration) - real markup that carries into
-        the delivered SRT/VTT, not just a visual toggle in the editor.</dd>
+        the delivered SRT/VTT, not just a visual toggle in the editor. <kbd>alt</kbd>+<kbd>i</kbd> toggles
+        italics on one cell; <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>i</kbd> turns on italic <em>mode</em> -
+        every cell you focus after that gets italicized too, useful for a whole run (a song, a
+        foreign-language aside) without hitting <kbd>alt</kbd>+<kbd>i</kbd> on each word - press it again
+        to turn the mode off. It never un-italicizes anything already marked.</dd>
+  </dl>
+  <p class="muted">The rest of this guide (sections 12-16) is Kauli's full transcript style guide - the
+     detailed rules behind the quick reference above. Client-specific instructions on the Client brief tab
+     always override anything below.</p>
+</div>
+
+<div class="card" id="transcript-styles">
+  <h2>12. Transcript styles - Clean Read, Verbatim &amp; Verbatim Light</h2>
+  <p>Which style applies to a given order is set on the Client brief tab - these are what each one actually
+     means:</p>
+  <dl>
+    <dt>Clean Read (most common)</dt>
+    <dd>Transcribe what's actually said, as close to the true audio as possible, while cleaning up small-scale
+        noise: a word repeated while the speaker formulates their next point, filler words ("you know," "sort
+        of," "um," "like"), and false starts that don't add anything. A good Clean Read transcript still
+        contains the entire conversation - digressions, jokes, relevant sound effects or music - and keeps the
+        speaker's exact words with standard spelling ("going to" rather than "gonna," "want to" rather than
+        "wanna"). Cleaning up noise is not the same as omitting real content.</dd>
+    <dt>Verbatim (used rarely)</dt>
+    <dd>Capture each word exactly as spoken, with no editing for clarity - every filler word, false start,
+        stammer and interjection included. Offset filler words with commas, put a double dash after a false
+        start, and dashes after a stammer (whether of an initial sound or a whole word). Don't burn time trying
+        to tell an "um" from an "uh" or counting exactly how many there were - approximate.</dd>
+    <dt>Verbatim Light (Entertainment &amp; Media)</dt>
+    <dd>The goal is communicating the tone and meaning to the audience while keeping captions easy to follow -
+        transcribe the spoken content only if there's enough cell space for it, given Ereri's 6-second /
+        32-character caption limits (see the quick reference above). This one takes judgment and practice,
+        especially syncing a file with difficult or fast speech.</dd>
+  </dl>
+</div>
+
+<div class="card" id="editing-calls">
+  <h2>13. Editing calls - speaker errors, filler words, false starts &amp; interjections</h2>
+  <dl>
+    <dt>Speaker errors</dt>
+    <dd>Leave a speaker's own error as-is, in every style - the incorrect version is a better duplicate of
+        what a real listener heard. Even when you're sure they're wrong, a "fix" can introduce a worse error
+        you can't see: they say "Book XYZ by John Smith," you know Book XYZ is actually by Jane Doe so you
+        change the name - except they meant John Smith's other book, AYZ, and your correction just replaced
+        one error with a different one.</dd>
+    <dt>Filler words</dt>
+    <dd>Clean Read eliminates the extraneous ones; Verbatim keeps every one; Verbatim Light depends on
+        available cell space. Examples: "uh," "um," "kind of," "sort of," "like," "you know," "right," "OK."
+        These are only filler when they show up almost every sentence, make the sentence harder to read
+        instead of clearer, or the speaker clearly isn't trying to communicate the literal phrase. A sentence
+        that opens with "and," "but," or "so" as a conjunction is not a filler word - keep it.
+        <br><span class="muted" style="font-size:0.85rem;">Verbatim: "We sort of, you know, went all over the
+        place with this." → Clean Read: "We sort of went all over the place with this." Both keeping and
+        dropping the second "sort of"/"like" can be correct - use judgment, not a mechanical strip.</span></dd>
+    <dt>False starts</dt>
+    <dd>A false start is a repeated word or phrase (even mid-sentence) that isn't there for emphasis - tone of
+        voice helps tell a false start from filler. Clean Read eliminates the short ones; for a false start
+        longer than a few words, keep it and mark the change in direction with a double dash
+        (<kbd>alt</kbd>+<kbd>d</kbd>). A self-correction can usually be omitted unless the mistake itself
+        matters, or removing it would lose real context.
+        <br><span class="muted" style="font-size:0.85rem;">Verbatim: "It was-- it was a really great trip." →
+        Clean Read: "It was a really great trip." But "It was a really, really great trip" needs no
+        correction - that repetition is emphasis, not a false start.</span></dd>
+    <dt>Passive interjections</dt>
+    <dd>Clean Read drops pure active-listening noises like "yeah" or "mm-hmm" (common in interviews); Verbatim
+        keeps them exactly as spoken; Verbatim Light depends on cell space.</dd>
+  </dl>
+</div>
+
+<div class="card" id="ereri-editing">
+  <h2>14. Editing in Ereri - speaker IDs, sync, paragraphs, spell check &amp; sentence length</h2>
+  <dl>
+    <dt>Speaker ID judgment calls</dt>
+    <dd>The mechanic is in section 6 - type <code>NAME:</code> at the start of a line. Choosing <em>which</em>
+        name is the actual skill: use the file name, description, on-screen text or a quick web search; use
+        first and last name when you have both; if a speaker introduces themself with a title and surname
+        only ("I'm Mrs. Jones"), use that as given, but drop a title like Mr./Dr./Ms. once you know the full
+        name; a stage name or royal title is used as-is (<code>MADONNA:</code>, <code>KING CHARLES:</code>).
+        If only some speakers can be identified, name the ones you can and number the rest
+        (<code>SPEAKER 1:</code>, <code>SPEAKER 2:</code>) - with only one unnamed speaker, drop the number
+        (<code>SPEAKER:</code>). For sports, use <code>ANNOUNCER:</code>/<code>COMMENTATOR:</code> when
+        offscreen voices are hard to tell apart or there are more than three, <code>REPORTER:</code> for an
+        offscreen reporter's question, and <code>PA:</code> for stadium loudspeaker announcements. Use
+        <code>INTERPRETER:</code> only when speaker IDs are required in the first place, for someone verbally
+        interpreting another speaker's (or a sign-language signer's) speech.</dd>
+    <dt>Synchronization</dt>
+    <dd>Ereri's cells are real per-word ASR timestamps in step 1 (estimated by character count in step 2) -
+        the rule is the same one any timed-caption tool works to: a word belongs in whichever cell is
+        highlighted/active when the speaker actually begins saying it. More than one word can land in the same
+        cell if they're spoken quickly together; a long word (a big number, a drawn-out name) can span several
+        cells - keep it all together in the <em>first</em> cell where it starts, rather than splitting it
+        mid-word across cells. You can't add a brand-new cell out of nothing - <kbd>alt</kbd>+<kbd>k</kbd>
+        splits an existing cell at your cursor, <kbd>ctrl</kbd>+<kbd>m</kbd> merges one into the next, when the
+        ASR's original word boundaries don't match what you actually need.</dd>
+    <dt>Research</dt>
+    <dd>Confirming the spelling of a name or term is a real part of the job, not optional polish. Check the
+        order's file name and Client brief tab first, watch the video for on-screen text if one's attached,
+        and flag anything you can't resolve immediately so you can jump back to it (<kbd>alt</kbd>+<kbd>f</kbd>,
+        then <kbd>alt</kbd>+<kbd>↑</kbd>/<kbd>↓</kbd>) once later context in the file clears it up.</dd>
+    <dt>Paragraph length</dt>
+    <dd>The mechanic is in section 5 (<kbd>ctrl</kbd>+<kbd>enter</kbd> / <kbd>ctrl</kbd>+<kbd>⌫</kbd>). Aim
+        for roughly 3-5 sentences or 30-45 seconds per paragraph - shorter paragraphs are easier to proofread
+        and scan. Some will run longer or shorter depending on content; look for a natural transition point
+        rather than waiting for a full topic change if a speaker stays on one subject for a while.</dd>
+    <dt>Spell check: Ignore vs. Ignore all</dt>
+    <dd>The mechanic is in section 7. "Ignore" dismisses the flag on just the one cell you clicked; "Ignore
+        all" is for a word that's correct everywhere in this order (a name, a brand, deliberate slang) - it
+        clears every currently-flagged instance <em>and</em> remembers, so the word won't come back flagged on
+        a later spell-check run either. Orange/red flags are just "not in our dictionary," not "wrong" -
+        proper names and specialized terms routinely trip it; if you've researched one and know it's right,
+        Ignore All it and move on rather than second-guessing it every time it reappears.</dd>
+    <dt>Sentence length</dt>
+    <dd>Keep sentences short - one or two clauses where possible - for both readability and caption fit. It's
+        fine to open a sentence with a conjunction ("and," "but," "so," "for," "nor," "or," "yet"). Avoid
+        semicolons; a period can almost always stand in for one.
+        <br><span class="muted" style="font-size:0.85rem;">Best: "He knew it, and I knew he knew it. So
+        that's why I asked him for help and got what I needed in the end." Too long: the same sentence with
+        the period after "it" replaced by a comma, run on to the end.</span></dd>
+  </dl>
+</div>
+
+<div class="card" id="grammar">
+  <h2>15. Grammar reference - sentence structure, common mistakes &amp; house spellings</h2>
+  <dl>
+    <dt>Independent vs. dependent clauses</dt>
+    <dd>An independent clause is a complete thought that can stand alone ("She went to the store"). A
+        dependent (subordinate) clause can't stand alone and needs an independent clause to complete its
+        meaning - it typically opens with a subordinating conjunction ("because," "although," "if," "when")
+        or a relative pronoun ("who," "which," "that"): "Although very interesting" isn't a sentence on its
+        own; "Although very interesting, the lecture was too long" is.</dd>
+    <dt>Commonly confused words</dt>
+    <dd>
+      <div style="overflow-x:auto;">
+      <table>
+        <tbody>
+          <tr><td><strong>a while / awhile</strong></td><td>Always two words: "Wait here for a while."</td></tr>
+          <tr><td><strong>a lot</strong></td><td>Always two words, never "alot."</td></tr>
+          <tr><td><strong>all right</strong></td><td>Always two words, never "alright."</td></tr>
+          <tr><td><strong>anyway / any way</strong></td><td>One word as an adverb ("Anyway, let's move on");
+              two as an adjective-noun phrase ("any way possible").</td></tr>
+          <tr><td><strong>complimentary / complementary</strong></td><td>Free/nice ("complimentary tickets")
+              vs. fitting together well ("complementary colors").</td></tr>
+          <tr><td><strong>everyday / every day</strong></td><td>One word as an adjective ("my everyday
+              shoes"); two words for frequency ("I go there every day").</td></tr>
+          <tr><td><strong>Google / google</strong></td><td>Capitalized as the brand; lowercase as the verb
+              ("I needed to google that").</td></tr>
+          <tr><td><strong>it's / its</strong></td><td>"It's" only ever means "it is." The possessive is
+              "its," no apostrophe.</td></tr>
+          <tr><td><strong>queue / cue</strong></td><td>A line of people or a software queue vs. a signal to
+              start, or a pool stick.</td></tr>
+          <tr><td><strong>sight / site / cite</strong></td><td>Vision; a place (incl. a website); to
+              reference a source.</td></tr>
+          <tr><td><strong>wary / weary</strong></td><td>Cautious vs. tired.</td></tr>
+          <tr><td><strong>who's / whose</strong></td><td>"Who is" vs. the possessive of "who."</td></tr>
+        </tbody>
+      </table>
+      </div>
+      All spelling is American English, except a proper name spelled its own way (an organization called
+      the "Colour Centre" keeps its own spelling). A product name that's also a common noun still pluralizes
+      the way it's commonly used online, even against normal rules: "a few BlackBerrys," "a few Nissan
+      Leafs."
+    </dd>
+    <dt>House spellings</dt>
+    <dd>
+      <p class="muted" style="margin:0 0 6px;">Kauli's preferred form where a word has more than one
+         correct spelling:</p>
+      <ul style="margin:0; padding-left:20px; font-size:0.92rem;">
+        <li><strong>Abbreviations:</strong> 2D, 3D, B2B, mic/miked up, MOOC, OK (never okay/O.K.), IDed
+            (never ID'd), till</li>
+        <li><strong>Lowercase:</strong> euro, eurozone, googleability, to google (the verb), internet</li>
+        <li><strong>Single word, no hyphen:</strong> antisemitism, dropdown, ebook, email, offscreen,
+            onscreen, plugin, smartphone, smartwatch, website</li>
+        <li><strong>Two words:</strong> a lot, all right, data set, et cetera (never etc.), health care,
+            home page, more so, web page</li>
+        <li><strong>Spellings:</strong> advisor (not adviser), free rein (not free reign), versus (not vs.)
+            - "Z" is always written as Z/z regardless of how a speaker pronounces it ("zed")</li>
+        <li><strong>Proper nouns:</strong> JavaScript, PowerPoint, Quran (not Koran), US (no periods),
+            YouTube, eBay, ExxonMobil, Google+/Paramount+ (not "Plus"), 9/11 when said as "nine-eleven" but
+            "September 11" when said in full, al-Qaeda</li>
+      </ul>
+    </dd>
+  </dl>
+</div>
+
+<div class="card" id="punctuation">
+  <h2>16. Punctuation reference</h2>
+  <p>Keep punctuation as simple as the sentence allows, in service of what the speaker is actually saying.
+     Always acceptable: apostrophes, commas, double dashes, hyphens, periods, question marks. Occasionally
+     acceptable: ampersands, at symbols, colons, em dashes, hashtags. Semicolons and parentheses are never
+     used. If something here doesn't cover a real case you hit, flag the cell for QA and check the finalized
+     transcript in your Account History afterward for how it was actually handled.</p>
+  <p class="muted"><strong>Kauli's rule:</strong> always write "dot dot slash" out as words. Never type the
+     literal characters <code>../</code> into a transcript or caption.</p>
+  <dl>
+    <dt>Ampersands (&amp;)</dt>
+    <dd>Only for company/brand names and set terms that are actually written with one: "Johnson &amp;
+        Johnson," "R&amp;D," "AT&amp;T." Spell out "and" everywhere else.</dd>
+    <dt>Apostrophes</dt>
+    <dd>Write a possessive plural ending in S the way the speaker actually pronounces it - "Dickens' novel"
+        or "Dickens's novel," whichever extra syllable you actually hear. "It's" always means "it is"; the
+        possessive "its" never takes an apostrophe.</dd>
+    <dt>At symbols (@)</dt>
+    <dd>Social handles and email addresses only: <code>@username</code>, <code>john.doe@example.com</code>.</dd>
+    <dt>Colons</dt>
+    <dd>Restrict colons to after a speaker ID, or where one's structurally part of the text (a URL, a time
+        like "8:00," a biblical citation like "Matthew 7:3"). Anywhere you'd otherwise reach for a colon as
+        punctuation, use a double dash or a comma instead.</dd>
+    <dt>Commas</dt>
+    <dd>Oxford comma in a list of three or more ("milk, eggs, and bread"); before a coordinating conjunction
+        joining two independent clauses ("I want to go, but I have to study"); after an introductory
+        adverbial phrase longer than three words (required) or three words or fewer (optional); after an
+        introductory/exclamatory word ("Oh, you're right!"); around a mid-sentence interjection; between
+        adjectives modifying the same noun; around the year in a full date and around a state/country in a
+        city-state pair. Watch for: a comma splice (joining two independent clauses with just a comma -
+        use a period instead); comma clutter (a comma before every "and" in a list); and misusing a comma
+        with a nonrestrictive clause (offset it: "The professor, who had years of experience, gave a great
+        lecture") versus a restrictive one (no commas: "The students who finished the extra work earned an
+        A" - it specifies which students).</dd>
+    <dt>Double dashes</dt>
+    <dd><kbd>alt</kbd>+<kbd>d</kbd> appends one. Always two dashes, never one (a single dash is only for a
+        hyphenated word) and never an em dash. Use it when a sentence changes direction mid-thought, when a
+        speaker is cut off or interrupts themself with an aside, or (Verbatim only) for a stammer or
+        repeated word. The word right after a double dash isn't capitalized unless it normally would be
+        without the dash there.</dd>
+    <dt>Exclamation points</dt>
+    <dd>Use sparingly in general content (presentations, interviews, lectures) for real emphasis or
+        excitement; entertainment content (movies, sports, reality TV) can carry them more liberally since
+        conveying the on-screen emotion is the actual goal there.</dd>
+    <dt>Hashtags</dt>
+    <dd>When a speaker says "hashtag" plus a word, write the pound symbol with the tag: "hashtag
+        videoSEO" → <code>#videoSEO</code>. Always hashtag a reference to the #MeToo movement even if the
+        word "hashtag" itself isn't spoken.</dd>
   </dl>
 </div>
 
 <div class="card" id="shipping">
-  <h2>12. Saving, approving &amp; the 100%-edited gate</h2>
+  <h2>17. Saving, approving &amp; the 100%-edited gate</h2>
   <p>Everything saves itself - a segment autosaves a couple of seconds after you stop typing, and the topbar
      always shows whether everything's saved. <kbd>ctrl</kbd>+<kbd>s</kbd> forces it immediately;
      <kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd> also re-renders that segment's audio.</p>
@@ -270,7 +506,7 @@
 </div>
 
 <div class="card" id="shortcuts">
-  <h2>13. Keyboard shortcuts, condensed</h2>
+  <h2>18. Keyboard shortcuts, condensed</h2>
   <p class="muted" style="margin-top:0;">The full, current list - with the reasoning for anything that isn't
      on the key you'd expect - always lives in the <strong>Shortcuts</strong> tab inside Ereri itself, since
      that one's guaranteed to match whatever's actually bound. The ones worth having memorized:</p>
@@ -286,7 +522,7 @@
 </div>
 
 <div class="card" id="trouble">
-  <h2>14. If Ereri seems broken</h2>
+  <h2>19. If Ereri seems broken</h2>
   <p>Tabs not switching, macros not responding, shortcuts not firing - almost always a stale cached copy of
      the editor's script fighting a newer page underneath it. <strong>Hard refresh first</strong>
      (<kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>r</kbd>, or <kbd>ctrl</kbd>+<kbd>F5</kbd>) before assuming
@@ -297,7 +533,7 @@
 </div>
 
 <div class="card" id="contact" style="text-align:center;">
-  <h2>15. Who to ask</h2>
+  <h2>20. Who to ask</h2>
   <p class="muted">A real person reads these, not a support queue.</p>
   <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
     <a href="mailto:{{ contact_email }}" class="btn secondary">Email</a>

@@ -1798,7 +1798,8 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 }
 .spell-popover .spell-suggestion-all:hover { background: var(--hover); }
 .spell-popover .spell-none { font-size: 0.8rem; color: var(--faint); padding: 2px 0; }
-.spell-popover .spell-ignore { background: none; color: var(--muted); border: none; padding: 2px 0; margin-top: 2px; text-decoration: underline; font-size: 0.78rem; }
+.spell-popover .spell-ignore-row { display: flex; gap: 12px; margin-top: 2px; }
+.spell-popover .spell-ignore { background: none; color: var(--muted); border: none; padding: 2px 0; text-decoration: underline; font-size: 0.78rem; }
 
 .find-replace-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
