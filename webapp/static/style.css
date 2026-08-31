@@ -2758,6 +2758,59 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
 @keyframes demo-blink { 50% { opacity: 0; } }
 .demo-result { display: flex; align-items: center; gap: 8px; margin: 18px 30px 0; padding-top: 18px; border-top: 1px dashed var(--border); font-size: 0.9rem; color: var(--ok); transition: opacity 0.5s ease; }
 .demo-check { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ok-soft); font-size: 0.75rem; flex-shrink: 0; }
+
+/* ------------------------------------------------------------ hero tour -- */
+/* A second, JS-choreographed sequence (upload -> processing -> review ->
+   download) - reuses .demo-player-chrome's shell and .m-visual-*/.m-file-chip's
+   static look from elsewhere on this page, but never their infinite
+   auto-looping keyframes (m-upload-fill, m-chip-in, etc.) - those animate on
+   their own timer with no hook for JS to know when a fill/pop actually
+   finished, which this needs to sequence a cursor arriving, then a fill,
+   then a move to the next target. One-shot, JS-driven transitions instead. */
+.m-hero-tour {
+  background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 16px;
+  margin: 28px auto 0; max-width: 480px; overflow: hidden;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.55);
+}
+.m-tour-stage { position: relative; padding: 28px 24px; min-height: 132px; }
+.m-tour-scene {
+  display: none; flex-direction: column; align-items: center; gap: 14px; text-align: center;
+}
+.m-tour-scene.active { display: flex; }
+.m-tour-dropzone { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
+.m-tour-file-icon { font-size: 1.1rem; }
+.m-tour-filename { font-family: var(--font-mono); font-size: 0.8rem; }
+.m-tour-status-text { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.m-tour-action {
+  padding: 7px 18px; font-size: 0.8rem; pointer-events: none;
+}
+.m-tour-review-row { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.m-tour-checkmark { margin: 0; padding-top: 0; border-top: none; opacity: 0; }
+.m-tour-checkmark.shown { opacity: 1; }
+#tour-upload .m-visual-upload-bar { max-width: 200px; }
+#tour-upload .m-visual-upload-fill { animation: none; width: 0%; transition: width 1.2s ease; }
+#tour-download .m-file-chip { animation: none; opacity: 0; transform: translateY(4px); transition: opacity 0.3s ease, transform 0.3s ease; }
+#tour-download .m-file-chip.popped { opacity: 1; transform: translateY(0); }
+/* Two elements on purpose: the outer .m-tour-cursor carries the glide
+   (translate, set inline by JS, slow) and the inner dot carries the click
+   pulse (scale, toggled by a CSS class, fast) - inline style always beats a
+   class selector for the same property, so a "clicking" class trying to
+   add scale() on the SAME element JS already set transform on inline would
+   silently never apply. Splitting the property across two elements avoids
+   that instead of fighting the cascade. */
+.m-tour-cursor {
+  position: absolute; top: 0; left: 0; width: 0; height: 0; opacity: 0; pointer-events: none;
+  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+}
+.m-tour-cursor-dot {
+  display: block; width: 14px; height: 14px; margin: -7px 0 0 -7px;
+  border-radius: 50%; background: var(--accent); border: 2px solid var(--accent-ink);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: transform 0.18s ease;
+}
+.m-tour-cursor.clicking .m-tour-cursor-dot { transform: scale(1.6); }
+@media (prefers-reduced-motion: reduce) {
+  .m-hero-tour { display: none; }
+}
 .demo-caption { text-align: center; color: var(--faint); font-size: 0.75rem; margin-top: 14px; }
 
 /* ------------------------------------------------------- ops dashboard --- */
