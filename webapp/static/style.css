@@ -2482,6 +2482,15 @@ mark.guide-search-hit-current { background: var(--accent); color: #fff; }
 .m-author-name { font-weight: 700; font-size: 0.95rem; }
 .m-author-role { font-size: 0.78rem; color: var(--faint); margin-bottom: 8px; }
 .m-author-bio { font-size: 0.85rem; color: var(--muted); line-height: 1.5; margin: 0; }
+.m-author-heading { font-size: 1.05rem; font-weight: 700; margin: 40px 0 14px; }
+.m-author-box + .m-author-heading { margin-top: 32px; }
+.m-share-icons { display: flex; gap: 10px; }
+.m-share-icon {
+  display: flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+  border-radius: 50%; background: var(--panel); border: 1px solid var(--border-subtle);
+  color: var(--ink); transition: background 0.15s, color 0.15s;
+}
+.m-share-icon:hover { background: var(--accent); color: var(--accent-ink); }
 
 /* simple legal/status pages */
 .m-inner.narrow.legal { line-height: 1.7; }

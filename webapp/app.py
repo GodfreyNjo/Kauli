@@ -433,6 +433,98 @@ def _reading_time(body_html: str) -> str:
 
 
 templates.env.filters["reading_time"] = _reading_time
+
+
+# Real content-navigation links, not "backlinks" - a backlink is a link
+# FROM another site TO ours, which nothing on our own page can create.
+# What this actually does: hyperlink the first mention of a key term in a
+# post to (a) a more specific page of ours on the same topic, spreading
+# real internal link equity and giving a reader somewhere useful to go
+# next, or (b) a genuinely authoritative external source for a general
+# term we don't have our own page about (Wikipedia, MDN, an official spec)
+# - standard, honest editorial practice that builds topical trust, not an
+# attempt to manufacture backlinks. Ordered longest-phrase-first so e.g.
+# "voice cloning consent" (if ever used verbatim) would take priority over
+# the shorter "voice cloning" - matters because only the FIRST match wins
+# per post, see _autolink_key_terms.
+_GLOSSARY_LINKS: list[tuple[str, str, bool]] = [
+    # phrase (matched case-insensitively) -> (url, is_external)
+    ("clean read", "/blog/clean-read-vs-verbatim-choosing-the-right-transcript-style", False),
+    ("full verbatim", "/blog/clean-read-vs-verbatim-choosing-the-right-transcript-style", False),
+    ("voice cloning", "/blog/voice-cloning-consent-gate", False),
+    ("code-switching", "/blog/sheng-vs-standard-swahili-machine-translation", False),
+    ("Sheng", "/blog/sheng-vs-standard-swahili-machine-translation", False),
+    ("video dubbing", "/solutions/video-dubbing", False),
+    ("video transcription", "/solutions/video-transcription", False),
+    ("video translation", "/solutions/video-translation", False),
+    ("video localization", "/solutions/video-localization", False),
+    ("closed captions", "/solutions/captioning", False),
+    ("voice over", "/solutions/voice-over", False),
+    ("e-learning", "/solutions/e-learning", False),
+    ("formatting standards", "/formatting-standards", False),
+    ("automatic speech recognition", "https://en.wikipedia.org/wiki/Speech_recognition", True),
+    ("text-to-speech", "https://en.wikipedia.org/wiki/Speech_synthesis", True),
+    ("WebVTT", "https://developer.mozilla.org/en-US/docs/Web/API/WebVTT_API", True),
+    ("SubRip", "https://en.wikipedia.org/wiki/SubRip", True),
+    ("Swahili language", "https://en.wikipedia.org/wiki/Swahili_language", True),
+    ("Kikuyu language", "https://en.wikipedia.org/wiki/Kikuyu_language", True),
+    ("Gĩkũyũ", "https://en.wikipedia.org/wiki/Kikuyu_language", True),
+    ("deepfake", "https://en.wikipedia.org/wiki/Deepfake", True),
+    ("European Accessibility Act", "https://ec.europa.eu/social/main.jsp?catId=1202", True),
+]
+_GLOSSARY_LINKS.sort(key=lambda t: -len(t[0]))
+
+_HTML_TOKEN_RE = re.compile(r"(<[^>]+>)")
+_TAG_NAME_RE = re.compile(r"</?([a-zA-Z0-9]+)")
+_SKIP_LINKING_INSIDE = {"a", "h1", "h2", "h3", "h4", "h5", "h6", "script", "style"}
+
+
+def _autolink_key_terms(body_html: str, own_slug: str = "") -> str:
+    """Hyperlinks the FIRST mention of each glossary term in this post - one
+    link per term, never more, so a term mentioned five times doesn't turn
+    into five identical links (that reads as spam, not navigation). Never
+    links inside an existing <a>, inside a heading, or a term whose own
+    target IS this post (no self-link to the page you're already on)."""
+    if not body_html:
+        return body_html
+    used_terms: set[str] = set()
+    tokens = _HTML_TOKEN_RE.split(body_html)
+    skip_depth = 0  # >0 while inside an <a>/heading/script/style span
+
+    for i, tok in enumerate(tokens):
+        if tok.startswith("<"):
+            m = _TAG_NAME_RE.match(tok)
+            if m and m.group(1).lower() in _SKIP_LINKING_INSIDE:
+                skip_depth += -1 if tok.startswith("</") else 1
+                skip_depth = max(0, skip_depth)
+            continue
+        if skip_depth > 0 or not tok.strip():
+            continue
+        # At most ONE substitution per token (break on first hit): once a
+        # token contains real markup, testing further phrases against it
+        # again risks a later phrase matching text that's now inside the
+        # href we just inserted, not the visible prose - a plain text
+        # token starting the loop clean is the invariant this whole
+        # function depends on, so it can never be violated mid-loop.
+        for phrase, url, external in _GLOSSARY_LINKS:
+            if phrase in used_terms:
+                continue
+            if own_slug and url.endswith(own_slug):
+                continue
+            pattern = re.compile(r"(?<![\w-])(" + re.escape(phrase) + r")(?![\w-])", re.IGNORECASE)
+            new_tok, n = pattern.subn(
+                (f'<a href="{url}" target="_blank" rel="noopener">\\1</a>' if external
+                 else f'<a href="{url}">\\1</a>'),
+                tok, count=1,
+            )
+            if n:
+                tokens[i] = new_tok
+                used_terms.add(phrase)
+                break
+    return "".join(tokens)
+
+
+templates.env.filters["autolink_terms"] = _autolink_key_terms
 # Single source of truth for the signup-form hint text - defined once
 # alongside the actual policy in supabase_auth.py, not retyped per route.
 templates.env.globals["password_policy_hint"] = supabase_auth.PASSWORD_POLICY_HINT
