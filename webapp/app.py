@@ -412,6 +412,27 @@ def _time_ago(ts: float | None) -> str:
 
 
 templates.env.filters["time_ago"] = _time_ago
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WORD_RE = re.compile(r"\S+")
+
+
+def _reading_time(body_html: str) -> str:
+    """"N min read" - industry-standard estimate (~200 words/minute, the
+    figure most style guides and CMSs settle on) off the real word count of
+    the rendered post, tags stripped first so a URL inside an href or a
+    class name never inflates it. Always at least 1 - a real reader never
+    sees "0 min read" on a short post."""
+    if not body_html:
+        return "1 min read"
+    text = _TAG_RE.sub(" ", body_html)
+    words = len(_WORD_RE.findall(text))
+    minutes = max(1, round(words / 200))
+    return f"{minutes} min read"
+
+
+templates.env.filters["reading_time"] = _reading_time
 # Single source of truth for the signup-form hint text - defined once
 # alongside the actual policy in supabase_auth.py, not retyped per route.
 templates.env.globals["password_policy_hint"] = supabase_auth.PASSWORD_POLICY_HINT

@@ -30,7 +30,8 @@
   <div class="m-inner narrow legal">
     {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
     <p class="muted" style="font-size:0.8rem; margin-top:10px;">{{ author_name }} &middot;
-       {% if post['published_at'] %}<time datetime="{{ published_at_iso }}">{{ post['published_at']|int|timestamp_to_str }}</time>{% else %}Draft{% endif %}</p>
+       {% if post['published_at'] %}<time datetime="{{ published_at_iso }}">{{ post['published_at']|int|timestamp_to_str }}</time>{% else %}Draft{% endif %}
+       &middot; {{ post['body_html']|reading_time }}</p>
     <h1 class="m-h2" style="text-align:left;">{{ post['title'] }}</h1>
     {% if post['cover_image_path'] %}
     <img src="/blog-cover/{{ post['id'] }}" alt="" class="m-blog-hero-image" loading="eager">
