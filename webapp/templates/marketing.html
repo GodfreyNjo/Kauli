@@ -91,19 +91,22 @@
 
     <a href="#demo" class="m-hero-demo-link">▶ See a real example, with real audio</a>
 
-    <!-- Illustrative walkthrough, not a screen recording of a real client
-         session or a screenshot of the real Ereri editor - same deliberate
-         choice as the #demo section below (see its own comment in
-         style.css): an abstract mockup that reads as "a real product in
-         use" without publishing the internal staff tool's actual UI. A
-         simulated cursor glides to each stage's action and "clicks" it,
-         purely decorative (aria-hidden, buttons are tabindex="-1" - the
-         real CTAs above are the only actionable ones in the hero). -->
+    <!-- An honest mockup, not a screenshot of the real Ereri editor - same
+         deliberate choice as the #demo section below (see its own comment
+         in style.css): an abstract UI that reads as "a real account in
+         use" without publishing the internal staff tool's actual UI or
+         implying this is footage of any real person's account. The visible
+         "Demo" badge is the honesty signal, same as any product demo -
+         nothing here claims to be a live recording. A simulated cursor
+         glides to each stage's action and "clicks" it, purely decorative
+         (aria-hidden, buttons are tabindex="-1" - the real CTAs above are
+         the only actionable ones in the hero). -->
     <div class="m-hero-tour" id="hero-tour" aria-hidden="true">
       <div class="demo-player-chrome">
         <span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span>
-        <span class="demo-chrome-title" id="tour-title">Kauli · new order</span>
-        <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span>illustrative demo</span></span>
+        <span class="m-tour-account">👤 My Kauli account</span>
+        <span class="demo-chrome-title" id="tour-title">New order</span>
+        <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span>Demo</span></span>
       </div>
       <div class="m-tour-stage" id="tour-stage">
         <div class="m-tour-scene" id="tour-upload">
@@ -135,9 +138,6 @@
         <div class="m-tour-cursor" id="tour-cursor"><span class="m-tour-cursor-dot"></span></div>
       </div>
     </div>
-    <p class="demo-caption">Illustrative walkthrough of a real order, not a screen recording of an
-       actual client session.</p>
-
     <div class="m-hero-langs">
       {% for code, label in source_languages.items() %}
       <span class="m-lang-pill">{{ label }}</span>
@@ -154,9 +154,10 @@
       var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
       var scenes = ["tour-upload", "tour-processing", "tour-review", "tour-download"];
-      var titles = { "tour-upload": "Kauli · new order", "tour-processing": "Kauli · processing…", "tour-review": "Kauli · review", "tour-download": "Kauli · ready" };
+      var titles = { "tour-upload": "New order", "tour-processing": "Processing…", "tour-review": "Review", "tour-download": "Ready" };
       var timers = [];
       function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+      function stopTimers() { timers.forEach(clearTimeout); timers = []; }
 
       function moveCursorTo(btnId, cb) {
         var btn = document.getElementById(btnId);
@@ -208,27 +209,59 @@
       }
       var runners = [runUpload, runProcessing, runReview, runDownload];
 
-      function playStage(i) {
+      // Real pause, not just "stop scheduling more" - stopped for two
+      // independent reasons (scrolled out of view, or the browser tab
+      // itself isn't visible), either one is enough to pause, both have to
+      // clear before it resumes. epoch guards against a stale timer chain
+      // from a PREVIOUS play cycle still firing after a pause/resume - each
+      // fresh start() bumps it, and every scheduled continuation checks its
+      // own captured epoch against the current one before doing anything,
+      // so a late callback from an already-stopped cycle is a silent no-op
+      // instead of a race that could restart playback out of order.
+      var inView = false, pageVisible = !document.hidden, playing = false, epoch = 0;
+      function shouldPlay() { return inView && pageVisible && !reduceMotion; }
+
+      function stop() { stopTimers(); playing = false; }
+
+      function playStage(i, myEpoch) {
+        if (myEpoch !== epoch) return;
         showScene(i);
-        runners[i](function () { after(500, function () { playStage((i + 1) % scenes.length); }); });
+        runners[i](function () {
+          if (myEpoch !== epoch) return;
+          after(500, function () {
+            if (myEpoch !== epoch) return;
+            playStage((i + 1) % scenes.length, myEpoch);
+          });
+        });
       }
 
-      function start() {
-        if (reduceMotion) { showScene(0); return; }
-        playStage(0);
+      function maybeStart() {
+        if (playing || !shouldPlay()) return;
+        playing = true;
+        epoch++;
+        playStage(0, epoch);
       }
+
+      showScene(0); // static first frame immediately, before any motion decision
 
       var container = document.getElementById("hero-tour");
       if (container && "IntersectionObserver" in window) {
         var obs = new IntersectionObserver(function (entries) {
           entries.forEach(function (entry) {
-            if (entry.isIntersecting) { start(); obs.disconnect(); }
+            inView = entry.isIntersecting;
+            if (inView) maybeStart(); else stop();
           });
         }, { threshold: 0.3 });
         obs.observe(container);
       } else {
-        start();
+        inView = true;
+        maybeStart();
       }
+
+      document.addEventListener("visibilitychange", function () {
+        pageVisible = !document.hidden;
+        if (pageVisible) maybeStart(); else stop();
+      });
     })();
   </script>
 
@@ -291,33 +324,48 @@
 
       // Auto-cycles which step is "active" - a filled connector line and a
       // highlighted circle sweep left to right, then loop. Purely decorative
-      // motion (illustrative, not a literal replay of a real job), so it's
-      // fine to loop indefinitely - skipped entirely under
-      // prefers-reduced-motion, same as the existing fade-in below.
+      // motion (illustrative, not a literal replay of a real job).
+      // Genuinely paused (interval cleared, not just left running off
+      // screen) whenever it's scrolled out of view OR the browser tab
+      // itself isn't visible - either reason is enough to stop it, both
+      // have to clear before it resumes - not just for battery/CPU, a
+      // stopped visitor coming back to a step mid-sweep looks like it
+      // glitched, restarting clean from step 1 doesn't.
+      var inView = false, pageVisible = !document.hidden;
       function setActive(i) {
         stepEls.forEach(function (el, idx) { el.classList.toggle('active', idx === i); });
         if (progressEl) progressEl.style.width = (i / (stepEls.length - 1) * 100) + '%';
       }
       function startCycle() {
-        if (reduceMotion || cycleTimer) return;
+        if (reduceMotion || cycleTimer || !inView || !pageVisible) return;
+        steps.classList.add('in-view');
+        activeIndex = 0;
         setActive(0);
         cycleTimer = setInterval(function () {
           activeIndex = (activeIndex + 1) % stepEls.length;
           setActive(activeIndex);
         }, 2200);
       }
+      function stopCycle() {
+        if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+      }
 
-      if (!('IntersectionObserver' in window)) { startCycle(); return; }
-      var obs = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            steps.classList.add('in-view');
-            startCycle();
-            obs.disconnect();
-          }
-        });
-      }, { threshold: 0.3 });
-      obs.observe(steps);
+      if ('IntersectionObserver' in window) {
+        var obs = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            inView = entry.isIntersecting;
+            if (inView) startCycle(); else stopCycle();
+          });
+        }, { threshold: 0.3 });
+        obs.observe(steps);
+      } else {
+        inView = true;
+        startCycle();
+      }
+      document.addEventListener('visibilitychange', function () {
+        pageVisible = !document.hidden;
+        if (pageVisible) startCycle(); else stopCycle();
+      });
     })();
   </script>
 
@@ -330,7 +378,7 @@
         <div class="demo-player-chrome" aria-hidden="true">
           <span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span>
           <span class="demo-chrome-title">Kauli editor · live preview</span>
-          <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span id="demo-status-text">illustrative demo</span></span>
+          <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span id="demo-status-text">Demo</span></span>
         </div>
         <div class="demo-waveform">
           {% for i in range(28) %}<span></span>{% endfor %}
@@ -349,8 +397,8 @@
         </div>
         <audio id="demo-audio-en" src="/static/demo-en.wav" preload="auto"></audio>
       </div>
-      <p class="demo-caption">Illustrative example, not a real client recording. Swahili is your original
-         source audio; only the translated (English) output is ever synthesized.</p>
+      <p class="demo-caption">Swahili is your original source audio; only the translated (English)
+         output is ever synthesized.</p>
 
       <div style="text-align:center; margin-top:22px;">
         <button type="button" class="btn secondary" id="demo-play-pause">▶ Play demo</button>
@@ -451,7 +499,7 @@
         if (speakerEl) speakerEl.classList.remove('playing');
         swEl.textContent = ''; enEl.textContent = '';
         enLine.style.opacity = 0; resultEl.style.opacity = 0;
-        setStatus('illustrative demo');
+        setStatus('Demo');
         isRunning = false;
         if (playPauseBtn) playPauseBtn.textContent = '▶ Play demo';
       }
@@ -511,6 +559,14 @@
           if (isRunning) { setIdleUI(); } else { startSequence(); }
         });
       }
+      // This one only ever starts on an explicit click (see setIdleUI's own
+      // comment - deliberately no autoplay), but it has real audio, so if a
+      // visitor clicks play and then switches tabs, that audio would
+      // otherwise keep playing to an empty tab. Real stop, not a
+      // resume-later pause - same behavior as clicking Pause themselves.
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden && isRunning) setIdleUI();
+      });
       setIdleUI(); // explicit idle render on load - nothing plays until clicked
     })();
   </script>

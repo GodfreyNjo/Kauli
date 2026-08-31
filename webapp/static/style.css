@@ -2772,6 +2772,7 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
   margin: 28px auto 0; max-width: 480px; overflow: hidden;
   box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.55);
 }
+.m-tour-account { margin-left: 8px; font-size: 0.74rem; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .m-tour-stage { position: relative; padding: 28px 24px; min-height: 132px; }
 .m-tour-scene {
   display: none; flex-direction: column; align-items: center; gap: 14px; text-align: center;
