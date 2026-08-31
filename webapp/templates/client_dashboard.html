@@ -264,8 +264,12 @@
              able to see it was received and re-download it from this order's page.</p>
 
           <label>Anything else we should know?
-            <textarea name="instr_notes" rows="2">{{ form_values.get('instr_notes', '') }}</textarea>
+            <textarea name="instr_notes" rows="2"
+                      placeholder="e.g. there's a Swahili section around the 4-minute mark in this otherwise-English video">{{ form_values.get('instr_notes', '') }}</textarea>
           </label>
+          <p class="muted" style="margin-top:-8px;">If your file mixes languages in different sections -
+             mostly English with a Swahili or Kikuyu part, for example - mention it here so the editor
+             knows to expect the switch.</p>
         </div>
       </details>
     </div>

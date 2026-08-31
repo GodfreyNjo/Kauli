@@ -76,9 +76,9 @@
       var y = btnRect.top - stageRect.top + btnRect.height / 2;
       cursorEl.style.opacity = "1";
       cursorEl.style.transform = "translate(" + x + "px, " + y + "px)";
-      after(650, function () {
+      after(750, function () {
         cursorEl.classList.add("clicking");
-        after(220, function () { cursorEl.classList.remove("clicking"); if (cb) cb(); });
+        after(320, function () { cursorEl.classList.remove("clicking"); if (cb) cb(); });
       });
     }
 
@@ -90,29 +90,36 @@
       if (titleEl) titleEl.textContent = titles[scenes[i]];
     }
 
+    // Dwell times slowed down from the first pass - a prospective client
+    // needs real time to actually read the review stage's two lines of
+    // text, not just register that something moved. ~3-4s per stage is
+    // the industry-standard range for a self-paced onboarding/product
+    // tour (Rev/3Play's own walkthroughs sit in roughly the same range),
+    // not the faster pace that's fine for a decorative loop nobody's
+    // meant to actually read.
     function runUpload(cb) {
       var fill = document.getElementById("tour-upload-fill");
       if (fill) fill.style.width = "0%";
       moveCursorTo("tour-upload-btn", function () {
         if (fill) fill.style.width = "100%";
-        after(1500, cb);
+        after(2400, cb);
       });
     }
-    function runProcessing(cb) { cursorEl.style.opacity = "0"; after(1800, cb); }
+    function runProcessing(cb) { cursorEl.style.opacity = "0"; after(2800, cb); }
     function runReview(cb) {
       var check = document.getElementById("tour-checkmark");
       if (check) check.classList.remove("shown");
       moveCursorTo("tour-approve-btn", function () {
         if (check) check.classList.add("shown");
-        after(1100, cb);
+        after(3200, cb);
       });
     }
     function runDownload(cb) {
       var chips = document.querySelectorAll("#tour-download .m-file-chip");
       chips.forEach(function (c) { c.classList.remove("popped"); });
       moveCursorTo("tour-download-btn", function () {
-        chips.forEach(function (c, i) { after(i * 150, function () { c.classList.add("popped"); }); });
-        after(1300, cb);
+        chips.forEach(function (c, i) { after(i * 200, function () { c.classList.add("popped"); }); });
+        after(2400, cb);
       });
     }
     var runners = [runUpload, runProcessing, runReview, runDownload];
@@ -136,7 +143,7 @@
       showScene(i);
       runners[i](function () {
         if (myEpoch !== epoch) return;
-        after(500, function () {
+        after(800, function () {
           if (myEpoch !== epoch) return;
           playStage((i + 1) % scenes.length, myEpoch);
         });

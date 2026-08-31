@@ -2799,7 +2799,7 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
 .m-tour-checkmark { margin: 0; padding-top: 0; border-top: none; opacity: 0; }
 .m-tour-checkmark.shown { opacity: 1; }
 #tour-upload .m-visual-upload-bar { max-width: 200px; }
-#tour-upload .m-visual-upload-fill { animation: none; width: 0%; transition: width 1.2s ease; }
+#tour-upload .m-visual-upload-fill { animation: none; width: 0%; transition: width 1.8s ease; }
 #tour-download .m-file-chip { animation: none; opacity: 0; transform: translateY(4px); transition: opacity 0.3s ease, transform 0.3s ease; }
 #tour-download .m-file-chip.popped { opacity: 1; transform: translateY(0); }
 /* Two elements on purpose: the outer .m-tour-cursor carries the glide
