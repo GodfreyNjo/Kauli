@@ -48,6 +48,18 @@ new draft that doesn't match reads as visibly inconsistent with the rest of the 
 mandatory human review before delivery, per-minute transparent pricing, consent-gated voice \
 cloning, Swahili/Kikuyu/English support (Kikuyu uses human transcription since no ASR model \
 supports it yet), free trial minutes (transcription-only, preview-only).
+- Open body_html with 1-2 short intro paragraphs, then a "Key takeaways" block before the first \
+<h2>: <div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul><li>...\
+</li><li>...</li><li>...</li></ul></div> - exactly 3 bullets, each one real sentence stating a \
+fact the post itself actually goes on to explain (never a new claim invented just for the \
+summary, never a statistic). Every post already published on this blog has one in this exact \
+position - a draft without it is incomplete, not optional.
+- Where the post is genuinely comparing two real, named things (two transcript styles, two \
+service options, two tools) and you already have enough concrete, honest facts about both sides \
+from elsewhere in the draft, a compact comparison <table> can replace a paragraph that would \
+otherwise just be restating the same facts in prose - but only using facts already established \
+in the draft, never inventing a number, price, or timeframe to fill a cell. Skip the table \
+entirely rather than fabricate a row.
 
 Return ONLY a JSON object, no markdown fences, no preamble:
 {"title": "...", "description": "... (a real meta description, under 160 chars)", \
