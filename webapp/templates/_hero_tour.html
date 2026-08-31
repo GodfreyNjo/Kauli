@@ -1,0 +1,174 @@
+{# Reusable animated "product tour" - upload/link, processing, review,
+   download - with a simulated cursor. Include after setting two local
+   variables: tour_mode ("upload" or "link") and tour_filename (only used
+   in "upload" mode). An honest mockup, not a screenshot of the real Ereri
+   editor or any real person's account - see marketing.html's own comment
+   at its first use for the full reasoning. Fixed element ids are safe here
+   because only one instance of this partial is ever included per page. #}
+<div class="m-hero-tour" id="hero-tour" aria-hidden="true">
+  <div class="demo-player-chrome">
+    <span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span><span class="demo-chrome-dot"></span>
+    <span class="m-tour-account">👤 My Kauli account</span>
+    <span class="demo-chrome-title" id="tour-title">New order</span>
+    <span class="demo-chrome-status"><span class="demo-chrome-pulse"></span><span>Demo</span></span>
+  </div>
+  <div class="m-tour-stage" id="tour-stage">
+    {% if tour_mode == 'link' %}
+    <div class="m-tour-scene" id="tour-upload">
+      <div class="m-tour-dropzone">
+        <span class="m-tour-file-icon">🔗</span>
+        <span class="m-tour-filename">youtube.com/watch?v=…</span>
+      </div>
+      <div class="m-visual-upload-bar"><div class="m-visual-upload-fill" id="tour-upload-fill"></div></div>
+      <button type="button" class="btn cta-olive m-tour-action" id="tour-upload-btn" tabindex="-1">Fetch video</button>
+    </div>
+    {% else %}
+    <div class="m-tour-scene" id="tour-upload">
+      <div class="m-tour-dropzone">
+        <span class="m-tour-file-icon">🎬</span>
+        <span class="m-tour-filename">{{ tour_filename or "field_report.mp4" }}</span>
+      </div>
+      <div class="m-visual-upload-bar"><div class="m-visual-upload-fill" id="tour-upload-fill"></div></div>
+      <button type="button" class="btn cta-olive m-tour-action" id="tour-upload-btn" tabindex="-1">Upload</button>
+    </div>
+    {% endif %}
+    <div class="m-tour-scene" id="tour-processing">
+      <div class="demo-waveform">{% for i in range(20) %}<span></span>{% endfor %}</div>
+      <p class="m-tour-status-text">AI drafting transcript &amp; translation…</p>
+    </div>
+    <div class="m-tour-scene" id="tour-review">
+      <div class="demo-line"><span class="demo-lang-tag">SW</span><span class="demo-text">Karibu kwenye huduma yetu ya utangazaji wa kisasa.</span></div>
+      <div class="demo-line"><span class="demo-lang-tag accent">EN</span><span class="demo-text">Welcome to our modern broadcasting service.</span></div>
+      <div class="m-tour-review-row">
+        <span class="demo-result m-tour-checkmark" id="tour-checkmark"><span class="demo-check">✓</span> Human-reviewed</span>
+        <button type="button" class="btn cta-olive m-tour-action" id="tour-approve-btn" tabindex="-1">Approve</button>
+      </div>
+    </div>
+    <div class="m-tour-scene" id="tour-download">
+      <div class="m-visual-files">
+        <span class="m-file-chip">.SRT</span><span class="m-file-chip">.VTT</span><span class="m-file-chip">.MP4</span>
+      </div>
+      <button type="button" class="btn cta-olive m-tour-action" id="tour-download-btn" tabindex="-1">Download</button>
+    </div>
+    <div class="m-tour-cursor" id="tour-cursor"><span class="m-tour-cursor-dot"></span></div>
+  </div>
+</div>
+<script>
+  (function () {
+    var stageEl = document.getElementById("tour-stage");
+    var cursorEl = document.getElementById("tour-cursor");
+    var titleEl = document.getElementById("tour-title");
+    if (!stageEl || !cursorEl) return;
+    var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    var scenes = ["tour-upload", "tour-processing", "tour-review", "tour-download"];
+    var titles = { "tour-upload": "New order", "tour-processing": "Processing…", "tour-review": "Review", "tour-download": "Ready" };
+    var timers = [];
+    function after(ms, fn) { timers.push(setTimeout(fn, ms)); }
+    function stopTimers() { timers.forEach(clearTimeout); timers = []; }
+
+    function moveCursorTo(btnId, cb) {
+      var btn = document.getElementById(btnId);
+      if (!btn) { if (cb) cb(); return; }
+      var stageRect = stageEl.getBoundingClientRect();
+      var btnRect = btn.getBoundingClientRect();
+      var x = btnRect.left - stageRect.left + btnRect.width / 2;
+      var y = btnRect.top - stageRect.top + btnRect.height / 2;
+      cursorEl.style.opacity = "1";
+      cursorEl.style.transform = "translate(" + x + "px, " + y + "px)";
+      after(650, function () {
+        cursorEl.classList.add("clicking");
+        after(220, function () { cursorEl.classList.remove("clicking"); if (cb) cb(); });
+      });
+    }
+
+    function showScene(i) {
+      scenes.forEach(function (id, idx) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle("active", idx === i);
+      });
+      if (titleEl) titleEl.textContent = titles[scenes[i]];
+    }
+
+    function runUpload(cb) {
+      var fill = document.getElementById("tour-upload-fill");
+      if (fill) fill.style.width = "0%";
+      moveCursorTo("tour-upload-btn", function () {
+        if (fill) fill.style.width = "100%";
+        after(1500, cb);
+      });
+    }
+    function runProcessing(cb) { cursorEl.style.opacity = "0"; after(1800, cb); }
+    function runReview(cb) {
+      var check = document.getElementById("tour-checkmark");
+      if (check) check.classList.remove("shown");
+      moveCursorTo("tour-approve-btn", function () {
+        if (check) check.classList.add("shown");
+        after(1100, cb);
+      });
+    }
+    function runDownload(cb) {
+      var chips = document.querySelectorAll("#tour-download .m-file-chip");
+      chips.forEach(function (c) { c.classList.remove("popped"); });
+      moveCursorTo("tour-download-btn", function () {
+        chips.forEach(function (c, i) { after(i * 150, function () { c.classList.add("popped"); }); });
+        after(1300, cb);
+      });
+    }
+    var runners = [runUpload, runProcessing, runReview, runDownload];
+
+    // Real pause, not just "stop scheduling more" - stopped for two
+    // independent reasons (scrolled out of view, or the browser tab itself
+    // isn't visible), either one is enough to pause, both have to clear
+    // before it resumes. epoch guards against a stale timer chain from a
+    // PREVIOUS play cycle still firing after a pause/resume - each fresh
+    // start bumps it, and every scheduled continuation checks its own
+    // captured epoch against the current one before doing anything, so a
+    // late callback from an already-stopped cycle is a silent no-op
+    // instead of a race that could restart playback out of order.
+    var inView = false, pageVisible = !document.hidden, playing = false, epoch = 0;
+    function shouldPlay() { return inView && pageVisible && !reduceMotion; }
+
+    function stop() { stopTimers(); playing = false; }
+
+    function playStage(i, myEpoch) {
+      if (myEpoch !== epoch) return;
+      showScene(i);
+      runners[i](function () {
+        if (myEpoch !== epoch) return;
+        after(500, function () {
+          if (myEpoch !== epoch) return;
+          playStage((i + 1) % scenes.length, myEpoch);
+        });
+      });
+    }
+
+    function maybeStart() {
+      if (playing || !shouldPlay()) return;
+      playing = true;
+      epoch++;
+      playStage(0, epoch);
+    }
+
+    showScene(0); // static first frame immediately, before any motion decision
+
+    var container = document.getElementById("hero-tour");
+    if (container && "IntersectionObserver" in window) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          inView = entry.isIntersecting;
+          if (inView) maybeStart(); else stop();
+        });
+      }, { threshold: 0.3 });
+      obs.observe(container);
+    } else {
+      inView = true;
+      maybeStart();
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      pageVisible = !document.hidden;
+      if (pageVisible) maybeStart(); else stop();
+    });
+  })();
+</script>

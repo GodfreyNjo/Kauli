@@ -1260,6 +1260,52 @@ SOLUTION_PAGES = {
         "cta_heading": "See the quality for yourself, on your own material",
         "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
         "related": ["video-translation", "video-transcription", "captioning"],
+        "tour": {"mode": "upload", "filename": "field_report_march2026.mp4"},
+        "faq": [
+            {"q": "Will our field footage and recordings stay confidential?",
+             "a": "We don't share your data with anyone else, and we don't run ads or ad-tracking on "
+                  "this site. Uploaded files and generated deliverables are currently kept on our "
+                  "servers indefinitely - we don't yet have automatic deletion after a fixed period, so "
+                  "if your program handles sensitive material, ask us (or use the \"Your data\" section "
+                  "in Settings) to delete a file or your account data at any time, and we will."},
+            {"q": "Can we pay by bank transfer to fit a grant disbursement cycle?",
+             "a": "Yes - bank transfer is a real payment option on every plan, though it's the one "
+                  "method that isn't confirmed automatically (a real person confirms once the transfer "
+                  "lands). It's also the standard billing method on our Enterprise plan for "
+                  "organizations with an ongoing relationship."},
+            {"q": "What if our recording is in Kikuyu, not Swahili?",
+             "a": "Kikuyu goes through an extra manual transcription step, since no speech-recognition "
+                  "model handles it yet - a real human transcriber types the source by ear. Translation "
+                  "and voicing after that run the same AI-plus-human-review pipeline as everything "
+                  "else; Kikuyu orders just cost a bit more per minute to cover that real labor."},
+            {"q": "Is there a discount for a large volume of program content?",
+             "a": f"Yes - Pro is {billing.PLANS['pro']['discount']*100:.0f}% off every per-minute rate "
+                  f"for ${billing.PLANS['pro']['price_usd']}/month, Premium is "
+                  f"{billing.PLANS['premium']['discount']*100:.0f}% off for "
+                  f"${billing.PLANS['premium']['price_usd']}/month, and Enterprise is a negotiated "
+                  f"volume rate with a dedicated account manager and bank-transfer billing. The first "
+                  f"{billing.FREE_MINUTES_PER_MONTH:.0f} minutes every month are free on every plan."},
+            {"q": "Do you require consent before cloning an interview subject's or community leader's voice?",
+             "a": "Yes, always - if a dub needs to sound like the original speaker rather than a "
+                  "standard voice, we require your explicit confirmation of rights and consent before "
+                  "that ever runs. It's enforced server-side, not just a checkbox in a form."},
+        ],
+        "fit_guide": [
+            {"plan": "Free", "for": "An occasional field clip or two a month, testing quality before "
+                                     "committing budget.",
+             "detail": f"{billing.FREE_MINUTES_PER_MONTH:.0f} free transcription minutes every month, "
+                       "then pay per minute."},
+            {"plan": "Pro", "for": "Regular campaign or program content, monthly reporting.",
+             "detail": f"{billing.PLANS['pro']['discount']*100:.0f}% off every rate, "
+                       f"${billing.PLANS['pro']['price_usd']}/month, email support."},
+            {"plan": "Premium", "for": "A program that needs burned-in captions or a dubbed video file "
+                                        "ready for community screenings.",
+             "detail": f"{billing.PLANS['premium']['discount']*100:.0f}% off every rate, video "
+                       "deliverables and priority-quality translation included."},
+            {"plan": "Enterprise", "for": "A multi-country program with a grant cycle that needs "
+                                           "bank-transfer billing.",
+             "detail": "Negotiated volume rate, dedicated account manager, bank transfer billing."},
+        ],
     },
     "youtubers": {
         "title": "Kauli for YouTubers - dub or subtitle your videos into English or Swahili",
@@ -1290,6 +1336,46 @@ SOLUTION_PAGES = {
         "cta_heading": "Try it on your last upload",
         "cta_body": "Paste the link, or connect your channel for ongoing auto-import.",
         "related": ["video-dubbing", "captioning", "voice-over"],
+        "tour": {"mode": "link"},
+        "faq": [
+            {"q": "Do I have to download my video first?",
+             "a": "No - paste the YouTube URL and we fetch the audio directly. The download-then-"
+                  "reupload step most tools force on you just isn't there."},
+            {"q": "Can I connect my whole channel instead of pasting links one at a time?",
+             "a": "Yes - connect a channel or playlist and new public uploads show up as one-click "
+                  "pending orders in your dashboard. Nothing runs (or gets billed) automatically - you "
+                  "decide what actually gets processed."},
+            {"q": "Will this work better than YouTube's own built-in auto-dub?",
+             "a": "YouTube's auto-dub is a genuinely useful, free starting point for calm, single-"
+                  "speaker content. It reliably struggles with fast dialogue, overlapping speakers, and "
+                  "Sheng-inflected phrasing - exactly where a real editor checking every line against "
+                  "the source audio earns its cost, which is what every Kauli order gets regardless of "
+                  "plan."},
+            {"q": "Do I get a downloadable dubbed video file, or just audio?",
+             "a": f"Burned-in captions or a fully dubbed video file are included on Premium, or "
+                  f"available as a "
+                  f"${billing.ADDONS['video_deliverables']['rate_per_min']:.2f}/minute add-on on any "
+                  "plan - plain audio, transcript and subtitles are included on every plan."},
+            {"q": "What if my video mixes Sheng and English mid-sentence?",
+             "a": "That's exactly the kind of code-switching a generic AI translation tends to "
+                  "mishandle - it's why a real editor checks every line against the source audio on "
+                  "every order, not just the ones that look risky at a glance."},
+        ],
+        "fit_guide": [
+            {"plan": "Free", "for": "Testing quality on one upload before you commit to a workflow.",
+             "detail": f"{billing.FREE_MINUTES_PER_MONTH:.0f} free transcription minutes every month, "
+                       "then pay per minute."},
+            {"plan": "Pro", "for": "A weekly upload schedule, wanting a discount on regular volume.",
+             "detail": f"{billing.PLANS['pro']['discount']*100:.0f}% off every rate, "
+                       f"${billing.PLANS['pro']['price_usd']}/month."},
+            {"plan": "Premium", "for": "A channel that wants burned captions or a dubbed video file "
+                                        "ready to re-upload.",
+             "detail": f"{billing.PLANS['premium']['discount']*100:.0f}% off every rate, video "
+                       "deliverables and priority-quality translation included."},
+            {"plan": "Enterprise", "for": "A larger channel or network processing high volume across "
+                                           "multiple creators.",
+             "detail": "Negotiated volume rate, dedicated account manager, bank transfer billing."},
+        ],
     },
     "media-broadcast": {
         "title": "Kauli for media and broadcast - subtitles and dubs on a real deadline",

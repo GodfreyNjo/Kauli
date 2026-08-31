@@ -2387,6 +2387,16 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .m-plan .m-plan-blurb { font-size: 0.83rem; color: var(--muted); line-height: 1.5; margin: 10px 0 16px; flex: 1; }
 .m-plan .btn { text-align: center; }
 
+/* "Which plan fits you" - grounded in the same real billing.PLANS data as
+   the pricing table above it, not a fabricated vs.-competitor comparison
+   (no verified competitor pricing to publish honestly) - just our own real
+   tiers mapped to a real scenario for this audience. */
+.m-fit-guide { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 16px; }
+.m-fit-card { background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 16px 18px; }
+.m-fit-plan { display: block; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--accent); margin-bottom: 8px; }
+.m-fit-for { font-size: 0.88rem; color: var(--ink); margin: 0 0 8px; line-height: 1.45; }
+.m-fit-detail { font-size: 0.8rem; color: var(--muted); margin: 0; line-height: 1.45; }
+
 .m-rates-card { background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius); padding: 10px 24px; max-width: 640px; margin: 0 auto; }
 
 .m-book-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 40px; align-items: start; }

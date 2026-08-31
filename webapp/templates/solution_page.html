@@ -23,6 +23,11 @@
       <a href="/#book" class="btn secondary">Book a call</a>
     </div>
     <p class="m-hero-note">No card required to try it. Pay only for what you process, when you're ready.</p>
+    {% if page.tour %}
+    {% set tour_mode = page.tour.mode %}
+    {% set tour_filename = page.tour.filename %}
+    {% include "_hero_tour.html" %}
+    {% endif %}
   </section>
 
   <section class="m-section" id="why-you">
@@ -57,8 +62,37 @@
       <p class="muted" style="margin-top:14px; font-size:0.85rem;">Your first {{ free_minutes|int }} minutes are free
          to try, no card required. See the full breakdown, plans and add-ons on the <a href="/#pricing">main pricing
          section →</a></p>
+
+      {% if page.fit_guide %}
+      <h3 style="margin-top:36px; font-size:1.05rem;">Which plan actually fits you</h3>
+      <div class="m-fit-guide">
+        {% for f in page.fit_guide %}
+        <div class="m-fit-card">
+          <span class="m-fit-plan">{{ f.plan }}</span>
+          <p class="m-fit-for">{{ f.for }}</p>
+          <p class="m-fit-detail">{{ f.detail }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
     </div>
   </section>
+
+  {% if page.faq %}
+  <section class="m-section" id="faq">
+    <div class="m-inner narrow">
+      <h2 class="m-h2">Questions you probably have</h2>
+      <div class="m-faq-list">
+        {% for item in page.faq %}
+        <details class="m-faq-item">
+          <summary>{{ item.q }}</summary>
+          <p>{{ item.a }}</p>
+        </details>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   <section class="m-section" id="get-started">
     <div class="m-inner narrow" style="text-align:center;">
