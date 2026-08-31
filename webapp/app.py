@@ -1354,9 +1354,10 @@ SOLUTION_PAGES = {
     },
     "video-transcription": {
         "title": "Kauli - Video and audio transcription services, Swahili, Kikuyu and English",
-        "meta_description": "Transcribe video or audio in Swahili, Kikuyu or English - AI-drafted, "
-                             "checked word-by-word by a real editor against the source before "
-                             "delivery. Transparent per-minute pricing, based in Kenya.",
+        "meta_description": "Transcribe video or audio in Swahili, Kikuyu or English, with real "
+                             "per-word timestamps - AI-drafted, checked word-by-word by a real "
+                             "editor against the source before delivery. Transparent per-minute "
+                             "pricing, based in Kenya.",
         "kicker": "Video and audio transcription",
         "h1": "Video and audio transcription, checked word-by-word before it ships",
         "intro": "An AI draft transcribes fast, but a real editor checks it against the source "
@@ -1367,6 +1368,10 @@ SOLUTION_PAGES = {
             {"title": "Every transcript human-reviewed",
              "body": "An AI draft is fast, but a real editor checks it against the source audio "
                       "word by word before it's marked ready - not just auto-generated and shipped."},
+            {"title": "Real per-word timestamps, not estimated",
+             "body": "Every word in your transcript carries its actual timing from the source audio, "
+                      "not a guess spread evenly across a sentence - useful for a searchable archive, "
+                      "a deposition record, or cueing up an exact moment in a long recording."},
             {"title": "Kikuyu goes through real human transcription",
              "body": "No automated speech-recognition model supports Kikuyu yet - orders in Kikuyu "
                       "go straight to a real human transcriber, not a lower-quality automated "
