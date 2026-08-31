@@ -617,6 +617,20 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
 .order-progress-pending .order-progress-label { color: var(--faint); }
 .order-progress-attention .order-progress-label { color: var(--err); font-weight: 600; }
 
+/* --------------------------------------- client order preview + AI Q&A --- */
+.order-preview-media { width: 100%; border-radius: var(--radius); background: #000; display: block; }
+.order-preview-yt { position: relative; width: 100%; padding-top: 56.25%; border-radius: var(--radius); overflow: hidden; }
+.order-preview-yt iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.ai-chat-log { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+.ai-chat-log:empty { display: none; }
+.ai-chat-q, .ai-chat-a {
+  padding: 8px 12px; border-radius: var(--radius-sm); font-size: 0.85rem; line-height: 1.45; max-width: 85%;
+}
+.ai-chat-q { align-self: flex-end; background: var(--accent-soft); color: var(--ink); }
+.ai-chat-a { align-self: flex-start; background: var(--panel); border: 1px solid var(--border-subtle); color: var(--ink); }
+#order-transcript-table tr.order-transcript-active { background: var(--accent-soft); }
+#order-transcript-table tr.order-transcript-active td { color: var(--ink); }
+
 /* ------------------------------------------------ staff overview page --- */
 .overview-header h1 { margin-bottom: 0; font-size: 1.5rem; }
 /* Real bug this fixes: a long real filename ("Rick Astley - Never Gonna

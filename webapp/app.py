@@ -40,7 +40,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -4299,6 +4299,76 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "folders": db.list_folders_for_client(user["client_scope_id"]),
         "progress_steps": _order_progress_steps(order["status"]),
     })
+
+
+def _transcript_text_for_order(job, order_level: dict) -> str:
+    """The real, final, human-reviewed text for this order - the target-
+    language translation where one actually happened, the source
+    transcript otherwise (a transcription-only order has no final_text at
+    all). Never the raw AI draft - source_final_text/final_text are only
+    ever set once a segment's been through the real review pipeline, same
+    fields the existing transcript preview table above already reads."""
+    if not job or not job.segments:
+        return ""
+    use_translation = bool(order_level.get("mt"))
+    lines = []
+    for seg in job.segments:
+        if getattr(seg, "segment_type", "speech") != "speech":
+            continue
+        text = (seg.final_text if use_translation else seg.source_final_text) or ""
+        text = text.strip()
+        if text:
+            lines.append(text)
+    return "\n".join(lines)
+
+
+@app.post("/client/orders/{order_id}/ai-summary")
+def client_order_ai_summary(request: Request, order_id: str):
+    """Lazy-generated, cached forever after - see the ai_summary_text
+    migration note in db.py and order_ai_assist.py's own module docstring
+    for why this is a real Claude call grounded in the order's own
+    transcript, not something pulled from Transkriptor (their API doesn't
+    provide one)."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"ok": False, "error": "Not signed in."}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
+    if order["ai_summary_text"]:
+        return JSONResponse({"ok": True, "summary": order["ai_summary_text"]})
+    job = _load_job(order)
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    text = _transcript_text_for_order(job, order_level)
+    result = order_ai_assist.generate_order_summary(text)
+    if result["ok"]:
+        db.set_order_ai_summary(order_id, result["summary"])
+    return JSONResponse(result)
+
+
+@app.post("/client/orders/{order_id}/ai-ask")
+async def client_order_ai_ask(request: Request, order_id: str):
+    """Stateless per-question Q&A, not a persisted chat - each call is a
+    fresh grounded-in-the-real-transcript request, no conversation memory
+    kept server-side. Real cost/abuse guardrail this deliberately does NOT
+    have yet: no rate limit on repeated questions per order - a real,
+    known gap, flagged rather than silently shipped as if it were handled."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"ok": False, "error": "Not signed in."}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    question = (body.get("question") or "").strip()
+    job = _load_job(order)
+    order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
+    text = _transcript_text_for_order(job, order_level)
+    result = order_ai_assist.answer_question_about_order(text, question)
+    return JSONResponse(result)
 
 
 @app.post("/client/orders/{order_id}/messages")

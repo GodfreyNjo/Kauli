@@ -194,7 +194,154 @@
   {% endif %}
 </div>
 
-{% if job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'ready_for_delivery', 'delivered', 'returned_to_client'] and not order['is_free_preview'] %}
+{% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and not order['is_free_preview'] %}
+<div class="card">
+  {% if dubbed_ready %}
+  <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
+  {% elif burned_ready %}
+  <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/burned"></video>
+  {% elif order['source_youtube_id'] %}
+  <div class="order-preview-yt"><iframe src="https://www.youtube.com/embed/{{ order['source_youtube_id'] }}"
+     title="Source video" frameborder="0" allowfullscreen></iframe></div>
+  {% elif has_dub %}
+  <audio controls class="order-preview-media" id="order-preview-audio" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+  {% endif %}
+
+  <h2 style="margin-top:{{ '20px' if (dubbed_ready or burned_ready or order['source_youtube_id'] or has_dub) else '0' }};">AI summary</h2>
+  <div id="ai-summary-content">
+    {% if order['ai_summary_text'] %}
+    <p>{{ order['ai_summary_text'] }}</p>
+    {% else %}
+    <p class="muted" id="ai-summary-loading">Generating a summary from your reviewed transcript…</p>
+    {% endif %}
+  </div>
+
+  <h2 style="margin-top:24px;">Ask about this transcript</h2>
+  <p class="muted" style="margin-top:0; font-size:0.82rem;">A real question, answered only from your actual
+     reviewed transcript - "what did they say about pricing?", "who's speaking at the start?"</p>
+  <div id="ai-chat-log" class="ai-chat-log"></div>
+  <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
+    <input type="text" id="ai-ask-input" placeholder="Ask a question…" maxlength="500" style="flex:1;" required>
+    <button type="submit" class="secondary">Ask</button>
+  </form>
+
+  <h2 style="margin-top:28px;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2>
+  <p class="muted" style="font-size:0.82rem;">The real, human-reviewed text your files are built from. See
+     something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
+  <div style="max-height:420px; overflow-y:auto; margin-top:10px;" id="order-transcript-scroll">
+    <table id="order-transcript-table">
+      <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
+      <tbody>
+        {% for seg in job.segments %}
+        {% if seg.segment_type == 'speech' %}
+        <tr data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}">
+          <td class="muted" style="font-size:0.78rem; white-space:nowrap;">
+            {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
+            {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.68rem;">{{ seg.speaker_id }}</span>{% endif %}
+          </td>
+          <td>{{ seg.source_final_text }}</td>
+          <td>{{ seg.final_text }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+  (function () {
+    var orderId = {{ order['id']|tojson }};
+
+    // AI summary - render the cached value server-side if it's already
+    // there (see order['ai_summary_text'] above); only fire this request
+    // when the page rendered the "generating…" placeholder instead.
+    var loadingEl = document.getElementById("ai-summary-loading");
+    if (loadingEl) {
+      fetch("/client/orders/" + orderId + "/ai-summary", { method: "POST" })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var container = document.getElementById("ai-summary-content");
+          if (!container) return;
+          if (data.ok) {
+            container.innerHTML = "<p></p>";
+            container.querySelector("p").textContent = data.summary;
+          } else {
+            container.innerHTML = '<p class="muted"></p>';
+            container.querySelector("p").textContent = data.error || "Couldn't generate a summary right now.";
+          }
+        })
+        .catch(function () {
+          if (loadingEl) loadingEl.textContent = "Couldn't generate a summary right now.";
+        });
+    }
+
+    // Ask-the-transcript - stateless per question, client-side-only log
+    // (nothing persisted server-side, see the route's own docstring).
+    var askForm = document.getElementById("ai-ask-form");
+    var askInput = document.getElementById("ai-ask-input");
+    var chatLog = document.getElementById("ai-chat-log");
+    if (askForm && askInput && chatLog) {
+      askForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var question = askInput.value.trim();
+        if (!question) return;
+        var qEl = document.createElement("div");
+        qEl.className = "ai-chat-q";
+        qEl.textContent = question;
+        chatLog.appendChild(qEl);
+        var aEl = document.createElement("div");
+        aEl.className = "ai-chat-a";
+        aEl.textContent = "Thinking…";
+        chatLog.appendChild(aEl);
+        chatLog.scrollTop = chatLog.scrollHeight;
+        askInput.value = "";
+        askInput.disabled = true;
+        fetch("/client/orders/" + orderId + "/ai-ask", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: question }),
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            aEl.textContent = data.ok ? data.answer : (data.error || "Something went wrong.");
+          })
+          .catch(function () { aEl.textContent = "Something went wrong - try again."; })
+          .finally(function () { askInput.disabled = false; askInput.focus(); chatLog.scrollTop = chatLog.scrollHeight; });
+      });
+    }
+
+    // Segment-sync highlight - real playhead position (timeupdate), not a
+    // separately-scheduled guess, so it can't drift the way an
+    // independent timer would. Works for either a real <video>/<audio>
+    // element; does nothing (no error) when the order has no player at
+    // all, e.g. a transcription-only order.
+    var media = document.querySelector(".order-preview-media");
+    var rows = document.querySelectorAll("#order-transcript-table tr[data-start-ms]");
+    var scrollBox = document.getElementById("order-transcript-scroll");
+    if (media && rows.length) {
+      var activeRow = null;
+      media.addEventListener("timeupdate", function () {
+        var nowMs = media.currentTime * 1000;
+        var match = null;
+        for (var i = 0; i < rows.length; i++) {
+          var start = Number(rows[i].dataset.startMs), end = Number(rows[i].dataset.endMs);
+          if (nowMs >= start && nowMs < end) { match = rows[i]; break; }
+        }
+        if (match !== activeRow) {
+          if (activeRow) activeRow.classList.remove("order-transcript-active");
+          if (match) {
+            match.classList.add("order-transcript-active");
+            if (scrollBox) {
+              var boxTop = scrollBox.getBoundingClientRect().top, rowTop = match.getBoundingClientRect().top;
+              scrollBox.scrollTop += (rowTop - boxTop) - scrollBox.clientHeight / 2 + match.clientHeight / 2;
+            }
+          }
+          activeRow = match;
+        }
+      });
+    }
+  })();
+</script>
+{% elif job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] and not order['is_free_preview'] %}
 <details class="card">
   <summary><h2 style="display:inline;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2></summary>
   <p class="muted" style="font-size:0.82rem;">Read-only preview of what our team is working from - not an

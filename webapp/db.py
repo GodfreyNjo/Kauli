@@ -939,6 +939,18 @@ def init_db() -> None:
         conn.execute("ALTER TABLE orders ADD COLUMN wants_human_voice_over INTEGER NOT NULL DEFAULT 0")
     if "voice_actor_id" not in existing_order_cols:
         conn.execute("ALTER TABLE orders ADD COLUMN voice_actor_id TEXT")
+    if "ai_summary_text" not in existing_order_cols:
+        # A real Claude-generated summary of this order's own final,
+        # human-reviewed transcript (see webapp/order_ai_assist.py) - NOT
+        # pulled from Transkriptor, whose transcription API has no summary
+        # field in its response at all (checked against the real, documented
+        # API contract in kauli/providers/asr.py before building this).
+        # Generated once on first client view of a delivered order and
+        # cached here - never regenerated automatically, so it can't drift
+        # from what the client already read, and a second view never pays
+        # for a second API call.
+        conn.execute("ALTER TABLE orders ADD COLUMN ai_summary_text TEXT")
+        conn.execute("ALTER TABLE orders ADD COLUMN ai_summary_generated_at REAL")
     existing_actor_cols = {row["name"] for row in conn.execute("PRAGMA table_info(voice_actors)")}
     if existing_actor_cols and "user_id" not in existing_actor_cols:
         # existing_actor_cols is empty only on a genuinely fresh DB where
@@ -2060,6 +2072,19 @@ def set_dub_voice(order_id: str, voice: str | None, job_status: str | None = Non
     conn.execute(
         "UPDATE orders SET dub_voice = ?, dub_voice_job_status = ?, updated_at = ? WHERE id = ?",
         (voice, job_status, time.time(), order_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def set_order_ai_summary(order_id: str, text: str) -> None:
+    """Caches a real Claude-generated summary of this order's own final
+    transcript - see the ai_summary_text migration note above and
+    webapp/order_ai_assist.py."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE orders SET ai_summary_text = ?, ai_summary_generated_at = ? WHERE id = ?",
+        (text, time.time(), order_id),
     )
     conn.commit()
     conn.close()
