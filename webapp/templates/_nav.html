@@ -10,15 +10,101 @@
       <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
     </picture>
   </a>
-  <div class="m-nav-links">
-    <a href="{{ home }}#how">How it works</a>
-    <a href="{{ home }}#demo">See a demo</a>
-    <a href="{{ home }}#who">Who it's for</a>
+  <button type="button" class="m-nav-burger" id="m-nav-burger" aria-expanded="false" aria-controls="m-nav-links" aria-label="Open menu">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  </button>
+  <div class="m-nav-links" id="m-nav-links">
+    <div class="m-nav-dropdown">
+      <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
+        Product
+        <svg class="m-nav-chevron" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
+      </button>
+      <div class="m-nav-dropdown-menu">
+        <a href="{{ home }}#how">How it works</a>
+        <a href="{{ home }}#demo">See a demo</a>
+        <a href="{{ home }}#book">Book a call</a>
+      </div>
+    </div>
+
+    <div class="m-nav-dropdown">
+      <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
+        Solutions
+        <svg class="m-nav-chevron" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
+      </button>
+      <div class="m-nav-dropdown-menu m-nav-dropdown-menu-wide">
+        <div class="m-nav-dropdown-col">
+          <span class="m-nav-dropdown-heading">By audience</span>
+          <a href="/solutions/ngos">For NGOs</a>
+          <a href="/solutions/youtubers">For YouTubers</a>
+          <a href="/solutions/media-broadcast">For media &amp; broadcast</a>
+          <a href="/solutions/e-learning">For e-learning</a>
+        </div>
+        <div class="m-nav-dropdown-col">
+          <span class="m-nav-dropdown-heading">By service</span>
+          <a href="/solutions/video-translation">Video translation</a>
+          <a href="/solutions/video-dubbing">Video dubbing</a>
+          <a href="/solutions/captioning">Captioning</a>
+          <a href="/solutions/video-transcription">Transcription</a>
+          <a href="/solutions/voice-over">Voice over</a>
+          <a href="/solutions/video-localization">Full localization</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="m-nav-dropdown">
+      <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
+        Resources
+        <svg class="m-nav-chevron" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
+      </button>
+      <div class="m-nav-dropdown-menu">
+        <a href="/blog">Blog</a>
+        <a href="{{ home }}#faq">FAQ</a>
+        <a href="/formatting-standards">How we format your content</a>
+      </div>
+    </div>
+
     <a href="{{ home }}#pricing">Pricing</a>
-    <a href="{{ home }}#faq">FAQ</a>
-    <a href="/blog">Blog</a>
-    <a href="{{ home }}#book">Book a call</a>
     <a href="/login" class="btn secondary">Sign in</a>
     <a href="/login?mode=signup" class="btn cta-olive">Get started free</a>
   </div>
 </nav>
+<script>
+  (function () {
+    var dropdowns = document.querySelectorAll(".m-nav-dropdown");
+    function closeAll(except) {
+      dropdowns.forEach(function (d) {
+        if (d === except) return;
+        d.classList.remove("open");
+        var btn = d.querySelector(".m-nav-dropdown-trigger");
+        if (btn) btn.setAttribute("aria-expanded", "false");
+      });
+    }
+    dropdowns.forEach(function (d) {
+      var btn = d.querySelector(".m-nav-dropdown-trigger");
+      if (!btn) return;
+      btn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var isOpen = d.classList.contains("open");
+        closeAll(d);
+        d.classList.toggle("open", !isOpen);
+        btn.setAttribute("aria-expanded", String(!isOpen));
+      });
+    });
+    document.addEventListener("click", function () { closeAll(); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { closeAll(); if (burger) burger.focus(); }
+    });
+
+    var burger = document.getElementById("m-nav-burger");
+    var links = document.getElementById("m-nav-links");
+    if (burger && links) {
+      burger.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var isOpen = links.classList.toggle("open");
+        burger.setAttribute("aria-expanded", String(isOpen));
+      });
+    }
+  })();
+</script>

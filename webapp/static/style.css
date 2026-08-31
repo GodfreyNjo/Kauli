@@ -105,7 +105,11 @@ html[data-theme="dark"] {
   --ink: #e4e4e7;
   --heading-ink: #ffffff;
   --muted: #a1a1aa;
-  --faint: #71717a;
+  /* #71717a measured 3.85:1 against --bg - real WCAG AA failure (needs
+     4.5:1) for anything sized as normal text, not just "could be lighter."
+     #7d7d87 measures 4.57:1, clearing it with a small margin - checked with
+     the real relative-luminance formula, not eyeballed. */
+  --faint: #7d7d87;
 
   --accent: #556b2f;
   --accent-hover: #64802e;
@@ -1942,6 +1946,40 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .m-nav-links a.btn.secondary { color: var(--ink); }
 .m-nav-links a.btn:hover { color: var(--accent-ink); }
 
+/* Grouped nav - matches 3Play's own Platform/Solutions/Resources pattern
+   instead of seven bare links fighting for space (the old layout wrapped
+   "Who it's for" onto its own line at real desktop widths). Click-to-open
+   on the trigger button, not hover-only - works identically for a mouse,
+   a keyboard (real focus + Enter/Space on a real <button>), and touch,
+   which a CSS-only :hover dropdown never does. */
+.m-nav-dropdown { position: relative; }
+.m-nav-dropdown-trigger {
+  display: flex; align-items: center; gap: 6px; background: none; border: none; margin: 0; padding: 0;
+  color: var(--muted); font-size: 0.87rem; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.m-nav-dropdown-trigger:hover, .m-nav-dropdown.open .m-nav-dropdown-trigger { color: var(--ink); }
+.m-nav-chevron { flex-shrink: 0; transition: transform 0.15s ease; }
+.m-nav-dropdown.open .m-nav-chevron { transform: rotate(180deg); }
+.m-nav-dropdown-menu {
+  display: none; position: absolute; top: calc(100% + 14px); left: 0; z-index: 25;
+  background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius);
+  padding: 10px; min-width: 220px; box-shadow: 0 12px 32px -8px rgba(0,0,0,0.4);
+  flex-direction: column; gap: 2px;
+}
+.m-nav-dropdown.open .m-nav-dropdown-menu { display: flex; }
+.m-nav-dropdown-menu a { padding: 8px 10px; border-radius: var(--radius-sm); font-size: 0.87rem; }
+.m-nav-dropdown-menu a:hover { background: var(--hover); color: var(--ink); }
+.m-nav-dropdown-menu-wide { flex-direction: row; gap: 4px; min-width: 420px; }
+.m-nav-dropdown-col { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.m-nav-dropdown-heading {
+  font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--faint); padding: 8px 10px 4px;
+}
+
+.m-nav-burger {
+  display: none; background: none; border: none; color: var(--ink); padding: 6px; cursor: pointer;
+}
+
 /* Rev's own hero isn't a flat gradient wash - it's a soft, colorful glow
    sitting behind the hero content on their same near-black base (confirmed
    live: rev.com's <body> is a plain solid rgb(18,15,32) - literally what
@@ -2133,7 +2171,7 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 /* The "3-bullet rule" - no paragraphs, every card scannable in one glance. */
 .m-feature-bullets { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
 .m-feature-bullets li {
-  font-size: 0.87rem; color: var(--muted); line-height: 1.45; padding-left: 22px; position: relative;
+  font-size: 0.97rem; color: var(--muted); line-height: 1.5; padding-left: 22px; position: relative;
 }
 .m-feature-bullets li::before {
   content: "✓"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 700; font-size: 0.8rem;
@@ -2530,7 +2568,12 @@ mark.guide-search-hit-current { background: var(--accent); color: #fff; }
 .m-inner.narrow.legal { line-height: 1.7; }
 .m-inner.narrow.legal h2 { margin-top: 32px; font-size: 1.1rem; }
 .m-inner.narrow.legal h3 { margin-top: 22px; font-size: 0.98rem; }
-.m-inner.narrow.legal p, .m-inner.narrow.legal li { color: var(--muted); font-size: 0.92rem; }
+/* 1.09rem = 17.4px, 3Play's own real measured blog-post body text (checked
+   live: 17.4px/26.1px line-height on 3playmedia.com, Inter) - the old
+   0.92rem (14.7px) was noticeably smaller than that, on pages meant to be
+   read at length (terms, privacy, the formatting-standards page, the staff
+   guide), not scanned. */
+.m-inner.narrow.legal p, .m-inner.narrow.legal li { color: var(--muted); font-size: 1.09rem; }
 .m-inner.narrow.legal ul { padding-left: 20px; }
 
 /* -------------------------------------------------- comparison table -- */
@@ -2625,8 +2668,23 @@ tbody tr:last-child .m-compare-us { border-bottom: 2px solid var(--accent); }
 .m-faq-item p { margin: 12px 0 0; color: var(--muted); font-size: 0.9rem; line-height: 1.6; }
 
 @media (max-width: 760px) {
-  .m-nav-links { gap: 12px; }
-  .m-nav-links a:not(.btn) { display: none; }
+  /* Real mobile menu, not "hide every link but the two buttons" - the old
+     rule left mobile visitors with zero way to reach How it works,
+     Solutions, Blog, FAQ, or Pricing at all. Burger toggles the whole
+     panel open/closed; each dropdown still works the same click-to-open
+     way inside it, just stacked instead of floating. */
+  .m-nav-burger { display: flex; align-items: center; }
+  .m-nav-links {
+    display: none; position: absolute; top: 100%; left: 0; right: 0;
+    flex-direction: column; align-items: stretch; gap: 4px; padding: 12px 20px 20px;
+    background: var(--bg); border-bottom: 1px solid var(--border-subtle);
+    max-height: calc(100vh - 66px); overflow-y: auto;
+  }
+  .m-nav-links.open { display: flex; }
+  .m-nav-links a:not(.btn) { padding: 10px 4px; }
+  .m-nav-links a.btn { text-align: center; margin-top: 6px; }
+  .m-nav-dropdown-menu { position: static; box-shadow: none; border: none; background: none; padding: 0 0 0 12px; min-width: 0; }
+  .m-nav-dropdown-menu-wide { flex-direction: column; min-width: 0; }
   .m-book-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
