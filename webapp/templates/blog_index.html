@@ -12,7 +12,7 @@
 {% include "_nav.html" %}
 
 <section class="m-section" style="padding-top:48px;">
-  <div class="m-inner narrow">
+  <div class="m-inner">
     <h1 class="m-h2" style="text-align:left;">Blog</h1>
     <p class="m-lede" style="text-align:left;">Real technical detail on Swahili, Kikuyu and English
        localization - not fluff.</p>
@@ -40,10 +40,10 @@
         <div class="m-blog-card-visual m-blog-card-photo" style="background-image:url('/blog-cover/{{ post['id'] }}');" aria-hidden="true"></div>
         {% else %}
         <div class="m-blog-card-visual" data-category="{{ post['category'] or '' }}" aria-hidden="true">
-          <svg viewBox="0 0 200 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <svg viewBox="0 0 200 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
             <g fill="currentColor" opacity="0.5">
               {% for i in range(24) %}
-              <rect x="{{ i * 8.4 }}" y="{{ 30 - (((i * 37) % 26) + 4) }}" width="4" height="{{ ((i * 37) % 26) + 4 }}" rx="2"/>
+              <rect x="{{ i * 8.4 }}" y="{{ 92 - (14 + ((i * 37) % 78)) }}" width="4" height="{{ 14 + ((i * 37) % 78) }}" rx="2"/>
               {% endfor %}
             </g>
           </svg>
@@ -51,7 +51,6 @@
         {% endif %}
         {% if post['category'] %}<span class="m-category-pill" data-category="{{ post['category'] }}">{{ post['category'] }}</span>{% endif %}
         <h2>{{ post['title'] }}</h2>
-        {% if post['description'] %}<p>{{ post['description'] }}</p>{% endif %}
         <span class="m-blog-date">{{ post['published_at']|int|timestamp_to_str }} &middot; {{ post['body_html']|reading_time }}</span>
       </a>
       {% endfor %}
