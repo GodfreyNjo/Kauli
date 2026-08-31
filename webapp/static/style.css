@@ -1942,7 +1942,28 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .m-nav-links a.btn.secondary { color: var(--ink); }
 .m-nav-links a.btn:hover { color: var(--accent-ink); }
 
-.m-hero { padding: 96px 24px 80px; text-align: center; overflow: hidden; }
+/* Rev's own hero isn't a flat gradient wash - it's a soft, colorful glow
+   sitting behind the hero content on their same near-black base (confirmed
+   live: rev.com's <body> is a plain solid rgb(18,15,32) - literally what
+   --bg is already built from, see its comment above - the color comes from
+   a large blurred shape behind the hero, not the page background itself).
+   Same structure here, our own palette: the olive accent plus the two
+   existing brand tones already used elsewhere on the site (--accent2
+   purple for category pills, --info steel-blue), never a color invented
+   just for this. z-index:-1 + position:relative keeps it behind the real
+   hero content without having to tag every child; overflow:hidden on
+   .m-hero (already set, unchanged) clips it to the hero itself so it never
+   bleeds into the flat page below. */
+.m-hero { padding: 96px 24px 80px; text-align: center; overflow: hidden; position: relative; }
+.m-hero::before {
+  content: ""; position: absolute; z-index: -1; inset: -20% -10% -35%;
+  background:
+    radial-gradient(ellipse 55% 50% at 20% 15%, color-mix(in srgb, var(--accent) 50%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 82% 10%, color-mix(in srgb, var(--accent2) 40%, transparent), transparent 70%),
+    radial-gradient(ellipse 55% 50% at 55% 75%, color-mix(in srgb, var(--info) 30%, transparent), transparent 70%);
+  filter: blur(80px);
+  pointer-events: none;
+}
 .m-hero .kicker {
   display: inline-block; font-size: 0.76rem; font-weight: 650; letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--accent); background: var(--accent-soft);
