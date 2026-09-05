@@ -324,6 +324,7 @@
     {% if request.query_params.get('yt_added') %}<p class="ok">✓ Now watching that channel.</p>{% endif %}
     {% if request.query_params.get('yt_error') == 'unrecognized' %}<p class="error">Couldn't recognize that as a YouTube channel or playlist link.</p>{% endif %}
     {% if request.query_params.get('yt_error') == 'resolve_failed' %}<p class="error">Couldn't find that channel on YouTube - double check the link.</p>{% endif %}
+    {% if request.query_params.get('yt_error') == 'rate_limited' %}<p class="error">Too many channels added too quickly - wait a few minutes and try again.</p>{% endif %}
 
     <form method="post" action="/client/youtube-watches" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
       <label style="flex:1; min-width:220px;">Channel or playlist URL

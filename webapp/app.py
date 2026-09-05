@@ -2552,6 +2552,15 @@ def reset_password_form(request: Request):
 @app.post("/reset-password")
 def reset_password_submit(request: Request, access_token: str = Form(""), refresh_token: str = Form(""),
                            password: str = Form(""), confirm_password: str = Form("")):
+    # IP-keyed, same shape as /forgot-password just above it - the tokens
+    # themselves come from Supabase's own emailed link (not guessable), but
+    # this still calls out to Supabase's API on every submit and is public/
+    # unauthenticated, so it's worth the same guard against being hammered.
+    allowed, retry_after = rate_limit.check(f"reset:{rate_limit.client_ip(request)}", limit=5, window_s=600)
+    if not allowed:
+        return templates.TemplateResponse(request, "reset_password.html", {
+            "error": f"Too many attempts - try again in {retry_after // 60 + 1} minute(s).",
+        }, status_code=429)
     if not access_token or not refresh_token:
         return templates.TemplateResponse(request, "reset_password.html", {
             "error": "That reset link is invalid or has expired. Request a new one.",
@@ -2598,6 +2607,17 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
 def signup(request: Request, email: str = Form(...), password: str = Form(...),
            marketing_consent: str = Form(""), next: str = Form("")):
     email = email.strip().lower()
+    # IP-keyed, not email-keyed - the thing worth bounding here is one
+    # visitor spamming Supabase's sign_up API with lots of *different*
+    # emails (real accounts or throwaway ones), not one email retrying its
+    # own signup a few times.
+    allowed, retry_after = rate_limit.check(f"signup:{rate_limit.client_ip(request)}", limit=6, window_s=600)
+    if not allowed:
+        return templates.TemplateResponse(request, "login.html", {
+            "error": f"Too many signup attempts - try again in {retry_after // 60 + 1} minute(s).",
+            "notice": None, "mode": "signup", "email": email,
+            "marketing_consent": bool(marketing_consent), "next": _safe_next(next),
+        }, status_code=429)
     policy_errors = supabase_auth.password_policy_errors(password, email=email)
     if policy_errors:
         # Rejected before ever calling Supabase - no point spending an API
@@ -2886,6 +2906,14 @@ def settings_team_invite(request: Request, email: str = Form(...)):
     # that isn't theirs to manage.
     if user["client_scope_id"] != user["id"]:
         return RedirectResponse("/settings?tab=team", status_code=303)
+    # Real email sent to a third party's address below - without a limit, a
+    # logged-in account could be used to email-bomb any inbox it names,
+    # over and over, using our own mailer/domain.
+    allowed, retry_after = rate_limit.check(f"invite:{user['id']}", limit=10, window_s=600)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=team&team_error=Too+many+invites+-+try+again+in+{retry_after // 60 + 1}+minute(s).",
+            status_code=303)
     email = email.strip().lower()
     if not email or "@" not in email:
         return RedirectResponse("/settings?tab=team&team_error=Enter+a+real+email+address.", status_code=303)
@@ -3656,6 +3684,12 @@ def record_feedback(request: Request, context: str, user_id: str, rating: str):
     report."""
     if rating not in ("great", "good", "needs_work"):
         return HTMLResponse("Unknown rating.", status_code=404)
+    # Public, unauthenticated, no login wall - same shape as the callback/
+    # forgot-password guards above. Real abuse case this closes: hitting a
+    # "needs_work" link on repeat to spam staff with churn-risk alerts.
+    allowed, retry_after = rate_limit.check(f"feedback:{rate_limit.client_ip(request)}", limit=20, window_s=600)
+    if not allowed:
+        return HTMLResponse("Too many requests - try again shortly.", status_code=429)
     user = db.get_user(user_id)
     if not user:
         return HTMLResponse("Account not found.", status_code=404)
@@ -3679,6 +3713,12 @@ def client_add_youtube_watch(request: Request, channel_url: str = Form(""), labe
         return RedirectResponse("/login")
     if not youtube_poll.youtube_polling_configured():
         return RedirectResponse("/client?yt_error=not_configured", status_code=303)
+    # Each add below calls out to the real YouTube Data API, which is
+    # quota-limited on our side, not just rate-limited on theirs - bound
+    # how fast one account can burn through that shared quota.
+    allowed, retry_after = rate_limit.check(f"ytwatch:{user['id']}", limit=10, window_s=600)
+    if not allowed:
+        return RedirectResponse("/client?yt_error=rate_limited", status_code=303)
     parsed = youtube_poll.extract_channel_or_playlist_id(channel_url.strip())
     if not parsed:
         return RedirectResponse("/client?yt_error=unrecognized", status_code=303)
@@ -4337,6 +4377,14 @@ def client_order_ai_summary(request: Request, order_id: str):
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
     if order["ai_summary_text"]:
         return JSONResponse({"ok": True, "summary": order["ai_summary_text"]})
+    # Keyed on the account, not the order - a real result is cached forever
+    # right below, so this only ever fires repeatedly on a *failing*
+    # generation; without a limit that's an unbounded retry loop straight
+    # onto a real, billed Claude call every time.
+    allowed, retry_after = rate_limit.check(f"ai-summary:{user['client_scope_id']}", limit=10, window_s=600)
+    if not allowed:
+        return JSONResponse({"ok": False, "error": f"Too many requests - try again in {retry_after}s."},
+                             status_code=429)
     job = _load_job(order)
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     text = _transcript_text_for_order(job, order_level)
@@ -4350,15 +4398,19 @@ def client_order_ai_summary(request: Request, order_id: str):
 async def client_order_ai_ask(request: Request, order_id: str):
     """Stateless per-question Q&A, not a persisted chat - each call is a
     fresh grounded-in-the-real-transcript request, no conversation memory
-    kept server-side. Real cost/abuse guardrail this deliberately does NOT
-    have yet: no rate limit on repeated questions per order - a real,
-    known gap, flagged rather than silently shipped as if it were handled."""
+    kept server-side. Every call is a real, billed Claude request, so it's
+    rate-limited per account below - the gap this docstring used to flag
+    as unaddressed."""
     user = current_user(request)
     if not user or user["role"] != "client":
         return JSONResponse({"ok": False, "error": "Not signed in."}, status_code=401)
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
+    allowed, retry_after = rate_limit.check(f"ai-ask:{user['client_scope_id']}", limit=20, window_s=600)
+    if not allowed:
+        return JSONResponse({"ok": False, "error": f"Too many questions - try again in {retry_after}s."},
+                             status_code=429)
     try:
         body = await request.json()
     except Exception:
