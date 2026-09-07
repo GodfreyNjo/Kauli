@@ -1,0 +1,84 @@
+<!-- Google One Tap - the native Google "Sign in as X" prompt (Google
+     Identity Services), for a logged-out visitor whose browser already has
+     an active Google session. Included only on public pages, only when
+     `user` is falsy (see each include site) - no reason to prompt someone
+     already signed in.
+
+     Entirely inert until GOOGLE_ONE_TAP_CLIENT_ID is set in .env: that
+     needs a real Google Cloud OAuth Client ID with kauli-forgemedia.com
+     added as an authorized JavaScript origin. It can be the SAME client ID
+     already backing /login/google (find it in the Google Cloud project
+     behind Supabase's Google provider) or a new one - either way, Google
+     only cares that the origin serving this script is on that client's
+     authorized-origins list, not which app.py route eventually receives
+     the credential.
+
+     Gated behind real cookie consent, same pattern as _ga.html: this only
+     DEFINES the loader (window.__kauliLoadOneTap); base.html's own
+     consent script is what actually calls it, and only once analytics
+     cookies have been accepted - Google's own g_state cookie is a
+     third-party cookie like any other, so it gets the same treatment GA's
+     _ga cookie does, not a free pass just because it's "just" a login
+     convenience. -->
+{% if google_one_tap_client_id %}
+<script>
+  window.__kauliOneTapClientId = {{ google_one_tap_client_id|tojson }};
+  window.__kauliLoadOneTap = function () {
+    if (window.__kauliOneTapLoaded || !window.__kauliOneTapClientId) return;
+    if (!window.crypto || !window.crypto.subtle) return;  // no SubtleCrypto (very old browser) - skip silently
+    window.__kauliOneTapLoaded = true;
+
+    function randomNonce() {
+      if (window.crypto.randomUUID) return window.crypto.randomUUID();
+      return "n-" + Math.random().toString(36).slice(2) + Date.now();
+    }
+    function hashNonce(raw) {
+      return window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw)).then(function (buf) {
+        return Array.from(new Uint8Array(buf)).map(function (b) {
+          return b.toString(16).padStart(2, "0");
+        }).join("");
+      });
+    }
+    // A real full-page form POST, not fetch - so a successful sign-in comes
+    // back as a normal 303 redirect through _complete_auth_session, the
+    // same real login/session-cookie path every other sign-in method uses
+    // (see /auth/google/callback's identical reasoning for the redirect-
+    // based Google OAuth flow this mirrors).
+    function submitCredential(credential, rawNonce) {
+      var form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/auth/google/one-tap";
+      form.style.display = "none";
+      [["credential", credential], ["nonce", rawNonce]].forEach(function (pair) {
+        var input = document.createElement("input");
+        input.type = "hidden";
+        input.name = pair[0];
+        input.value = pair[1];
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+    }
+
+    var rawNonce = randomNonce();
+    hashNonce(rawNonce).then(function (hashedNonce) {
+      var s = document.createElement("script");
+      s.src = "https://accounts.google.com/gsi/client";
+      s.async = true;
+      s.defer = true;
+      s.onload = function () {
+        if (!window.google || !window.google.accounts || !window.google.accounts.id) return;
+        google.accounts.id.initialize({
+          client_id: window.__kauliOneTapClientId,
+          callback: function (response) { submitCredential(response.credential, rawNonce); },
+          nonce: hashedNonce,
+          use_fedcm_for_prompt: true,
+          auto_select: false,  // show the picker, never silently sign someone in
+        });
+        google.accounts.id.prompt();  // no-op with no visible UI if there's no active Google session
+      };
+      document.head.appendChild(s);
+    });
+  };
+</script>
+{% endif %}

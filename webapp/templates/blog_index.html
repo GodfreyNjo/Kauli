@@ -8,6 +8,7 @@
 <meta property="og:description" content="Notes on Swahili, Kikuyu and English dubbing, translation and subtitling.">
 <link rel="icon" href="/static/kauli-icon.png">
 {% include "_ga.html" %}
+{% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}
 <div class="marketing-page">
 {% include "_nav.html" %}

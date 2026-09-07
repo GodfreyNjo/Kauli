@@ -23,6 +23,7 @@
 }
 </script>
 {% include "_ga.html" %}
+{% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}
 {% include "_nav.html" %}
 

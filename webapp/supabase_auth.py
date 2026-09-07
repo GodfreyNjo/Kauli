@@ -196,6 +196,36 @@ def complete_oauth_session(access_token: str, refresh_token: str):
         return None, str(exc)
 
 
+def sign_in_with_google_id_token(id_token: str, nonce: str | None = None):
+    """Returns (session_or_None, error_message_or_None) - same shape as
+    sign_in/sign_up/complete_oauth_session, so app.py's Google One Tap route
+    can hand the result straight to the same _complete_auth_session every
+    other login goes through.
+
+    This is Supabase's own documented mechanism for Google One Tap: rather
+    than a second, parallel identity system verifying the Google ID token
+    ourselves, sign_in_with_id_token hands it to Supabase's GoTrue, which
+    validates it against the SAME Google OAuth client already configured for
+    /login/google above and mints a normal Supabase session - so a One Tap
+    login and a regular Google-redirect login land in the exact same
+    accounts, keyed by the same verified email, with no separate code path
+    for "logged in via One Tap" anywhere else in this app.
+
+    nonce is the RAW (unhashed) value the frontend generated before hashing
+    it for Google (see _one_tap.html) - Supabase hashes it again here and
+    checks it matches what's embedded in the ID token, which is what stops a
+    captured token from being replayed on a second sign-in request."""
+    try:
+        res = _with_timeout_retry(
+            lambda: get_client().auth.sign_in_with_id_token(
+                {"provider": "google", "token": id_token, "nonce": nonce}
+            )
+        )
+        return res.session, None
+    except Exception as exc:  # noqa: BLE001
+        return None, str(exc)
+
+
 def change_password(email: str, current_password: str, new_password: str):
     """For a logged-in user changing their password from Settings -
     different path from set_new_password below (that one consumes a

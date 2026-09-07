@@ -5,6 +5,7 @@
 {% block head_extra %}
 <meta name="description" content="Exactly how Kauli formats a delivered transcript, caption file and dub by default - and how to tell us to do it differently.">
 {% include "_ga.html" %}
+{% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}
 {% include "_nav.html" %}
 

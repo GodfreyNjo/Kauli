@@ -313,15 +313,22 @@ async def add_trace_id(request: Request, call_next):
 # itself was fast and correct every single time. Confirmed via the exact
 # console message: "Sending form data to 'https://checkout.paystack.com/
 # ...' violates ... form-action 'self'. The request has been blocked."
+# accounts.google.com/gsi/* entries below are Google Identity Services (the
+# One Tap prompt, see _one_tap.html) - client, connect and frame per
+# Google's own documented CSP requirements for gis/client. Without frame-src
+# specifically, the prompt's own iframe silently never appears at all (same
+# class of bug as the YouTube player note above - default-src has no
+# fallback here since frame-src is explicitly set).
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://assets.calendly.com "
-    "https://www.youtube.com https://www.googletagmanager.com; "
+    "https://www.youtube.com https://www.googletagmanager.com https://accounts.google.com; "
     # style-src/font-src: api.fontshare.com serves the @font-face CSS itself
     # (style-src), cdn.fontshare.com serves the actual woff2/woff/ttf files
     # it points at (font-src) - same split as the existing Google Fonts
     # pair (fonts.googleapis.com serves CSS, fonts.gstatic.com serves files).
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com "
+    "https://accounts.google.com; "
     "font-src 'self' https://fonts.gstatic.com https://cdn.fontshare.com; "
     "img-src 'self' data: https://i.ytimg.com; "
     # google-analytics.com/analytics.google.com: real bug found and fixed
@@ -332,8 +339,9 @@ _CSP = (
     # console before this fix, confirmed gone after it.
     "connect-src 'self' https://cloudflareinsights.com https://static.cloudflareinsights.com "
     "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com "
-    "https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com; "
-    "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com; "
+    "https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com "
+    "https://accounts.google.com; "
+    "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com https://accounts.google.com; "
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
     "form-action 'self' https://checkout.paystack.com"
 )
@@ -1160,6 +1168,11 @@ templates.env.globals["contact_email"] = CONTACT_EMAIL
 templates.env.globals["contact_whatsapp_url"] = f"https://wa.me/{CONTACT_PHONE_WHATSAPP}"
 templates.env.globals["contact_phone_tel"] = CONTACT_PHONE_TEL
 templates.env.globals["contact_phone_display"] = CONTACT_PHONE
+# Unset until a real Google Cloud OAuth Client ID (with kauli-forgemedia.com
+# added as an authorized JavaScript origin) is put in .env - see
+# _one_tap.html, which no-ops entirely when this is empty, same "silently
+# inert until configured" pattern as calendly_url above.
+templates.env.globals["google_one_tap_client_id"] = os.environ.get("GOOGLE_ONE_TAP_CLIENT_ID")
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -2513,14 +2526,20 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
 
 
 @app.get("/login", response_class=HTMLResponse)
-def login_form(request: Request, mode: str = "signin", notice: str | None = None, next: str | None = None):
+def login_form(request: Request, mode: str = "signin", notice: str | None = None, next: str | None = None,
+                error: str | None = None):
+    # error was a real, pre-existing gap: /login/google's own "not
+    # configured" failure already redirected here with ?error=..., but this
+    # route never read it, so that message silently never reached anyone -
+    # same bug the new Google One Tap failure path below would otherwise
+    # have quietly inherited.
     display_notice = None
     if notice == "account_closed":
         display_notice = "Your account has been closed."
     elif notice == "password_reset":
         display_notice = "Your password has been reset - sign in with your new password."
     return templates.TemplateResponse(request, "login.html", {
-        "error": None, "notice": display_notice, "mode": "signup" if mode == "signup" else "signin",
+        "error": error, "notice": display_notice, "mode": "signup" if mode == "signup" else "signin",
         "next": _safe_next(next) if next else "",
     })
 
@@ -2695,6 +2714,32 @@ def google_callback_submit(request: Request, access_token: str = Form(""), refre
             "error": error or "That sign-in didn't work - please try again.",
         }, status_code=400)
     return _complete_auth_session(request, session, next)
+
+
+@app.post("/auth/google/one-tap")
+def google_one_tap_submit(request: Request, credential: str = Form(""), nonce: str = Form("")):
+    """The Google One Tap prompt's callback (_one_tap.html) submits here as
+    a plain form POST, not fetch/JSON - same reasoning as the regular
+    Google OAuth callback just above: a real 303 redirect through
+    _complete_auth_session is simpler and more consistent than a JS-side
+    JSON response that then has to do its own navigation.
+
+    Public and unauthenticated by design (a visitor isn't signed in yet),
+    so it's IP-rate-limited like every other public auth endpoint - a
+    forged/replayed credential still fails Supabase's own verification
+    below, but there's no reason to let that verification be hammered."""
+    allowed, retry_after = rate_limit.check(f"onetap:{rate_limit.client_ip(request)}", limit=10, window_s=60)
+    if not allowed:
+        return RedirectResponse(f"/login?error={quote('Too many attempts - try again shortly.')}", status_code=303)
+    if not credential:
+        return RedirectResponse(
+            f"/login?error={quote('That sign-in did not come back from Google correctly - please try again.')}",
+            status_code=303)
+    session, error = supabase_auth.sign_in_with_google_id_token(credential, nonce or None)
+    if error or not session:
+        return RedirectResponse(
+            f"/login?error={quote(error or 'That sign-in did not work - please try again.')}", status_code=303)
+    return _complete_auth_session(request, session, "")
 
 
 @app.get("/logout")

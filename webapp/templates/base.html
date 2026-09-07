@@ -164,11 +164,12 @@
   </div>
 
   <!-- Real consent, not just an acknowledgement: Accept turns on Google
-       Analytics (only ever loaded on the public pages - see _ga.html);
-       Preferences opens the modal below where "Necessary only" is a genuine
-       decline, not a dead button. One banner/one choice sitewide, since it's
-       the same real decision regardless of which page someone happens to
-       land on first. -->
+       Analytics (only ever loaded on the public pages - see _ga.html) and
+       the Google One Tap sign-in prompt (see _one_tap.html, same public
+       pages); Preferences opens the modal below where "Necessary only" is a
+       genuine decline, not a dead button. One banner/one choice sitewide,
+       since it's the same real decision regardless of which page someone
+       happens to land on first. -->
   <div class="cookie-notice" id="cookie-notice" style="display:none;" role="region" aria-label="Cookie notice">
     <!-- Vendor-neutral by design, same register as most real cookie
          banners - "non-essential cookies to analyze traffic" here, the
@@ -252,6 +253,13 @@
       function maybeLoadGA() {
         if (getConsent() === "accepted" && window.__kauliLoadGA) window.__kauliLoadGA();
       }
+      // Same shape as maybeLoadGA - __kauliLoadOneTap only exists on the
+      // public pages that include _one_tap.html, and only actually does
+      // anything once GOOGLE_ONE_TAP_CLIENT_ID is configured (see that
+      // file); everywhere else this is a harmless no-op.
+      function maybeLoadOneTap() {
+        if (getConsent() === "accepted" && window.__kauliLoadOneTap) window.__kauliLoadOneTap();
+      }
       function hideBanner() {
         if (!notice) return;
         notice.style.display = "none";
@@ -270,11 +278,12 @@
       function closePrefs() { if (overlay) overlay.hidden = true; }
 
       maybeLoadGA();
+      maybeLoadOneTap();
       if (getConsent() === null) showBanner();
 
       if (acceptBtn) {
         acceptBtn.addEventListener("click", function () {
-          setConsent("accepted"); maybeLoadGA(); hideBanner();
+          setConsent("accepted"); maybeLoadGA(); maybeLoadOneTap(); hideBanner();
         });
       }
       document.querySelectorAll("[data-cookie-prefs-open]").forEach(function (el) {
@@ -286,7 +295,7 @@
       }
       if (saveBtn) {
         saveBtn.addEventListener("click", function () {
-          if (analyticsBox && analyticsBox.checked) { setConsent("accepted"); maybeLoadGA(); }
+          if (analyticsBox && analyticsBox.checked) { setConsent("accepted"); maybeLoadGA(); maybeLoadOneTap(); }
           else { setConsent("declined"); deleteGaCookies(); }
           hideBanner(); closePrefs();
         });
