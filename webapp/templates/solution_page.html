@@ -8,6 +8,52 @@
 <meta property="og:description" content="{{ page.meta_description }}">
 <meta property="og:type" content="website">
 <link rel="icon" href="/static/kauli-icon.png">
+<!-- Previously had zero structured data despite these being the highest
+     commercial-intent pages on the site (marketing.html already had
+     Organization/WebSite/Product/FAQPage) - added below: Service (so a
+     search engine can attach this specific offering to Kauli as an
+     Organization, not just read it as plain text), BreadcrumbList (real
+     navigational structure - Home -> this page), and the same FAQPage
+     pattern marketing.html already uses, reusing this page's own real FAQ
+     content instead of duplicating it as plain prose only. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "serviceType": {{ page.kicker|tojson }},
+  "name": {{ page.title|tojson }},
+  "description": {{ page.meta_description|tojson }},
+  "provider": { "@type": "Organization", "name": "Kauli",
+                "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
+  "areaServed": "KE",
+  "url": "{{ request.url }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Kauli",
+      "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
+    { "@type": "ListItem", "position": 2, "name": {{ page.title|tojson }}, "item": "{{ request.url }}" }
+  ]
+}
+</script>
+{% if page.faq %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {% for q in page.faq %}
+    { "@type": "Question", "name": {{ q.q|tojson }},
+      "acceptedAnswer": { "@type": "Answer", "text": {{ q.a|tojson }} } }{{ "," if not loop.last }}
+    {% endfor %}
+  ]
+}
+</script>
+{% endif %}
 {% include "_ga.html" %}
 {% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}

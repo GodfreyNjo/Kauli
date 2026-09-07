@@ -22,6 +22,16 @@
     })();
   </script>
   <title>{% block title %}Kauli{% endblock %} - Kauli</title>
+  <!-- Real, site-wide gap until now: no page anywhere declared a canonical
+       URL, so a search engine had no explicit signal for which URL is the
+       "real" one if this site is ever reached via a query-string variant
+       (utm_source=..., ?sent=1, etc.) - stripped down to scheme+host+path,
+       never including the query string, which is exactly what a canonical
+       should point at. Harmless on the logged-in app pages this also
+       renders on (robots.txt already disallows crawling those). -->
+  <link rel="canonical" href="{{ request.url.scheme }}://{{ request.url.netloc }}{{ request.url.path }}">
+  {% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
+  {% if bing_site_verification %}<meta name="msvalidate.01" content="{{ bing_site_verification }}">{% endif %}
   <!-- marketing.html already had this - base.html (every client/staff app
        page) never did, which is why the app's own tabs showed a generic
        icon while the marketing site showed the real one. -->

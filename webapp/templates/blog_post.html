@@ -35,7 +35,7 @@
        &middot; {{ post['body_html']|reading_time }}</p>
     <h1 class="m-h2" style="text-align:left;">{{ post['title'] }}</h1>
     {% if post['cover_image_path'] %}
-    <img src="/blog-cover/{{ post['id'] }}" alt="" class="m-blog-hero-image" loading="eager">
+    <img src="/blog-cover/{{ post['id'] }}" alt="{{ post['title'] }}" class="m-blog-hero-image" loading="eager">
     {% endif %}
 
     {% set post_url = request.url.scheme + '://' + request.url.netloc + '/blog/' + post['slug'] %}

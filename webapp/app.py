@@ -1173,6 +1173,13 @@ templates.env.globals["contact_phone_display"] = CONTACT_PHONE
 # _one_tap.html, which no-ops entirely when this is empty, same "silently
 # inert until configured" pattern as calendly_url above.
 templates.env.globals["google_one_tap_client_id"] = os.environ.get("GOOGLE_ONE_TAP_CLIENT_ID")
+# Same "unset -> inert" pattern for the two search-engine ownership-
+# verification meta tags (base.html) - Google Search Console and Bing
+# Webmaster Tools each hand you a token to paste in as one of these once
+# you add the site as a property there; nothing to fabricate here, this
+# just gives the real token somewhere to go without a code change.
+templates.env.globals["google_site_verification"] = os.environ.get("GOOGLE_SITE_VERIFICATION")
+templates.env.globals["bing_site_verification"] = os.environ.get("BING_SITE_VERIFICATION")
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -1243,7 +1250,13 @@ MARKETING_FAQ = [
 # burned captions) - nothing here promises anything the product doesn't do.
 SOLUTION_PAGES = {
     "ngos": {
-        "title": "Kauli for NGOs - Swahili/English localization without agency rates",
+        # Title has no leading "Kauli" - base.html's <title> block always
+        # appends " - Kauli" itself (see marketing.html's own title, which
+        # follows the same convention); every title in this dict used to
+        # start with "Kauli" too, which meant every solution page rendered
+        # a real, live, duplicate "... - Kauli - Kauli" title tag (confirmed
+        # via curl against the actual rendered <title> before this fix).
+        "title": "Swahili and English Localization for NGOs, Without Agency Rates",
         "meta_description": "Transcription, translation and dubbing between Swahili, Kikuyu and English for "
                              "field reports, training videos and campaigns - transparent per-minute pricing, "
                              "every order human-reviewed before delivery.",
@@ -1321,12 +1334,12 @@ SOLUTION_PAGES = {
         ],
     },
     "youtubers": {
-        "title": "Kauli for YouTubers - dub or subtitle your videos into English or Swahili",
-        "meta_description": "Paste a YouTube link and get a translated transcript, subtitles, or a fully "
-                             "dubbed track back - human-reviewed before delivery, transparent per-minute "
-                             "pricing.",
+        "title": "Translate or Dub Your YouTube Videos - Swahili to English and Back",
+        "meta_description": "Paste a YouTube link and get it translated from Swahili to English (or "
+                             "English to Swahili) - a transcript, subtitles, or a fully dubbed track "
+                             "back, human-reviewed before delivery, transparent per-minute pricing.",
         "kicker": "For YouTubers and content creators",
-        "h1": "Reach your English-speaking audience, without manually managing every upload",
+        "h1": "Translate your YouTube videos - Swahili to English, or English to Swahili",
         "intro": "Paste a YouTube link and Kauli fetches the audio itself - no downloading, re-uploading, or "
                  "juggling files. Get a translated transcript, subtitles, or a fully dubbed track back, "
                  "reviewed by a real editor before it's marked ready.",
@@ -1391,7 +1404,7 @@ SOLUTION_PAGES = {
         ],
     },
     "media-broadcast": {
-        "title": "Kauli for media and broadcast - subtitles and dubs on a real deadline",
+        "title": "Subtitles and Dubbing for Media and Broadcast, On a Real Deadline",
         "meta_description": "Broadcast-ready subtitles, translated transcripts and dubbed video with burned "
                              "captions - human-reviewed, priced per minute, with a real tracked delivery "
                              "deadline on every order.",
@@ -1456,7 +1469,7 @@ SOLUTION_PAGES = {
         ],
     },
     "e-learning": {
-        "title": "Kauli for e-learning - localize a course once, reuse it every cohort",
+        "title": "E-Learning Localization - Swahili, Kikuyu and English",
         "meta_description": "Translate and dub course material between Swahili, Kikuyu and English with "
                              "consistent terminology across every lesson - human-reviewed, priced per minute.",
         "kicker": "For e-learning and training teams",
@@ -1528,7 +1541,7 @@ SOLUTION_PAGES = {
     # facts as everywhere else, no new claims - just addressed in the
     # vocabulary that visitor actually used to search.
     "voice-over": {
-        "title": "Kauli - Swahili and Kikuyu voice over services, AI or a real human actor",
+        "title": "Swahili and Kikuyu Voice Over Services - AI or a Real Human Actor",
         "meta_description": "Swahili, Kikuyu and English voice over - AI-synthesized by default, or a real "
                              "human voice actor as an add-on. Consent required before any voice is cloned, "
                              "human-reviewed before delivery, transparent per-minute pricing.",
@@ -1591,12 +1604,12 @@ SOLUTION_PAGES = {
         ],
     },
     "captioning": {
-        "title": "Kauli - Swahili and Kikuyu captioning and closed captions",
-        "meta_description": "Closed captions and subtitles in Swahili, Kikuyu and English, burned into the "
-                             "video or as a separate file - human-reviewed line by line, transparent "
-                             "per-minute pricing.",
-        "kicker": "Captioning and closed captions",
-        "h1": "Closed captions and subtitles, reviewed line by line before they ship",
+        "title": "Swahili and Kikuyu Subtitles and Captions, Including for YouTube",
+        "meta_description": "Subtitles and closed captions in Swahili, Kikuyu and English, for YouTube "
+                             "or any video - burned into the video or as a separate file, "
+                             "human-reviewed line by line, transparent per-minute pricing.",
+        "kicker": "Subtitles, captions and closed captions",
+        "h1": "Subtitles and closed captions for YouTube or any video, in Swahili and Kikuyu",
         "intro": "An AI draft gets the captions fast, but a real editor checks every line against the "
                  "source audio before it's marked ready - burned into the video, or as a separate "
                  "subtitle file, your choice.",
@@ -1670,12 +1683,12 @@ SOLUTION_PAGES = {
     # be a real problem the moment a Somali-speaking lead showed up, not
     # just an SEO inaccuracy.
     "video-translation": {
-        "title": "Kauli - Video translation services for Swahili, Kikuyu and English",
-        "meta_description": "Translate video and audio between Swahili, Kikuyu and English - a real "
-                             "editor checks every line against the source before delivery. "
-                             "Transparent per-minute pricing, based in Kenya.",
-        "kicker": "Video translation services",
-        "h1": "Video translation between Swahili, Kikuyu and English, checked line by line",
+        "title": "Swahili to English Video Translation, Human-Reviewed",
+        "meta_description": "Convert a video from Swahili to English, English to Swahili, or into "
+                             "Kikuyu - a real editor checks every line against the source before "
+                             "delivery. Transparent per-minute pricing, based in Kenya.",
+        "kicker": "Swahili, Kikuyu and English video translation",
+        "h1": "Convert a Swahili video to English - or English to Swahili, or Kikuyu - checked line by line",
         "intro": "An AI draft translates fast, but a real editor checks every line against the "
                  "source audio before it's marked ready - a translated transcript, subtitles, or a "
                  "fully dubbed track, whichever your video actually needs. Based in Kenya, built for "
@@ -1702,6 +1715,11 @@ SOLUTION_PAGES = {
         "related": ["video-transcription", "video-dubbing", "video-localization"],
         "tour": {"mode": "upload", "filename": "interview_clip.mp4"},
         "faq": [
+            {"q": "How do I convert a Swahili video to English?",
+             "a": "Upload the file or paste a YouTube link, pick English as the target language and "
+                  "the deliverable you need - a translated transcript, subtitles, or a fully dubbed "
+                  "track - and submit. An AI draft runs first, then a real editor checks it against "
+                  "the source audio line by line before it's marked ready."},
             {"q": "Do you translate text documents, or only audio/video?",
              "a": "Audio and video only - Kauli transcribes the spoken audio first, then translates "
                   "that. There's no standalone document-translation feature."},
@@ -1734,12 +1752,12 @@ SOLUTION_PAGES = {
         ],
     },
     "video-transcription": {
-        "title": "Kauli - Video and audio transcription services, Swahili, Kikuyu and English",
-        "meta_description": "Transcribe video or audio in Swahili, Kikuyu or English, with real "
+        "title": "Swahili, Kikuyu and English Video & Audio Transcription Services",
+        "meta_description": "Swahili, Kikuyu or English video and audio transcription, with real "
                              "per-word timestamps - AI-drafted, checked word-by-word by a real "
                              "editor against the source before delivery. Transparent per-minute "
                              "pricing, based in Kenya.",
-        "kicker": "Video and audio transcription",
+        "kicker": "Swahili, Kikuyu and English transcription services",
         "h1": "Video and audio transcription, checked word-by-word before it ships",
         "intro": "An AI draft transcribes fast, but a real editor checks it against the source "
                  "audio before it's marked ready - a clean read or a verbatim transcript, your "
@@ -1802,12 +1820,13 @@ SOLUTION_PAGES = {
         ],
     },
     "video-dubbing": {
-        "title": "Kauli - Video dubbing services, Swahili, Kikuyu and English",
-        "meta_description": "Dub video into Swahili, Kikuyu or English - AI-synthesized by default, "
-                             "a real human voice actor as an add-on, human-reviewed before "
-                             "delivery. Transparent per-minute pricing, based in Kenya.",
-        "kicker": "Video dubbing services",
-        "h1": "Video dubbing into Swahili, Kikuyu or English, reviewed before it ships",
+        "title": "Swahili to English Video Dubbing Services (and Kikuyu)",
+        "meta_description": "Dub a Swahili video into English, or English into Swahili or Kikuyu - "
+                             "AI-synthesized by default, a real human voice actor as an add-on, "
+                             "human-reviewed before delivery. Transparent per-minute pricing, based "
+                             "in Kenya.",
+        "kicker": "Swahili, Kikuyu and English video dubbing",
+        "h1": "Dub a video between Swahili, Kikuyu and English, reviewed before it ships",
         "intro": "Kauli pairs fast AI voice synthesis with a real editor on every order - a fully "
                  "dubbed track, checked against the source audio line by line before it's marked "
                  "ready. Want a real human voice instead of a synthesized one? That's a real "
@@ -1867,7 +1886,7 @@ SOLUTION_PAGES = {
         ],
     },
     "video-localization": {
-        "title": "Kauli - Video localization services, Swahili, Kikuyu and English",
+        "title": "Swahili, Kikuyu and English Video Localization Services",
         "meta_description": "Full video localization between Swahili, Kikuyu and English - "
                              "transcription, translation, subtitles, captions or a full dub, all "
                              "human-reviewed, from one team. Based in Kenya.",
@@ -2264,15 +2283,28 @@ def sitemap(request: Request):
     """<lastmod> only where a real modification timestamp exists (blog
     posts have one - updated_at) - the static marketing/solution pages
     don't have real per-page change tracking, so they're listed without
-    one rather than a fabricated date that would just be a guess."""
+    one rather than a fabricated date that would just be a guess.
+    <priority> is this site's own honest ranking of its pages against each
+    other (homepage highest, the actual commercial-intent solution pages
+    next, reference/legal pages lowest) - not a claim about anything
+    outside that, which is all <priority> has ever meant."""
     base = f"{request.url.scheme}://{request.url.netloc}"
-    static_urls = [f"{base}/", f"{base}/terms", f"{base}/privacy", f"{base}/blog"]
-    static_urls += [f"{base}/solutions/{slug}" for slug in SOLUTION_PAGES]
-    entries = [f"  <url><loc>{u}</loc></url>" for u in static_urls]
+    # (url, priority) - /formatting-standards was a real gap: a real, live,
+    # indexable page that was simply never listed here at all.
+    static_urls = [
+        (f"{base}/", "1.0"),
+        (f"{base}/blog", "0.6"),
+        (f"{base}/formatting-standards", "0.4"),
+        (f"{base}/terms", "0.2"),
+        (f"{base}/privacy", "0.2"),
+    ]
+    static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
+    entries = [f"  <url><loc>{u}</loc><priority>{p}</priority></url>" for u, p in static_urls]
     for p in db.list_blog_posts(published_only=True):
         loc = f"{base}/blog/{p['slug']}"
         lastmod = datetime.fromtimestamp(p["updated_at"]).strftime("%Y-%m-%d") if p["updated_at"] else None
-        entries.append(f"  <url><loc>{loc}</loc>{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}</url>")
+        entries.append(f"  <url><loc>{loc}</loc>"
+                        f"{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}<priority>0.5</priority></url>")
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
            + "\n".join(entries) + "\n</urlset>")
     return Response(content=xml, media_type="application/xml")
@@ -2327,6 +2359,10 @@ def llms_txt(request: Request):
                        for sl in billing.SERVICE_LEVELS.values())
     posts = db.list_blog_posts(published_only=True)
     post_lines = "\n".join(f"- [{p['title']}]({base}/blog/{p['slug']})" for p in posts[:20])
+    # Derived from SOLUTION_PAGES itself, not hand-typed - a previous
+    # version of this list only had 4 of the 10 real solution pages on it,
+    # and would only have drifted further out of sync as more got added.
+    solution_lines = "\n".join(f"- [{p['title']}]({base}/solutions/{slug})" for slug, p in SOLUTION_PAGES.items())
     body = f"""# Kauli
 
 > AI-drafted, human-verified transcription, translation and dubbing between
@@ -2344,11 +2380,9 @@ Source: {', '.join(SOURCE_LANGUAGES.values())}. Translates into English or Swahi
 
 ## Key pages
 - [Homepage]({base}/) - overview, pricing, FAQ
-- [For NGOs]({base}/solutions/ngos)
-- [For YouTubers & creators]({base}/solutions/youtubers)
-- [For media & broadcast]({base}/solutions/media-broadcast)
-- [For e-learning & training]({base}/solutions/e-learning)
+{solution_lines}
 - [Blog]({base}/blog)
+- [Formatting standards]({base}/formatting-standards)
 - [Terms]({base}/terms) / [Privacy]({base}/privacy)
 
 ## Blog posts
