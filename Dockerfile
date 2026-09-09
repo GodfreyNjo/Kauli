@@ -114,6 +114,19 @@ COPY webapp/ webapp/
 # throwaway layer.
 VOLUME ["/app/webapp/data"]
 
+# Runs as root by default (a real gap flagged in a security review) - a
+# fixed, non-root UID/GID instead, matching what actually needs write
+# access: /app itself (bytecode caches, webapp/data before a volume is
+# mounted over it) and /var/lib/clamav (freshclam has to write real
+# virus-definition updates there on every container start, not just at
+# build time). 10001 is arbitrary but fixed - chosen so the HOST-side bind
+# mount (/root/kauli/webapp/data on the real VM) can be chowned to match
+# it exactly once, rather than a UID that changes between builds.
+RUN groupadd -g 10001 kauli && useradd -u 10001 -g kauli -M -s /usr/sbin/nologin kauli \
+    && mkdir -p /var/log/clamav /var/run/clamav \
+    && chown -R kauli:kauli /app /var/lib/clamav /var/log/clamav /var/run/clamav
+USER kauli
+
 EXPOSE 8000
 
 # No --reload (that's dev-only, watches the filesystem and restarts on

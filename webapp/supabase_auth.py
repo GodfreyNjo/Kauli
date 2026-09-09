@@ -50,7 +50,7 @@ STAFF_EMAILS = {
 # already have (a real Supabase project applies its own minimum retroactively
 # would just lock people out; there's no "change password" flow yet to send
 # them through, so this only ever tightens things going forward).
-PASSWORD_MIN_LENGTH = 10
+PASSWORD_MIN_LENGTH = 12  # was 10 - bumped to match a real security requirements doc's explicit ask
 PASSWORD_POLICY_HINT = (
     f"At least {PASSWORD_MIN_LENGTH} characters, with an uppercase letter, "
     "a lowercase letter, a number and a symbol."
@@ -267,10 +267,13 @@ def set_new_password(access_token: str, refresh_token: str, new_password: str):
     handed back to the browser (see reset_password.html - Supabase returns
     these in the URL fragment, which never reaches our server on its own,
     so the page's own JS forwards them here as normal form fields).
-    Returns (ok, error_message_or_None)."""
+    Returns (ok, error_message_or_None, email_or_None) - the email is
+    whoever the access_token actually belonged to, for app.py's own
+    security_events audit row; None on any failure, same as error."""
     try:
-        get_client().auth.set_session(access_token, refresh_token)
+        res = get_client().auth.set_session(access_token, refresh_token)
         get_client().auth.update_user({"password": new_password})
-        return True, None
+        email = res.session.user.email if res and res.session else None
+        return True, None, email
     except Exception as exc:  # noqa: BLE001
-        return False, str(exc)
+        return False, str(exc), None

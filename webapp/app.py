@@ -245,6 +245,55 @@ app.add_middleware(SessionMiddleware, secret_key=_session_secret,
 api_log = logging_setup.get_logger("api")
 
 
+_MAX_ORDINARY_BODY_BYTES = 15 * 1024 * 1024  # 15MB - generous for any real JSON/form body that isn't a file upload
+
+
+def _is_large_body_exempt(path: str) -> bool:
+    """True for the real routes that legitimately carry a large multipart
+    body - every one of these already has its OWN, correct-for-its-domain
+    size enforcement further down the stack (upload_security.
+    stream_save_with_limits' real, streamed 2GB cap for audio/video;
+    presign-upload's R2 path checks head_object_size after the fact), so
+    they're exempt from the blanket cap here rather than double-capped at
+    a much smaller, wrong-for-video-files number. Matched by real prefix/
+    suffix against request.url.path, NOT the route-template strings
+    ("/client/orders/{order_id}/resume") those never equal - a request's
+    actual path always has the real id substituted in."""
+    if path in ("/client/orders", "/settings"):
+        return True
+    if path.startswith("/client/orders/") and path.endswith("/resume"):
+        return True
+    if path.startswith("/staff/orders/") and path.endswith("/human-voice-upload"):
+        return True
+    if path.startswith("/actor/orders/") and path.endswith("/upload"):
+        return True
+    if path.startswith("/staff/billing/confirm/"):
+        return True
+    if path.startswith("/staff/blog/") and path.endswith("/edit"):
+        return True
+    return False
+
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    """Rejects an oversized body via Content-Length BEFORE it's ever read
+    into memory - every other POST/PUT route in this app (AI chat
+    endpoints, webhooks, ordinary forms) has no size limit of its own at
+    all; Starlette/uvicorn don't impose one by default either. Without
+    this, one request with an enormous JSON or form body is a real,
+    trivial memory-exhaustion DoS against any of them - the request size
+    limit a real API needs, that nothing here provided until now.
+    Webhooks are deliberately NOT exempt: Paystack/M-Pesa/Calendly payloads
+    are always small, and the whole point of a size cap is stopping a huge
+    body from being read into memory before anything (including a
+    signature check) has validated it's real."""
+    if not _is_large_body_exempt(request.url.path):
+        content_length = request.headers.get("content-length")
+        if content_length and content_length.isdigit() and int(content_length) > _MAX_ORDINARY_BODY_BYTES:
+            return JSONResponse({"error": "Request body too large."}, status_code=413)
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def add_trace_id(request: Request, call_next):
     """One UUID per request, correlating every log line it produces (and
@@ -364,11 +413,20 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = _CSP
     # HSTS only means anything - and is only safe to send - once this is
-    # actually served over real HTTPS; sending it over plain HTTP does
-    # nothing (browsers ignore it), so this is inert right now and starts
-    # working the moment a real domain+TLS cert exists, no code change
-    # needed then.
-    if request.url.scheme == "https":
+    # actually served over real HTTPS. request.url.scheme is NOT that check
+    # here: this app sits behind a Cloudflare Tunnel, which hands uvicorn a
+    # plain-HTTP connection regardless of what the real visitor used (same
+    # root cause _public_base_url's own docstring documents for the OAuth
+    # redirect URL) - confirmed live: this header was silently never being
+    # sent to a single real visitor despite the site genuinely being all-
+    # HTTPS (curl https://kauli-forgemedia.com/ showed no
+    # Strict-Transport-Security header at all before this fix).
+    # x-forwarded-proto is Cloudflare's own standard header for exactly
+    # this, set the same trustworthy way cf-connecting-ip already is (see
+    # rate_limit.client_ip) - never trust it from a source that isn't
+    # actually behind Cloudflare, but this app only serves real internet
+    # traffic through the tunnel.
+    if request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     return response
 
@@ -2517,7 +2575,8 @@ def _public_base_url(request: Request) -> str:
     return os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or str(request.base_url).rstrip("/")
 
 
-def _complete_auth_session(request: Request, session, next: str, marketing_consent: bool = False) -> RedirectResponse:
+def _complete_auth_session(request: Request, session, next: str, marketing_consent: bool = False,
+                            login_kind: str = "password") -> RedirectResponse:
     """The real provisioning that has to happen once Supabase confirms who
     someone is, regardless of which door they came through - shared by
     /login, /signup, and the Google OAuth callback below (extracted from
@@ -2525,13 +2584,19 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
     is exactly the kind of thing that quietly drifts apart over time -
     Google sign-in would have been a third copy). marketing_consent only
     ever comes from the real signup checkbox; Google/email-login callers
-    just don't have one to set."""
+    just don't have one to set. login_kind is only for the security_events
+    row below - "password", "google_oauth", or "google_one_tap" - so an
+    audit trail can distinguish how someone actually got in."""
     email = session.user.email.strip().lower()
     role, is_admin = _resolve_role_and_admin(email)
     user, was_new = db.get_or_create_user(
         session.user.id, email, default_role=role,
         marketing_consent=marketing_consent, consent_ip=request.client.host if request.client else None,
     )
+    db.log_security_event(
+        "signup" if was_new else "login_success", user_id=user["id"], email=email,
+        ip_address=rate_limit.client_ip(request), user_agent=request.headers.get("user-agent"),
+        detail=login_kind)
     # Not gated on was_new - an existing account can also accept a team
     # invite sent to their email; this just needs to run once per login,
     # which is exactly what it does (accept_team_invite is a no-op once
@@ -2542,6 +2607,8 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
             db.set_user_admin(user["id"], True)
         if role == "staff" and db.is_invited_staff(email):
             db.remove_staff_invite(email)  # consumed - the invite did its job
+            db.log_security_event("staff_role_granted", user_id=user["id"], email=email,
+                                   ip_address=rate_limit.client_ip(request), detail="invite accepted at signup")
         if role == "voice_actor":
             db.link_voice_actor_user(email, user["id"])  # consumed - same idea, see that function's comment
         if role == "client":  # the welcome message is written for a client, not a new staff account
@@ -2626,11 +2693,13 @@ def reset_password_submit(request: Request, access_token: str = Form(""), refres
         return templates.TemplateResponse(request, "reset_password.html", {
             "error": "Password needs " + ", ".join(policy_errors) + ".",
         }, status_code=400)
-    ok, error = supabase_auth.set_new_password(access_token, refresh_token, password)
+    ok, error, reset_email = supabase_auth.set_new_password(access_token, refresh_token, password)
     if not ok:
         return templates.TemplateResponse(request, "reset_password.html", {
             "error": error or "That reset link is invalid or has expired. Request a new one.",
         }, status_code=400)
+    db.log_security_event("password_changed", email=reset_email, ip_address=rate_limit.client_ip(request),
+                           user_agent=request.headers.get("user-agent"), detail="via reset link")
     return RedirectResponse("/login?notice=password_reset", status_code=303)
 
 
@@ -2643,12 +2712,26 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
     # password policy, this is purely about attempt rate.
     allowed, retry_after = rate_limit.check(f"login:{email}", limit=8, window_s=60)
     if not allowed:
+        # Real alerting for a real brute-force pattern - throttled to at
+        # most once per 10 minutes per targeted email (its own separate
+        # rate_limit key), so a sustained attack sends staff one email, not
+        # one per blocked attempt for as long as it keeps going.
+        alert_allowed, _ = rate_limit.check(f"login-alert:{email}", limit=1, window_s=600)
+        if alert_allowed:
+            notifications.notify_staff(
+                "Kauli: repeated failed logins",
+                f"More than 8 failed login attempts in 60s for {email} "
+                f"(latest from {rate_limit.client_ip(request)}) - could be a real brute-force attempt, "
+                "or someone who forgot their password and is retyping it fast.",
+            )
         return templates.TemplateResponse(request, "login.html", {
             "error": f"Too many attempts - try again in {retry_after}s.", "notice": None, "mode": "signin",
             "next": _safe_next(next),
         }, status_code=429)
     session, error = supabase_auth.sign_in(email, password)
     if error or not session:
+        db.log_security_event("login_failed", email=email, ip_address=rate_limit.client_ip(request),
+                               user_agent=request.headers.get("user-agent"), detail=error)
         return templates.TemplateResponse(request, "login.html", {
             "error": error or "Wrong email or password.", "notice": None, "mode": "signin",
             "next": _safe_next(next),
@@ -2747,7 +2830,7 @@ def google_callback_submit(request: Request, access_token: str = Form(""), refre
         return templates.TemplateResponse(request, "oauth_callback.html", {
             "error": error or "That sign-in didn't work - please try again.",
         }, status_code=400)
-    return _complete_auth_session(request, session, next)
+    return _complete_auth_session(request, session, next, login_kind="google_oauth")
 
 
 @app.post("/auth/google/one-tap")
@@ -2773,7 +2856,7 @@ def google_one_tap_submit(request: Request, credential: str = Form(""), nonce: s
     if error or not session:
         return RedirectResponse(
             f"/login?error={quote(error or 'That sign-in did not work - please try again.')}", status_code=303)
-    return _complete_auth_session(request, session, "")
+    return _complete_auth_session(request, session, "", login_kind="google_one_tap")
 
 
 @app.get("/logout")
@@ -2877,6 +2960,8 @@ def settings_api_key_generate(request: Request):
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
     db.set_client_api_key(user["id"], key_hash, raw_key[:18])
     request.session["_new_api_key"] = raw_key
+    db.log_security_event("api_key_generated", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
     return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
@@ -2886,6 +2971,8 @@ def settings_api_key_revoke(request: Request):
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
         return RedirectResponse("/login")
     db.revoke_client_api_key(user["id"])
+    db.log_security_event("api_key_revoked", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
     return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
@@ -2971,6 +3058,8 @@ def settings_change_password(request: Request, current_password: str = Form(...)
     if not ok:
         return RedirectResponse(f"/settings?tab=security&password_error={quote(error or 'Something went wrong.')}",
                                  status_code=303)
+    db.log_security_event("password_changed", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request), user_agent=request.headers.get("user-agent"))
     return RedirectResponse("/settings?tab=security&password_saved=1", status_code=303)
 
 
@@ -3529,6 +3618,8 @@ def settings_close_account(request: Request, confirm_text: str = Form("")):
         return RedirectResponse(
             f"/settings?tab=security&error={quote('Type your email exactly to confirm closing your account.')}",
             status_code=303)
+    db.log_security_event("account_closed", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
     db.close_account(user["id"])
     request.session.clear()
     return RedirectResponse("/login?notice=account_closed", status_code=303)
@@ -5409,6 +5500,23 @@ def staff_exceptions(request: Request):
     })
 
 
+@app.get("/staff/security", response_class=HTMLResponse)
+def staff_security(request: Request, kind: str | None = None):
+    """Real audit trail (security_events) - login attempts, password
+    changes, staff role grants/revokes, API key generation. Written to
+    from many call sites across app.py; this is the one place it's
+    actually read back, without which logging it would be pure write-only
+    ceremony. Admin-only, not just staff - this spans every account on the
+    platform (IPs, emails, failed-login patterns), a materially bigger
+    blast radius than the day-to-day staff tooling around it."""
+    admin = _require_admin(request)
+    if not admin:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "staff_security.html", {
+        "user": admin, "events": db.list_security_events(kind=kind or None), "filter_kind": kind,
+    })
+
+
 @app.post("/staff/exceptions/{request_id}/grant")
 def staff_grant_exception(request: Request, request_id: str, staff_note: str = Form("")):
     user = current_user(request)
@@ -6153,8 +6261,12 @@ def staff_admin_invite(request: Request, email: str = Form(...)):
         # queuing an invite that would never actually be consumed (invites
         # only apply at ACCOUNT CREATION - see _resolve_role_and_admin).
         db.promote_to_staff(existing["id"])
+        db.log_security_event("staff_role_granted", user_id=existing["id"], actor_user_id=admin["id"],
+                               email=email, ip_address=rate_limit.client_ip(request))
         return RedirectResponse(f"/staff/admin?notice=Promoted+the+existing+account+for+{email}+to+staff.", status_code=303)
     db.add_staff_invite(email, invited_by=admin["id"])
+    db.log_security_event("staff_invite_sent", actor_user_id=admin["id"], email=email,
+                           ip_address=rate_limit.client_ip(request))
     return RedirectResponse(
         f"/staff/admin?notice=Invited+{email}+-+they+get+staff+access+automatically+the+moment+they+sign+up.",
         status_code=303)
@@ -6176,7 +6288,10 @@ def staff_admin_demote(request: Request, user_id: str):
         return RedirectResponse("/login")
     if user_id == admin["id"]:
         return RedirectResponse("/staff/admin?error=Can%27t+demote+your+own+account.", status_code=303)
+    demoted = db.get_user(user_id)
     db.demote_from_staff(user_id)
+    db.log_security_event("staff_role_revoked", user_id=user_id, actor_user_id=admin["id"],
+                           email=demoted["email"] if demoted else None, ip_address=rate_limit.client_ip(request))
     return RedirectResponse("/staff/admin", status_code=303)
 
 

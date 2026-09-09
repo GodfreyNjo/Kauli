@@ -141,6 +141,7 @@
         {% if user['is_admin'] %}
         <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}"><span class="icon">V</span><span class="label">Voice Talent</span></a>
         <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}"><span class="icon">A</span><span class="label">Admin</span></a>
+        <a href="/staff/security" class="{{ 'active' if '/staff/security' in request.url.path else '' }}"><span class="icon">🔒</span><span class="label">Security log</span></a>
         {% endif %}
         {% elif user['role'] == 'voice_actor' %}
         <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}"><span class="icon">J</span><span class="label">My jobs</span></a>

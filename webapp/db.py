@@ -418,6 +418,29 @@ CREATE TABLE IF NOT EXISTS upload_audit_log (
     created_at REAL NOT NULL
 );
 
+-- Real security audit trail - a genuine gap before this: upload_audit_log
+-- above covers file uploads specifically, but nothing recorded WHO logged
+-- in (or failed to), changed a password, or was promoted/demoted/granted
+-- an API key. user_id is nullable - a failed login attempt for an email
+-- that doesn't exist has no real user_id to attach, but the attempted
+-- email/IP is still worth keeping. Append-only by design (no update/delete
+-- helper below) - an audit log that can be edited after the fact isn't one.
+CREATE TABLE IF NOT EXISTS security_events (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,          -- 'login_success' | 'login_failed' | 'signup' | 'password_changed' |
+                                  -- 'oauth_login' | 'staff_role_granted' | 'staff_role_revoked' |
+                                  -- 'api_key_generated' | 'api_key_revoked' | 'account_closed'
+    user_id TEXT,                -- the account acted on/by - NULL when not resolvable (e.g. unknown email)
+    actor_user_id TEXT,          -- who performed it, when different from user_id (e.g. staff promoting someone else)
+    email TEXT,                  -- kept even when user_id is NULL, e.g. a failed login for a nonexistent account
+    ip_address TEXT,
+    user_agent TEXT,
+    detail TEXT,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_security_events_kind ON security_events(kind, created_at);
+
 -- Real, persistent in-app notifications (the staff overview page's bell) -
 -- separate from notifications.py's notify_staff*, which only ever sends an
 -- EMAIL. Both fire from the same real events; this is what lets a staff
@@ -1051,6 +1074,45 @@ def log_upload_audit(user_id: str | None, order_id: str | None, audit: dict,
     )
     conn.commit()
     conn.close()
+
+
+def log_security_event(kind: str, user_id: str | None = None, actor_user_id: str | None = None,
+                        email: str | None = None, ip_address: str | None = None,
+                        user_agent: str | None = None, detail: str | None = None) -> None:
+    """See the security_events table's own comment for what `kind` values
+    mean. Never raises on a DB hiccup - a logging failure should never be
+    the thing that breaks a real login or password change, same reasoning
+    as log_upload_audit above."""
+    try:
+        conn = get_conn()
+        conn.execute(
+            """INSERT INTO security_events
+               (id, kind, user_id, actor_user_id, email, ip_address, user_agent, detail, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (uuid.uuid4().hex, kind, user_id, actor_user_id, email, ip_address, user_agent, detail, time.time()),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def list_security_events(kind: str | None = None, limit: int = 200):
+    """Newest first - a real, queryable view onto security_events, not
+    just a table that gets written to and never read (see staff_security.
+    html, the only place this is called from)."""
+    conn = get_conn()
+    if kind:
+        rows = conn.execute(
+            "SELECT * FROM security_events WHERE kind = ? ORDER BY created_at DESC LIMIT ?",
+            (kind, limit),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM security_events ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    conn.close()
+    return rows
 
 
 def get_user_by_email(email: str):
