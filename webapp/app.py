@@ -24,6 +24,7 @@ import tempfile
 import threading
 import time
 import traceback
+import types
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -2585,8 +2586,9 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
     Google sign-in would have been a third copy). marketing_consent only
     ever comes from the real signup checkbox; Google/email-login callers
     just don't have one to set. login_kind is only for the security_events
-    row below - "password", "google_oauth", or "google_one_tap" - so an
-    audit trail can distinguish how someone actually got in."""
+    row below - "password", "password_mfa", "google_oauth", or
+    "google_one_tap" - so an audit trail can distinguish how someone
+    actually got in."""
     email = session.user.email.strip().lower()
     role, is_admin = _resolve_role_and_admin(email)
     user, was_new = db.get_or_create_user(
@@ -2736,7 +2738,68 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), n
             "error": error or "Wrong email or password.", "notice": None, "mode": "signin",
             "next": _safe_next(next),
         })
+    totp_factor_id = supabase_auth.verified_totp_factor_id(session)
+    if totp_factor_id:
+        # Password alone isn't enough for this account - the actual login
+        # (setting request.session["user_id"], via _complete_auth_session)
+        # is deliberately NOT done yet. Everything needed to finish once
+        # the code checks out lives server-side (pending_auth_state - see
+        # its own table comment), keyed by a small opaque token in the
+        # cookie, not the tokens themselves.
+        login_token = db.create_pending_auth_state("mfa_login", {
+            "user_id": session.user.id, "email": session.user.email, "factor_id": totp_factor_id,
+            "access_token": session.access_token, "refresh_token": session.refresh_token,
+            "next": _safe_next(next),
+        })
+        request.session["_mfa_login_token"] = login_token
+        return RedirectResponse("/login/mfa", status_code=303)
     return _complete_auth_session(request, session, next)
+
+
+@app.get("/login/mfa", response_class=HTMLResponse)
+def login_mfa_form(request: Request, error: str | None = None):
+    pending = db.get_pending_auth_state(request.session.get("_mfa_login_token"), "mfa_login")
+    if not pending:
+        return RedirectResponse("/login")
+    return templates.TemplateResponse(request, "login_mfa.html", {"error": error, "email": pending["email"]})
+
+
+@app.post("/login/mfa")
+def login_mfa_submit(request: Request, code: str = Form(...)):
+    login_token = request.session.get("_mfa_login_token")
+    pending = db.get_pending_auth_state(login_token, "mfa_login")
+    if not pending:
+        return RedirectResponse("/login")
+    # Keyed on the pending user, not IP - same reasoning as the password
+    # login limit above. Tighter window (5, not 8): a TOTP code is only 6
+    # digits (1 in a million per guess, but that's still brute-forceable
+    # fast without a real limit) and only valid for ~30s, so there's no
+    # legitimate reason for many rapid guesses in a row.
+    allowed, retry_after = rate_limit.check(f"mfa-login:{pending['user_id']}", limit=5, window_s=60)
+    if not allowed:
+        return templates.TemplateResponse(request, "login_mfa.html", {
+            "error": f"Too many attempts - try again in {retry_after}s.", "email": pending["email"],
+        }, status_code=429)
+    code = code.strip()
+    # Format-detected, not a separate field/toggle - a backup code always
+    # has a dash (XXXX-XXXX), a TOTP code never does.
+    if "-" in code:
+        ok = db.consume_backup_code(pending["user_id"], _hash_backup_code(code))
+        error = None if ok else "That backup code is wrong or already used."
+    else:
+        ok, error = supabase_auth.mfa_challenge_and_verify(
+            pending["access_token"], pending["refresh_token"], pending["factor_id"], code)
+    if not ok:
+        db.log_security_event("mfa_login_failed", user_id=pending["user_id"], email=pending["email"],
+                               ip_address=rate_limit.client_ip(request))
+        return templates.TemplateResponse(request, "login_mfa.html", {
+            "error": error or "Wrong code - try again.", "email": pending["email"],
+        }, status_code=400)
+    db.delete_pending_auth_state(login_token)
+    request.session.pop("_mfa_login_token", None)
+    fake_session = types.SimpleNamespace(
+        user=types.SimpleNamespace(id=pending["user_id"], email=pending["email"]))
+    return _complete_auth_session(request, fake_session, pending["next"], login_kind="password_mfa")
 
 
 @app.post("/signup")
@@ -2911,7 +2974,8 @@ _SETTINGS_TABS = ("general", "defaults", "notifications", "integrations", "team"
 def settings_form(request: Request, tab: str = "general", team_notice: str | None = None,
                    team_error: str | None = None, defaults_saved: bool = False,
                    password_error: str | None = None, password_saved: bool = False,
-                   saved: bool = False, error: str | None = None, webhook_error: str | None = None):
+                   saved: bool = False, error: str | None = None, webhook_error: str | None = None,
+                   mfa_step: str | None = None, mfa_error: str | None = None, mfa_notice: str | None = None):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login")
@@ -2936,6 +3000,17 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
     # page refresh (or anyone else who later views this page) never sees
     # the real key again, only its stored hash can ever confirm a match.
     new_api_key = request.session.pop("_new_api_key", None)
+    # Same one-shot-reveal for the two MFA session states: the pending
+    # enrollment's QR/secret (only relevant mid-setup, mfa_step=verify) and
+    # a freshly generated batch of backup codes (mfa_step=backup_codes) -
+    # neither is ever popped except by actually rendering this page, so a
+    # page reload before finishing setup still shows the SAME QR code
+    # rather than silently generating a new, different one server-side.
+    mfa_pending = (
+        db.get_pending_auth_state(request.session.get("_mfa_enroll_token"), "mfa_enroll")
+        if mfa_step == "verify" else None
+    )
+    new_backup_codes = request.session.pop("_mfa_new_backup_codes", None) if mfa_step == "backup_codes" else None
     return templates.TemplateResponse(request, "settings.html", {
         "user": user, "saved": saved, "error": error, "tab": tab,
         "theme": "dark" if user["role"] == "staff" else "light",
@@ -2948,6 +3023,9 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "deletion_requested": db.has_pending_deletion_request(user["id"]) if user["role"] == "client" else False,
         "webhook_error": webhook_error,
+        "mfa_step": mfa_step, "mfa_error": mfa_error, "mfa_notice": mfa_notice, "mfa_pending": mfa_pending,
+        "new_backup_codes": new_backup_codes,
+        "backup_codes_remaining": db.count_unused_backup_codes(user["id"]) if user["mfa_enabled_at"] else 0,
     })
 
 
@@ -3061,6 +3139,141 @@ def settings_change_password(request: Request, current_password: str = Form(...)
     db.log_security_event("password_changed", user_id=user["id"], email=user["email"],
                            ip_address=rate_limit.client_ip(request), user_agent=request.headers.get("user-agent"))
     return RedirectResponse("/settings?tab=security&password_saved=1", status_code=303)
+
+
+# --------------------------------------------------------------- MFA (TOTP) ----
+_BACKUP_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # no 0/O/1/I/L - easy to misread when written down
+
+
+def _generate_backup_codes(n: int = 10) -> list[str]:
+    """Real random codes, not a fixed pattern - secrets.choice, same real-
+    randomness standard as the API key token above. XXXX-XXXX is long
+    enough to not be guessable (32^8 combinations) and short enough to
+    type by hand if someone's reading it off a printout."""
+    codes = []
+    for _ in range(n):
+        raw = "".join(secrets.choice(_BACKUP_CODE_ALPHABET) for _ in range(8))
+        codes.append(f"{raw[:4]}-{raw[4:]}")
+    return codes
+
+
+def _hash_backup_code(code: str) -> str:
+    # Uppercased/stripped before hashing so "abcd-1234" and "ABCD-1234" (a
+    # real thing someone typing this by hand will do) both match.
+    return hashlib.sha256(code.strip().upper().encode()).hexdigest()
+
+
+@app.post("/settings/mfa/enroll")
+def settings_mfa_enroll(request: Request, current_password: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    allowed, retry_after = rate_limit.check(f"login:{user['email']}", limit=8, window_s=60)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=security&mfa_error=Too+many+attempts+-+try+again+in+{retry_after}s", status_code=303)
+    ok, error, data = supabase_auth.mfa_start_enroll(user["email"], current_password)
+    if not ok:
+        return RedirectResponse(f"/settings?tab=security&mfa_error={quote(error or 'Something went wrong.')}",
+                                 status_code=303)
+    # Held server-side (pending_auth_state - see its own table comment for
+    # why NOT the session cookie: the QR code alone is a multi-KB SVG data
+    # URI, plus a Supabase JWT access_token, comfortably over the browser's
+    # ~4KB cookie limit). Only the small opaque token goes in the cookie.
+    # Cleared the moment enrollment is confirmed, cancelled, or abandoned
+    # for a new attempt.
+    request.session["_mfa_enroll_token"] = db.create_pending_auth_state("mfa_enroll", data)
+    return RedirectResponse("/settings?tab=security&mfa_step=verify", status_code=303)
+
+
+@app.post("/settings/mfa/verify-enroll")
+def settings_mfa_verify_enroll(request: Request, code: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    enroll_token = request.session.get("_mfa_enroll_token")
+    pending = db.get_pending_auth_state(enroll_token, "mfa_enroll")
+    if not pending:
+        return RedirectResponse("/settings?tab=security&mfa_error=That+setup+attempt+expired+-+start+again.",
+                                 status_code=303)
+    allowed, retry_after = rate_limit.check(f"mfa-enroll:{user['id']}", limit=8, window_s=60)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=security&mfa_step=verify&mfa_error=Too+many+attempts+-+try+again+in+{retry_after}s",
+            status_code=303)
+    ok, error = supabase_auth.mfa_challenge_and_verify(
+        pending["access_token"], pending["refresh_token"], pending["factor_id"], code)
+    if not ok:
+        return RedirectResponse(
+            f"/settings?tab=security&mfa_step=verify&mfa_error={quote(error or 'Wrong code - try again.')}",
+            status_code=303)
+    db.delete_pending_auth_state(enroll_token)
+    request.session.pop("_mfa_enroll_token", None)
+    db.set_user_mfa_enabled(user["id"], True)
+    backup_codes = _generate_backup_codes()
+    db.replace_mfa_backup_codes(user["id"], [_hash_backup_code(c) for c in backup_codes])
+    db.log_security_event("mfa_enabled", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
+    # Shown exactly once - same one-shot-reveal-via-session pattern as
+    # new_api_key above (see settings_form's own comment on why).
+    request.session["_mfa_new_backup_codes"] = backup_codes
+    return RedirectResponse("/settings?tab=security&mfa_step=backup_codes", status_code=303)
+
+
+@app.post("/settings/mfa/cancel-enroll")
+def settings_mfa_cancel_enroll(request: Request):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    db.delete_pending_auth_state(request.session.pop("_mfa_enroll_token", None))
+    return RedirectResponse("/settings?tab=security", status_code=303)
+
+
+@app.post("/settings/mfa/disable")
+def settings_mfa_disable(request: Request, current_password: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    allowed, retry_after = rate_limit.check(f"login:{user['email']}", limit=8, window_s=60)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=security&mfa_error=Too+many+attempts+-+try+again+in+{retry_after}s", status_code=303)
+    ok, error = supabase_auth.mfa_disable(user["email"], current_password)
+    if not ok:
+        return RedirectResponse(f"/settings?tab=security&mfa_error={quote(error or 'Something went wrong.')}",
+                                 status_code=303)
+    db.set_user_mfa_enabled(user["id"], False)
+    db.delete_mfa_backup_codes(user["id"])
+    db.log_security_event("mfa_disabled", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
+    return RedirectResponse("/settings?tab=security&mfa_notice=Two-factor+authentication+turned+off.",
+                             status_code=303)
+
+
+@app.post("/settings/mfa/regenerate-backup-codes")
+def settings_mfa_regenerate_backup_codes(request: Request, current_password: str = Form(...)):
+    user = current_user(request)
+    if not user:
+        return RedirectResponse("/login")
+    if not user["mfa_enabled_at"]:
+        return RedirectResponse("/settings?tab=security", status_code=303)
+    allowed, retry_after = rate_limit.check(f"login:{user['email']}", limit=8, window_s=60)
+    if not allowed:
+        return RedirectResponse(
+            f"/settings?tab=security&mfa_error=Too+many+attempts+-+try+again+in+{retry_after}s", status_code=303)
+    # Re-authenticates but doesn't actually need the resulting session for
+    # anything beyond confirming the password is real - regenerating codes
+    # is entirely local (webapp/db.py), no Supabase call involved.
+    session, error = supabase_auth.sign_in(user["email"], current_password)
+    if error or not session:
+        return RedirectResponse(f"/settings?tab=security&mfa_error={quote('Your current password is incorrect.')}",
+                                 status_code=303)
+    backup_codes = _generate_backup_codes()
+    db.replace_mfa_backup_codes(user["id"], [_hash_backup_code(c) for c in backup_codes])
+    db.log_security_event("mfa_backup_codes_regenerated", user_id=user["id"], email=user["email"],
+                           ip_address=rate_limit.client_ip(request))
+    request.session["_mfa_new_backup_codes"] = backup_codes
+    return RedirectResponse("/settings?tab=security&mfa_step=backup_codes", status_code=303)
 
 
 @app.post("/settings/team/invite")

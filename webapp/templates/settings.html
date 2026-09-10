@@ -296,8 +296,76 @@
         </label>
         <button type="submit" class="secondary">Update password</button>
       </form>
-      <p class="muted" style="font-size:0.76rem; margin-top:12px;">Two-factor authentication isn't available
-         yet - if that's something you need, let us know.</p>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Two-factor authentication</h2>
+      {% if mfa_error %}<p class="error">{{ mfa_error }}</p>{% endif %}
+      {% if mfa_notice %}<p class="ok">{{ mfa_notice }}</p>{% endif %}
+
+      {% if mfa_step == 'backup_codes' and new_backup_codes %}
+        <p class="ok">✓ Two-factor authentication is on.</p>
+        <p style="font-size:0.85rem;">Save these backup codes somewhere safe - each one lets you sign in
+           <strong>once</strong> if you ever lose access to your authenticator app. They won't be shown again.</p>
+        <div class="card internal-card" style="font-family:monospace; font-size:0.95rem; line-height:1.9; letter-spacing:0.02em;">
+          {% for c in new_backup_codes %}{{ c }}<br>{% endfor %}
+        </div>
+        <a href="/settings?tab=security" class="btn secondary" style="margin-top:14px;">I've saved these</a>
+
+      {% elif mfa_step == 'verify' and mfa_pending %}
+        <p style="font-size:0.85rem;">Scan this with an authenticator app (Google Authenticator, Authy, 1Password,
+           etc.), then enter the 6-digit code it shows to confirm.</p>
+        <img src="{{ mfa_pending.qr_code }}" alt="Two-factor authentication QR code" width="200" height="200"
+             style="background:#fff; padding:10px; border-radius:8px;">
+        <p class="muted" style="font-size:0.78rem;">Can't scan it? Enter this code manually instead:
+           <code style="user-select:all;">{{ mfa_pending.secret }}</code></p>
+        <form method="post" action="/settings/mfa/verify-enroll" style="max-width:280px;">
+          <label>6-digit code
+            <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required
+                   pattern="[0-9]{6}" maxlength="6" placeholder="123456">
+          </label>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button type="submit">Confirm</button>
+          </div>
+        </form>
+        <form method="post" action="/settings/mfa/cancel-enroll" style="margin-top:8px;">
+          <button type="submit" class="secondary">Cancel</button>
+        </form>
+
+      {% elif user['mfa_enabled_at'] %}
+        <p class="ok" style="font-size:0.85rem;">✓ Two-factor authentication is on - you'll need a code from your
+           authenticator app to sign in.</p>
+        <p class="muted" style="font-size:0.82rem;">{{ backup_codes_remaining }} backup code{{ '' if backup_codes_remaining == 1 else 's' }} remaining.</p>
+        <details style="margin-top:10px;">
+          <summary class="muted" style="cursor:pointer; font-size:0.82rem;">Get new backup codes &raquo;</summary>
+          <form method="post" action="/settings/mfa/regenerate-backup-codes" style="margin-top:10px; max-width:280px;">
+            <p class="muted" style="font-size:0.78rem; margin-top:0;">This invalidates any existing backup codes.</p>
+            <label>Current password
+              <input type="password" name="current_password" required autocomplete="current-password">
+            </label>
+            <button type="submit" class="secondary" style="margin-top:8px;">Generate new codes</button>
+          </form>
+        </details>
+        <details style="margin-top:10px;">
+          <summary class="muted" style="cursor:pointer; font-size:0.82rem; color:var(--err);">Turn off two-factor authentication &raquo;</summary>
+          <form method="post" action="/settings/mfa/disable" style="margin-top:10px; max-width:280px;">
+            <label>Current password
+              <input type="password" name="current_password" required autocomplete="current-password">
+            </label>
+            <button type="submit" class="secondary" style="margin-top:8px;">Turn off two-factor authentication</button>
+          </form>
+        </details>
+
+      {% else %}
+        <p class="muted" style="font-size:0.85rem; margin-top:0;">Add a second step at sign-in - a code from an
+           authenticator app, on top of your password.</p>
+        <form method="post" action="/settings/mfa/enroll" style="max-width:280px;">
+          <label>Current password
+            <input type="password" name="current_password" required autocomplete="current-password">
+          </label>
+          <button type="submit" class="secondary" style="margin-top:8px;">Set up two-factor authentication</button>
+        </form>
+      {% endif %}
     </div>
 
     {% if user['role'] == 'client' %}

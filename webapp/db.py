@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import sqlite3
 import time
 import uuid
@@ -429,7 +430,9 @@ CREATE TABLE IF NOT EXISTS security_events (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,          -- 'login_success' | 'login_failed' | 'signup' | 'password_changed' |
                                   -- 'oauth_login' | 'staff_role_granted' | 'staff_role_revoked' |
-                                  -- 'api_key_generated' | 'api_key_revoked' | 'account_closed'
+                                  -- 'staff_invite_sent' | 'api_key_generated' | 'api_key_revoked' |
+                                  -- 'account_closed' | 'mfa_enabled' | 'mfa_disabled' |
+                                  -- 'mfa_backup_codes_regenerated' | 'mfa_login_failed'
     user_id TEXT,                -- the account acted on/by - NULL when not resolvable (e.g. unknown email)
     actor_user_id TEXT,          -- who performed it, when different from user_id (e.g. staff promoting someone else)
     email TEXT,                  -- kept even when user_id is NULL, e.g. a failed login for a nonexistent account
@@ -440,6 +443,38 @@ CREATE TABLE IF NOT EXISTS security_events (
 );
 CREATE INDEX IF NOT EXISTS idx_security_events_user ON security_events(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_security_events_kind ON security_events(kind, created_at);
+
+-- Supabase's own MFA has no recovery-code concept - this is this app's own
+-- real addition so losing an authenticator device doesn't mean losing the
+-- account. Hashed (SHA-256, same reasoning as the API key hash above - a
+-- backup code IS effectively a bearer credential): the raw codes are shown
+-- to the user exactly once, right after generation, and never stored or
+-- logged anywhere in that form again.
+CREATE TABLE IF NOT EXISTS mfa_backup_codes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    used_at REAL,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mfa_backup_codes_user ON mfa_backup_codes(user_id);
+
+-- Short-lived server-side state for a multi-step MFA flow (enrollment's
+-- QR/secret/tokens between the enroll and confirm steps; login's tokens
+-- between the password step and the code-challenge step). Deliberately
+-- NOT stored in the session cookie itself - a real, caught-before-ship
+-- problem: a Supabase JWT access_token is routinely 800-1200 bytes on its
+-- own, and the QR code is a whole SVG data URI (several KB of raw path
+-- markup) - combined, comfortably over the ~4KB browser cookie limit,
+-- which would have failed silently (browsers just drop/truncate an
+-- oversized cookie, no error surfaced anywhere). The cookie holds only a
+-- random opaque token pointing at a row here instead.
+CREATE TABLE IF NOT EXISTS pending_auth_state (
+    token TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,      -- 'mfa_enroll' | 'mfa_login'
+    payload_json TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
 
 -- Real, persistent in-app notifications (the staff overview page's bell) -
 -- separate from notifications.py's notify_staff*, which only ever sends an
@@ -654,6 +689,14 @@ def init_db() -> None:
         # actually logged in since this shipped would be misleading, not
         # just harmless; "never recorded yet" is the honest starting state.
         conn.execute("ALTER TABLE users ADD COLUMN last_seen_at REAL")
+    if "mfa_enabled_at" not in existing_user_cols:
+        # NULL = two-factor not enabled. The actual source of truth for
+        # WHETHER a login needs the MFA challenge is Supabase's own
+        # session.user.factors (see supabase_auth.has_verified_totp_factor) -
+        # this column is a fast, local mirror purely so Settings can show
+        # "two-factor is on" without an extra Supabase API round-trip on
+        # every page load. Kept in sync at enroll/disable time.
+        conn.execute("ALTER TABLE users ADD COLUMN mfa_enabled_at REAL")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1113,6 +1156,115 @@ def list_security_events(kind: str | None = None, limit: int = 200):
         ).fetchall()
     conn.close()
     return rows
+
+
+def set_user_mfa_enabled(user_id: str, enabled: bool) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET mfa_enabled_at = ? WHERE id = ?", (time.time() if enabled else None, user_id))
+    conn.commit()
+    conn.close()
+
+
+def replace_mfa_backup_codes(user_id: str, code_hashes: list[str]) -> None:
+    """Wipes any existing codes (used or not) and stores a fresh set -
+    called once right after enrollment, and again any time the user
+    regenerates them. Deliberately all-or-nothing (delete then insert in
+    one connection) rather than appending, so there's never a confusing
+    mix of two different generations of codes active at once."""
+    conn = get_conn()
+    conn.execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (user_id,))
+    now = time.time()
+    conn.executemany(
+        "INSERT INTO mfa_backup_codes (id, user_id, code_hash, used_at, created_at) VALUES (?, ?, ?, NULL, ?)",
+        [(uuid.uuid4().hex, user_id, h, now) for h in code_hashes],
+    )
+    conn.commit()
+    conn.close()
+
+
+def count_unused_backup_codes(user_id: str) -> int:
+    conn = get_conn()
+    n = conn.execute(
+        "SELECT COUNT(*) FROM mfa_backup_codes WHERE user_id = ? AND used_at IS NULL", (user_id,)
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def consume_backup_code(user_id: str, code_hash: str) -> bool:
+    """True if this was a real, unused backup code for this account - marks
+    it used (single-use) in the same breath so it can never be replayed.
+    False for a wrong code or an already-used one, without distinguishing
+    which - same "don't help an attacker narrow it down" reasoning as the
+    forgot-password flow's identical response either way."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT id FROM mfa_backup_codes WHERE user_id = ? AND code_hash = ? AND used_at IS NULL",
+        (user_id, code_hash),
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+    conn.execute("UPDATE mfa_backup_codes SET used_at = ? WHERE id = ?", (time.time(), row["id"]))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def delete_mfa_backup_codes(user_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM mfa_backup_codes WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+_PENDING_AUTH_STATE_TTL_S = 15 * 60  # 15 minutes - generous for "scan a QR code and type a 6-digit code"
+
+
+def create_pending_auth_state(kind: str, payload: dict) -> str:
+    token = secrets.token_urlsafe(24)
+    now = time.time()
+    conn = get_conn()
+    # Opportunistic cleanup, not a separate cron job - an abandoned
+    # enrollment/login attempt that never comes back leaves a row behind
+    # forever otherwise. Piggybacking on every real write here keeps this
+    # table from growing unbounded without needing its own scheduled task.
+    conn.execute("DELETE FROM pending_auth_state WHERE created_at < ?", (now - _PENDING_AUTH_STATE_TTL_S,))
+    conn.execute(
+        "INSERT INTO pending_auth_state (token, kind, payload_json, created_at) VALUES (?, ?, ?, ?)",
+        (token, kind, json.dumps(payload), now),
+    )
+    conn.commit()
+    conn.close()
+    return token
+
+
+def get_pending_auth_state(token: str | None, kind: str) -> dict | None:
+    """None for a missing/wrong-kind/expired token - every caller treats
+    that identically to "start over", never distinguishing why, so there's
+    nothing meaningful lost by collapsing all three cases here."""
+    if not token:
+        return None
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT payload_json, kind, created_at FROM pending_auth_state WHERE token = ?", (token,)
+    ).fetchone()
+    conn.close()
+    if not row or row["kind"] != kind:
+        return None
+    if time.time() - row["created_at"] > _PENDING_AUTH_STATE_TTL_S:
+        delete_pending_auth_state(token)
+        return None
+    return json.loads(row["payload_json"])
+
+
+def delete_pending_auth_state(token: str | None) -> None:
+    if not token:
+        return
+    conn = get_conn()
+    conn.execute("DELETE FROM pending_auth_state WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
 
 
 def get_user_by_email(email: str):

@@ -111,6 +111,28 @@ def get_client() -> Client:
     return _client
 
 
+def _session_scoped_client(access_token: str, refresh_token: str) -> Client:
+    """A FRESH Client, not the shared get_client() singleton - every
+    auth.mfa.* call (enroll/challenge/verify/unenroll) operates on
+    whatever session is currently set on the Client INSTANCE it's called
+    through (supabase-py reads self.get_session() internally, not a
+    parameter), and get_client() is one shared, module-level singleton
+    reused across every concurrent request this app serves. change_password
+    above already calls set_session() on that same shared singleton for its
+    own re-auth step - a real, pre-existing risk if two people happened to
+    hit a sensitive auth action at the same moment, but not something to
+    silently inherit into new, MORE sensitive code (this literally decides
+    who gets past a second authentication factor). A throwaway Client per
+    call is real isolation, at the cost of one extra object - worth it
+    here specifically."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_ANON_KEY")
+    options = SyncClientOptions(httpx_client=httpx.Client(timeout=_AUTH_TIMEOUT))
+    client = create_client(url, key, options=options)
+    client.auth.set_session(access_token, refresh_token)
+    return client
+
+
 def _is_timeout(exc: Exception) -> bool:
     """True for a real network timeout (worth a silent retry and a friendly
     message), False for anything else (e.g. "Invalid login credentials",
@@ -277,3 +299,105 @@ def set_new_password(access_token: str, refresh_token: str, new_password: str):
         return True, None, email
     except Exception as exc:  # noqa: BLE001
         return False, str(exc), None
+
+
+# ---------------------------------------------------------------- MFA (TOTP) ----
+# Real Supabase-native TOTP, not a home-grown implementation - GoTrue does the
+# actual secret generation/QR/code verification (see _session_scoped_client's
+# docstring for why every call below runs against its own throwaway Client,
+# never the shared get_client() singleton). Supabase's own MFA has no
+# recovery-code concept built in, so that half (mfa_generate_backup_codes/
+# webapp/db.py's mfa_backup_codes table) is this app's own real addition on
+# top, not something faked to look native.
+
+
+def has_verified_totp_factor(session) -> bool:
+    """Free - session.user.factors already comes back on every sign_in, no
+    extra API call needed. Used right after password sign-in to decide
+    whether /login needs to detour through the MFA challenge before this
+    login is actually complete."""
+    return verified_totp_factor_id(session) is not None
+
+
+def verified_totp_factor_id(session) -> str | None:
+    """The actual factor_id challenge_and_verify needs - also free, same
+    session.user.factors as has_verified_totp_factor above. None if there
+    isn't a verified TOTP factor (or more than one - Supabase allows
+    multiple, this app only ever enrolls/uses the first)."""
+    factors = getattr(session.user, "factors", None) or []
+    for f in factors:
+        if f.factor_type == "totp" and f.status == "verified":
+            return f.id
+    return None
+
+
+def mfa_start_enroll(email: str, current_password: str):
+    """Re-authenticates with the current password first (same reasoning as
+    change_password - this app's own session cookie never holds a Supabase
+    token to reuse, and re-proving the password before touching MFA is the
+    right call anyway, not a workaround). Cleans up any abandoned
+    unverified TOTP factor from a previous incomplete attempt before
+    creating a fresh one - Supabase doesn't overwrite/replace, it just
+    keeps accumulating factors otherwise.
+    Returns (ok, error, data) - data is
+    {"factor_id", "qr_code", "secret", "access_token", "refresh_token"}
+    on success, None otherwise. access_token/refresh_token are handed back
+    so app.py can stash them (briefly, server-side, in the signed session
+    cookie) for the confirmation step right after - the same real,
+    already-accepted pattern the Google OAuth callback uses for its own
+    tokens-in-transit."""
+    session, error = sign_in(email, current_password)
+    if error or not session:
+        return False, "Your current password is incorrect.", None
+    try:
+        client = _session_scoped_client(session.access_token, session.refresh_token)
+        for f in client.auth.mfa.list_factors().totp:
+            if f.status == "unverified":
+                client.auth.mfa.unenroll({"factor_id": f.id})
+        enrolled = client.auth.mfa.enroll({"factor_type": "totp", "issuer": "Kauli", "friendly_name": "Kauli"})
+        if not enrolled.totp:
+            return False, "Couldn't start two-factor setup - try again.", None
+        return True, None, {
+            "factor_id": enrolled.id,
+            "qr_code": enrolled.totp.qr_code,  # already a data:image/svg+xml;utf-8,... URI
+            "secret": enrolled.totp.secret,
+            "access_token": session.access_token,
+            "refresh_token": session.refresh_token,
+        }
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc), None
+
+
+def mfa_challenge_and_verify(access_token: str, refresh_token: str, factor_id: str, code: str):
+    """The shared real verification step - used both to CONFIRM a fresh
+    enrollment (turns the factor from unverified to verified) and, at
+    login time, to complete the actual second-factor challenge. Same
+    Supabase call either way; the only difference is what app.py does
+    with a success. Returns (ok, error)."""
+    try:
+        client = _session_scoped_client(access_token, refresh_token)
+        client.auth.mfa.challenge_and_verify({"factor_id": factor_id, "code": code.strip()})
+        return True, None
+    except Exception as exc:  # noqa: BLE001
+        # Supabase's own message for a wrong/expired code is already
+        # reasonable to show as-is ("Invalid TOTP code" etc.) - not
+        # rewritten, same as every other auth error in this module.
+        return False, str(exc)
+
+
+def mfa_disable(email: str, current_password: str):
+    """Re-authenticates first, same reasoning as mfa_start_enroll - then
+    unenrolls every verified TOTP factor on the account (normally just
+    one; Supabase technically allows more, so this doesn't assume exactly
+    one). Returns (ok, error)."""
+    session, error = sign_in(email, current_password)
+    if error or not session:
+        return False, "Your current password is incorrect."
+    try:
+        client = _session_scoped_client(session.access_token, session.refresh_token)
+        factors = client.auth.mfa.list_factors()
+        for f in factors.totp:
+            client.auth.mfa.unenroll({"factor_id": f.id})
+        return True, None
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)

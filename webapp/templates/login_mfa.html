@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block theme_locked %}1{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+{% block title %}Two-factor authentication{% endblock %}
+{% block content %}
+<div class="auth-shell">
+  <div class="auth-form-panel">
+    <div class="auth-form-inner">
+      <div class="auth-brand">
+        <picture>
+          <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
+          <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="auth-brand-logo" width="301" height="81">
+        </picture>
+      </div>
+
+      <div class="auth-panel" style="display:block;">
+        <h1 class="m-h2" style="font-size:1.4rem; margin-top:0;">Enter your two-factor code</h1>
+        <p class="muted" style="font-size:0.85rem;">{{ email }} has two-factor authentication on - enter the
+           6-digit code from your authenticator app.</p>
+        {% if error %}<p class="error">{{ error }}</p>{% endif %}
+        <form method="post" action="/login/mfa">
+          <label class="auth-field">
+            <span class="auth-field-label">Code</span>
+            <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required
+                   pattern="[0-9]{6}|[A-Za-z0-9]{4}-[A-Za-z0-9]{4}" maxlength="9" placeholder="123456" autofocus>
+          </label>
+          <button type="submit">Verify</button>
+        </form>
+        <p class="muted" style="font-size:0.78rem; margin-top:14px;">Lost your device? Enter one of your backup
+           codes instead (format XXXX-XXXX) - each one works once.</p>
+        <p class="auth-forgot"><a href="/login">&larr; Back to login</a></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

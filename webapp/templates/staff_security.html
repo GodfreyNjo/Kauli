@@ -8,7 +8,8 @@
 
 <div style="margin-bottom:14px;">
   <a href="/staff/security" class="{{ 'btn secondary' if not filter_kind else 'btn' }}" style="margin-right:6px;">All</a>
-  {% for k in ["login_failed", "login_success", "signup", "password_changed", "staff_role_granted",
+  {% for k in ["login_failed", "login_success", "signup", "password_changed", "mfa_enabled", "mfa_disabled",
+               "mfa_login_failed", "mfa_backup_codes_regenerated", "staff_role_granted",
                "staff_role_revoked", "staff_invite_sent", "api_key_generated", "api_key_revoked", "account_closed"] %}
   <a href="/staff/security?kind={{ k }}" class="{{ 'btn' if filter_kind == k else 'btn secondary' }}"
      style="margin-right:6px; margin-bottom:6px; display:inline-block;">{{ k|replace('_', ' ') }}</a>
@@ -22,7 +23,7 @@
     </thead>
     <tbody>
       {% for e in events %}
-      <tr class="{{ 'error' if e['kind'] in ('login_failed',) else '' }}">
+      <tr class="{{ 'error' if e['kind'] in ('login_failed', 'mfa_login_failed') else '' }}">
         <td class="muted" style="white-space:nowrap; font-size:0.82rem;">{{ e['created_at']|int|timestamp_to_str }}</td>
         <td><span class="status status-{{ e['kind'] }}">{{ e['kind']|replace('_', ' ') }}</span></td>
         <td>{{ e['email'] or '-' }}</td>
