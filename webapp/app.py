@@ -41,7 +41,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -1239,6 +1239,11 @@ templates.env.globals["google_one_tap_client_id"] = os.environ.get("GOOGLE_ONE_T
 # just gives the real token somewhere to go without a code change.
 templates.env.globals["google_site_verification"] = os.environ.get("GOOGLE_SITE_VERIFICATION")
 templates.env.globals["bing_site_verification"] = os.environ.get("BING_SITE_VERIFICATION")
+# Single source of truth for the GA4 property id, shared with the server-
+# side Measurement Protocol calls in ga_events.py - was a literal
+# hardcoded separately in _ga.html before, which could drift from
+# whatever ga_events.py sends events to.
+templates.env.globals["ga_measurement_id"] = ga_events.measurement_id()
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -2546,6 +2551,9 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
                               personal_email_flag=_is_personal_email_domain(email))
     _notify_internal_new_lead(lead_id, name, email, org_type.strip() or None, volume_estimate.strip() or None,
                                base_url=str(request.base_url))
+    # GA4's own recommended lead-gen event name.
+    ga_events.send_event(ga_events.client_id_from_request(request), "generate_lead",
+                          {"org_type": org_type.strip() or None, "volume_estimate": volume_estimate.strip() or None})
     # Redirect (not a direct render) so refreshing the confirmation page
     # never re-submits the form - standard POST/redirect/GET.
     return RedirectResponse("/?sent=1#book", status_code=303)
@@ -2599,6 +2607,14 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
         "signup" if was_new else "login_success", user_id=user["id"], email=email,
         ip_address=rate_limit.client_ip(request), user_agent=request.headers.get("user-agent"),
         detail=login_kind)
+    # GA4's own recommended event names (sign_up/login) - scoped to real
+    # clients only, same reasoning as the welcome-message/notification
+    # block below: a handful of known staff/voice-actor accounts logging
+    # in isn't a marketing conversion, and counting it as one would just
+    # be noise in the real acquisition funnel this exists to make visible.
+    if role == "client":
+        ga_client_id = ga_events.client_id_from_request(request)
+        ga_events.send_event(ga_client_id, "sign_up" if was_new else "login", {"method": login_kind})
     # Not gated on was_new - an existing account can also accept a team
     # invite sent to their email; this just needs to run once per login,
     # which is exactly what it does (accept_team_invite is a no-op once
@@ -4617,6 +4633,13 @@ def create_order(
         instrumental_only=instr_instrumental_only, notes=instr_notes.strip() or None,
         style_guide_path=style_guide_path, style_guide_filename=style_guide_filename,
     )
+    # Custom event, not a GA4 e-commerce one - a submitted order isn't
+    # revenue yet (it might be fully covered by the free allowance, or
+    # still waiting on payment below); the real "purchase" event fires
+    # once money actually clears (see _activate_payment).
+    ga_events.send_event(ga_events.client_id_from_request(request), "order_submitted", {
+        "service_level": service_level, "is_rush": is_rush, "value": round(cost["total_usd"], 2),
+    })
 
     if cost["total_usd"] <= 0:
         # Fully covered by this month's free allowance - no payment step,
@@ -5114,9 +5137,14 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         _queue_first_payment_message(payer, base_url=base_url)
         db.set_onboarding_status(payer["id"], "activated")
     try:
-        payment_kind = json.loads(payment["meta"]).get("kind", "order") if payment["meta"] else "order"
+        meta = json.loads(payment["meta"]) if payment["meta"] else {}
     except (json.JSONDecodeError, AttributeError):
-        payment_kind = "order"
+        meta = {}
+    payment_kind = meta.get("kind", "order")
+    # Captured at checkout time, not here - see _checkout's own comment on
+    # why (this function runs from a payment webhook, which carries none
+    # of the customer's cookies to read a client_id from directly).
+    ga_client_id = meta.get("ga_client_id")
     line_items = None
     if payment["order_id"] and payment_kind == "difficulty_surcharge":
         # Already processed and delivered-ready - this only clears the
@@ -5215,6 +5243,16 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
                 + (f"View your receipt: {receipt_url}\n" if receipt_url else ""))
         ok, detail = mailer.send_email(payer["email"], "Your Kauli receipt", html, text)
         db.set_receipt_email_result(receipt_id, ok, detail)
+    # GA4's own recommended e-commerce event - the real "money actually
+    # cleared" moment, not just a checkout attempt. transaction_id is this
+    # payment's own real, unique id, so GA's dedup logic can't double-
+    # count it even if a webhook somehow fired twice (though
+    # db.complete_payment's idempotency check above already means this
+    # whole function only ever runs once per real payment anyway).
+    ga_events.send_event(ga_client_id, "purchase", {
+        "transaction_id": payment["id"], "value": payment["amount_usd"], "currency": "USD",
+        "payment_kind": payment_kind,
+    })
     return True
 
 
@@ -5260,12 +5298,19 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
                 f"Give+it+a+few+minutes%2C+or+contact+us+if+it+seems+stuck.",
                 status_code=303)
     payment_id = billing.new_reference()  # ours, generated before the provider ever hears about this
+    # Captured here, not at _activate_payment - a payment webhook (Paystack/
+    # M-Pesa's own servers) carries none of the customer's cookies, so this
+    # is the last point a real client_id is available at all. Stashed on
+    # the payment's own meta for _activate_payment to read back once the
+    # webhook actually confirms the charge (see ga_events.client_id_from_
+    # request's docstring).
+    ga_client_id = ga_events.client_id_from_request(request)
 
     if provider == "paystack":
         if not billing.paystack_configured():
             return RedirectResponse(f"{back_url}?error=Paystack+isn%27t+configured+yet.", status_code=303)
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "paystack", order_id=order_id,
-                           meta=json.dumps({"kind": payment_kind}))
+                           meta=json.dumps({"kind": payment_kind, "ga_client_id": ga_client_id}))
         callback_url = str(request.base_url).rstrip("/") + f"/billing/callback/paystack?payment_id={payment_id}"
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url)
         if "error" in result:
@@ -5278,7 +5323,9 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # not just a countdown telling them to wait - Paystack's checkout
         # page for a given reference stays open well past our own 15-
         # minute pending window, so re-using it is safe and correct.
-        db.update_payment_meta(payment_id, json.dumps({"kind": payment_kind, "authorization_url": result["authorization_url"]}))
+        db.update_payment_meta(payment_id, json.dumps({
+            "kind": payment_kind, "authorization_url": result["authorization_url"], "ga_client_id": ga_client_id,
+        }))
         return RedirectResponse(result["authorization_url"], status_code=303)
 
     if provider == "mpesa":
@@ -5288,7 +5335,8 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
             return RedirectResponse(f"{back_url}?error=Enter+the+M-Pesa+phone+number.", status_code=303)
         amount_kes, rate_source = billing.usd_to_kes(amount_usd)
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, amount_kes, "KES", "mpesa",
-                           meta=json.dumps({"phone": phone.strip(), "rate_source": rate_source, "kind": payment_kind}),
+                           meta=json.dumps({"phone": phone.strip(), "rate_source": rate_source,
+                                             "kind": payment_kind, "ga_client_id": ga_client_id}),
                            order_id=order_id)
         callback_url = str(request.base_url).rstrip("/") + "/webhooks/mpesa"
         result = billing.mpesa_stk_push(phone.strip(), amount_kes, payment_id, callback_url)
@@ -5299,6 +5347,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         db.update_payment_meta(payment_id, json.dumps({
             "phone": phone.strip(), "rate_source": rate_source,
             "checkout_request_id": result["checkout_request_id"], "kind": payment_kind,
+            "ga_client_id": ga_client_id,
         }))
         return RedirectResponse(
             f"{back_url}?notice=Check+your+phone+({phone.strip()})+for+the+M-Pesa+PIN+prompt+-+"
@@ -5306,7 +5355,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
 
     if provider == "bank":
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "bank", order_id=order_id,
-                           meta=json.dumps({"kind": payment_kind}))
+                           meta=json.dumps({"kind": payment_kind, "ga_client_id": ga_client_id}))
         # order_pay.html has always promised "We'll email transfer
         # instructions" - a real gap until now, nothing ever actually
         # sent one. bank_details is a real, deliberate KAULI_BANK_DETAILS

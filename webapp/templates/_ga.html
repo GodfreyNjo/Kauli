@@ -8,7 +8,7 @@
      recorded in localStorage. What this collects and why is disclosed at
      /privacy#cookies. -->
 <script>
-  window.__kauliGaId = 'G-29L6CFPNEB';
+  window.__kauliGaId = {{ ga_measurement_id|tojson }};
   window.__kauliLoadGA = function () {
     if (window.__kauliGaLoaded) return;
     window.__kauliGaLoaded = true;
@@ -19,6 +19,14 @@
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     window.gtag = gtag;
+    // Explicit Google Consent Mode grant - this loader only ever runs
+    // AFTER real cookie-notice acceptance in the first place (see
+    // maybeLoadGA in base.html), so there's no separate "default: denied"
+    // state to declare first; this just removes any ambiguity for
+    // gtag.js's own internal consent handling, which real-world testing
+    // showed can otherwise delay when hits actually reach Google's
+    // servers, not just skip them.
+    gtag('consent', 'default', {analytics_storage: 'granted'});
     gtag('js', new Date());
     gtag('config', window.__kauliGaId);
   };
