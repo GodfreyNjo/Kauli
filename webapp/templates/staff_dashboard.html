@@ -123,7 +123,7 @@
   <div class="table-scroll">
   <table id="queue-table">
     <thead><tr>
-      <th style="width:28px;"><input type="checkbox" id="queue-select-all"></th>
+      <th style="width:28px;"><input type="checkbox" id="queue-select-all" aria-label="Select all orders"></th>
       <th class="sortable" data-sort="text" data-col="1">Job</th>
       <th class="sortable" data-sort="text" data-col="2">Client</th>
       <th>Service / route</th>
@@ -147,8 +147,9 @@
           data-due-today="{{ '1' if (r['ts'] and not r['ts']['overdue'] and r['ts']['remaining_s'] <= 86400) else '0' }}"
           data-search="{{ (o['original_filename'] ~ ' ' ~ o['client_name'] ~ ' ' ~ o['id'])|lower }}"
           data-sortvals="{{ r['pct'] if r['pct'] is not none else -1 }}|{{ (o['internal_deadline_at']|int) if r['ts'] else 9999999999 }}|{{ r['stage_seconds']|int }}|{{ o['created_at']|int }}"
-          class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
-        <td onclick="event.stopPropagation();"><input type="checkbox" class="queue-row-select" data-order-id="{{ o['id'] }}"></td>
+          class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0" role="link">
+        <td onclick="event.stopPropagation();"><input type="checkbox" class="queue-row-select" data-order-id="{{ o['id'] }}"
+               aria-label="Select {{ o['original_filename'] }} ({{ o['client_name'] }})"></td>
         <td class="ellipsis-cell" style="max-width:260px;" title="{{ o['original_filename'] }}">
           <span class="queue-file-icon queue-file-{{ r['file_kind'] }}" aria-hidden="true">
             {% if r['file_kind'] == 'youtube' %}&#9654;{% elif r['file_kind'] == 'video' %}&#127909;{% else %}&#127925;{% endif %}

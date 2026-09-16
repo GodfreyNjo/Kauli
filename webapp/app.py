@@ -1244,6 +1244,12 @@ templates.env.globals["bing_site_verification"] = os.environ.get("BING_SITE_VERI
 # hardcoded separately in _ga.html before, which could drift from
 # whatever ga_events.py sends events to.
 templates.env.globals["ga_measurement_id"] = ga_events.measurement_id()
+# Real WCAG 2.2.1 (Timing Adjustable) gap until now - a real 30-minute
+# idle logout (see IDLE_TIMEOUT_SECONDS/SessionMiddleware above) existed
+# with no warning before it happened at all; base.html's own idle-warning
+# script needs the real number, not a guessed one, to warn far enough
+# ahead of the actual cutoff.
+templates.env.globals["idle_timeout_seconds"] = IDLE_TIMEOUT_SECONDS
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -2657,6 +2663,8 @@ def login_form(request: Request, mode: str = "signin", notice: str | None = None
         display_notice = "Your account has been closed."
     elif notice == "password_reset":
         display_notice = "Your password has been reset - sign in with your new password."
+    elif notice == "session_expired":
+        display_notice = "You were signed out after a while inactive - sign back in to continue."
     return templates.TemplateResponse(request, "login.html", {
         "error": error, "notice": display_notice, "mode": "signup" if mode == "signup" else "signin",
         "next": _safe_next(next) if next else "",

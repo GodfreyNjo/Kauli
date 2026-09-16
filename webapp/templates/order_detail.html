@@ -221,7 +221,8 @@
      reviewed transcript - "what did they say about pricing?", "who's speaking at the start?"</p>
   <div id="ai-chat-log" class="ai-chat-log"></div>
   <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
-    <input type="text" id="ai-ask-input" placeholder="Ask a question…" maxlength="500" style="flex:1;" required>
+    <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
+           maxlength="500" style="flex:1;" required>
     <button type="submit" class="secondary">Ask</button>
   </form>
 
@@ -239,8 +240,8 @@
             {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
             {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.68rem;">{{ seg.speaker_id }}</span>{% endif %}
           </td>
-          <td>{{ seg.source_final_text }}</td>
-          <td>{{ seg.final_text }}</td>
+          <td lang="{{ order['source_lang'] }}">{{ seg.source_final_text }}</td>
+          <td lang="{{ order['target_lang'] }}">{{ seg.final_text }}</td>
         </tr>
         {% endif %}
         {% endfor %}
@@ -357,8 +358,8 @@
             {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
             {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.68rem;">{{ seg.speaker_id }}</span>{% endif %}
           </td>
-          <td>{{ seg.source_final_text }}</td>
-          <td>{{ seg.final_text }}</td>
+          <td lang="{{ order['source_lang'] }}">{{ seg.source_final_text }}</td>
+          <td lang="{{ order['target_lang'] }}">{{ seg.final_text }}</td>
         </tr>
         {% endif %}
         {% endfor %}
@@ -386,7 +387,8 @@
     {% if job and job.segments %}
     <button type="button" class="secondary" id="request-revision-btn" style="margin-bottom:8px;">Request a revision</button>
     {% endif %}
-    <textarea name="body" id="message-body" rows="2" placeholder="Write a message..." required></textarea>
+    <textarea name="body" id="message-body" rows="2" placeholder="Write a message..." aria-label="Write a message"
+              required></textarea>
     <button type="submit">Send</button>
   </form>
 </details>

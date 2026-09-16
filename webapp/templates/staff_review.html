@@ -276,7 +276,7 @@
   </div>
   <form method="post" action="/staff/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
     <input type="hidden" name="visibility" value="client">
-    <textarea name="body" rows="2" placeholder="Reply to client..." required></textarea>
+    <textarea name="body" rows="2" placeholder="Reply to client..." aria-label="Reply to client" required></textarea>
     <label class="auth-checkbox-row" style="margin:8px 0;">
       <input type="checkbox" name="also_email" value="1">
       <span>Also email {{ order_client_email or 'the client' }} this message right now (otherwise they
@@ -302,7 +302,8 @@
   </div>
   <form method="post" action="/staff/orders/{{ order['id'] }}/messages" style="margin-top:14px;">
     <input type="hidden" name="visibility" value="internal">
-    <textarea name="body" rows="2" placeholder="Internal note (staff only)..." required></textarea>
+    <textarea name="body" rows="2" placeholder="Internal note (staff only)..." aria-label="Internal note (staff only)"
+              required></textarea>
     <button type="submit" class="secondary">Add internal note</button>
   </form>
 </details>
@@ -314,12 +315,12 @@
     <strong>{{ seg.segment_id }}</strong>
     <span>{{ (seg.start_ms / 1000)|round(1) }}s – {{ (seg.end_ms / 1000)|round(1) }}s</span>
   </div>
-  <p class="source"><span class="lbl">{{ order['source_lang'] }}</span> {{ seg.source_transcript }}</p>
+  <p class="source" lang="{{ order['source_lang'] }}"><span class="lbl">{{ order['source_lang'] }}</span> {{ seg.source_transcript }}</p>
   {% if seg.cultural_notes %}<p class="note">⚠ {{ seg.cultural_notes }}</p>{% endif %}
 
   <form method="post" action="/staff/orders/{{ order['id'] }}/segments/{{ seg.segment_id }}">
     <label>Final text (what gets spoken/subtitled - human edit always wins)
-      <textarea name="edited_text" rows="2">{{ seg.final_text }}</textarea>
+      <textarea name="edited_text" rows="2" lang="{{ order['target_lang'] }}">{{ seg.final_text }}</textarea>
     </label>
     <label class="checkbox">
       <input type="checkbox" name="resynthesize"> Re-synthesize audio for this segment with the edited text

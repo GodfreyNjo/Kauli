@@ -28,7 +28,8 @@
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
       <form method="post" action="/settings" enctype="multipart/form-data">
         <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-          <div class="avatar-upload" id="avatar-upload" tabindex="0" role="button" title="Change profile photo">
+          <div class="avatar-upload" id="avatar-upload" tabindex="0" role="button" title="Change profile photo"
+               aria-label="Change profile photo">
             {% if user['avatar_path'] %}
               <img src="/avatar/{{ user['id'] }}" alt="" id="avatar-upload-preview">
             {% else %}

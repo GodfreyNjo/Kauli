@@ -3,6 +3,7 @@
 {% block title %}Ereri - {{ order['id'] }}{% endblock %}
 {% block content %}
 {% if notice %}<p class="ok" style="margin:0 0 8px;">{{ notice }}</p>{% endif %}
+<h1 class="sr-only">Ereri editor - {{ order['original_filename'] }}</h1>
 <div class="editor-shell">
   <div class="editor-topbar" id="editor-topbar">
     <button type="button" id="topbar-collapse-btn" class="topbar-collapse-btn" title="Collapse this bar">&#9662;</button>
@@ -299,7 +300,7 @@
         <form method="post" action="/staff/orders/{{ order['id'] }}/assign-speaker-voice" style="margin-bottom:8px; display:flex; gap:6px; align-items:center;">
           <input type="hidden" name="speaker_id" value="{{ spk }}">
           <strong style="font-size:0.85rem; min-width:90px;">{{ spk }}</strong>
-          <select name="voice_key" style="flex:1;">
+          <select name="voice_key" style="flex:1;" aria-label="Voice for {{ spk }}">
             {% for key, v in piper_voices.items() %}
             <option value="{{ key }}"
               {% if speaker_voices.get(spk) and speaker_voices[spk].endswith(v['path'].split('/')[-1]) %}selected{% endif %}>
@@ -518,8 +519,8 @@
     </div>
     <div class="spell-popover" id="spell-popover" hidden></div>
     <div class="find-replace-bar" id="find-replace-bar" hidden>
-      <input type="text" id="find-input" placeholder="Find">
-      <input type="text" id="replace-input" placeholder="Replace with">
+      <input type="text" id="find-input" placeholder="Find" aria-label="Find">
+      <input type="text" id="replace-input" placeholder="Replace with" aria-label="Replace with">
       <button type="button" id="find-replace-all-btn">Replace all in this step</button>
       <span id="find-replace-count" class="muted"></span>
       <button type="button" id="find-replace-close-btn" class="secondary" title="Close (Ctrl+Shift+F)">&times;</button>

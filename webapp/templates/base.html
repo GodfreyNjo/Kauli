@@ -65,7 +65,8 @@
     </div>
     {% if user['role'] == 'staff' %}
     <form method="get" action="/staff/search" class="topbar-search">
-      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads... (Ctrl+K)">
+      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads... (Ctrl+K)"
+             aria-label="Search jobs, clients, leads">
     </form>
     {% endif %}
     <div class="topbar-right">
@@ -226,6 +227,26 @@
     </div>
   </div>
 
+  {% if user %}
+  <!-- Real WCAG 2.2.1 (Timing Adjustable) gap until now: a genuine 30-
+       minute idle logout (see IDLE_TIMEOUT_SECONDS) happened with zero
+       warning - someone mid-way through writing a client message or a
+       long transcript edit could lose it with no notice at all. Logged-
+       in pages only; there's nothing session-based to warn a logged-out
+       visitor about. -->
+  <div class="modal-overlay" id="idle-timeout-modal" hidden>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="idle-timeout-title">
+      <h2 id="idle-timeout-title">Still there?</h2>
+      <p>You'll be signed out in <strong id="idle-timeout-countdown">5:00</strong> due to inactivity - anything
+         you haven't saved could be lost.</p>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button type="button" class="btn" id="idle-timeout-stay">Stay signed in</button>
+        <a href="/logout" class="btn secondary">Sign out now</a>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <script>
     (function () {
       // "accepted" | "declined" | null (no real choice made yet - the
@@ -317,6 +338,90 @@
           setConsent("declined"); deleteGaCookies(); hideBanner(); closePrefs();
         });
       }
+    })();
+  </script>
+  <script>
+    (function () {
+      // Idle-session-timeout warning - see the modal's own comment above
+      // for why this exists. IDLE_TIMEOUT_MS is the REAL server-side
+      // value (idle_timeout_seconds, from IDLE_TIMEOUT_SECONDS in app.py),
+      // not a guessed number that could drift from what actually logs
+      // someone out.
+      var modal = document.getElementById("idle-timeout-modal");
+      if (!modal) return;  // logged-out page - nothing to warn about
+      var IDLE_TIMEOUT_MS = {{ idle_timeout_seconds|tojson }} * 1000;
+      // Never more than a third of the real timeout, and never less than
+      // 30s - a warning that fires immediately (a very short configured
+      // timeout) or a lead time longer than the timeout itself would both
+      // be nonsensical.
+      var WARNING_LEAD_MS = Math.max(30 * 1000, Math.min(5 * 60 * 1000, IDLE_TIMEOUT_MS / 3));
+      var countdownEl = document.getElementById("idle-timeout-countdown");
+      var stayBtn = document.getElementById("idle-timeout-stay");
+      var lastActivity = Date.now();
+      var warningShown = false;
+      var countdownTimer = null;
+
+      function formatMMSS(ms) {
+        var totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+        var m = Math.floor(totalSeconds / 60), s = totalSeconds % 60;
+        return m + ":" + (s < 10 ? "0" : "") + s;
+      }
+
+      function recordActivity() {
+        lastActivity = Date.now();
+        if (warningShown) resetAfterExtend();
+      }
+
+      function resetAfterExtend() {
+        warningShown = false;
+        modal.hidden = true;
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      }
+
+      function showWarning() {
+        warningShown = true;
+        modal.hidden = false;
+        if (stayBtn) stayBtn.focus();
+        countdownTimer = setInterval(function () {
+          var remaining = IDLE_TIMEOUT_MS - (Date.now() - lastActivity);
+          if (remaining <= 0) {
+            clearInterval(countdownTimer);
+            window.location.href = "/login?notice=session_expired";
+            return;
+          }
+          if (countdownEl) countdownEl.textContent = formatMMSS(remaining);
+        }, 1000);
+      }
+
+      // A real request, not a client-side-only timer reset - this is what
+      // actually extends the server-side session (current_user()'s own
+      // "touch" logic in app.py runs on any authenticated request), not
+      // just the countdown UI. A lightweight, already-authenticated,
+      // side-effect-free endpoint - not a page navigation.
+      function extendSession() {
+        fetch("/notifications/recent", { credentials: "same-origin" }).then(function (resp) {
+          // A real 401 here means the session already genuinely expired
+          // server-side (e.g. the tab sat suspended past the real
+          // cutoff) - resetting the client-side countdown in that case
+          // would just show a live "signed in" UI over a dead session.
+          if (resp.status === 401) { window.location.href = "/login?notice=session_expired"; return; }
+          recordActivity();
+        }).catch(function () { recordActivity(); });
+      }
+
+      if (stayBtn) stayBtn.addEventListener("click", extendSession);
+
+      ["mousedown", "keydown", "scroll", "touchstart"].forEach(function (evt) {
+        document.addEventListener(evt, function () {
+          if (!warningShown) lastActivity = Date.now();
+        }, { passive: true });
+      });
+
+      setInterval(function () {
+        if (warningShown) return;
+        var idleFor = Date.now() - lastActivity;
+        if (idleFor >= IDLE_TIMEOUT_MS - WARNING_LEAD_MS) showWarning();
+      }, 5000);
     })();
   </script>
   <script>
