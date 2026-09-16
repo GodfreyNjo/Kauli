@@ -48,7 +48,8 @@
 
 {% if rows %}
 <div class="card queue-toolbar">
-  <input type="text" id="queue-search" placeholder="Search jobs, clients, files or Job ID...">
+  <input type="text" id="queue-search" placeholder="Search jobs, clients, files or Job ID..."
+         aria-label="Search jobs, clients, files or Job ID">
   <button type="button" id="queue-filters-toggle" class="secondary">Filters <span id="queue-filters-badge" class="filter-count-badge" hidden>0</span></button>
   <div style="flex:1;"></div>
   <button type="button" id="queue-columns-toggle" class="secondary">Columns</button>
@@ -57,7 +58,7 @@
 
 <div class="card queue-filters" id="queue-filters-panel" hidden>
   <div class="queue-filter-field">
-    <label>Status</label>
+    <label for="filter-status">Status</label>
     <select id="filter-status">
       <option value="all">All</option>
       <option value="pending_payment">Pending payment</option>
@@ -73,7 +74,7 @@
     </select>
   </div>
   <div class="queue-filter-field">
-    <label>Service</label>
+    <label for="filter-service">Service</label>
     <select id="filter-service">
       <option value="all">All</option>
       <option value="transcribe">Transcription</option>
@@ -82,7 +83,7 @@
     </select>
   </div>
   <div class="queue-filter-field">
-    <label>Tier</label>
+    <label for="filter-tier">Tier</label>
     <select id="filter-tier">
       <option value="all">All</option>
       <option value="free">Free</option>
@@ -91,7 +92,7 @@
     </select>
   </div>
   <div class="queue-filter-field">
-    <label>Deadline</label>
+    <label for="filter-deadline">Deadline</label>
     <select id="filter-deadline">
       <option value="all">All</option>
       <option value="overdue">Overdue</option>
