@@ -3884,11 +3884,17 @@ def set_onboarding_status(user_id: str, status: str) -> None:
 def clients_needing_activation_nudge(threshold_hours: float = 48.0):
     """Real clients (role='client') who signed up more than threshold_hours
     ago, still on onboarding_status='new', and have never submitted an
-    order - the post-signup equivalent of stale_leads() above. Staff use
-    this to know who to personally nudge; queuing the actual
-    'inactivity_nudge' message (and flipping status to 'nudged') is a
-    separate, explicit staff action, not automatic - a human should decide
-    when a real client actually gets chased, not a cron job."""
+    order - the post-signup equivalent of stale_leads() above.
+
+    Two real callers, two different thresholds, both deliberate: staff_leads
+    (48h) surfaces these on /staff/leads so a human can nudge someone early
+    if they want to; app.py's _activation_nudge_loop (72h) automatically
+    sends the same real email via _send_activation_nudge if nobody already
+    did. Both paths share has_onboarding_message's dedupe, so a client is
+    never nudged twice regardless of which one gets there first - this
+    used to be staff-only by design ("a human should decide when a real
+    client gets chased"), changed to also auto-send at 72h by explicit
+    request, not a default this app started with."""
     cutoff = time.time() - threshold_hours * 3600
     conn = get_conn()
     rows = conn.execute(

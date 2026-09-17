@@ -5974,40 +5974,52 @@ def staff_mark_onboarding_sent(request: Request, message_id: str):
     return RedirectResponse("/staff/leads", status_code=303)
 
 
+def _send_activation_nudge(client, base_url: str) -> None:
+    """The actual nudge send, shared by the manual staff button and the
+    automatic 72-hour sweep below - one real copy of this email, not two
+    that quietly drift apart. Guarded by has_onboarding_message the same
+    way either caller already was, so a client can never get double-
+    nudged just because both paths happened to run near each other."""
+    if db.has_onboarding_message(client["id"], "inactivity_nudge"):
+        return
+    name = (client["display_name"] or client["email"].split("@")[0]).strip()
+    subject = "Still thinking it over?"
+    body = (
+        f"Hi {name},\n\n"
+        f"Noticed you signed up for Kauli but haven't uploaded anything yet - your "
+        f"{billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.\n\n"
+        "No pressure at all, just wanted to check if anything's unclear or in the way. "
+        f"Happy to walk you through it - reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+        f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
+    )
+    nudge_cta_url = f"{base_url.rstrip('/')}/client"
+    html_inner = (
+        f'<p style="margin:0 0 14px;">Hi {name},</p>'
+        f'<p style="margin:0 0 14px;">Noticed you signed up for Kauli but haven\'t uploaded anything '
+        f'yet - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.</p>'
+        f'<p style="margin:0 0 14px;">No pressure at all, just wanted to check if anything\'s unclear '
+        f'or in the way. Happy to walk you through it - '
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
+        f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+    )
+    _queue_and_send(client, "inactivity_nudge", subject, body, base_url=base_url,
+                     cta_text="Upload your first order for free", cta_url=nudge_cta_url, html_inner=html_inner)
+    db.set_onboarding_status(client["id"], "nudged")
+
+
 @app.post("/staff/onboarding/{user_id}/nudge")
 def staff_queue_nudge(request: Request, user_id: str):
-    """Deliberately a staff-triggered action, not a cron job - see
-    clients_needing_activation_nudge's docstring for why a human decides
-    when a real client actually gets chased."""
+    """Manual override for a client staff wants to chase sooner than the
+    automatic 72-hour sweep below would get to them - same real email,
+    same has_onboarding_message guard, just triggered by a person instead
+    of waiting on the clock."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
     client = db.get_user(user_id)
-    if client and not db.has_onboarding_message(user_id, "inactivity_nudge"):
-        name = (client["display_name"] or client["email"].split("@")[0]).strip()
-        subject = "Still thinking it over?"
-        body = (
-            f"Hi {name},\n\n"
-            f"Noticed you signed up for Kauli but haven't uploaded anything yet - your "
-            f"{billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.\n\n"
-            "No pressure at all, just wanted to check if anything's unclear or in the way. "
-            f"Happy to walk you through it - reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
-            f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
-        )
-        nudge_cta_url = f"{str(request.base_url).rstrip('/')}/client"
-        html_inner = (
-            f'<p style="margin:0 0 14px;">Hi {name},</p>'
-            f'<p style="margin:0 0 14px;">Noticed you signed up for Kauli but haven\'t uploaded anything '
-            f'yet - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.</p>'
-            f'<p style="margin:0 0 14px;">No pressure at all, just wanted to check if anything\'s unclear '
-            f'or in the way. Happy to walk you through it - '
-            f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
-            f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
-            f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
-        )
-        _queue_and_send(client, "inactivity_nudge", subject, body, base_url=str(request.base_url),
-                         cta_text="Upload your first order for free", cta_url=nudge_cta_url, html_inner=html_inner)
-        db.set_onboarding_status(user_id, "nudged")
+    if client:
+        _send_activation_nudge(client, str(request.base_url))
     return RedirectResponse("/staff/leads", status_code=303)
 
 
@@ -8579,3 +8591,37 @@ def _deadline_watch_loop() -> None:
 
 
 threading.Thread(target=_deadline_watch_loop, daemon=True).start()
+
+
+# ---------------------------------------------------- activation nudge ----
+# Automatic version of the staff-triggered nudge above (see
+# _send_activation_nudge) - a real, deliberate decision to switch from
+# "a human decides when a real client gets chased" (this file's own prior
+# comment) to a fixed 72-hour timer, made explicitly by the user rather
+# than assumed. Same daemon-thread pattern as the YouTube poller/deadline
+# watch above; checking hourly against a 72-hour threshold is plenty
+# granular - being an hour late to a 3-day-old signup changes nothing.
+# base_url comes from KAULI_PUBLIC_BASE_URL (see _public_base_url's own
+# comment on why - the same real, deployed value worker.py already reads
+# for its own no-request-object contexts), not a request object, since
+# nothing triggered this sweep.
+ACTIVATION_NUDGE_INTERVAL_S = 60 * 60
+ACTIVATION_NUDGE_THRESHOLD_HOURS = 72.0
+
+
+def _activation_nudge_sweep_once() -> None:
+    base_url = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or "https://kauli-forgemedia.com"
+    for client in db.clients_needing_activation_nudge(threshold_hours=ACTIVATION_NUDGE_THRESHOLD_HOURS):
+        _send_activation_nudge(client, base_url)
+
+
+def _activation_nudge_loop() -> None:
+    while True:
+        time.sleep(ACTIVATION_NUDGE_INTERVAL_S)
+        try:
+            _activation_nudge_sweep_once()
+        except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the loop forever
+            api_log.warning("activation nudge sweep failed", extra={"error": str(exc)})
+
+
+threading.Thread(target=_activation_nudge_loop, daemon=True).start()
