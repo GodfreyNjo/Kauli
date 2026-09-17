@@ -95,6 +95,25 @@ CREATE TABLE IF NOT EXISTS blog_views (
 );
 CREATE INDEX IF NOT EXISTS idx_blog_views_post ON blog_views(post_id);
 
+-- One real OAuth connection per client to their OWN YouTube channel - a
+-- separate grant from the sign-in Google OAuth (email/profile only),
+-- needed because pushing captions to a client's video requires the
+-- youtube.force-ssl scope, which only that channel's real owner can
+-- authorize. refresh_token is what actually matters long-term (access
+-- tokens expire in ~1hr); see webapp/youtube_captions.py for the refresh
+-- flow. One connection per user - reconnecting overwrites the old row
+-- rather than creating a second, since a client only has one channel to
+-- push to in practice.
+CREATE TABLE IF NOT EXISTS youtube_connections (
+    user_id TEXT PRIMARY KEY,
+    channel_id TEXT,
+    channel_title TEXT,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    expires_at REAL NOT NULL,
+    connected_at REAL NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     client_id TEXT NOT NULL,
@@ -1881,6 +1900,50 @@ def blog_performance_report() -> list[dict]:
     """).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def save_youtube_connection(user_id: str, channel_id: str | None, channel_title: str | None,
+                             access_token: str, refresh_token: str, expires_at: float) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO youtube_connections (user_id, channel_id, channel_title, access_token, "
+        "refresh_token, expires_at, connected_at) VALUES (?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT(user_id) DO UPDATE SET channel_id = excluded.channel_id, "
+        "channel_title = excluded.channel_title, access_token = excluded.access_token, "
+        "refresh_token = excluded.refresh_token, expires_at = excluded.expires_at, "
+        "connected_at = excluded.connected_at",
+        (user_id, channel_id, channel_title, access_token, refresh_token, expires_at, time.time()),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_youtube_connection(user_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM youtube_connections WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def update_youtube_access_token(user_id: str, access_token: str, expires_at: float) -> None:
+    """Called after a real token refresh (webapp/youtube_captions.py) -
+    only the short-lived access token changes; the refresh_token Google
+    issued at connect time stays valid until the client disconnects or
+    revokes access on Google's own side."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE youtube_connections SET access_token = ?, expires_at = ? WHERE user_id = ?",
+        (access_token, expires_at, user_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_youtube_connection(user_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM youtube_connections WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
 
 
 def blog_reader_countries(limit: int = 15) -> list[dict]:

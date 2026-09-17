@@ -235,6 +235,25 @@
     </div>
   {% endif %}
 
+  {% if tab == 'integrations' and user['role'] == 'client' and youtube_oauth_configured %}
+    <div class="card">
+      <h2 style="margin-top:0;">YouTube</h2>
+      <p class="muted" style="font-size:0.85rem; margin-top:0;">Connect your own YouTube channel to push
+         a job's human-verified captions directly onto the original video from its order page, instead of
+         downloading and uploading them by hand. Per-person, not account-wide - each teammate connects
+         their own channel if they need this.</p>
+      {% if youtube_connection %}
+      <p style="font-size:0.85rem;">Connected as <strong>{{ youtube_connection['channel_title'] or 'your channel' }}</strong>
+         &middot; since {{ youtube_connection['connected_at']|int|timestamp_to_str }}</p>
+      <form method="post" action="/client/youtube/disconnect">
+        <button type="submit" class="row-action-btn" onclick="return confirm('Disconnect your YouTube channel? You can reconnect any time.');">Disconnect</button>
+      </form>
+      {% else %}
+      <a class="btn secondary" href="/client/youtube/connect?next={{ '/settings?tab=integrations'|urlencode }}">Connect your YouTube channel</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if tab == 'team' and user['role'] == 'client' %}
     <div class="card">
       <h2 style="margin-top:0;">Team</h2>

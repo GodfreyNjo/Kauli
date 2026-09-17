@@ -191,6 +191,30 @@
     <p class="muted" style="margin-top:8px;">Want a dubbed audio/video version of this? Ask us in the
        message thread below, or submit a new order with Full dub selected.</p>
     {% endif %}
+
+    {% if order['source_youtube_id'] and has_translation and subs_ready and youtube_oauth_configured %}
+    <div class="card" style="margin-top:14px; background:var(--hover);">
+      <h3 style="margin-top:0; font-size:0.95rem;">Push captions to YouTube</h3>
+      {% if youtube_error %}<p class="error" style="font-size:0.85rem;">{{ youtube_error }}</p>{% endif %}
+      {% if youtube_pushed %}<p class="ok" style="font-size:0.85rem;">Captions pushed to your video.</p>{% endif %}
+      {% if youtube_connected %}<p class="ok" style="font-size:0.85rem;">YouTube channel connected.</p>{% endif %}
+      {% if youtube_connection %}
+      <p class="muted" style="font-size:0.85rem; margin-bottom:10px;">
+        Connected as <strong>{{ youtube_connection['channel_title'] or 'your channel' }}</strong>.
+        Uploads the human-verified subtitles (.srt) above directly onto the original video as a
+        {{ order['target_lang']|upper }} caption track, published immediately - review the file first if
+        you want to check it before it goes live on YouTube.
+      </p>
+      <form method="post" action="/client/orders/{{ order['id'] }}/push-captions-youtube" style="display:inline;">
+        <button type="submit" class="btn secondary">Push {{ order['target_lang']|upper }} captions to this video</button>
+      </form>
+      {% else %}
+      <p class="muted" style="font-size:0.85rem; margin-bottom:10px;">Connect your YouTube channel to push
+         these captions directly onto the original video instead of downloading and uploading them by hand.</p>
+      <a class="btn secondary" href="/client/youtube/connect?next={{ ('/client/orders/' ~ order['id'])|urlencode }}">Connect your YouTube channel</a>
+      {% endif %}
+    </div>
+    {% endif %}
   {% endif %}
 </div>
 

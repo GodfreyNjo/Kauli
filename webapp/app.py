@@ -41,7 +41,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -1267,6 +1267,7 @@ templates.env.globals["idle_timeout_seconds"] = IDLE_TIMEOUT_SECONDS
 templates.env.globals["nav_icon"] = nav_icons.nav_icon
 templates.env.globals["icon_svg"] = nav_icons.icon_svg
 templates.env.globals["trend_arrow"] = nav_icons.trend_arrow
+templates.env.globals["youtube_oauth_configured"] = youtube_captions.youtube_oauth_configured()
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -2976,6 +2977,90 @@ def google_one_tap_submit(request: Request, credential: str = Form(""), nonce: s
     return _complete_auth_session(request, session, "", login_kind="google_one_tap")
 
 
+# ---------------------------------------------- client YouTube connect ----
+@app.get("/client/youtube/connect")
+def youtube_connect_start(request: Request, next: str = ""):
+    """A real, separate OAuth grant to the client's OWN YouTube channel -
+    see webapp/youtube_captions.py's own docstring for why this can't
+    reuse the sign-in Google OAuth. Gated behind GOOGLE_YOUTUBE_CLIENT_ID/
+    SECRET being set, same "inert until configured" pattern as every other
+    optional integration in this app."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    if not youtube_captions.youtube_oauth_configured():
+        return RedirectResponse(_safe_next(next))
+    state = uuid.uuid4().hex
+    request.session["youtube_oauth_state"] = state
+    request.session["youtube_oauth_next"] = _safe_next(next)
+    redirect_uri = _public_base_url(request) + "/client/youtube/callback"
+    return RedirectResponse(youtube_captions.build_authorize_url(redirect_uri, state), status_code=303)
+
+
+@app.get("/client/youtube/callback", response_class=HTMLResponse)
+def youtube_connect_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    next_url = request.session.pop("youtube_oauth_next", "/client")
+    expected_state = request.session.pop("youtube_oauth_state", None)
+    if error:
+        return RedirectResponse(f"{next_url}?youtube_error={quote('YouTube connection was cancelled.')}", status_code=303)
+    if not code or not state or state != expected_state:
+        return RedirectResponse(f"{next_url}?youtube_error={quote('That connection request expired - please try again.')}", status_code=303)
+    try:
+        redirect_uri = _public_base_url(request) + "/client/youtube/callback"
+        tokens = youtube_captions.exchange_code_for_tokens(code, redirect_uri)
+        expires_at = time.time() + tokens.get("expires_in", 3600)
+        channel_id, channel_title = youtube_captions.get_channel_info(tokens["access_token"])
+        db.save_youtube_connection(user["id"], channel_id, channel_title,
+                                    tokens["access_token"], tokens["refresh_token"], expires_at)
+    except Exception as exc:  # noqa: BLE001 - a real, specific message beats a stack trace for the client
+        return RedirectResponse(f"{next_url}?youtube_error={quote(str(exc)[:200])}", status_code=303)
+    return RedirectResponse(f"{next_url}?youtube_connected=1", status_code=303)
+
+
+@app.post("/client/youtube/disconnect")
+def youtube_disconnect(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    db.delete_youtube_connection(user["id"])
+    return RedirectResponse("/settings?tab=integrations", status_code=303)
+
+
+@app.post("/client/orders/{order_id}/push-captions-youtube")
+def push_captions_to_youtube(request: Request, order_id: str):
+    """Real captions.insert against the client's own connected channel -
+    see webapp/youtube_captions.py. Only ever pushes the subtitle file
+    this client already has real, human-verified access to download
+    (order_detail.html's own /download/srt) - never a draft/unreviewed
+    transcript."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    if not order["source_youtube_id"]:
+        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('This order was not sourced from a YouTube video.')}", status_code=303)
+    srt_path = Path(order["outdir"]) / f"subs_{order['target_lang']}.srt"
+    if not srt_path.exists():
+        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Subtitles are not ready yet.')}", status_code=303)
+    connection = db.get_youtube_connection(user["id"])
+    if not connection:
+        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Connect your YouTube channel first.')}", status_code=303)
+    try:
+        access_token = youtube_captions.ensure_fresh_token(connection)
+        youtube_captions.upload_caption(
+            access_token, order["source_youtube_id"], order["target_lang"], str(srt_path),
+            name=f"{order['target_lang'].upper()} (Kauli, human-verified)",
+        )
+    except Exception as exc:  # noqa: BLE001 - a real, specific message beats a silent failure
+        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote(str(exc)[:250])}", status_code=303)
+    return RedirectResponse(f"/client/orders/{order_id}?youtube_pushed=1", status_code=303)
+
+
 @app.get("/logout")
 def logout(request: Request):
     request.session.clear()
@@ -3080,6 +3165,10 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "mfa_step": mfa_step, "mfa_error": mfa_error, "mfa_notice": mfa_notice, "mfa_pending": mfa_pending,
         "new_backup_codes": new_backup_codes,
         "backup_codes_remaining": db.count_unused_backup_codes(user["id"]) if user["mfa_enabled_at"] else 0,
+        # Per-user, not account-level like the API key/webhook/team blocks
+        # above - any client (not just the team owner) may have their own
+        # YouTube channel to push captions to on their own orders.
+        "youtube_connection": db.get_youtube_connection(user["id"]) if user["role"] == "client" else None,
     })
 
 
@@ -4741,7 +4830,9 @@ def _order_progress_steps(status: str) -> list[dict]:
 
 
 @app.get("/client/orders/{order_id}", response_class=HTMLResponse)
-def client_order_detail(request: Request, order_id: str, error: str | None = None, notice: str | None = None):
+def client_order_detail(request: Request, order_id: str, error: str | None = None, notice: str | None = None,
+                         youtube_error: str | None = None, youtube_connected: str | None = None,
+                         youtube_pushed: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
@@ -4779,10 +4870,13 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "has_video_deliverables": has_video_deliverables, "has_video_source": has_video_source,
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
+        "subs_ready": (outdir / f"subs_{order['target_lang']}.srt").exists(),
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
         "progress_steps": _order_progress_steps(order["status"]),
+        "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
+        "youtube_connection": db.get_youtube_connection(user["id"]),
     })
 
 
