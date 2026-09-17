@@ -531,6 +531,16 @@ def run(
             if reason:
                 job.warnings.append(reason)
             log(f"      {reason or 'ASR fell back to faster-whisper'}")
+        # Backup Transkriptor key used successfully - real Transkriptor
+        # output still ran (providers["asr"] stays as-is), just worth
+        # flagging that the primary key needs a look, same visibility
+        # mechanism as the real-fallback warning above without conflating
+        # the two.
+        elif getattr(asr_provider, "backup_key_used", False):
+            note = getattr(asr_provider, "backup_key_note", None)
+            if note:
+                job.warnings.append(note)
+            log(f"      {note or 'ASR used the backup Transkriptor key'}")
         if not job.source_duration_ms and job.segments:
             job.source_duration_ms = job.segments[-1].end_ms
         job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)

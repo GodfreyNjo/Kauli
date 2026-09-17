@@ -291,39 +291,72 @@ class TranskriptorASR(ASRProvider):
     # disclosed limitation, not a claim that Transkriptor is that reliable.
     ASSUMED_CONFIDENCE = 0.90
 
-    def __init__(self, api_key: str | None = None, poll_interval_s: float = 5.0,
-                 timeout_s: float = 1800.0):
+    def __init__(self, api_key: str | None = None, backup_api_key: str | None = None,
+                 poll_interval_s: float = 5.0, timeout_s: float = 1800.0):
         self.api_key = api_key or os.environ.get("TRANSKRIPTOR_API_KEY")
+        # A second Transkriptor account's key, tried before ever giving up on
+        # real Transkriptor quality and dropping to local Whisper - covers a
+        # bad/rate-limited/exhausted primary key without silently degrading
+        # every order behind it. Distinct from fallback_used/fallback_reason
+        # below on purpose: using the backup key still means real Transkriptor
+        # output ran (job.providers["asr"] stays "transkriptor" in
+        # pipeline.py), it's just worth a quieter warning that the primary
+        # key needs attention - not the same as the real quality hit of
+        # falling back to local Whisper.
+        self.backup_api_key = backup_api_key or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
         self.poll_interval_s = poll_interval_s
         self.timeout_s = timeout_s
         self.fallback_used = False
         self.fallback_reason: str | None = None
+        self.backup_key_used = False
+        self.backup_key_note: str | None = None
 
-    def _headers(self) -> dict:
-        return {"Authorization": f"Bearer {self.api_key}",
+    def _headers(self, api_key: str) -> dict:
+        return {"Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json", "Accept": "application/json"}
 
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
-        try:
-            return self._transcribe_via_api(audio_path, language)
-        except Exception as exc:  # noqa: BLE001 - any failure here means "fall back", not "crash the order"
-            self.fallback_used = True
-            self.fallback_reason = (
-                f"Transkriptor ASR failed ({exc.__class__.__name__}: {exc}) - "
-                "fell back to local faster-whisper.")
-            return FasterWhisperASR().transcribe(audio_path, language=language)
+        primary_exc: Exception | None = None
+        if self.api_key:
+            try:
+                return self._transcribe_via_api(audio_path, language, self.api_key)
+            except Exception as exc:  # noqa: BLE001 - any failure here means "try the backup key, or fall back"
+                primary_exc = exc
+        if self.backup_api_key:
+            try:
+                segs = self._transcribe_via_api(audio_path, language, self.backup_api_key)
+                self.backup_key_used = True
+                self.backup_key_note = (
+                    f"Primary Transkriptor key failed ({primary_exc.__class__.__name__}: {primary_exc}) - "
+                    "used the backup key instead. Worth checking on the primary key/account."
+                ) if primary_exc else "Used the backup Transkriptor key (no primary key configured)."
+                return segs
+            except Exception as exc2:  # noqa: BLE001 - both keys failed, now really fall back
+                self.fallback_used = True
+                self.fallback_reason = (
+                    f"Transkriptor ASR failed on both keys (primary: "
+                    f"{primary_exc.__class__.__name__ if primary_exc else 'not configured'}: {primary_exc}; "
+                    f"backup: {exc2.__class__.__name__}: {exc2}) - fell back to local faster-whisper.")
+                return FasterWhisperASR().transcribe(audio_path, language=language)
+        self.fallback_used = True
+        self.fallback_reason = (
+            f"Transkriptor ASR failed ({primary_exc.__class__.__name__}: {primary_exc}) - "
+            "fell back to local faster-whisper." if primary_exc else
+            "Transkriptor ASR failed (no API key configured) - fell back to local faster-whisper.")
+        return FasterWhisperASR().transcribe(audio_path, language=language)
 
-    def _transcribe_via_api(self, audio_path: str, language: str) -> list[Segment]:
+    def _transcribe_via_api(self, audio_path: str, language: str, api_key: str) -> list[Segment]:
         import time
         import requests
 
-        if not self.api_key:
-            raise RuntimeError("TRANSKRIPTOR_API_KEY not set")
+        if not api_key:
+            raise RuntimeError("no Transkriptor API key given")
         lang_code = self.LANG_CODES.get(language, language)
         file_name = os.path.basename(audio_path)
+        headers = self._headers(api_key)
 
         r = requests.post(f"{self.BASE}/transcription/local_file/get_upload_url",
-                           headers=self._headers(), json={"file_name": file_name}, timeout=30)
+                           headers=headers, json={"file_name": file_name}, timeout=30)
         r.raise_for_status()
         d = r.json()
         upload_url, public_url = d["upload_url"], d["public_url"]
@@ -333,7 +366,7 @@ class TranskriptorASR(ASRProvider):
         up.raise_for_status()
 
         r = requests.post(f"{self.BASE}/transcription/local_file/initiate_transcription",
-                           headers=self._headers(),
+                           headers=headers,
                            json={"url": public_url, "language": lang_code, "service": "Standard"},
                            timeout=30)
         r.raise_for_status()
@@ -343,7 +376,7 @@ class TranskriptorASR(ASRProvider):
         while time.time() < deadline:
             time.sleep(self.poll_interval_s)
             r = requests.get(f"{self.BASE}/files/{order_id}/content",
-                              headers=self._headers(), timeout=30)
+                              headers=headers, timeout=30)
             r.raise_for_status()
             payload = r.json()
             body = payload.get("body", payload)

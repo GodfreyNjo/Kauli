@@ -4471,7 +4471,8 @@ def create_order(
         # fallback lives INSIDE the provider itself, not here, so this one
         # value is the whole policy. Falls straight to faster-whisper with
         # no attempt at all if no key is configured yet.
-        asr = "transkriptor" if os.environ.get("TRANSKRIPTOR_API_KEY") else "faster-whisper"
+        asr = ("transkriptor" if os.environ.get("TRANSKRIPTOR_API_KEY") or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
+               else "faster-whisper")
     if not level["mt"]:
         mt = "stub"
     elif source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:

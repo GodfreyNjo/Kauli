@@ -117,12 +117,19 @@ VOLUME ["/app/webapp/data"]
 # Runs as root by default (a real gap flagged in a security review) - a
 # fixed, non-root UID/GID instead, matching what actually needs write
 # access: /app itself (bytecode caches, webapp/data before a volume is
-# mounted over it) and /var/lib/clamav (freshclam has to write real
+# mounted over it), /var/lib/clamav (freshclam has to write real
 # virus-definition updates there on every container start, not just at
-# build time). 10001 is arbitrary but fixed - chosen so the HOST-side bind
-# mount (/root/kauli/webapp/data on the real VM) can be chowned to match
-# it exactly once, rather than a UID that changes between builds.
-RUN groupadd -g 10001 kauli && useradd -u 10001 -g kauli -M -s /usr/sbin/nologin kauli \
+# build time), and a real home directory (see -m below - a gap this list
+# originally missed: MT providers that lazily download a HuggingFace model,
+# like Helsinki-NLP/opus-mt-swc-en, cache it under $HOME/.cache by default,
+# and a non-root user with no real home directory made every one of those
+# downloads fail with a PermissionError, dead-lettering the order instead of
+# just running slower - a real production incident caught from a live
+# dead-lettered job, not a hypothetical). 10001 is arbitrary but fixed -
+# chosen so the HOST-side bind mount (/root/kauli/webapp/data on the real
+# VM) can be chowned to match it exactly once, rather than a UID that
+# changes between builds.
+RUN groupadd -g 10001 kauli && useradd -u 10001 -g kauli -m -s /usr/sbin/nologin kauli \
     && mkdir -p /var/log/clamav /var/run/clamav \
     && chown -R kauli:kauli /app /var/lib/clamav /var/log/clamav /var/run/clamav
 USER kauli
