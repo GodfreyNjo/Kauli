@@ -81,22 +81,21 @@ def probe_duration_minutes(path: str) -> float:
 
 
 # YouTube increasingly blocks yt-dlp's normal (web-client) requests with
-# "Sign in to confirm you're not a bot" - a real, live problem, confirmed
-# 2026-08-23 against a real video a client hit this on. Already-current
-# yt-dlp alone doesn't fix it (checked - no newer release existed). The
-# real, officially-supported fix yt-dlp ships for this is requesting
-# through the ANDROID app's API surface instead of the web player's -
-# not a login bypass or a scraping trick, just a different first-party
-# client YouTube itself still serves without this particular check.
-# Verified working against the exact video that failed. Falls back to
-# "web" if the android client doesn't have what's needed for a given
-# video (occasionally offers fewer/lower-quality formats than web does
-# when unblocked) - real cookies (--cookies-from-browser upstream calls
-# this) are the other documented option, but that needs an actual signed-
-# in browser session's cookies handed to this server, which is a real
-# account-security tradeoff to make deliberately, not something to wire
-# in silently.
-YT_DLP_EXTRACTOR_ARGS = {"extractor_args": {"youtube": {"player_client": ["android", "web"]}}}
+# "Sign in to confirm you're not a bot" - a real, live, ongoing arms race
+# (YouTube tightens it, yt-dlp/the community find the next first-party
+# client that isn't yet blocked, repeat). First confirmed 2026-08-23
+# (fixed then by requesting through the ANDROID client); recurred
+# 2026-09-17 against a different real video, with "android" no longer
+# enough on its own by then either. Broadened to also try "tv" and
+# "web_safari" - per yt-dlp's own current guidance, these two are commonly
+# still unblocked when "android"/"web" aren't, and (like android) are
+# real first-party YouTube clients, not a login bypass or scraping trick.
+# Real cookies (--cookies-from-browser upstream calls this) are the other
+# documented option, but that needs an actual signed-in browser session's
+# cookies handed to this server, which is a real account-security
+# tradeoff to make deliberately, not something to wire in silently - only
+# reach for that if this broader client list stops being enough too.
+YT_DLP_EXTRACTOR_ARGS = {"extractor_args": {"youtube": {"player_client": ["android", "tv", "web_safari", "web"]}}}
 
 
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
