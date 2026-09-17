@@ -41,7 +41,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -6051,6 +6051,7 @@ def staff_lead_detail(request: Request, lead_id: str, notice: str | None = None)
         "user": user, "lead": lead, "notes": db.list_lead_notes(lead_id),
         "converted_user": converted_user, "lead_statuses": db.LEAD_STATUSES,
         "notice": notice, "email_configured": mailer.email_configured(),
+        "playbook": lead_playbook.get_playbook_stage(lead["org_type"], lead["status"], lead["company"] or lead["name"]),
     })
 
 

@@ -46,18 +46,48 @@
   {% endif %}
 </div>
 
+{% if playbook %}
+<div class="card">
+  <h2 style="margin-top:0;">Outreach playbook - stage {{ playbook['stage_number'] }} of {{ playbook['total_stages'] }}: {{ playbook['stage_label'] }}</h2>
+  <p class="muted" style="margin-top:0; font-size:0.85rem;">Real, ready-to-use content for this lead's current stage -
+     nothing here sends itself. Copy what you need into a call, WhatsApp, or the email form below; move the
+     lead's Stage dropdown above to see the next step. Ends automatically once this lead is Won or Lost.</p>
+  {% if playbook['decision_maker'] %}
+  <p style="margin:0 0 14px; padding:10px 12px; background:var(--hover); border-radius:8px; font-size:0.85rem;">
+    <strong>Who to ask for:</strong> {{ playbook['decision_maker'] }}
+  </p>
+  {% endif %}
+
+  <h3 style="font-size:0.88rem; margin:16px 0 6px;">Email draft</h3>
+  <p class="muted" style="margin:0 0 4px; font-size:0.82rem;"><strong>Subject:</strong> {{ playbook['email_subject'] }}</p>
+  <div class="card" style="background:var(--hover); white-space:pre-wrap; font-size:0.88rem; padding:14px 16px;">{{ playbook['email_body'] }}</div>
+
+  <h3 style="font-size:0.88rem; margin:18px 0 6px;">Call talking points</h3>
+  <ul style="margin:0 0 4px; padding-left:20px; font-size:0.88rem;">
+    {% for point in playbook['call_points'] %}<li style="margin-bottom:4px;">{{ point }}</li>{% endfor %}
+  </ul>
+
+  <h3 style="font-size:0.88rem; margin:18px 0 6px;">Text / WhatsApp message</h3>
+  <div class="card" style="background:var(--hover); white-space:pre-wrap; font-size:0.88rem; padding:14px 16px;">{{ playbook['text_message'] }}</div>
+</div>
+{% endif %}
+
 <div class="card">
   <h2 style="margin-top:0;">Send email</h2>
   {% if not email_configured %}
     <p class="muted">Email isn't configured on this server yet (BREVO_API_KEY/BREVO_FROM_EMAIL).</p>
+  {% elif not lead['email'] %}
+    <p class="muted">No email on file for this lead yet - use the call/text drafts above, or add a real
+       email via a note once you find one.</p>
   {% else %}
-    <p class="muted" style="margin-top:0; font-size:0.85rem;">Sent to {{ lead['email'] }} from Kauli Operations - logged to Activity below either way.</p>
+    <p class="muted" style="margin-top:0; font-size:0.85rem;">Sent to {{ lead['email'] }} from Kauli Operations - logged to Activity below either way.
+       {% if playbook %}Pre-filled with this stage's draft below - edit anything before sending.{% endif %}</p>
     <form method="post" action="/staff/leads/{{ lead['id'] }}/email">
       <label>Subject
-        <input type="text" name="subject" required>
+        <input type="text" name="subject" required value="{{ playbook['email_subject'] if playbook else '' }}">
       </label>
       <label>Message
-        <textarea name="body" rows="6" required placeholder="Hi {{ lead['name'] }},"></textarea>
+        <textarea name="body" rows="6" required placeholder="Hi {{ lead['name'] }},">{{ playbook['email_body'] if playbook else '' }}</textarea>
       </label>
       <button type="submit">Send email</button>
     </form>
