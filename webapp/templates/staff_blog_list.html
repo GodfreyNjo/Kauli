@@ -19,6 +19,55 @@
    possible - DEV.to above is the reliable free option right now.</p>
 {% endif %}
 
+<h2 style="margin-top:28px;">Performance</h2>
+<p class="muted" style="margin-top:-6px; font-size:0.82rem;">Signups/orders/revenue are last-touch: whichever
+   post someone was reading right before they signed up. A visitor who reads without signing up in that
+   same session shows up in views/readers only - an honest gap, not every reader converts.</p>
+{% if not performance %}
+<p class="muted">No published posts yet.</p>
+{% else %}
+<div class="card" style="padding:0; overflow-x:auto;">
+  <table>
+    <thead><tr><th>Post</th><th>Views</th><th>Unique readers</th><th>Signups</th><th>Paid orders</th><th>Revenue</th></tr></thead>
+    <tbody>
+      {% for p in performance %}
+      <tr>
+        <td><a href="/blog/{{ p['slug'] }}" target="_blank" rel="noopener">{{ p['title'] }}</a></td>
+        <td>{{ p['views'] or 0 }}</td>
+        <td>{{ p['unique_readers'] or 0 }}</td>
+        <td>{{ p['signups'] or 0 }}</td>
+        <td>{{ p['paid_orders'] or 0 }}</td>
+        <td>{% if p['revenue_usd'] %}${{ "%.2f"|format(p['revenue_usd']) }}{% else %}&mdash;{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2 style="margin-top:28px;">Reader locations</h2>
+<p class="muted" style="margin-top:-6px; font-size:0.82rem;">Country of every tracked blog view, from
+   Cloudflare's own edge - not available for traffic that reaches this app outside Cloudflare (local
+   testing, direct-IP requests).</p>
+{% if not reader_countries['countries'] %}
+<p class="muted">No tracked views yet.</p>
+{% else %}
+<div class="card" style="padding:0; overflow-x:auto; margin-bottom:16px;">
+  <table>
+    <thead><tr><th>Country</th><th>Views</th></tr></thead>
+    <tbody>
+      {% for c in reader_countries['countries'] %}
+      <tr><td style="font-family:var(--font-mono);">{{ c['country'] }}</td><td>{{ c['views'] }}</td></tr>
+      {% endfor %}
+      {% if reader_countries['unknown_views'] %}
+      <tr><td class="muted">Unknown</td><td class="muted">{{ reader_countries['unknown_views'] }}</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2 style="margin-top:28px;">All posts</h2>
 <div class="card" style="padding:0; margin-top:16px;">
   <table>
     <thead><tr><th>Title</th><th>Status</th><th>Views</th><th>Updated</th><th></th></tr></thead>

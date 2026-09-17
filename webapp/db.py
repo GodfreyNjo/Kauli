@@ -80,6 +80,21 @@ CREATE TABLE IF NOT EXISTS blog_posts (
     devto_url TEXT    -- set once cross-posted to DEV.to - see webapp/devto_publish.py
 );
 
+-- One real row per GET /blog/{slug}, not just a bare counter - lets
+-- staff see WHERE readers actually come from (country, via Cloudflare's
+-- own CF-IPCountry header - already reaching this app for free, no paid
+-- geolocation API needed) and roughly how many distinct people read a
+-- post (visitor_id: a random id generated once per anonymous session,
+-- not a durable cross-session fingerprint - see blog_post() in app.py).
+CREATE TABLE IF NOT EXISTS blog_views (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    post_id TEXT NOT NULL,
+    viewed_at REAL NOT NULL,
+    country TEXT,        -- 2-letter code from CF-IPCountry, NULL off-Cloudflare (e.g. local dev)
+    visitor_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_blog_views_post ON blog_views(post_id);
+
 CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
     client_id TEXT NOT NULL,
@@ -629,6 +644,15 @@ def init_db() -> None:
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent_at REAL")
         conn.execute("ALTER TABLE users ADD COLUMN marketing_consent_ip TEXT")
+    if "referred_by_blog_post_id" not in existing_user_cols:
+        # Real last-touch attribution: which blog post (if any) this person
+        # was reading right before they signed up - captured from the
+        # session in _complete_auth_session (app.py), set once at account
+        # creation and never overwritten, same "first real provisioning
+        # moment" pattern the CRM-lead-conversion logic just above uses.
+        # NULL for the (large) majority of signups that didn't come via a
+        # blog post - an honest gap, not every signup has a referring post.
+        conn.execute("ALTER TABLE users ADD COLUMN referred_by_blog_post_id TEXT")
     if "default_source_lang" not in existing_user_cols:
         # Personal, not account-wide (unlike marketing_consent/API keys/
         # webhooks, which are the account owner's call) - a teammate on a
@@ -1522,7 +1546,8 @@ def remove_team_member(owner_client_id: str, team_member_row_id: str) -> None:
 
 
 def get_or_create_user(user_id: str, email: str, default_role: str, display_name: str | None = None,
-                        marketing_consent: bool = False, consent_ip: str | None = None):
+                        marketing_consent: bool = False, consent_ip: str | None = None,
+                        referred_by_blog_post_id: str | None = None):
     """Called right after a real Supabase login. First time we see this
     Supabase user id, provision a local row for them (role decided by the
     KAULI_STAFF_EMAILS allowlist - see webapp/supabase_auth.py) plus a
@@ -1548,10 +1573,12 @@ def get_or_create_user(user_id: str, email: str, default_role: str, display_name
         now = time.time()
         conn.execute(
             "INSERT INTO users (id, email, role, display_name, created_at, marketing_consent, "
-            "marketing_consent_at, marketing_consent_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "marketing_consent_at, marketing_consent_ip, referred_by_blog_post_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user_id, email, default_role, display_name or email.split("@")[0], now,
              int(marketing_consent), now if marketing_consent else None,
-             consent_ip if marketing_consent else None),
+             consent_ip if marketing_consent else None,
+             referred_by_blog_post_id if default_role == "client" else None),
         )
         conn.execute(
             "INSERT INTO subscriptions (user_id, plan, status, period_started_at) "
@@ -1814,6 +1841,68 @@ def increment_blog_post_views(post_id: str) -> None:
     conn.execute("UPDATE blog_posts SET views = views + 1 WHERE id = ?", (post_id,))
     conn.commit()
     conn.close()
+
+
+def record_blog_view(post_id: str, country: str | None, visitor_id: str) -> None:
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO blog_views (post_id, viewed_at, country, visitor_id) VALUES (?, ?, ?, ?)",
+        (post_id, time.time(), country, visitor_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def blog_performance_report() -> list[dict]:
+    """Real "did this post make money" numbers per published post - views
+    and unique readers from blog_views, signups/paid orders/revenue traced
+    through users.referred_by_blog_post_id (last-touch: the post someone
+    was reading right before they signed up). Revenue only counts
+    payments.status = 'completed', same rule every other revenue figure
+    in this app uses - a pending checkout isn't money yet."""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT
+            p.id, p.title, p.slug, p.views,
+            COUNT(DISTINCT v.visitor_id) AS unique_readers,
+            (SELECT COUNT(*) FROM users u WHERE u.referred_by_blog_post_id = p.id) AS signups,
+            (SELECT COUNT(DISTINCT o.id) FROM orders o
+               JOIN users u2 ON o.client_id = u2.id
+               WHERE u2.referred_by_blog_post_id = p.id
+                 AND o.status NOT IN ('pending_payment', 'dead_letter')) AS paid_orders,
+            (SELECT COALESCE(SUM(pay.amount_usd), 0) FROM payments pay
+               JOIN users u3 ON pay.user_id = u3.id
+               WHERE u3.referred_by_blog_post_id = p.id AND pay.status = 'completed') AS revenue_usd
+        FROM blog_posts p
+        LEFT JOIN blog_views v ON v.post_id = p.id
+        WHERE p.status = 'published'
+        GROUP BY p.id
+        ORDER BY p.views DESC
+    """).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def blog_reader_countries(limit: int = 15) -> list[dict]:
+    """Real reader-location breakdown across every tracked blog view - one
+    row per country, most-viewed first. Counts individual views, not
+    unique visitors (someone reading 3 posts from Kenya is 3 real Kenyan
+    views) - simpler and just as honest for "where do our readers come
+    from" as the question was actually asked."""
+    conn = get_conn()
+    rows = conn.execute("""
+        SELECT country, COUNT(*) AS views
+        FROM blog_views
+        WHERE country IS NOT NULL
+        GROUP BY country
+        ORDER BY views DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    unknown = conn.execute(
+        "SELECT COUNT(*) FROM blog_views WHERE country IS NULL"
+    ).fetchone()[0]
+    conn.close()
+    return {"countries": [dict(r) for r in rows], "unknown_views": unknown}
 
 
 def list_blog_posts(published_only: bool = True):

@@ -2340,6 +2340,18 @@ def blog_post(request: Request, slug: str):
     if not post:
         return HTMLResponse("Post not found.", status_code=404)
     db.increment_blog_post_views(post["id"])
+    # Real per-view analytics (see blog_views' own schema comment) - country
+    # comes free from Cloudflare's own header, no geolocation API needed.
+    # visitor_id is generated once per anonymous session (not a durable
+    # cross-session fingerprint) purely to approximate "how many distinct
+    # people read this", same session Starlette already keeps for everyone.
+    if "blog_visitor_id" not in request.session:
+        request.session["blog_visitor_id"] = uuid.uuid4().hex
+    db.record_blog_view(post["id"], request.headers.get("cf-ipcountry"), request.session["blog_visitor_id"])
+    # Real last-touch attribution for _complete_auth_session below - the
+    # post someone was reading right before they signed up, not guessed
+    # from a UTM param nobody actually attaches to an internal blog link.
+    request.session["last_blog_post_id"] = post["id"]
     author = db.get_user(post["author_id"]) if post["author_id"] else None
     return templates.TemplateResponse(request, "blog_post.html", {
         **_marketing_context(home="/"),
@@ -2611,6 +2623,7 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
     user, was_new = db.get_or_create_user(
         session.user.id, email, default_role=role,
         marketing_consent=marketing_consent, consent_ip=request.client.host if request.client else None,
+        referred_by_blog_post_id=request.session.get("last_blog_post_id"),
     )
     db.log_security_event(
         "signup" if was_new else "login_success", user_id=user["id"], email=email,
@@ -6709,6 +6722,8 @@ def staff_blog_list(request: Request, error: str | None = None, notice: str | No
         "medium_configured": medium_publish.medium_configured(),
         "devto_configured": devto_publish.devto_configured(),
         "error": error, "notice": notice,
+        "performance": db.blog_performance_report(),
+        "reader_countries": db.blog_reader_countries(),
     })
 
 
