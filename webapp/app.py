@@ -41,7 +41,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -1250,6 +1250,9 @@ templates.env.globals["ga_measurement_id"] = ga_events.measurement_id()
 # script needs the real number, not a guessed one, to warn far enough
 # ahead of the actual cutoff.
 templates.env.globals["idle_timeout_seconds"] = IDLE_TIMEOUT_SECONDS
+templates.env.globals["nav_icon"] = nav_icons.nav_icon
+templates.env.globals["icon_svg"] = nav_icons.icon_svg
+templates.env.globals["trend_arrow"] = nav_icons.trend_arrow
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -6960,13 +6963,22 @@ def staff_overview(request: Request):
     revenue_this_month = db.revenue_between(month_start, now)
     revenue_prev_month = db.revenue_between(prev_month_start, month_start)
 
-    orders = db.list_all_orders()
+    # Same "not real staff work yet" filter /staff/jobs already applies -
+    # an unpaid order sitting in pending_payment doesn't belong on a "what
+    # needs my attention" widget (real bug: without this, list_all_orders()'s
+    # own sort - active/deadline first, else newest-first - could surface a
+    # just-submitted, still-unpaid order ahead of real in-flight jobs).
+    orders = [o for o in db.list_all_orders() if o["status"] != "pending_payment"]
     # Compact by design - "everything visible without scrolling" (a real
     # ask, not a nice-to-have) means this widget shows a short real slice
     # with a real link to the full, properly-paginated list at /staff/jobs,
     # not every order crammed into one tall table.
     active_jobs = orders[:5]
     review_queue = [o for o in orders if o["status"] == "awaiting_review"][:3]
+    overdue_count = sum(
+        1 for o in orders
+        if (ts := tat.time_status(o["tat_start_at"], o["deadline_at"])) and ts["overdue"]
+    )
     edited_pct = {}
     for o in active_jobs + review_queue:
         if o["id"] not in edited_pct:
@@ -6999,7 +7011,7 @@ def staff_overview(request: Request):
         "in_progress": in_progress, "in_review": in_review, "ops_decision": ops_decision,
         "completed_total": completed_total, "completed_pct_change": _pct_change(completed_last_30, completed_prev_30),
         "revenue_this_month": revenue_this_month, "revenue_pct_change": _pct_change(revenue_this_month, revenue_prev_month),
-        "active_jobs": active_jobs, "review_queue": review_queue, "edited_pct": edited_pct,
+        "active_jobs": active_jobs, "review_queue": review_queue, "edited_pct": edited_pct, "overdue_count": overdue_count,
         "activity": activity, "top_clients": db.top_clients_by_usage(days=30, limit=5),
         "daily_trend_svg": _daily_trend_svg(db.daily_job_trend(days=30)),
         "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,

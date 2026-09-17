@@ -24,11 +24,11 @@
   <div class="settings-panel">
   {% if tab == 'overview' %}
     <div class="stat-grid">
-      <div class="stat-tile"><div class="stat-value">{{ stats['in_progress'] }}</div><div class="stat-label">In progress</div></div>
-      <div class="stat-tile"><div class="stat-value">{{ stats['in_review'] }}</div><div class="stat-label">In review</div></div>
-      <div class="stat-tile"><div class="stat-value">{{ stats['needs_you'] }}</div><div class="stat-label">Needs client</div></div>
-      <div class="stat-tile ok"><div class="stat-value">{{ stats['completed'] }}</div><div class="stat-label">Completed</div></div>
-      <div class="stat-tile"><div class="stat-value">${{ "%.0f"|format(stats['total_spent_usd']) }}</div><div class="stat-label">Total spent</div></div>
+      <div class="stat-tile"><div class="stat-icon warn">{{ icon_svg('spinner') }}</div><div class="stat-value">{{ stats['in_progress'] }}</div><div class="stat-label">In progress</div></div>
+      <div class="stat-tile"><div class="stat-icon info">{{ icon_svg('eye') }}</div><div class="stat-value">{{ stats['in_review'] }}</div><div class="stat-label">In review</div></div>
+      <div class="stat-tile"><div class="stat-icon {{ 'err' if stats['needs_you'] else '' }}">{{ icon_svg('alert') }}</div><div class="stat-value">{{ stats['needs_you'] }}</div><div class="stat-label">Needs client</div></div>
+      <div class="stat-tile ok"><div class="stat-icon ok">{{ icon_svg('check') }}</div><div class="stat-value">{{ stats['completed'] }}</div><div class="stat-label">Completed</div></div>
+      <div class="stat-tile"><div class="stat-icon">{{ icon_svg('card') }}</div><div class="stat-value">${{ "%.0f"|format(stats['total_spent_usd']) }}</div><div class="stat-label">Total spent</div></div>
     </div>
     <div class="card">
       <h2 style="margin-top:0;">Account</h2>

@@ -8,12 +8,13 @@
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
 <div class="stat-grid">
-  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('new', 0) }}</div><div class="stat-label">New</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('contacted', 0) }}</div><div class="stat-label">Contacted</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('qualified', 0) }}</div><div class="stat-label">Qualified</div></div>
-  <div class="stat-tile"><div class="stat-value">{{ pipeline['by_status'].get('proposal', 0) }}</div><div class="stat-label">Proposal sent</div></div>
-  <div class="stat-tile ok"><div class="stat-value">{{ pipeline['won'] }}</div><div class="stat-label">Won</div></div>
+  <div class="stat-tile"><div class="stat-icon">{{ icon_svg('target') }}</div><div class="stat-value">{{ pipeline['by_status'].get('new', 0) }}</div><div class="stat-label">New</div></div>
+  <div class="stat-tile"><div class="stat-icon info">{{ icon_svg('eye') }}</div><div class="stat-value">{{ pipeline['by_status'].get('contacted', 0) }}</div><div class="stat-label">Contacted</div></div>
+  <div class="stat-tile"><div class="stat-icon warn">{{ icon_svg('spinner') }}</div><div class="stat-value">{{ pipeline['by_status'].get('qualified', 0) }}</div><div class="stat-label">Qualified</div></div>
+  <div class="stat-tile"><div class="stat-icon">{{ icon_svg('paper') }}</div><div class="stat-value">{{ pipeline['by_status'].get('proposal', 0) }}</div><div class="stat-label">Proposal sent</div></div>
+  <div class="stat-tile ok"><div class="stat-icon ok">{{ icon_svg('check') }}</div><div class="stat-value">{{ pipeline['won'] }}</div><div class="stat-label">Won</div></div>
   <div class="stat-tile{% if pipeline['conversion_rate'] is not none and pipeline['conversion_rate'] < 0.3 %} warn{% endif %}">
+    <div class="stat-icon{% if pipeline['conversion_rate'] is not none and pipeline['conversion_rate'] < 0.3 %} warn{% endif %}">{{ icon_svg('bars') }}</div>
     <div class="stat-value">{% if pipeline['conversion_rate'] is not none %}{{ "%.0f"|format(pipeline['conversion_rate'] * 100) }}%{% else %}-{% endif %}</div>
     <div class="stat-label">Conversion rate</div>
     <div class="stat-sub">of {{ pipeline['won'] + pipeline['lost'] }} decided</div>

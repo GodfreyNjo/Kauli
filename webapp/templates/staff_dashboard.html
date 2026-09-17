@@ -8,26 +8,31 @@
 
 <div class="dashboard-stats overview-kpis">
   <div class="dashboard-stat-card">
+    <div class="stat-icon">{{ icon_svg('checklist') }}</div>
     <span class="stat-label">Total jobs</span>
     <span class="stat-value">{{ total_jobs }}</span>
     <span class="stat-hint">All time in queue</span>
   </div>
   <div class="dashboard-stat-card {{ 'needs-you' if needs_attention_n else '' }}">
+    <div class="stat-icon {{ 'err' if needs_attention_n else '' }}">{{ icon_svg('alert') }}</div>
     <span class="stat-label">Needs attention</span>
     <span class="stat-value">{{ needs_attention_n }}</span>
     <span class="stat-hint">{{ overdue_n }} overdue &middot; {{ due_today_n }} due today</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
     <span class="stat-label">In progress</span>
     <span class="stat-value">{{ in_progress_n }}</span>
     <span class="stat-hint">AI processing</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon info">{{ icon_svg('eye') }}</div>
     <span class="stat-label">Ready</span>
     <span class="stat-value">{{ ready_n }}</span>
     <span class="stat-hint">Ready for delivery</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon ok">{{ icon_svg('check') }}</div>
     <span class="stat-label">Delivered</span>
     <span class="stat-value">{{ delivered_today_n }}</span>
     <span class="stat-hint">Completed today</span>
@@ -238,6 +243,13 @@
   function loadView() { try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || {}; } catch (e) { return {}; } }
   function saveView(v) { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
   var view = loadView();
+  // A real deep link (e.g. the overview page's "N jobs are overdue" banner
+  // linking to /staff/jobs?deadline=overdue) should win over whatever
+  // filter was last saved locally - it's a specific thing someone just
+  // clicked to see, not a stale preference from a prior visit.
+  var urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('deadline')) view.deadline = urlParams.get('deadline');
+  if (urlParams.has('tab')) view.tab = urlParams.get('tab');
 
   var table = document.getElementById('queue-table');
   var rowsAll = Array.from(table.querySelectorAll('tbody tr'));

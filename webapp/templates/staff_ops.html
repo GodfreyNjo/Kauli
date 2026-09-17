@@ -15,19 +15,23 @@
 <h2>Revenue <span class="muted" style="font-weight:400; font-size:0.8rem;">(confirmed payments only)</span></h2>
 <div class="stat-grid">
   <div class="stat-tile ok">
+    <div class="stat-icon ok">{{ icon_svg('card') }}</div>
     <div class="stat-value">${{ "%.2f"|format(revenue['total_period']) }}</div>
     <div class="stat-label">Last {{ days }} days</div>
   </div>
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('card') }}</div>
     <div class="stat-value">${{ "%.2f"|format(revenue['total_all_time']) }}</div>
     <div class="stat-label">All time</div>
   </div>
   <div class="stat-tile{% if revenue['pending_bank_count'] %} warn{% endif %}">
+    <div class="stat-icon{% if revenue['pending_bank_count'] %} warn{% endif %}">{{ icon_svg('spinner') }}</div>
     <div class="stat-value">${{ "%.2f"|format(revenue['pending_bank_amount']) }}</div>
     <div class="stat-label">Pending bank transfers</div>
     <div class="stat-sub">{{ revenue['pending_bank_count'] }} awaiting confirmation - see Billing</div>
   </div>
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('target') }}</div>
     <div class="stat-value">{{ new_leads }}</div>
     <div class="stat-label">New leads</div>
     <div class="stat-sub">not yet contacted - see Leads</div>
@@ -89,14 +93,17 @@
 
 <div class="stat-grid">
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('card') }}</div>
     <div class="stat-value">${{ "%.2f"|format(margin['total_revenue_usd']) }}</div>
     <div class="stat-label">Revenue billed</div>
   </div>
   <div class="stat-tile">
+    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
     <div class="stat-value">${{ "%.2f"|format(margin['total_est_ai_cost_usd']) }}</div>
     <div class="stat-label">Est. AI cost</div>
   </div>
   <div class="stat-tile{% if margin['total_est_margin_usd'] < 0 %} err{% else %} ok{% endif %}">
+    <div class="stat-icon {{ 'err' if margin['total_est_margin_usd'] < 0 else 'ok' }}">{{ icon_svg('bars') }}</div>
     <div class="stat-value">${{ "%.2f"|format(margin['total_est_margin_usd']) }}</div>
     <div class="stat-label">Est. margin</div>
   </div>
@@ -124,14 +131,17 @@
 <h2>Throughput &amp; SLA <span class="muted" style="font-weight:400; font-size:0.8rem;">(last {{ days }} days)</span></h2>
 <div class="stat-grid">
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('checklist') }}</div>
     <div class="stat-value">{{ orders_created }}</div>
     <div class="stat-label">Orders created</div>
   </div>
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('pulse') }}</div>
     <div class="stat-value">{{ "%.1f"|format(minutes_processed) }}</div>
     <div class="stat-label">Minutes delivered</div>
   </div>
   <div class="stat-tile">
+    <div class="stat-icon">{{ icon_svg('bars') }}</div>
     {% if turnaround['median_hours'] is not none %}
       <div class="stat-value">{{ "%.1f"|format(turnaround['median_hours']) }}<small> hrs</small></div>
       <div class="stat-sub">avg {{ "%.1f"|format(turnaround['avg_hours']) }} hrs, {{ turnaround['count'] }} orders</div>
@@ -142,6 +152,7 @@
     <div class="stat-label">Median turnaround</div>
   </div>
   <div class="stat-tile{% if failures['rate'] and failures['rate'] > 0.1 %} err{% endif %}">
+    <div class="stat-icon{% if failures['rate'] and failures['rate'] > 0.1 %} err{% else %} ok{% endif %}">{{ icon_svg('alert') }}</div>
     {% if failures['rate'] is not none %}
       <div class="stat-value">{{ "%.0f"|format(failures['rate'] * 100) }}%</div>
       <div class="stat-sub">{{ failures['failed'] }} failed of {{ failures['total'] }}</div>

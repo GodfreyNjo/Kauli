@@ -533,13 +533,14 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
 }
 .sidebar-nav a .icon {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 20px; height: 20px; flex-shrink: 0;
-  border: 1px solid var(--chrome-icon-border); border-radius: 5px;
+  width: 22px; height: 22px; flex-shrink: 0;
+  border-radius: 6px;
   font-size: 0.66rem; font-weight: 700; font-family: var(--font-mono);
   color: var(--chrome-text);
 }
-.sidebar-nav a:hover .icon { color: var(--chrome-text-active); border-color: var(--chrome-text); }
-.sidebar-nav a.active .icon { color: var(--chrome-text-active); border-color: var(--accent); }
+.sidebar-nav a .icon svg { width: 15px; height: 15px; }
+.sidebar-nav a:hover .icon { color: var(--chrome-text-active); }
+.sidebar-nav a.active .icon { color: var(--chrome-text-active); }
 .sidebar-nav a:hover { background: var(--chrome-active-bg); color: var(--chrome-text-active); }
 .sidebar-nav a {
   border-left: 3px solid transparent;
@@ -563,7 +564,7 @@ a:hover { color: var(--accent-hover); text-decoration: underline; }
   color: var(--chrome-text-active) !important;
   font-weight: 600;
 }
-.sidebar-help-btn .icon { color: var(--chrome-text-active); border-color: var(--accent); }
+.sidebar-help-btn .icon { color: var(--chrome-text-active); }
 .sidebar-help-btn:hover { background: color-mix(in srgb, var(--accent) 40%, transparent); }
 
 /* Compact WhatsApp/Email pair right under it - same "real person, one
@@ -668,6 +669,48 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
 .dashboard-stat-card .stat-value { display: block; font-size: 1.9rem; font-weight: 700; color: var(--heading-ink); margin: 4px 0 2px; }
 .dashboard-stat-card .stat-hint { font-size: 0.8rem; color: var(--faint); }
 .dashboard-stat-card.needs-you .stat-value { color: var(--err); }
+
+/* Icon-in-circle glyph at the top of a stat card - real semantic color
+   (accent/ok/warn/err/info) reused from the status-pill palette, never a
+   new set of colors, so a card's icon and its own trend chip always agree
+   on what "good" vs "needs attention" looks like. */
+.stat-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+  background: var(--accent-soft); color: var(--accent-text);
+}
+.stat-icon svg { width: 17px; height: 17px; }
+.stat-icon.ok { background: var(--ok-soft); color: var(--ok); }
+.stat-icon.warn { background: var(--warn-soft); color: var(--warn); }
+.stat-icon.err { background: var(--err-soft); color: var(--err); }
+.stat-icon.info { background: var(--info-soft); color: var(--info); }
+
+/* Trend chip - a small pill instead of bare colored text, so a glance at
+   the card's corner is enough without reading the percentage itself. */
+.trend-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.74rem; font-weight: 700; padding: 1px 7px 1px 6px; border-radius: 999px;
+}
+.trend-chip.trend-up { color: var(--ok); background: var(--ok-soft); }
+.trend-chip.trend-down { color: var(--err); background: var(--err-soft); }
+.trend-chip svg { width: 9px; height: 9px; }
+
+/* Overdue-jobs alert - a real, actionable banner (links straight to the
+   filtered queue) rather than another number buried in a stat tile,
+   since a job past its deadline is the one thing on this page that
+   actually needs someone to act today. */
+.overdue-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--err-soft); color: var(--err); border: 1px solid var(--err-soft);
+  border-radius: var(--radius); padding: 11px 16px; margin-bottom: 20px;
+  text-decoration: none; font-size: 0.86rem;
+}
+.overdue-banner:hover { filter: brightness(0.97); text-decoration: none; }
+.overdue-banner svg { width: 18px; height: 18px; flex-shrink: 0; }
+.overdue-banner span:first-of-type { flex: 1; color: var(--ink); }
+.overdue-banner strong { color: var(--err); }
+.overdue-banner-cta { font-weight: 700; white-space: nowrap; }
 
 /* ---------------------------------------------------- order progress --- */
 .order-progress {

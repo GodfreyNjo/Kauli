@@ -11,11 +11,13 @@
 
 <div class="dashboard-stats">
   <div class="dashboard-stat-card">
+    <div class="stat-icon">{{ icon_svg('card') }}</div>
     <span class="stat-label">Total spent</span>
     <span class="stat-value">${{ "%.2f"|format(total_spent_usd) }}</span>
     <span class="stat-hint">All-time, confirmed payments</span>
   </div>
   <div class="dashboard-stat-card {{ 'needs-you' if outstanding_usd > 0 else '' }}">
+    <div class="stat-icon {{ 'err' if outstanding_usd > 0 else 'ok' }}">{{ icon_svg('alert' if outstanding_usd > 0 else 'check') }}</div>
     <span class="stat-label">Outstanding</span>
     <span class="stat-value">${{ "%.2f"|format(outstanding_usd) }}</span>
     <span class="stat-hint">
@@ -23,6 +25,7 @@
     </span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon ok">{{ icon_svg('target') }}</div>
     <span class="stat-label">Prepaid credits</span>
     <span class="stat-value" style="{{ 'color:var(--ok);' if wallet_credits > 0 else '' }}">{{ "%.0f"|format(wallet_credits) }}</span>
     <span class="stat-hint">$0.10/credit, never expires</span>

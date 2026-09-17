@@ -8,43 +8,56 @@
 
 <div class="dashboard-stats overview-kpis">
   <div class="dashboard-stat-card">
+    <div class="stat-icon">{{ icon_svg('checklist') }}</div>
     <span class="stat-label">Total jobs</span>
     <span class="stat-value">{{ total_jobs }}</span>
     <span class="stat-hint">
       {% if jobs_pct_change is not none %}
-        <span class="{{ 'trend-up' if jobs_pct_change >= 0 else 'trend-down' }}">{{ '+' if jobs_pct_change >= 0 else '' }}{{ jobs_pct_change }}%</span> vs last 30 days
-      {% else %}no data yet{% endif %}
+        <span class="trend-chip {{ 'trend-up' if jobs_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(jobs_pct_change) }}{{ '+' if jobs_pct_change >= 0 else '' }}{{ jobs_pct_change }}%</span> vs last 30 days
+      {% else %}No prior 30 days to compare{% endif %}
     </span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
     <span class="stat-label">In progress</span>
     <span class="stat-value">{{ in_progress }}</span>
-    <span class="stat-hint">AI processing</span>
+    <span class="stat-hint">AI processing right now</span>
   </div>
   <div class="dashboard-stat-card {{ 'needs-you' if in_review else '' }}">
+    <div class="stat-icon info">{{ icon_svg('eye') }}</div>
     <span class="stat-label">In review</span>
     <span class="stat-value">{{ in_review }}</span>
     <span class="stat-hint">{{ review_queue|length }} in your queue</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon ok">{{ icon_svg('check') }}</div>
     <span class="stat-label">Completed</span>
     <span class="stat-value">{{ completed_total }}</span>
     <span class="stat-hint">
       {% if completed_pct_change is not none %}
-        <span class="{{ 'trend-up' if completed_pct_change >= 0 else 'trend-down' }}">{{ '+' if completed_pct_change >= 0 else '' }}{{ completed_pct_change }}%</span> vs last 30 days
-      {% else %}no data yet{% endif %}
+        <span class="trend-chip {{ 'trend-up' if completed_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(completed_pct_change) }}{{ '+' if completed_pct_change >= 0 else '' }}{{ completed_pct_change }}%</span> vs last 30 days
+      {% else %}No prior 30 days to compare{% endif %}
     </span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon">{{ icon_svg('card') }}</div>
     <span class="stat-label">Revenue (this month)</span>
     <span class="stat-value">${{ "%.2f"|format(revenue_this_month) }}</span>
     <span class="stat-hint">
       {% if revenue_pct_change is not none %}
-        <span class="{{ 'trend-up' if revenue_pct_change >= 0 else 'trend-down' }}">{{ '+' if revenue_pct_change >= 0 else '' }}{{ revenue_pct_change }}%</span> vs last month
-      {% else %}no data yet{% endif %}
+        <span class="trend-chip {{ 'trend-up' if revenue_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(revenue_pct_change) }}{{ '+' if revenue_pct_change >= 0 else '' }}{{ revenue_pct_change }}%</span> vs last month
+      {% else %}No prior month to compare{% endif %}
     </span>
   </div>
 </div>
+
+{% if overdue_count %}
+<a href="/staff/jobs?deadline=overdue" class="overdue-banner">
+  {{ icon_svg('alert') }}
+  <span><strong>{{ overdue_count }}</strong> job{{ 's' if overdue_count != 1 else '' }} {{ 'are' if overdue_count != 1 else 'is' }} overdue</span>
+  <span class="overdue-banner-cta">View {{ 'them' if overdue_count != 1 else 'it' }} &rarr;</span>
+</a>
+{% endif %}
 
 <div class="overview-grid">
   <div class="overview-main">

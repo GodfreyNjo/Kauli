@@ -127,37 +127,37 @@
       </div>
       <nav class="sidebar-nav">
         {% if user['role'] == 'staff' %}
-        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}"><span class="icon">O</span><span class="label">Overview</span></a>
-        <a href="/staff/jobs" class="{{ 'active' if request.url.path == '/staff/jobs' else '' }}"><span class="icon">Q</span><span class="label">All jobs</span></a>
-        <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}"><span class="icon">R</span><span class="label">Reports</span></a>
-        <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}"><span class="icon">C</span><span class="label">CRM</span></a>
-        <a href="/staff/clients" class="{{ 'active' if '/staff/clients' in request.url.path else '' }}"><span class="icon">U</span><span class="label">Clients</span></a>
-        <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}"><span class="icon">E</span><span class="label">Exceptions</span></a>
-        <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
-        <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}"><span class="icon">W</span><span class="label">Blog</span></a>
-        <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}"><span class="icon">N</span><span class="label">Newsletter</span></a>
-        <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Editor guide</span></a>
-        <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}"><span class="icon">H</span><span class="label">Handbook</span></a>
-        <a href="/staff/resources" class="{{ 'active' if '/staff/resources' in request.url.path else '' }}"><span class="icon">D</span><span class="label">Resources</span></a>
-        <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}"><span class="icon">•</span><span class="label">Status</span></a>
+        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}">{{ nav_icon('grid') }}<span class="label">Overview</span></a>
+        <a href="/staff/jobs" class="{{ 'active' if request.url.path == '/staff/jobs' else '' }}">{{ nav_icon('checklist') }}<span class="label">All jobs</span></a>
+        <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Reports</span></a>
+        <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">CRM</span></a>
+        <a href="/staff/clients" class="{{ 'active' if '/staff/clients' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">Clients</span></a>
+        <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}">{{ nav_icon('alert') }}<span class="label">Exceptions</span></a>
+        <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
+        <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
+        <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
+        <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
+        <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">Handbook</span></a>
+        <a href="/staff/resources" class="{{ 'active' if '/staff/resources' in request.url.path else '' }}">{{ nav_icon('folder') }}<span class="label">Resources</span></a>
+        <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}">{{ nav_icon('pulse') }}<span class="label">Status</span></a>
         {% if user['is_admin'] %}
-        <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}"><span class="icon">V</span><span class="label">Voice Talent</span></a>
-        <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}"><span class="icon">A</span><span class="label">Admin</span></a>
-        <a href="/staff/security" class="{{ 'active' if '/staff/security' in request.url.path else '' }}"><span class="icon">🔒</span><span class="label">Security log</span></a>
+        <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Voice Talent</span></a>
+        <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}">{{ nav_icon('shield') }}<span class="label">Admin</span></a>
+        <a href="/staff/security" class="{{ 'active' if '/staff/security' in request.url.path else '' }}">{{ nav_icon('lock') }}<span class="label">Security log</span></a>
         {% endif %}
         {% elif user['role'] == 'voice_actor' %}
-        <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}"><span class="icon">J</span><span class="label">My jobs</span></a>
+        <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>
         <div class="sidebar-divider"></div>
         <div class="sidebar-contact-row">
           <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" title="WhatsApp us"><span class="icon">W</span><span class="label" style="font-size:0.76rem;">WhatsApp</span></a>
           <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
         </div>
         {% else %}
-        <a href="/client/home" class="{{ 'active' if request.url.path == '/client/home' else '' }}"><span class="icon">D</span><span class="label">Dashboard</span></a>
-        <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}"><span class="icon">O</span><span class="label">My orders</span></a>
-        <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}"><span class="icon">F</span><span class="label">Files</span></a>
-        <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}"><span class="icon">M</span><span class="label">Messages</span></a>
-        <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}"><span class="icon">B</span><span class="label">Billing</span></a>
+        <a href="/client/home" class="{{ 'active' if request.url.path == '/client/home' else '' }}">{{ nav_icon('grid') }}<span class="label">Dashboard</span></a>
+        <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}">{{ nav_icon('checklist') }}<span class="label">My orders</span></a>
+        <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">Files</span></a>
+        <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}">{{ nav_icon('message') }}<span class="label">Messages</span></a>
+        <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Help &amp; troubleshooting</span></a>
         <div class="sidebar-contact-row">
@@ -165,7 +165,7 @@
           <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
         </div>
         {% endif %}
-        <a href="/settings" class="{{ 'active' if request.url.path == '/settings' else '' }}"><span class="icon">S</span><span class="label">Settings</span></a>
+        <a href="/settings" class="{{ 'active' if request.url.path == '/settings' else '' }}">{{ nav_icon('gear') }}<span class="label">Settings</span></a>
       </nav>
     </aside>
     {% endif %}

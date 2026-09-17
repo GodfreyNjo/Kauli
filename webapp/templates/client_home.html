@@ -6,26 +6,31 @@
 
 <div class="dashboard-stats">
   <div class="dashboard-stat-card">
+    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
     <span class="stat-label">In progress</span>
     <span class="stat-value">{{ stats['in_progress'] }}</span>
     <span class="stat-hint">Orders being worked on</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon info">{{ icon_svg('eye') }}</div>
     <span class="stat-label">In review</span>
     <span class="stat-value">{{ stats['in_review'] }}</span>
     <span class="stat-hint">With our staff</span>
   </div>
   <div class="dashboard-stat-card {{ 'needs-you' if stats['needs_you'] > 0 else '' }}">
+    <div class="stat-icon {{ 'err' if stats['needs_you'] > 0 else '' }}">{{ icon_svg('alert') }}</div>
     <span class="stat-label">Needs your input</span>
     <span class="stat-value">{{ stats['needs_you'] }}</span>
     <span class="stat-hint">Payment or a file we need from you</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon ok">{{ icon_svg('check') }}</div>
     <span class="stat-label">Completed</span>
     <span class="stat-value">{{ stats['completed'] }}</span>
     <span class="stat-hint">Ready to download</span>
   </div>
   <div class="dashboard-stat-card">
+    <div class="stat-icon">{{ icon_svg('card') }}</div>
     <span class="stat-label">Total spent</span>
     <span class="stat-value">${{ "%.2f"|format(stats['total_spent_usd']) }}</span>
     <span class="stat-hint">All-time, confirmed payments</span>
