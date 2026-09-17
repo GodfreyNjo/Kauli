@@ -158,9 +158,18 @@
   <div style="padding:20px 24px 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
     <h2 style="margin:0;">All leads</h2>
     <div class="filter-tabs">
-      <a href="/staff/leads" class="{{ 'active' if not filter_status else '' }}">All <span class="tab-count">{{ pipeline['by_status'].values() | sum }}</span></a>
+      <a href="/staff/leads{{ '?org_type=' ~ filter_org_type if filter_org_type }}" class="{{ 'active' if not filter_status else '' }}">All <span class="tab-count">{{ pipeline['by_status'].values() | sum }}</span></a>
       {% for s in lead_statuses %}
-      <a href="/staff/leads?status={{ s }}" class="{{ 'active' if filter_status == s else '' }}">{{ s|capitalize }} <span class="tab-count">{{ pipeline['by_status'].get(s, 0) }}</span></a>
+      <a href="/staff/leads?status={{ s }}{{ '&org_type=' ~ filter_org_type if filter_org_type }}" class="{{ 'active' if filter_status == s else '' }}">{{ s|capitalize }} <span class="tab-count">{{ pipeline['by_status'].get(s, 0) }}</span></a>
+      {% endfor %}
+    </div>
+  </div>
+  <div style="padding:0 24px 16px; display:flex; align-items:center; flex-wrap:wrap; gap:10px;">
+    <span class="muted" style="font-size:0.8rem;">Category:</span>
+    <div class="filter-tabs">
+      <a href="/staff/leads{{ '?status=' ~ filter_status if filter_status }}" class="{{ 'active' if not filter_org_type else '' }}">All <span class="tab-count">{{ pipeline['by_org_type'].values() | sum }}</span></a>
+      {% for ot, label in [('ngo', 'NGOs'), ('media_broadcast', 'Media'), ('corporate', 'Corporate'), ('education', 'Education'), ('individual', 'Creators')] %}
+      <a href="/staff/leads?org_type={{ ot }}{{ '&status=' ~ filter_status if filter_status }}" class="{{ 'active' if filter_org_type == ot else '' }}">{{ label }} <span class="tab-count">{{ pipeline['by_org_type'].get(ot, 0) }}</span></a>
       {% endfor %}
     </div>
   </div>

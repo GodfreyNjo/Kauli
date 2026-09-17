@@ -3675,7 +3675,7 @@ def create_lead(name: str, email: str, phone: str | None, company: str | None,
     return lead_id
 
 
-def list_leads(status: str | None = None, source: str | None = None):
+def list_leads(status: str | None = None, source: str | None = None, org_type: str | None = None):
     conn = get_conn()
     query = "SELECT * FROM leads WHERE 1=1"
     params: list = []
@@ -3685,6 +3685,9 @@ def list_leads(status: str | None = None, source: str | None = None):
     if source:
         query += " AND source = ?"
         params.append(source)
+    if org_type:
+        query += " AND org_type = ?"
+        params.append(org_type)
     query += " ORDER BY created_at DESC"
     rows = conn.execute(query, params).fetchall()
     conn.close()
@@ -3752,6 +3755,12 @@ def leads_pipeline_summary():
                   SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) AS won
            FROM leads GROUP BY source ORDER BY n DESC"""
     ).fetchall()
+    # Real category counts (org_type) for the CRM's category tabs - a lead
+    # with no org_type set (an old manually-logged one, or a website
+    # submission from before this field existed) groups under NULL rather
+    # than disappearing from any count.
+    by_org_type = {row["org_type"]: row["n"] for row in conn.execute(
+        "SELECT org_type, COUNT(*) AS n FROM leads GROUP BY org_type")}
     conn.close()
     won = by_status.get("won", 0)
     lost = by_status.get("lost", 0)
@@ -3759,6 +3768,7 @@ def leads_pipeline_summary():
     return {
         "by_status": by_status,
         "by_source": [dict(r) for r in by_source],
+        "by_org_type": by_org_type,
         "won": won, "lost": lost,
         "conversion_rate": (won / decided) if decided else None,
     }

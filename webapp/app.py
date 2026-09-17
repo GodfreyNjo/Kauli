@@ -5876,13 +5876,13 @@ def staff_view_receipt(request: Request, payment_id: str):
 # honest, fully-working version until/unless that gets built.
 @app.get("/staff/leads", response_class=HTMLResponse)
 def staff_leads(request: Request, status: str | None = None, source: str | None = None,
-                 error: str | None = None):
+                 org_type: str | None = None, error: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
     return templates.TemplateResponse(request, "staff_leads.html", {
-        "user": user, "leads": db.list_leads(status=status, source=source),
-        "filter_status": status, "filter_source": source, "error": error,
+        "user": user, "leads": db.list_leads(status=status, source=source, org_type=org_type),
+        "filter_status": status, "filter_source": source, "filter_org_type": org_type, "error": error,
         "pipeline": db.leads_pipeline_summary(),
         "stale_leads": db.stale_leads(threshold_hours=48.0),
         "lead_statuses": db.LEAD_STATUSES, "lead_sources": db.LEAD_SOURCES,
