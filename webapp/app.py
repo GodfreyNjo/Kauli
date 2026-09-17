@@ -2202,14 +2202,17 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
     if db.has_onboarding_message(user["id"], "welcome"):
         return  # already queued once for this account - don't duplicate on a second login
     name = (user["display_name"] or user["email"].split("@")[0]).strip()
-    subject = f"Welcome to Kauli, {name}!"
+    subject = f"Welcome to Kauli, {name} - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are ready"
     body = (
         f"Hi {name},\n\n"
         f"I'm {FOUNDER_NAME.split()[0]} - I actually run Kauli day to day at Forge Media "
         "Services, so this is genuinely from me, not an automated \"team\".\n\n"
         f"Your account has {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes loaded already - "
-        "upload a real clip whenever you're ready and see the AI-drafted, human-checked result "
-        "for yourself before you spend anything.\n\n"
+        "here's the fastest way to see a real result:\n\n"
+        "1. Open your dashboard.\n"
+        "2. Upload a short video or audio clip, or paste a YouTube link.\n"
+        "3. Pick your language pair (e.g. Swahili -> English).\n"
+        "4. We'll notify you the moment your AI-drafted, human-checked result is ready to download.\n\n"
         "If anything's unclear, or you'd rather just talk it through, reply to this email or "
         f"message me directly on WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
         f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
@@ -2219,16 +2222,21 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         f'<p style="margin:0 0 14px;">Hi {name},</p>'
         f'<p style="margin:0 0 14px;">I\'m {FOUNDER_NAME.split()[0]} - I actually run Kauli day to day '
         f'at Forge Media Services, so this is genuinely from me, not an automated "team".</p>'
-        f'<p style="margin:0 0 14px;">Your account has {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes '
-        f'loaded already - upload a real clip whenever you\'re ready and see the AI-drafted, '
-        f'human-checked result for yourself before you spend anything.</p>'
+        f'<p style="margin:0 0 6px;">Your account has <strong>{billing.FREE_MINUTES_PER_MONTH:.0f} free '
+        f'minutes</strong> loaded already - here\'s the fastest way to see a real result:</p>'
+        f'<ol style="margin:0 0 14px; padding-left:20px;">'
+        f'<li style="margin-bottom:4px;">Open your dashboard.</li>'
+        f'<li style="margin-bottom:4px;">Upload a short video or audio clip, or paste a YouTube link.</li>'
+        f'<li style="margin-bottom:4px;">Pick your language pair (e.g. Swahili &rarr; English).</li>'
+        f'<li>We\'ll notify you the moment your AI-drafted, human-checked result is ready to download.</li>'
+        f'</ol>'
         f'<p style="margin:0 0 14px;">If anything\'s unclear, or you\'d rather just talk it through, '
         f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email '
         f'or message me directly on <a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
         f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
     )
     _queue_and_send(user, "welcome", subject, body, base_url=base_url,
-                     cta_text="Upload your first order for free", cta_url=cta_url, html_inner=html_inner)
+                     cta_text="Upload your first file", cta_url=cta_url, html_inner=html_inner)
 
 
 def _queue_first_payment_message(user, base_url: str = "") -> None:
