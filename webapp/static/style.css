@@ -2062,6 +2062,16 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 /* ------------------------------------------------------ marketing site --- */
 .marketing-page { display: block; }
 .m-section { padding: 72px 24px; }
+
+/* Real 16:9 embed of the actual product-demo video - aspect-ratio keeps it
+   responsive without the old padding-bottom-percent hack, and the border/
+   radius match the site's existing card language instead of a bare iframe
+   floating on the page. */
+.m-video-embed {
+  aspect-ratio: 16 / 9; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--border-subtle); background: #000;
+}
+.m-video-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
 .m-inner { max-width: 1080px; margin: 0 auto; }
 .m-inner.narrow { max-width: 760px; }
 
