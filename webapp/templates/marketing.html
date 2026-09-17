@@ -92,38 +92,22 @@
 
     <a href="#demo" class="m-hero-demo-link">▶ See a real example, with real audio</a>
 
-    <!-- An honest mockup, not a screenshot of the real Ereri editor - same
-         deliberate choice as the #demo section below (see its own comment
-         in style.css): an abstract UI that reads as "a real account in
-         use" without publishing the internal staff tool's actual UI or
-         implying this is footage of any real person's account. The visible
-         "Demo" badge is the honesty signal, same as any product demo -
-         nothing here claims to be a live recording. A simulated cursor
-         glides to each stage's action and "clicks" it, purely decorative
-         (aria-hidden, buttons are tabindex="-1" - the real CTAs above are
-         the only actionable ones in the hero). Shared with solution_page.html
-         via _hero_tour.html - one component, not copy-pasted per page. -->
-    {% set tour_mode = 'upload' %}
-    {% set tour_filename = 'kenya_news_segment.mp4' %}
-    {% include "_hero_tour.html" %}
+    <!-- A real screen-recorded walkthrough, replacing the old animated
+         mockup (_hero_tour.html - still used on solution_page.html, which
+         doesn't have a matching real recording yet) - since it covers the
+         exact same upload-to-review flow for real, an honest simulation of
+         it here would just be redundant. -->
+    <div class="m-hero-video">
+      <iframe src="https://www.youtube.com/embed/XmenV6UEQRI"
+              title="Kauli product demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowfullscreen></iframe>
+    </div>
     <div class="m-hero-langs">
       {% for code, label in source_languages.items() %}
       <span class="m-lang-pill">{{ label }}</span>
       {% endfor %}
       <span class="m-lang-pill m-lang-more">+ more Kenyan languages coming</span>
-    </div>
-  </section>
-
-  <section class="m-section" id="watch-demo">
-    <div class="m-inner narrow">
-      <h2 class="m-h2">Watch a real walkthrough</h2>
-      <p class="m-lede">A two-minute look at submitting a video and getting back a human-verified result.</p>
-      <div class="m-video-embed">
-        <iframe src="https://www.youtube.com/embed/XmenV6UEQRI"
-                title="Kauli product demo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowfullscreen></iframe>
-      </div>
     </div>
   </section>
 
