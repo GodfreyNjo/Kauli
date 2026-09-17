@@ -109,6 +109,12 @@
   </div>
 </div>
 {% if margin['by_pair'] %}
+{% if margin_chart %}
+<div class="card" style="margin-bottom:16px;">
+  <p class="muted" style="margin:0 0 10px; font-size:0.82rem;">Est. margin per language pair, this window</p>
+  {{ margin_chart }}
+</div>
+{% endif %}
 <div class="card" style="padding:0; overflow-x:auto; margin-bottom:20px;">
   <table>
     <thead><tr><th>Language pair</th><th>Orders</th><th>Revenue</th><th>Est. AI cost</th><th>Est. margin</th></tr></thead>
@@ -169,21 +175,26 @@
    row is clients from this window who reached that stage. Wizard-step events only started logging when this
    shipped, so older cohorts will show 0 there even if they went on to order - that's a real gap in the history,
    not a friction point.</p>
+{% set funnel_stages = [
+  ('Signed up', funnel['signups']),
+  ('Verified trial ($1 charge)', funnel['trial_verified']),
+  ('Opened the order wizard', funnel['wizard_step1']),
+  ('Reached step 2 (languages)', funnel['wizard_step2']),
+  ('Reached step 3 (review cost)', funnel['wizard_step3']),
+  ('Submitted the wizard', funnel['wizard_submitted']),
+  ('Order actually created', funnel['orders_created']),
+  ('Paid for an order', funnel['orders_paid']),
+] %}
+{% if funnel['signups'] %}
+<div class="card" style="margin-bottom:16px;">
+  {{ funnel_chart_svg(funnel_stages, funnel['signups']) }}
+</div>
+{% endif %}
 <div class="card" style="padding:0; overflow-x:auto; margin-bottom:20px;">
   <table>
     <thead><tr><th>Stage</th><th>Clients</th><th>% of signups</th></tr></thead>
     <tbody>
-      {% set stages = [
-        ('Signed up', funnel['signups']),
-        ('Verified trial ($1 charge)', funnel['trial_verified']),
-        ('Opened the order wizard', funnel['wizard_step1']),
-        ('Reached step 2 (languages)', funnel['wizard_step2']),
-        ('Reached step 3 (review cost)', funnel['wizard_step3']),
-        ('Submitted the wizard', funnel['wizard_submitted']),
-        ('Order actually created', funnel['orders_created']),
-        ('Paid for an order', funnel['orders_paid']),
-      ] %}
-      {% for label, n in stages %}
+      {% for label, n in funnel_stages %}
       <tr{% if funnel['signups'] and n == 0 %} class="muted"{% endif %}>
         <td>{{ label }}</td>
         <td>{{ n }}</td>
@@ -195,8 +206,14 @@
 </div>
 
 <h2>Queue health <span class="muted" style="font-weight:400; font-size:0.8rem;">(live snapshot)</span></h2>
+{% set order_statuses = ['pending_payment', 'queued', 'processing', 'awaiting_review', 'editor_returned', 'ready_for_delivery', 'returned_to_client', 'failed', 'dead_letter'] %}
+{% if status_counts.values() | sum %}
+<div class="card" style="margin-bottom:16px;">
+  {{ status_bar_chart_svg(status_counts, order_statuses) }}
+</div>
+{% endif %}
 <div class="status-breakdown" style="margin-bottom:20px;">
-  {% for s in ['pending_payment', 'queued', 'processing', 'awaiting_review', 'editor_returned', 'ready_for_delivery', 'returned_to_client', 'failed', 'dead_letter'] %}
+  {% for s in order_statuses %}
   <div class="status-chip">
     <span class="status status-{{ s }}"></span>
     <strong>{{ status_counts.get(s, 0) }}</strong>

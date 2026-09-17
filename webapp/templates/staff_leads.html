@@ -121,6 +121,7 @@
 
 <div class="card">
   <h2 style="margin-top:0;">By source</h2>
+  {% if by_source_chart %}{{ by_source_chart }}{% endif %}
   <table>
     <thead><tr><th>Source</th><th>Leads</th><th>Won</th></tr></thead>
     <tbody>
@@ -129,6 +130,20 @@
       {% endfor %}
     </tbody>
   </table>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0;">By category</h2>
+  {% if by_org_type_chart %}{{ by_org_type_chart }}{% else %}
+  <table>
+    <thead><tr><th>Category</th><th>Leads</th></tr></thead>
+    <tbody>
+      {% for ot, n in pipeline['by_org_type'].items() %}
+      <tr><td style="text-transform:capitalize;">{{ (ot or 'unknown')|replace('_', ' ') }}</td><td>{{ n }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
 </div>
 
 <div class="card">

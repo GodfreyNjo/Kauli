@@ -41,7 +41,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -1268,6 +1268,9 @@ templates.env.globals["nav_icon"] = nav_icons.nav_icon
 templates.env.globals["icon_svg"] = nav_icons.icon_svg
 templates.env.globals["trend_arrow"] = nav_icons.trend_arrow
 templates.env.globals["youtube_oauth_configured"] = youtube_captions.youtube_oauth_configured()
+templates.env.globals["horizontal_bar_chart"] = charts.horizontal_bar_chart
+templates.env.globals["funnel_chart_svg"] = charts.funnel_chart_svg
+templates.env.globals["status_bar_chart_svg"] = charts.status_bar_chart_svg
 
 # Real answers only - every figure here is read from billing.py, not typed
 # in twice, so a rate change can never leave the FAQ quietly wrong. No
@@ -5880,10 +5883,19 @@ def staff_leads(request: Request, status: str | None = None, source: str | None 
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
+    pipeline = db.leads_pipeline_summary()
+    by_source_chart = charts.horizontal_bar_chart([
+        {"label": row["source"], "value": row["n"], "note": f"{row['won']} won"}
+        for row in pipeline["by_source"]
+    ], label_width=140) if len(pipeline["by_source"]) > 1 else ""
+    by_org_type_chart = charts.horizontal_bar_chart([
+        {"label": (ot or "unknown").replace("_", " "), "value": n}
+        for ot, n in sorted(pipeline["by_org_type"].items(), key=lambda kv: -kv[1])
+    ], label_width=140) if len(pipeline["by_org_type"]) > 1 else ""
     return templates.TemplateResponse(request, "staff_leads.html", {
         "user": user, "leads": db.list_leads(status=status, source=source, org_type=org_type),
         "filter_status": status, "filter_source": source, "filter_org_type": org_type, "error": error,
-        "pipeline": db.leads_pipeline_summary(),
+        "pipeline": pipeline, "by_source_chart": by_source_chart, "by_org_type_chart": by_org_type_chart,
         "stale_leads": db.stale_leads(threshold_hours=48.0),
         "lead_statuses": db.LEAD_STATUSES, "lead_sources": db.LEAD_SOURCES,
         "now_ts": time.time(),
@@ -7302,6 +7314,13 @@ def staff_ops(request: Request, days: int = 30):
     # operation; raise it in .env once real usage tells you what a normal
     # day actually costs.
     ai_spend_alert_threshold = float(os.environ.get("KAULI_DAILY_AI_COST_ALERT_USD", "5.0"))
+    margin = db.margin_summary(days=days)
+    margin_chart = charts.horizontal_bar_chart([
+        {"label": row["pair"], "value": row["est_margin_usd"],
+         "color": charts.STATUS_CRITICAL if row["est_margin_usd"] < 0 else charts.STATUS_GOOD,
+         "display": f"${row['est_margin_usd']:.2f}"}
+        for row in margin["by_pair"]
+    ], label_width=160) if len(margin["by_pair"]) > 1 else ""
     return templates.TemplateResponse(request, "staff_ops.html", {
         "user": user, "days": days, "now_ts": time.time(),
         "status_counts": db.orders_by_status(),
@@ -7311,7 +7330,7 @@ def staff_ops(request: Request, days: int = 30):
         "minutes_processed": db.minutes_processed(days=days),
         "orders_created": db.orders_created_since(days=days),
         "revenue": db.revenue_summary(days=days),
-        "margin": db.margin_summary(days=days),
+        "margin": margin, "margin_chart": margin_chart,
         "new_leads": db.count_new_leads(),
         "ops_triage": db.list_orders_needing_ops_triage(),
         "ai_spend_today": ai_spend_today,
