@@ -85,17 +85,32 @@ def probe_duration_minutes(path: str) -> float:
 # (YouTube tightens it, yt-dlp/the community find the next first-party
 # client that isn't yet blocked, repeat). First confirmed 2026-08-23
 # (fixed then by requesting through the ANDROID client); recurred
-# 2026-09-17 against a different real video, with "android" no longer
-# enough on its own by then either. Broadened to also try "tv" and
-# "web_safari" - per yt-dlp's own current guidance, these two are commonly
-# still unblocked when "android"/"web" aren't, and (like android) are
-# real first-party YouTube clients, not a login bypass or scraping trick.
-# Real cookies (--cookies-from-browser upstream calls this) are the other
-# documented option, but that needs an actual signed-in browser session's
-# cookies handed to this server, which is a real account-security
-# tradeoff to make deliberately, not something to wire in silently - only
-# reach for that if this broader client list stops being enough too.
-YT_DLP_EXTRACTOR_ARGS = {"extractor_args": {"youtube": {"player_client": ["android", "tv", "web_safari", "web"]}}}
+# 2026-09-17 against a different real video, with "android"/"tv"/
+# "web_safari"/"web" ALL failing too - the block was on this server's
+# datacenter IP/request fingerprint itself, not any one player client.
+#
+# Fixed properly with a real proof-of-origin (PO) token instead of
+# rotating through clients again - this is YouTube's own documented
+# mechanism for "prove this request comes from a real player", and
+# bgutil-ytdlp-pot-provider (see requirements.txt) is the current
+# community-standard way to generate one WITHOUT needing an actual
+# signed-in account's cookies on this server (unauthenticated
+# visitor_data mode). It talks to a separate `bgutil-provider` sidecar
+# container over the kauli_net Docker network (see this VM's `docker run`
+# history) - base_url here is that container's name, resolved via
+# Docker's own DNS on that user-defined network, not localhost (the two
+# containers don't share a network namespace). Falls back to plain
+# unauthenticated requests if the sidecar is ever down, same as yt-dlp
+# always did before this existed - never hard-fails the whole order over
+# a missing PO token. Real signed-in-account cookies remain the documented
+# fallback if YouTube ever closes this off too, but that's a deliberate
+# account-security tradeoff to make only if this stops being enough.
+YT_DLP_EXTRACTOR_ARGS = {
+    "extractor_args": {
+        "youtube": {"player_client": ["android", "tv", "web_safari", "web"]},
+        "youtubepot-bgutilhttp": {"base_url": ["http://bgutil-provider:4416"]},
+    }
+}
 
 
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:

@@ -5,6 +5,14 @@ numpy>=1.24
 # tracked here - a real gap caught by the container failing to import
 # webapp.app at all on first deploy.
 yt-dlp>=2024.1.1
+# Auto-discovered yt-dlp plugin (no code wiring needed on our side) that
+# fetches a real proof-of-origin token from the bgutil-provider sidecar
+# container (see YT_DLP_EXTRACTOR_ARGS in webapp/app.py and the VM's
+# separate `bgutil-provider` container) - the current, officially-
+# documented fix for YouTube's "Sign in to confirm you're not a bot"
+# check that doesn't need a real signed-in account's cookies on this
+# server (a real 2026-09-17 production incident - see that comment).
+bgutil-ytdlp-pot-provider>=1.0.0
 # Directly imported in webapp/billing.py, mailer.py, devto_publish.py,
 # medium_publish.py - was never listed here either, just riding along as
 # a transitive dep of supabase/fastapi. Explicit now so a future version

@@ -8,13 +8,23 @@
 # Build:  docker build -t kauli .
 # Run:    docker run -d -p 8000:8000 --env-file .env \
 #           -v kauli_data:/app/webapp/data \
-#           --name kauli kauli
+#           --network kauli_net --name kauli kauli
 #
 # webapp/data/ is a VOLUME, not baked into the image - it holds the
 # SQLite db, client uploads, and every order's generated output. Losing
 # that volume without a backup means losing every real order on the box;
 # see the launch runway doc's "automate backups" step before this ever
 # runs with real client data.
+#
+# --network kauli_net (a user-defined bridge - `docker network create
+# kauli_net`, once) is required, not optional, from 2026-09-17 on: YouTube
+# import needs the separate `bgutil-provider` sidecar container (see
+# webapp/app.py's YT_DLP_EXTRACTOR_ARGS) reachable by its container name,
+# which only resolves via Docker's embedded DNS on a user-defined network -
+# the default `bridge` network doesn't do container-name DNS at all. Run
+# that sidecar on the same network:
+#   docker run -d --init --network kauli_net --restart unless-stopped \
+#     --name bgutil-provider brainicism/bgutil-ytdlp-pot-provider
 
 FROM python:3.12-slim AS base
 
