@@ -180,7 +180,7 @@
       <tr onclick="location.href='/staff/leads/{{ lead['id'] }}'" style="cursor:pointer;">
         <td>{{ lead['created_at']|int|timestamp_to_str }}</td>
         <td>{{ lead['name'] }}</td>
-        <td>{{ lead['email'] }}{% if lead['personal_email_flag'] %} <span class="muted" style="font-size:0.72rem;" title="Personal email domain - not a rejection, just a triage signal">(personal)</span>{% endif %}</td>
+        <td>{{ lead['email'] or '-' }}{% if lead['personal_email_flag'] %} <span class="muted" style="font-size:0.72rem;" title="Personal email domain - not a rejection, just a triage signal">(personal)</span>{% endif %}</td>
         <td class="muted" style="font-size:0.82rem;">{{ (lead['org_type'] or '-')|replace('_', ' ') }}</td>
         <td class="muted" style="font-size:0.82rem;">{{ (lead['volume_estimate'] or '-')|replace('_', ' ') }}</td>
         <td><span class="source-badge">{{ lead['source'] }}</span></td>
