@@ -220,18 +220,71 @@
 
 {% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and not order['is_free_preview'] %}
 <div class="card">
-  {% if dubbed_ready %}
-  <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
-  {% elif burned_ready %}
-  <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/burned"></video>
-  {% elif order['source_youtube_id'] %}
-  <div class="order-preview-yt"><iframe src="https://www.youtube.com/embed/{{ order['source_youtube_id'] }}"
-     title="Source video" frameborder="0" allowfullscreen></iframe></div>
-  {% elif has_dub %}
-  <audio controls class="order-preview-media" id="order-preview-audio" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
-  {% endif %}
+  <div class="order-workspace-grid">
+    <div class="order-workspace-media">
+      {% if dubbed_ready %}
+      <div class="order-media-wrap">
+        <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
+      </div>
+      {% elif burned_ready %}
+      <div class="order-media-wrap">
+        <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/burned"></video>
+      </div>
+      {% elif order['source_youtube_id'] %}
+      <div class="order-preview-yt"><iframe src="https://www.youtube.com/embed/{{ order['source_youtube_id'] }}"
+         title="Source video" frameborder="0" allowfullscreen></iframe></div>
+      {% elif has_dub %}
+      <div class="order-media-wrap">
+        <audio controls class="order-preview-media" id="order-preview-audio" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+      </div>
+      {% endif %}
+      {% if not burned_ready and (dubbed_ready or has_dub) %}
+      <!-- A LIVE caption overlay, not a burned-in one - real segment text,
+           synced to the same real playhead (timeupdate) the transcript
+           table's active-row highlight already uses below. Skipped
+           entirely when burned_ready, since that file already has real
+           captions baked into its pixels - showing this on top would be
+           a literal duplicate, not a second real thing. -->
+      <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
+      {% endif %}
+    </div>
 
-  <h2 style="margin-top:{{ '20px' if (dubbed_ready or burned_ready or order['source_youtube_id'] or has_dub) else '0' }};">AI summary</h2>
+    <div class="order-workspace-transcript">
+      <div class="order-transcript-header">
+        <div>
+          <h2 style="margin:0; font-size:1.05rem;">Transcript &amp; translation</h2>
+          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">{{ job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length }} human-reviewed segment{{ '' if job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length == 1 else 's' }}</p>
+        </div>
+        <div class="order-transcript-langs">
+          <span class="order-transcript-lang-pill">{{ order['source_lang']|upper }}</span>
+          <span>&rarr;</span>
+          <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }}</span>
+        </div>
+      </div>
+      <div id="order-transcript-scroll">
+        <table id="order-transcript-table">
+          <thead><tr><th style="width:60px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
+          <tbody>
+            {% for seg in job.segments %}
+            {% if seg.segment_type == 'speech' %}
+            <tr data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}" data-target-text="{{ seg.final_text }}">
+              <td class="muted" style="font-size:0.76rem; white-space:nowrap;">
+                {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
+                {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.66rem;">{{ seg.speaker_id }}</span>{% endif %}
+              </td>
+              <td lang="{{ order['source_lang'] }}" style="font-size:0.85rem;">{{ seg.source_final_text }}</td>
+              <td lang="{{ order['target_lang'] }}" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="font-size:0.78rem; margin-top:8px;">See something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
+    </div>
+  </div>
+
+  <h2 style="margin-top:24px;">AI summary</h2>
   <div id="ai-summary-content">
     {% if order['ai_summary_text'] %}
     <p>{{ order['ai_summary_text'] }}</p>
@@ -250,36 +303,6 @@
     <button type="submit" class="secondary">Ask</button>
   </form>
 
-  <div class="order-transcript-header">
-    <div>
-      <h2 style="margin:0;">Transcript &amp; translation</h2>
-      <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">{{ job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length }} human-reviewed segment{{ '' if job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length == 1 else 's' }} - see something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
-    </div>
-    <div class="order-transcript-langs">
-      <span class="order-transcript-lang-pill">{{ order['source_lang']|upper }} source</span>
-      <span>&rarr;</span>
-      <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }} verified</span>
-    </div>
-  </div>
-  <div style="max-height:420px; margin-top:10px;" id="order-transcript-scroll">
-    <table id="order-transcript-table">
-      <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
-      <tbody>
-        {% for seg in job.segments %}
-        {% if seg.segment_type == 'speech' %}
-        <tr data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}">
-          <td class="muted" style="font-size:0.78rem; white-space:nowrap;">
-            {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
-            {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.68rem;">{{ seg.speaker_id }}</span>{% endif %}
-          </td>
-          <td lang="{{ order['source_lang'] }}">{{ seg.source_final_text }}</td>
-          <td lang="{{ order['target_lang'] }}">{{ seg.final_text }}</td>
-        </tr>
-        {% endif %}
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
 </div>
 <script>
   (function () {
@@ -350,6 +373,7 @@
     var media = document.querySelector(".order-preview-media");
     var rows = document.querySelectorAll("#order-transcript-table tr[data-start-ms]");
     var scrollBox = document.getElementById("order-transcript-scroll");
+    var captionOverlay = document.getElementById("order-caption-overlay");
     if (media && rows.length) {
       var activeRow = null;
       media.addEventListener("timeupdate", function () {
@@ -369,6 +393,19 @@
             }
           }
           activeRow = match;
+          // Live caption overlay - the same real target-language text the
+          // transcript panel already highlights, just also shown burned-
+          // in-style on the video itself (see the template's own note on
+          // why this only renders at all when the file isn't ALREADY
+          // burned - never a duplicate of a real caption track).
+          if (captionOverlay) {
+            if (match && match.dataset.targetText) {
+              captionOverlay.textContent = match.dataset.targetText;
+              captionOverlay.hidden = false;
+            } else {
+              captionOverlay.hidden = true;
+            }
+          }
         }
       });
     }
