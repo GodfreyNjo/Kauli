@@ -73,9 +73,35 @@
         {% endfor %}
       </select>
     </label>
-    <label>Body (HTML - real formatting, use &lt;p&gt;, &lt;h2&gt;, &lt;ul&gt;/&lt;li&gt;, etc.)
-      <textarea name="body_html" id="blog-body-input" rows="18" required style="font-family:monospace; font-size:0.85rem;">{{ post['body_html'] if post else '' }}</textarea>
-    </label>
+    <label style="margin-bottom:6px;">Body</label>
+    <div class="blog-editor">
+      <div class="blog-editor-toolbar">
+        <button type="button" class="blog-editor-btn" data-wrap="p" title="Paragraph">¶</button>
+        <button type="button" class="blog-editor-btn" data-wrap="h2" title="Heading 2"><b>H2</b></button>
+        <button type="button" class="blog-editor-btn" data-wrap="h3" title="Heading 3"><b>H3</b></button>
+        <span class="blog-editor-sep"></span>
+        <button type="button" class="blog-editor-btn" data-wrap="strong" title="Bold"><b>B</b></button>
+        <button type="button" class="blog-editor-btn" data-wrap="em" title="Italic"><i>I</i></button>
+        <button type="button" class="blog-editor-btn" data-link title="Link">🔗</button>
+        <span class="blog-editor-sep"></span>
+        <button type="button" class="blog-editor-btn" data-list="ul" title="Bullet list">&bull; List</button>
+        <button type="button" class="blog-editor-btn" data-list="ol" title="Numbered list">1. List</button>
+        <span class="blog-editor-sep"></span>
+        <button type="button" class="blog-editor-btn" data-takeaways title="Insert the Key Takeaways block every post opens with">+ Key takeaways</button>
+        <span style="flex:1;"></span>
+        <div class="blog-editor-tabs">
+          <button type="button" class="blog-editor-tab active" data-tab="write">Write</button>
+          <button type="button" class="blog-editor-tab" data-tab="preview">Preview</button>
+        </div>
+      </div>
+      <textarea name="body_html" id="blog-body-input" rows="18" required
+                placeholder="Start writing - use the toolbar above, or type real HTML directly."
+                style="font-family:monospace; font-size:0.85rem; border:none; border-radius:0; margin:0;">{{ post['body_html'] if post else '' }}</textarea>
+      <div class="m-blog-body" id="blog-body-preview" hidden style="padding:20px; min-height:300px; background:var(--panel);"></div>
+      <div class="blog-editor-footer">
+        <span id="blog-word-count" class="muted"></span>
+      </div>
+    </div>
     {% if not post %}
     <label>Status
       <select name="status">
@@ -139,6 +165,82 @@
         var el = document.getElementById(btn.dataset.copyTarget);
         el.select();
         navigator.clipboard && navigator.clipboard.writeText(el.value);
+      });
+    });
+
+    // ---- Body editor: toolbar, write/preview tabs, live word count ----
+    var body = document.getElementById('blog-body-input');
+    var preview = document.getElementById('blog-body-preview');
+    var wordCountEl = document.getElementById('blog-word-count');
+    if (!body) return;
+
+    function insertAtCursor(before, after, placeholder) {
+      var start = body.selectionStart, end = body.selectionEnd;
+      var selected = body.value.slice(start, end) || placeholder;
+      body.setRangeText(before + selected + after, start, end, 'end');
+      body.focus();
+      var caretAt = start + before.length;
+      body.setSelectionRange(caretAt, caretAt + selected.length);
+      updateWordCount();
+    }
+
+    document.querySelectorAll('.blog-editor-btn[data-wrap]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tag = btn.dataset.wrap;
+        var placeholders = { p: 'Paragraph text', h2: 'Heading', h3: 'Subheading', strong: 'bold text', em: 'italic text' };
+        insertAtCursor('<' + tag + '>', '</' + tag + '>', placeholders[tag] || '');
+      });
+    });
+
+    document.querySelectorAll('.blog-editor-btn[data-list]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var tag = btn.dataset.list;
+        insertAtCursor('<' + tag + '>\n  <li>', '</li>\n  <li>Second item</li>\n  <li>Third item</li>\n</' + tag + '>', 'First item');
+      });
+    });
+
+    var linkBtn = document.querySelector('.blog-editor-btn[data-link]');
+    if (linkBtn) {
+      linkBtn.addEventListener('click', function () {
+        var url = window.prompt('Link URL:', 'https://');
+        if (!url) return;
+        insertAtCursor('<a href="' + url + '">', '</a>', 'link text');
+      });
+    }
+
+    var takeawaysBtn = document.querySelector('.blog-editor-btn[data-takeaways]');
+    if (takeawaysBtn) {
+      takeawaysBtn.addEventListener('click', function () {
+        var block = '<div class="m-key-takeaways">\n<p class="m-key-takeaways-label">Key takeaways</p>\n<ul>\n' +
+          '<li>First real takeaway</li>\n<li>Second real takeaway</li>\n<li>Third real takeaway</li>\n</ul>\n</div>\n';
+        var pos = body.selectionStart;
+        body.setRangeText(block, pos, body.selectionEnd, 'end');
+        updateWordCount();
+      });
+    }
+
+    function updateWordCount() {
+      var text = body.value.replace(/<[^>]*>/g, ' ');
+      var words = (text.match(/[A-Za-z0-9''-]+/g) || []).length;
+      var minutes = Math.max(1, Math.round(words / 200));
+      wordCountEl.textContent = words + ' word' + (words === 1 ? '' : 's') + ' · ~' + minutes + ' min read';
+    }
+    body.addEventListener('input', updateWordCount);
+    updateWordCount();
+
+    var tabs = document.querySelectorAll('.blog-editor-tab');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        if (tab.dataset.tab === 'preview') {
+          preview.innerHTML = body.value || '<p class="muted">Nothing written yet.</p>';
+          body.hidden = true;
+          preview.hidden = false;
+        } else {
+          body.hidden = false;
+          preview.hidden = true;
+        }
       });
     });
   })();
