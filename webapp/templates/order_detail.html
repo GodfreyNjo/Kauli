@@ -250,10 +250,18 @@
     <button type="submit" class="secondary">Ask</button>
   </form>
 
-  <h2 style="margin-top:28px;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2>
-  <p class="muted" style="font-size:0.82rem;">The real, human-reviewed text your files are built from. See
-     something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
-  <div style="max-height:420px; overflow-y:auto; margin-top:10px;" id="order-transcript-scroll">
+  <div class="order-transcript-header">
+    <div>
+      <h2 style="margin:0;">Transcript &amp; translation</h2>
+      <p class="muted" style="font-size:0.82rem; margin:2px 0 0;">{{ job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length }} human-reviewed segment{{ '' if job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length == 1 else 's' }} - see something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
+    </div>
+    <div class="order-transcript-langs">
+      <span class="order-transcript-lang-pill">{{ order['source_lang']|upper }} source</span>
+      <span>&rarr;</span>
+      <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }} verified</span>
+    </div>
+  </div>
+  <div style="max-height:420px; margin-top:10px;" id="order-transcript-scroll">
     <table id="order-transcript-table">
       <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
       <tbody>

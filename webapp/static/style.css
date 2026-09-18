@@ -750,8 +750,39 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
 }
 .ai-chat-q { align-self: flex-end; background: var(--accent-soft); color: var(--ink); }
 .ai-chat-a { align-self: flex-start; background: var(--panel); border: 1px solid var(--border-subtle); color: var(--ink); }
-#order-transcript-table tr.order-transcript-active { background: var(--accent-soft); }
-#order-transcript-table tr.order-transcript-active td { color: var(--ink); }
+/* Transcript/translation workspace polish - same real table, same real
+   JS (segment-sync highlight off the actual playhead), just dressed up:
+   a sticky sw->en header, generous row padding, a speaker chip, and a
+   softer active-row treatment than the old flat accent-soft fill. This
+   is the one screenshot-worthy view of the real product (see the
+   marketing hero) - a client's own real order, not a mockup. */
+.order-transcript-header {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  margin: 28px 0 4px;
+}
+.order-transcript-langs {
+  display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
+}
+.order-transcript-lang-pill {
+  padding: 3px 10px; border-radius: 999px; background: var(--hover); border: 1px solid var(--border-subtle);
+}
+.order-transcript-lang-pill.target { background: var(--accent-soft); color: var(--accent-text); border-color: transparent; }
+#order-transcript-table { border-collapse: separate; border-spacing: 0; }
+#order-transcript-table thead th {
+  position: sticky; top: 0; background: var(--panel); z-index: 1;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted);
+  padding: 8px 14px; border-bottom: 1px solid var(--border-subtle);
+}
+#order-transcript-table tbody td { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid var(--border-subtle); line-height: 1.55; }
+#order-transcript-table tbody tr:last-child td { border-bottom: none; }
+#order-transcript-table tbody tr:hover td { background: var(--hover); }
+#order-transcript-table tr.order-transcript-active td { background: var(--accent-soft); color: var(--ink); }
+#order-transcript-table .meta-pill {
+  display: inline-block; margin-top: 4px; padding: 1px 7px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border-subtle); color: var(--muted); font-weight: 600;
+}
+#order-transcript-scroll { border: 1px solid var(--border-subtle); border-radius: var(--radius); overflow: auto; }
 
 /* ------------------------------------------------ staff overview page --- */
 .overview-header h1 { margin-bottom: 0; font-size: 1.5rem; }
