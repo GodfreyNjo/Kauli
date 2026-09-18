@@ -36,6 +36,12 @@
        page) never did, which is why the app's own tabs showed a generic
        icon while the marketing site showed the real one. -->
   <link rel="icon" href="/static/kauli-icon.png">
+  <!-- PWA: installable app shell (manifest.json + sw.js), no native app -
+       see the "why a PWA, not native" note in sw.js's own docstring.
+       theme-color matches the real brand accent (--accent in style.css). -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#556b2f">
+  <link rel="apple-touch-icon" href="/static/pwa-icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -585,6 +591,66 @@
         });
       }
     })();
+  </script>
+
+  {% if user and user['role'] == 'client' %}
+  <!-- Real "Add to Home Screen" prompt - only ever shown once Chrome's own
+       beforeinstallprompt fires (real engagement signals decide that, not
+       this code), and only to a logged-in client, matching the actual
+       PWA recommendation: give the client portal an app-like install
+       path, not the public marketing site. Dismiss is remembered per
+       browser (localStorage) so it never nags again this session/device -
+       there's no "ask me later" without a real reminder scheduler behind
+       it, so a plain dismiss is the honest option. -->
+  <div id="pwa-install-banner" class="pwa-install-banner" hidden>
+    <span>Install Kauli for faster access and order notifications.</span>
+    <button type="button" id="pwa-install-btn" class="secondary">Install</button>
+    <button type="button" id="pwa-install-dismiss" class="pwa-install-dismiss" aria-label="Dismiss">&times;</button>
+  </div>
+  <script>
+    (function () {
+      var deferredPrompt = null;
+      var banner = document.getElementById("pwa-install-banner");
+      var installBtn = document.getElementById("pwa-install-btn");
+      var dismissBtn = document.getElementById("pwa-install-dismiss");
+      if (!banner) return;
+      if (localStorage.getItem("kauli_pwa_install_dismissed") === "1") return;
+
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        banner.hidden = false;
+      });
+      if (installBtn) {
+        installBtn.addEventListener("click", function () {
+          banner.hidden = true;
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          deferredPrompt = null;
+        });
+      }
+      if (dismissBtn) {
+        dismissBtn.addEventListener("click", function () {
+          banner.hidden = true;
+          try { localStorage.setItem("kauli_pwa_install_dismissed", "1"); } catch (e) {}
+        });
+      }
+    })();
+  </script>
+  {% endif %}
+
+  <script>
+    // Real service worker - installability + a genuine offline fallback
+    // (see sw.js's own docstring for exactly what it does and, just as
+    // importantly, what it deliberately does NOT cache). Registered on
+    // every page, not just the client portal, since it's harmless on the
+    // public site and Chrome's own install-eligibility signals look at
+    // the whole origin, not one page.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+      });
+    }
   </script>
 </body>
 </html>

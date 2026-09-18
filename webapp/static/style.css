@@ -784,6 +784,20 @@ main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
 }
 #order-transcript-scroll { border: 1px solid var(--border-subtle); border-radius: var(--radius); overflow: auto; }
 
+/* ------------------------------------------------------ PWA install --- */
+.pwa-install-banner {
+  position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 500;
+  max-width: 480px; margin: 0 auto;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--panel); border: 1px solid var(--border-subtle); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 12px 14px; font-size: 0.85rem;
+}
+.pwa-install-banner span { flex: 1; }
+.pwa-install-dismiss {
+  background: none; border: none; color: var(--muted); font-size: 1.1rem; line-height: 1;
+  cursor: pointer; padding: 2px 4px;
+}
+
 /* ------------------------------------------------ staff overview page --- */
 .overview-header h1 { margin-bottom: 0; font-size: 1.5rem; }
 /* Real bug this fixes: a long real filename ("Rick Astley - Never Gonna
