@@ -113,6 +113,45 @@ YT_DLP_EXTRACTOR_ARGS = {
 }
 
 
+def _youtube_extra_opts() -> dict:
+    """Everything above (client rotation, the PO-token sidecar) still left
+    some real videos hitting "Sign in to confirm you're not a bot" -
+    confirmed live (2026-09-17/18) that this is a datacenter-IP-level
+    block on THIS SERVER's outbound IP itself, not a per-client or
+    per-token gap - every client returned LOGIN_REQUIRED even with a real
+    PO token attached. Two real, independent mitigations, both optional
+    and inert until configured (same pattern as every other integration
+    in this app), since neither is something code alone can turn on:
+
+    - KAULI_YOUTUBE_COOKIES_FILE: a real cookies.txt from an actual
+      signed-in YouTube account (Netscape format - "Get cookies.txt
+      LOCALLY" or similar browser extension). yt-dlp requests AS that
+      account instead of an anonymous visitor, which is a materially
+      different, stronger signal to YouTube than any client/token trick.
+      Treat this file as a real credential: 0600 permissions, never
+      committed, rotated if the account ever gets flagged.
+    - KAULI_YOUTUBE_PROXY: routes yt-dlp's requests through a residential
+      proxy instead of this server's own datacenter IP - addresses the
+      actual root cause search results and yt-dlp's own maintainers point
+      to (YouTube trusts residential IPs more), rather than working around
+      it client-side. A paid third-party service - this only points at
+      one already configured by whoever sets the env var.
+
+    sleep_interval/max_sleep_interval always apply (a real, free,
+    zero-tradeoff mitigation - throttling this server's own request rate
+    is good practice regardless of the two above) at a random 1-3s gap,
+    which matters if a client ever queues several YouTube imports close
+    together; a single request pays that cost once, not compounding."""
+    opts: dict = {"sleep_interval": 1, "max_sleep_interval": 3}
+    cookies_file = os.environ.get("KAULI_YOUTUBE_COOKIES_FILE", "").strip()
+    if cookies_file and Path(cookies_file).exists():
+        opts["cookiefile"] = cookies_file
+    proxy = os.environ.get("KAULI_YOUTUBE_PROXY", "").strip()
+    if proxy:
+        opts["proxy"] = proxy
+    return opts
+
+
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
     """Downloads AUDIO ONLY - the pipeline (ASR/MT/TTS) only ever needs
     audio samples, and audio-only is a fraction of the size/time of the
@@ -132,6 +171,7 @@ def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
         "noplaylist": True,
         "postprocessors": [{"key": "FFmpegExtractAudio", "preferredcodec": "m4a"}],
         **YT_DLP_EXTRACTOR_ARGS,
+        **_youtube_extra_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(url, download=True)
@@ -163,6 +203,7 @@ def fetch_youtube_video(video_id: str, dest_dir: Path) -> Path:
         "merge_output_format": "mp4",
         "noplaylist": True,
         **YT_DLP_EXTRACTOR_ARGS,
+        **_youtube_extra_opts(),
     }
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.download([f"https://www.youtube.com/watch?v={video_id}"])
