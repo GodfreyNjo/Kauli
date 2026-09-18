@@ -5,10 +5,21 @@
 # Launch Runway" artifact) for why that's a deliberate choice, not a
 # limitation of this Dockerfile.
 #
-# Build:  docker build -t kauli .
-# Run:    docker run -d -p 8000:8000 --env-file .env \
-#           -v kauli_data:/app/webapp/data \
-#           --network kauli_net --name kauli kauli
+# Build:  docker build -t kauli:latest .
+# Run:    the VM's own ./deploy.sh (see /root/kauli/deploy.sh) - NOT a
+#         hand-typed `docker run`. A real incident (2026-09-18): a
+#         redeploy that dropped the volume-mount flag silently wiped
+#         every blog cover image, avatar, and order upload written since
+#         that container started - no error, no warning, just gone the
+#         moment the old container was removed. deploy.sh always includes
+#         the mount and self-checks that real files (blog covers,
+#         avatars) survived the redeploy before declaring success. If
+#         deploy.sh doesn't exist yet on a fresh box, the command it
+#         should contain is:
+#           docker run -d --name kauli --network kauli_net \
+#             --restart unless-stopped -p 8000:8000 \
+#             -v /root/kauli/webapp/data:/app/webapp/data \
+#             --env-file /root/kauli/.env kauli:latest
 #
 # webapp/data/ is a VOLUME, not baked into the image - it holds the
 # SQLite db, client uploads, and every order's generated output. Losing
