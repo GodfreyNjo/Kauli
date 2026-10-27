@@ -144,3 +144,35 @@ def test_charge_currency_is_per_market(monkeypatch):
     assert billing.paystack_currency_for_market("ea") == "KES"  # M-Pesa only works in KES
     assert billing.paystack_currency_for_market("legacy") == "KES"
     assert billing.paystack_currency_for_market(None) == "KES"
+
+
+# ---- multilingual SEO data -------------------------------------------------
+def test_every_transcription_language_has_seo_facts_and_a_unique_slug():
+    from webapp import seo_languages
+    labels = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES.items()}
+    assert all(code in seo_languages.LANGUAGE_FACTS for code in labels)
+    slugs = seo_languages.build_slug_index(labels)
+    assert len(slugs) == len(labels)  # no two languages collapse onto one URL
+    assert seo_languages.slugify("Chinese (Mandarin)") == "chinese-mandarin"
+    assert seo_languages.display_name("Chinese (Mandarin)") == "Mandarin Chinese"
+
+
+def test_every_locale_has_every_string_and_valid_placeholders():
+    from webapp import locales
+    fmt = dict(t="0.12", tr="0.30", d="0.80", ht="1.20", htr="1.40", hd="2.00", n=77, free=5)
+    for code, strings in locales.STRINGS.items():
+        assert set(strings) == set(locales.KEYS), code
+        for value in strings.values():
+            value.format(**fmt)  # raises on a stray or misspelled placeholder
+    for code in locales.LOCALES:
+        assert code in locales.STRINGS
+    assert locales.LOCALES["ar"][2] == "rtl"
+
+
+def test_localized_copy_never_claims_review_or_translation_for_all_languages():
+    """The honest-scope guard: every locale must still say AI output is not
+    reviewed by a person and that translation/dubbing/review are limited."""
+    from webapp import locales
+    for code, s in locales.STRINGS.items():
+        assert "{n}" in s["a1"] and "{free}" in s["a3"], code
+        assert s["ai_3"] and s["price_note"] and s["a2"], code

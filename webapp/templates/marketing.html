@@ -61,6 +61,7 @@
   ]
 }
 </script>
+{% if hreflang_alts %}{% include "_hreflang.html" %}{% endif %}
 {% include "_ga.html" %}
 {% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}

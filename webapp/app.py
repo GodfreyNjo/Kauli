@@ -49,6 +49,7 @@ from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_f
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
+from . import locales as site_locales, seo_languages  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
@@ -2334,6 +2335,182 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
     }
 
 
+# ------------------------------------------------- multilingual SEO ----
+# Three layers, all honest about what the product does: (1) one English
+# "X audio to text" page per transcription language (/transcribe/<slug>) for
+# people searching in English; (2) translated landing pages (/es, /zh, /ar...)
+# for people searching in their own language; (3) a /languages hub, hreflang
+# alternates, sitemap entries and llms.txt so search engines and AI answer
+# engines can find all of it. The 74 non-core languages are TRANSCRIPTION
+# ONLY - nothing here may claim translation/dubbing/review for them.
+_CORE_LANGUAGE_ROWS = [
+    # (code, english label, autonym, regions, available, url)
+    ("sw", "Swahili", "Kiswahili", "East Africa",
+     "Instant AI + human review, translation and dubbing", "/solutions/video-transcription"),
+    ("en", "English", "English", "Worldwide",
+     "Instant AI + human review, translation and dubbing", "/solutions/audio-to-text"),
+    ("ki", "Kikuyu (Gikuyu)", "Gĩkũyũ", "Kenya",
+     "Human transcription + translation and dubbing", "/solutions/video-transcription"),
+]
+AI_LANGUAGE_SLUGS = seo_languages.build_slug_index(AI_ONLY_LANGUAGES)  # slug -> code
+_LOCALE_OPTIONS = [(code, meta[0]) for code, meta in site_locales.LOCALES.items()]
+
+
+def _site_base(request: Request) -> str:
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
+def _hreflang_alternates(base: str) -> list[tuple[str, str]]:
+    return [("en", f"{base}/")] + [(meta[1], f"{base}/{code}") for code, meta in site_locales.LOCALES.items()]
+
+
+def _price_strings(market: str) -> dict:
+    card = billing.price_card_for(market)
+    f = lambda x: f"{x:.2f}"  # noqa: E731
+    return {
+        "t": f(card["transcribe"]["ai"]), "tr": f(card["translate"]["ai"]), "d": f(card["dub"]["ai"]),
+        "ht": f(card["transcribe"]["human"]), "htr": f(card["translate"]["human"]), "hd": f(card["dub"]["human"]),
+    }
+
+
+def _language_total() -> int:
+    return len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)
+
+
+def _logged_in_redirect(request: Request):
+    user = current_user(request)
+    if user:
+        return RedirectResponse(
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
+    return None
+
+
+def _render_locale_page(request: Request, code: str):
+    redirect = _logged_in_redirect(request)
+    if redirect:
+        return redirect
+    native, hreflang, direction = site_locales.LOCALES[code]
+    p = _price_strings(_display_market(request))
+    fmt = dict(p, n=_language_total(), free=int(billing.FREE_MINUTES_PER_MONTH))
+    s = {k: v.format(**fmt) for k, v in site_locales.STRINGS[code].items()}
+    base = _site_base(request)
+    lang_pills = [(r[2], r[1]) for r in _CORE_LANGUAGE_ROWS] + sorted(
+        ((seo_languages.LANGUAGE_FACTS[c][0], label) for c, label in AI_ONLY_LANGUAGES.items()), key=lambda x: x[1])
+    lang_links = {r[1]: r[5] for r in _CORE_LANGUAGE_ROWS}
+    lang_links.update({label: f"/transcribe/{seo_languages.slugify(label)}" for label in AI_ONLY_LANGUAGES.values()})
+    return templates.TemplateResponse(request, "landing_localized.html", {
+        "user": None, "s": s, "p": p, "locale": code, "hreflang": hreflang, "text_dir": direction,
+        "locale_options": _LOCALE_OPTIONS, "base_url": base,
+        "hreflang_alts": _hreflang_alternates(base), "hreflang_default": f"{base}/",
+        "faq": [(s["q1"], s["a1"]), (s["q2"], s["a2"]), (s["q3"], s["a3"]), (s["q4"], s["a4"])],
+        "lang_pills": lang_pills, "lang_links": lang_links,
+    })
+
+
+def _make_locale_route(code: str):
+    def locale_page(request: Request):
+        return _render_locale_page(request, code)
+    locale_page.__name__ = f"locale_page_{code}"
+    return locale_page
+
+
+for _locale_code in site_locales.LOCALES:
+    app.add_api_route(f"/{_locale_code}", _make_locale_route(_locale_code), methods=["GET"],
+                       response_class=HTMLResponse, include_in_schema=False)
+
+
+def _language_page_dict(code: str) -> dict:
+    """The solution_page.html content for one 'X audio to text' page.
+    Everything stated here is true of the product today: Instant AI
+    transcription only, the language-specific facts are plain reference data."""
+    label = seo_languages.display_name(AI_ONLY_LANGUAGES[code])
+    autonym, regions = seo_languages.LANGUAGE_FACTS[code]
+    price = billing.PRICE_CARD["intl"]["transcribe"]["ai"]
+    show_autonym = autonym.lower() != label.lower()
+    name = f"{label} ({autonym})" if show_autonym else label
+    return {
+        "title": f"{label} Audio to Text - AI {label} Transcription",
+        "meta_description": f"Transcribe {name} audio and video to text in minutes, from ${price:.2f} per minute. "
+                             "Download as Word, text or SRT. Pay as you go, first minutes free.",
+        "kicker": f"{label} transcription",
+        "h1": f"{label} audio to text - transcribe {label} recordings in minutes",
+        "intro": f"Upload a {label} recording or paste a YouTube link, choose {label} as the spoken language "
+                 f"and get a timestamped transcript back in minutes. {label} is mainly spoken in {regions}.",
+        "why_heading": f"{label} transcription with Kauli",
+        "points": [
+            {"title": f"Transcribe {name}",
+             "body": f"Pick {label} as the spoken language when you order. Instant AI transcribes it and "
+                      "returns a transcript with a start time on every line, and speaker labels where "
+                      "the recording has more than one voice."},
+            {"title": "Word, text and SRT downloads",
+             "body": "Download your transcript as a Word document (.docx), plain text (.txt) or an SRT file."},
+            {"title": "Simple per-minute pricing",
+             "body": f"Instant AI transcription is ${price:.2f} per audio-minute - no subscription. Your first "
+                      "minutes are free after a one-time $1 card check, credited to your account."},
+            {"title": "Honest about the limits",
+             "body": f"Instant AI is machine transcription and is not reviewed by a person; accuracy depends on "
+                      f"audio quality, accent and background noise, so check names and numbers before you "
+                      f"publish. {label} is transcription only - translation, dubbing and human review are "
+                      "currently for Swahili, Kikuyu and English."},
+        ],
+        "cta_heading": f"Transcribe your {label} audio",
+        "cta_body": "A one-time $1 card check, credited to your account, unlocks your free minutes.",
+        "related": ["audio-to-text", "youtube-video-to-text", "podcast-transcription"],
+        "faq": [
+            {"q": f"Can you transcribe {label} audio?",
+             "a": f"Yes. Choose {label} as the spoken language and Kauli's Instant AI transcribes it, returning "
+                  "Word, text and SRT files."},
+            {"q": f"Do you translate {label} into English?",
+             "a": f"Not yet. For {label} we offer transcription only. Translation, dubbing and human review are "
+                  "currently available for Swahili, Kikuyu and English. If you need translation from "
+                  f"{label}, message us and tell us what you need."},
+            {"q": f"How accurate is {label} transcription?",
+             "a": "It depends on audio quality, accents and background noise. Instant AI is machine "
+                  "transcription and is not reviewed by a person, so we don't publish a headline accuracy "
+                  "figure. Skim the transcript for names, numbers and specialist terms before you publish."},
+            {"q": f"How much does {label} transcription cost?",
+             "a": f"${price:.2f} per audio-minute for Instant AI transcription in the US and internationally "
+                  "(lower in Kenya and East Africa), with no subscription."},
+        ],
+    }
+
+
+@app.get("/transcribe/{slug}", response_class=HTMLResponse)
+def language_page(request: Request, slug: str):
+    code = AI_LANGUAGE_SLUGS.get(slug)
+    if not code:
+        return HTMLResponse("Page not found.", status_code=404)
+    redirect = _logged_in_redirect(request)
+    if redirect:
+        return redirect
+    related_pages = [
+        {"slug": s, "kicker": SOLUTION_PAGES[s]["kicker"], "h1": SOLUTION_PAGES[s]["h1"]}
+        for s in ("audio-to-text", "youtube-video-to-text", "podcast-transcription") if s in SOLUTION_PAGES
+    ]
+    return templates.TemplateResponse(request, "solution_page.html", {
+        **_marketing_context(home="/", market=_display_market(request)),
+        "page": _language_page_dict(code), "related_pages": related_pages,
+    })
+
+
+@app.get("/languages", response_class=HTMLResponse)
+def languages_hub(request: Request):
+    redirect = _logged_in_redirect(request)
+    if redirect:
+        return redirect
+    rows = [{"label": r[1], "autonym": r[2], "regions": r[3], "available": r[4], "url": r[5]}
+            for r in _CORE_LANGUAGE_ROWS]
+    for code, label in sorted(AI_ONLY_LANGUAGES.items(), key=lambda kv: kv[1]):
+        autonym, regions = seo_languages.LANGUAGE_FACTS[code]
+        rows.append({"label": label, "autonym": autonym, "regions": regions,
+                     "available": "Instant AI transcription", "url": f"/transcribe/{seo_languages.slugify(label)}"})
+    return templates.TemplateResponse(request, "languages_hub.html", {
+        **_marketing_context(home="/", market=_display_market(request)),
+        "rows": rows, "total": len(rows), "base_url": _site_base(request),
+        "price": f"{billing.PRICE_CARD['intl']['transcribe']['ai']:.2f}", "locale_options": _LOCALE_OPTIONS,
+    })
+
+
 # ------------------------------------------------------- onboarding CS ----
 # The honest version of the "Founder's Welcome" / "CSM handoff" pattern:
 # Kauli is one person (Godfrey, Forge Media Services), not a company with a
@@ -2546,7 +2723,9 @@ def index(request: Request):
         return RedirectResponse(
             "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
     return templates.TemplateResponse(request, "marketing.html",
-        _marketing_context(sent=request.query_params.get("sent") == "1", market=_display_market(request)))
+        {**_marketing_context(sent=request.query_params.get("sent") == "1", market=_display_market(request)),
+         "hreflang_alts": _hreflang_alternates(_site_base(request)),
+         "hreflang_default": f"{_site_base(request)}/"})
 
 
 @app.get("/terms", response_class=HTMLResponse)
@@ -2653,13 +2832,23 @@ def sitemap(request: Request):
         (f"{base}/privacy", "0.2"),
     ]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
-    entries = [f"  <url><loc>{u}</loc><priority>{p}</priority></url>" for u, p in static_urls]
+    static_urls += [(f"{base}/languages", "0.8")]
+    static_urls += [(f"{base}/transcribe/{slug}", "0.6") for slug in AI_LANGUAGE_SLUGS]
+    # The homepage and the translated landing pages are alternates of each
+    # other - every one lists the whole set, itself included.
+    alt_urls = {f"{base}/"} | {f"{base}/{code}" for code in site_locales.LOCALES}
+    static_urls += [(f"{base}/{code}", "0.7") for code in site_locales.LOCALES]
+    alt_links = "".join(
+        f'<xhtml:link rel="alternate" hreflang="{hl}" href="{href}"/>' for hl, href in _hreflang_alternates(base))
+    alt_links += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}/"/>'
+    entries = [f"  <url><loc>{u}</loc>{alt_links if u in alt_urls else ''}<priority>{p}</priority></url>"
+               for u, p in static_urls]
     for p in db.list_blog_posts(published_only=True):
         loc = f"{base}/blog/{p['slug']}"
         lastmod = datetime.fromtimestamp(p["updated_at"]).strftime("%Y-%m-%d") if p["updated_at"] else None
         entries.append(f"  <url><loc>{loc}</loc>"
                         f"{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}<priority>0.5</priority></url>")
-    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
            + "\n".join(entries) + "\n</urlset>")
     return Response(content=xml, media_type="application/xml")
 
@@ -2736,6 +2925,8 @@ First {billing.FREE_MINUTES_PER_MONTH:.0f} minutes free to try, after a one-time
 
 ## Languages
 Instant AI transcription: {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages (transcription only).
+Full list of languages: {base}/languages (each language has its own page at {base}/transcribe/<language>).
+Translated landing pages: {', '.join(f"{base}/{c} ({m[0]})" for c, m in site_locales.LOCALES.items())}.
 Full service (translation, dubbing, human review): {', '.join(SOURCE_LANGUAGES.values())}, translating into English or Swahili.
 
 ## Key pages

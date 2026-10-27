@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="{% block theme %}light{% endblock %}" data-theme-locked="{% block theme_locked %}{% endblock %}">
+<html lang="{% block html_lang %}en{% endblock %}"{% block html_dir %}{% endblock %} data-theme="{% block theme %}light{% endblock %}" data-theme-locked="{% block theme_locked %}{% endblock %}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
