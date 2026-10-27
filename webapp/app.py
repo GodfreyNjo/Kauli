@@ -5185,6 +5185,8 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
+        "upsell": _order_upsell_prices(order),
+        "paystack_configured": billing.paystack_configured(),
     })
 
 
@@ -5631,6 +5633,26 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         # surcharge-approval gate, never re-queues the job.
         db.approve_difficulty_surcharge(payment["order_id"])
         description = f"Additional work on order {payment['order_id']}"
+    elif payment["order_id"] and payment_kind == "preview_unlock":
+        # A free-trial preview paid for after the fact: same file, now
+        # downloadable. Nothing re-queued - it was already processed.
+        db.set_order_free_preview(payment["order_id"], False)
+        order = db.get_order(payment["order_id"])
+        description = f"Unlocked transcript - {order['original_filename'] if order else payment['order_id']}"
+    elif payment["order_id"] and payment_kind == "review_upgrade":
+        # Instant AI -> Human-reviewed: it now waits for a real editor like
+        # any human-tier order, with a real deadline and a staff alert.
+        db.set_order_review_tier(payment["order_id"], "human")
+        db.update_order_status(payment["order_id"], "awaiting_review")
+        order = db.get_order(payment["order_id"])
+        if order:
+            deadlines = tat.compute_deadlines(order["tier"], order["service_level"],
+                                               order["duration_minutes"] or 0, rush=False)
+            db.set_order_deadlines(payment["order_id"], deadlines["start_at"],
+                                    deadlines["internal_deadline_at"], deadlines["deadline_at"])
+            order = db.get_order(payment["order_id"])
+            worker.notify_staff_needs_review(order)
+        description = f"Human review upgrade - {order['original_filename'] if order else payment['order_id']}"
     elif payment["order_id"]:
         order = db.get_order(payment["order_id"])
         if order and order["status"] == "pending_payment":
@@ -5797,8 +5819,9 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # configured becomes a RECURRING subscription; anything else (orders,
         # top-ups, plans without a code) stays a one-off charge.
         plan_code = billing.paystack_plan_code(plan) if (order_id is None and payment_kind == "order") else None
+        charge_currency = billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]))
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url,
-                                              plan_code=plan_code)
+                                              plan_code=plan_code, currency=charge_currency)
         if "error" in result:
             db.fail_payment(payment_id)
             _note_payment_failure(user["client_scope_id"], order_id, "Paystack", result["error"])
@@ -5894,6 +5917,54 @@ def billing_checkout(request: Request, plan: str = Form(...), provider: str = Fo
         )
     return _checkout(request, user, provider, plan, billing.PLANS[plan]["price_usd"],
                       None, phone, "/client/billing", "/client/billing")
+
+
+def _order_upsell_prices(order) -> dict:
+    """What it costs to (a) unlock a free-trial preview and (b) upgrade a paid
+    Instant AI order to human review - from the order's own FROZEN rate and
+    market, never today's price card. Either is None when not applicable."""
+    prices = {"unlock": None, "upgrade": None}
+    try:
+        cost = json.loads(order["cost_breakdown_json"]) if order["cost_breakdown_json"] else None
+    except (json.JSONDecodeError, TypeError):
+        cost = None
+    if not cost or order["review_tier"] != "ai" or order["status"] not in db.TERMINAL_OK_STATUSES:
+        return prices
+    if order["is_free_preview"]:
+        # The AI work was free - unlocking it costs what it would have cost.
+        unlock = round(cost.get("free_minutes_applied", 0) * cost["rate_per_min"], 2)
+        prices["unlock"] = unlock if unlock > 0 else None
+    else:
+        market = order["billing_market"] or "legacy"
+        diff = (billing.rate_for(order["service_level"], market, "human") - cost["rate_per_min"])
+        upgrade = round(diff * (order["duration_minutes"] or 0), 2)
+        prices["upgrade"] = upgrade if upgrade > 0 else None
+    return prices
+
+
+def _upsell_checkout(request: Request, order_id: str, provider: str, phone: str, kind: str):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    back = f"/client/orders/{order_id}"
+    amount = _order_upsell_prices(order)["unlock" if kind == "preview_unlock" else "upgrade"]
+    if not amount:
+        return RedirectResponse(f"{back}?error=That+option+is+not+available+for+this+order.", status_code=303)
+    return _checkout(request, user, provider, order["tier"], amount, order_id, phone, back, back,
+                      payment_kind=kind)
+
+
+@app.post("/client/orders/{order_id}/unlock")
+def order_unlock_preview(request: Request, order_id: str, provider: str = Form("paystack"), phone: str = Form("")):
+    return _upsell_checkout(request, order_id, provider, phone, "preview_unlock")
+
+
+@app.post("/client/orders/{order_id}/upgrade-review")
+def order_upgrade_review(request: Request, order_id: str, provider: str = Form("paystack"), phone: str = Form("")):
+    return _upsell_checkout(request, order_id, provider, phone, "review_upgrade")
 
 
 @app.get("/client/orders/{order_id}/pay", response_class=HTMLResponse)
@@ -6098,7 +6169,7 @@ def _handle_subscription_renewal(data: dict, base_url: str) -> None:
         return
     payment_id = billing.new_reference()
     amount_usd = billing.PLANS[plan]["price_usd"]
-    db.create_payment(payment_id, user["id"], plan, amount_usd, None, billing.paystack_currency(), "paystack",
+    db.create_payment(payment_id, user["id"], plan, amount_usd, None, "USD", "paystack",
                        meta=json.dumps({"kind": "subscription_renewal"}))
     payment = db.get_payment(payment_id)
     if payment and not _activate_payment(payment, provider_ref, base_url=base_url):

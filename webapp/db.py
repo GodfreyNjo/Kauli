@@ -2581,6 +2581,15 @@ def set_order_billing(order_id: str, service_level: str, duration_minutes: float
     conn.close()
 
 
+def set_order_review_tier(order_id: str, review_tier: str) -> None:
+    """Move an order between the instant-AI and human-reviewed tiers - used
+    when a client pays to upgrade an Instant AI order to human review."""
+    conn = get_conn()
+    conn.execute("UPDATE orders SET review_tier = ? WHERE id = ?", (review_tier, order_id))
+    conn.commit()
+    conn.close()
+
+
 def set_order_free_preview(order_id: str, is_free_preview: bool) -> None:
     conn = get_conn()
     conn.execute("UPDATE orders SET is_free_preview = ? WHERE id = ?", (int(is_free_preview), order_id))

@@ -469,13 +469,21 @@ def paystack_configured() -> bool:
 
 
 def paystack_currency() -> str:
-    """The currency Kauli asks Paystack to charge in: 'KES' (the default) or
-    'USD'. A Kenya-registered Paystack merchant account originally rejected
-    USD charges ("Currency not supported by merchant"); once Paystack enables
-    USD on the account, set PAYSTACK_CURRENCY=USD and every card charge is
-    taken in dollars - which is what a US customer needs, instead of seeing a
-    converted KES amount on their statement. Unset = KES, nothing changes."""
+    """Whether USD charging is switched on: 'USD' once PAYSTACK_CURRENCY=USD
+    is set (after enabling USD on the Paystack account), otherwise 'KES'. A
+    Kenya-registered merchant account originally rejected USD charges
+    ("Currency not supported by merchant"). Unset = KES, nothing changes."""
     return "USD" if os.environ.get("PAYSTACK_CURRENCY", "").strip().upper() == "USD" else "KES"
+
+
+def paystack_currency_for_market(market: str | None) -> str:
+    """The currency to actually charge THIS customer in. With USD switched on,
+    US/international customers pay in dollars (what their card statement
+    should show); Kenya & East Africa and legacy accounts stay on KES, since
+    M-Pesa/mobile money only works in KES and those clients expect it."""
+    if paystack_currency() == "USD" and market == "intl":
+        return "USD"
+    return "KES"
 
 
 def paystack_plan_code(plan: str) -> str | None:
@@ -493,15 +501,14 @@ RECURRING_GRACE_DAYS = 3
 
 
 def paystack_initialize(email: str, amount_usd: float, reference: str, callback_url: str,
-                        plan_code: str | None = None) -> dict:
+                        plan_code: str | None = None, currency: str | None = None) -> dict:
     """Returns {"authorization_url": ...} on success, {"error": ...} on
     failure - callers redirect the client to authorization_url, which is
     Paystack's own hosted checkout page. We never see or touch card data.
 
-    Currency follows PAYSTACK_CURRENCY (see paystack_currency): KES by
-    default - converted with the same usd_to_kes() M-Pesa uses, because a
-    Kenya merchant account didn't accept USD at first - or USD directly once
-    that's enabled on the account. Prices shown to clients are always USD.
+    `currency` is chosen per customer (see paystack_currency_for_market):
+    USD charges the dollar amount as-is; KES converts with the same
+    usd_to_kes() M-Pesa uses. Prices shown to clients are always USD.
 
     plan_code (a Paystack PLN_ code) turns the charge into a RECURRING
     subscription: Paystack then bills the card every month on its own. For
@@ -510,7 +517,7 @@ def paystack_initialize(email: str, amount_usd: float, reference: str, callback_
     key = _paystack_key()
     if not key:
         return {"error": "Paystack isn't configured (PAYSTACK_SECRET_KEY missing)."}
-    currency = paystack_currency()
+    currency = currency or paystack_currency()
     if currency == "USD":
         charge_amount = amount_usd
     else:

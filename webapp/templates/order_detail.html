@@ -164,9 +164,24 @@
 {{ seg.source_final_text }}{{ "\n\n" if not loop.last }}
 {%- endfor -%}
     </div>
-    <a class="btn" href="/client" style="margin-top:14px;">Submit a paid order for the downloadable file →</a>
+    {% if upsell['unlock'] and paystack_configured %}
+    <form method="post" action="/client/orders/{{ order['id'] }}/unlock" style="margin-top:14px;">
+      <input type="hidden" name="provider" value="paystack">
+      <button type="submit">Unlock this transcript for ${{ "%.2f"|format(upsell['unlock']) }} →</button>
+      <span class="muted" style="font-size:0.85rem;"> - download as Word, text and SRT. No need to upload it again.</span>
+    </form>
+    {% endif %}
+    <a class="btn secondary" href="/client" style="margin-top:14px;">Or submit a new paid order →</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p class="ok">Ready. Download your files below.</p>
+    {% if upsell['upgrade'] and paystack_configured %}
+    <form method="post" action="/client/orders/{{ order['id'] }}/upgrade-review" style="margin:0 0 12px;"
+          onsubmit="return confirm('Add human review to this order for ${{ "%.2f"|format(upsell['upgrade']) }}? A real editor will check it before it is marked final.');">
+      <input type="hidden" name="provider" value="paystack">
+      <button type="submit" class="secondary">Add human review - ${{ "%.2f"|format(upsell['upgrade']) }}</button>
+      <span class="muted" style="font-size:0.85rem;"> - a real editor checks this against the audio. You keep these files meanwhile.</span>
+    </form>
+    {% endif %}
     <div class="downloads">
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/docx">Transcript (.docx)</a>
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/txt">Transcript (.txt)</a>
