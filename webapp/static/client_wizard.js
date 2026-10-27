@@ -243,14 +243,35 @@
     // mirroring create_order's server-side override.
     const tierLangSelect = $("#source-lang-select");
     const tierManualLangs = tierLangSelect ? (tierLangSelect.dataset.manualLangs || "").split(",").filter(Boolean) : [];
+    const aiOnlyLangs = tierLangSelect ? (tierLangSelect.dataset.aiOnlyLangs || "").split(",").filter(Boolean) : [];
     const tierForced = !!(tierLangSelect && tierManualLangs.includes(tierLangSelect.value));
+    // The ~70 extra languages: machine transcription only - no reviewer,
+    // translator or voice exists for them, so lock to Instant AI +
+    // Transcription only (mirrors create_order's server-side check).
+    const aiOnlyLang = !!(tierLangSelect && aiOnlyLangs.includes(tierLangSelect.value));
+    if (aiOnlyLang) {
+      const aiRadio = $('input[name="review_tier"][value="ai"]');
+      if (aiRadio) aiRadio.checked = true;
+      const trRadio = $('input[name="service_level"][value="transcribe"]');
+      if (trRadio) trRadio.checked = true;
+    }
+    $all('input[name="service_level"]').forEach((r) => { r.disabled = aiOnlyLang && r.value !== "transcribe"; });
+    const targetField = $("#target-lang-field");
+    if (targetField) targetField.hidden = aiOnlyLang;
     if (tierForced) {
       const humanRadio = $('input[name="review_tier"][value="human"]');
       if (humanRadio) humanRadio.checked = true;
     }
-    $all('input[name="review_tier"]').forEach((r) => { r.disabled = tierForced && r.value !== "human"; });
+    $all('input[name="review_tier"]').forEach((r) => {
+      r.disabled = (tierForced && r.value !== "human") || (aiOnlyLang && r.value !== "ai");
+    });
     const forcedNote = $("#review-tier-forced-note");
-    if (forcedNote) forcedNote.hidden = !tierForced;
+    if (forcedNote) {
+      forcedNote.hidden = !(tierForced || aiOnlyLang);
+      forcedNote.textContent = aiOnlyLang
+        ? "This language is available as Instant AI transcription only (no translation, dubbing or human review)."
+        : "This language is transcribed by one of our team by hand, so it is always human-reviewed.";
+    }
     const tierRadio = $('input[name="review_tier"]:checked');
     const tier = tierRadio ? tierRadio.value : "human";
     const isAiTier = tier === "ai";

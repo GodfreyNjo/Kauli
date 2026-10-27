@@ -228,6 +228,44 @@ def _approximate_words(text: str, start_ms: int, end_ms: int, confidence: float)
     return out
 
 
+# Languages Instant AI transcription accepts beyond Kauli's three core ones
+# (Swahili, English, Kikuyu). key -> (label, Transkriptor language code).
+# Codes are from Transkriptor's own supported-languages table
+# (developer.transkriptor.com/docs/supported-languages.md, checked
+# 2026-10-28), one default variant per language; the key is an ISO-639 code
+# that local faster-whisper also understands, so the automatic fallback in
+# TranskriptorASR still works for every entry. Transcription only - there is
+# no human reviewer, translator or voice for these, which is why the order
+# form restricts them to the Instant AI tier.
+TRANSKRIPTOR_LANGUAGES = {
+    "af": ("Afrikaans", "af-ZA"), "am": ("Amharic", "am-ET"), "ar": ("Arabic", "ar-SA"),
+    "az": ("Azerbaijani", "az-AZ"), "bg": ("Bulgarian", "bg-BG"), "bn": ("Bengali", "bn-IN"),
+    "bs": ("Bosnian", "bs-BA"), "ca": ("Catalan", "ca-ES"), "cs": ("Czech", "cs-CZ"),
+    "cy": ("Welsh", "cy-GB"), "da": ("Danish", "da-DK"), "de": ("German", "de-DE"),
+    "el": ("Greek", "el-GR"), "es": ("Spanish", "es-US"), "et": ("Estonian", "et-EE"),
+    "eu": ("Basque", "eu-ES"), "fa": ("Persian", "fa-IR"), "fi": ("Finnish", "fi-FI"),
+    "tl": ("Filipino", "fil-PH"), "fr": ("French", "fr-FR"), "ga": ("Irish", "ga-IE"),
+    "gl": ("Galician", "gl-ES"), "gu": ("Gujarati", "gu-IN"), "he": ("Hebrew", "he-IL"),
+    "hi": ("Hindi", "hi-IN"), "hr": ("Croatian", "hr-HR"), "hu": ("Hungarian", "hu-HU"),
+    "hy": ("Armenian", "hy-AM"), "id": ("Indonesian", "id-ID"), "is": ("Icelandic", "is-IS"),
+    "it": ("Italian", "it-IT"), "ja": ("Japanese", "ja-JP"), "jv": ("Javanese", "jv-ID"),
+    "ka": ("Georgian", "ka-GE"), "kk": ("Kazakh", "kk-KZ"), "km": ("Khmer", "km-KH"),
+    "kn": ("Kannada", "kn-IN"), "ko": ("Korean", "ko-KR"), "lo": ("Lao", "lo-LA"),
+    "lt": ("Lithuanian", "lt-LT"), "lv": ("Latvian", "lv-LV"), "mk": ("Macedonian", "mk-MK"),
+    "ml": ("Malayalam", "ml-IN"), "mn": ("Mongolian", "mn-MN"), "mr": ("Marathi", "mr-IN"),
+    "ms": ("Malay", "ms-MY"), "mt": ("Maltese", "mt-MT"), "my": ("Burmese", "my-MM"),
+    "ne": ("Nepali", "ne-NP"), "nl": ("Dutch", "nl-NL"), "no": ("Norwegian", "nb-NO"),
+    "pa": ("Punjabi", "pa-IN"), "pl": ("Polish", "pl-PL"), "ps": ("Pashto", "ps-AF"),
+    "pt": ("Portuguese", "pt-BR"), "ro": ("Romanian", "ro-RO"), "ru": ("Russian", "ru-RU"),
+    "si": ("Sinhala", "si-LK"), "sk": ("Slovak", "sk-SK"), "sl": ("Slovenian", "sl-SI"),
+    "so": ("Somali", "so-SO"), "sq": ("Albanian", "sq-AL"), "sr": ("Serbian", "sr-RS"),
+    "sv": ("Swedish", "sv-SE"), "ta": ("Tamil", "ta-IN"), "te": ("Telugu", "te-IN"),
+    "th": ("Thai", "th-TH"), "tr": ("Turkish", "tr-TR"), "uk": ("Ukrainian", "uk-UA"),
+    "ur": ("Urdu", "ur-IN"), "uz": ("Uzbek", "uz-UZ"), "vi": ("Vietnamese", "vi-VN"),
+    "zh": ("Chinese (Mandarin)", "zh-CN"), "yue": ("Chinese (Cantonese)", "yue-CN"),
+}
+
+
 class TranskriptorASR(ASRProvider):
     """Real transcription via Transkriptor's API (developer.transkriptor.com) -
     the primary ASR for real orders, since it's a paid, purpose-built
@@ -281,7 +319,8 @@ class TranskriptorASR(ASRProvider):
     name = "transkriptor"
     cost_per_minute_usd = 0.0  # metered on Transkriptor's own dashboard, not tracked locally
     BASE = "https://api.tor.app/developer"
-    LANG_CODES = {"sw": "sw-KE", "en": "en-US"}
+    LANG_CODES = {**{k: code for k, (_label, code) in TRANSKRIPTOR_LANGUAGES.items()},
+                  "sw": "sw-KE", "en": "en-US"}
     # Transkriptor's API returns no confidence score at all - this is a
     # fixed, disclosed placeholder (not a measured value) so
     # source_confidence still has SOME value for the review-flag pipeline

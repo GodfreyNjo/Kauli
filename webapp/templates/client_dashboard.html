@@ -83,13 +83,21 @@
       <div class="row" style="margin-top:16px;">
         <label>From
           <select name="source_lang" id="source-lang-select"
-                  data-manual-langs="{{ manual_transcription_languages|join(',') }}">
-            {% for code, label in source_languages.items() %}
-            <option value="{{ code }}" {% if code == form_values.get('source_lang', 'sw') %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
+                  data-manual-langs="{{ manual_transcription_languages|join(',') }}"
+                  data-ai-only-langs="{{ ai_only_languages.keys()|join(',') }}">
+            <optgroup label="Full service - translation, dubbing, human review">
+              {% for code, label in source_languages.items() %}
+              <option value="{{ code }}" {% if code == form_values.get('source_lang', 'sw') %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </optgroup>
+            <optgroup label="Instant AI transcription only">
+              {% for code, label in ai_only_languages.items()|sort(attribute='1') %}
+              <option value="{{ code }}" {% if code == form_values.get('source_lang') %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </optgroup>
           </select>
         </label>
-        <label>To
+        <label id="target-lang-field">To
           <select name="target_lang">
             <option value="en" {% if form_values.get('target_lang', 'en') == 'en' %}selected{% endif %}>English</option>
             <option value="sw" {% if form_values.get('target_lang') == 'sw' %}selected{% endif %}>Swahili</option>

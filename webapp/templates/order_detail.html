@@ -168,6 +168,8 @@
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p class="ok">Ready. Download your files below.</p>
     <div class="downloads">
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/docx">Transcript (.docx)</a>
+      <a class="btn" href="/client/orders/{{ order['id'] }}/download/txt">Transcript (.txt)</a>
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
       {% if has_translation %}
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/srt">Subtitles (.srt)</a>

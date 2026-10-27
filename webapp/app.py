@@ -41,13 +41,14 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
 from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
+from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
@@ -882,7 +883,7 @@ def workflow_steps_for_order(order) -> list[dict]:
     # backwards for any other real, already-supported direction (e.g.
     # en->sw), where staff would see "Swahili source" on a step that's
     # actually the ENGLISH source transcript.
-    source_name = SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"])
+    source_name = LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"])
     target_name = SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"])
     steps = []
     if level["asr"]:
@@ -1259,6 +1260,15 @@ SOURCE_LANGUAGES = {
     "ki": "Kikuyu (Gikuyu)",
 }
 
+# The ~70 further languages Instant AI can TRANSCRIBE (nothing else: no
+# translation, voice or human review - see TRANSKRIPTOR_LANGUAGES). Kept
+# separate from SOURCE_LANGUAGES on purpose: that dict is the languages Kauli
+# fully supports end to end (and is what the marketing copy lists as such).
+AI_ONLY_LANGUAGES = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES.items()
+                      if code not in SOURCE_LANGUAGES}
+# Every code a stored order can carry, for display names.
+LANGUAGE_NAMES = {**AI_ONLY_LANGUAGES, **SOURCE_LANGUAGES}
+
 # No ASR model available to us - local Whisper or any vendor we checked -
 # recognizes these languages at all. Orders in one of these get the
 # "manual" provider instead of faster-whisper: real ffmpeg-detected speech
@@ -1354,7 +1364,10 @@ MARKETING_FAQ = [
      "a": "No - Kauli is entirely web-based. Upload a file or paste a YouTube link from your browser, "
           "and download the finished transcript, subtitles or dubbed track the same way."},
     {"q": "What languages do you support?",
-     "a": f"{', '.join(SOURCE_LANGUAGES.values())} today, translating into English or Swahili. "
+     "a": f"Instant AI transcription covers {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages - "
+          "from Spanish, French, Arabic, Hindi and Mandarin to Amharic, Somali and other languages - and "
+          "is transcription only. Full service (translation, dubbing and human review) is "
+          f"{', '.join(SOURCE_LANGUAGES.values())}, translating into English or Swahili. "
           "Kikuyu goes through an extra manual transcription step since no speech-recognition model "
           "handles it yet - translation and voicing still run the same AI-plus-human-review pipeline "
           "as everything else, it just costs a bit more per minute to cover that step. We only add a "
@@ -1398,16 +1411,16 @@ SOLUTION_PAGES = {
         "title": "Swahili and English Localization for NGOs, Without Agency Rates",
         "meta_description": "Transcription, translation and dubbing between Swahili, Kikuyu and English for "
                              "field reports, training videos and campaigns - transparent per-minute pricing, "
-                             "every order human-reviewed before delivery.",
+                             "optional human review before delivery.",
         "kicker": "For NGOs and civil-society organizations",
         "h1": "Reach Swahili and English-speaking audiences, without an agency budget or a six-week wait",
         "intro": "Field reports, training videos and awareness campaigns need to speak to the people they're "
                  "actually about. Kauli transcribes, translates and dubs between Swahili, Kikuyu and English at "
-                 "a transparent per-minute rate, with a real editor checking every line before it reaches you.",
+                 "a transparent per-minute rate, with a real editor checking every line before it reaches you on Human-reviewed orders.",
         "why_heading": "Built for real field and campaign work",
         "points": [
-            {"title": "Every order human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio line by line "
+            {"title": "Human-reviewed when you choose it",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio line by line "
                       "before it's marked ready - it matters when the content is about real people and real "
                       "communities."},
             {"title": "Consent required before any voice is cloned",
@@ -1415,15 +1428,15 @@ SOLUTION_PAGES = {
                       "leader - we require your explicit confirmation of rights and consent before that ever "
                       "runs. Never assumed."},
             {"title": "A real delivery estimate, not a guess",
-             "body": "Every order gets a real turnaround estimate the moment it's confirmed, based on its "
+             "body": "Every Human-reviewed order gets a real turnaround estimate the moment it's confirmed, based on its "
                       "actual length and service level, visible on your dashboard - so you know if it'll be "
                       "ready before your event or publication date."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits, no surprise tiers. Your first few minutes "
-                      "are free to test the quality yourself, no card required."},
+                      "are free to test the quality yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "See the quality for yourself, on your own material",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-translation", "video-transcription", "captioning"],
         "tour": {"mode": "upload", "filename": "field_report_march2026.mp4"},
         "faq": [
@@ -1476,7 +1489,7 @@ SOLUTION_PAGES = {
         "title": "Translate or Dub Your YouTube Videos - Swahili to English and Back",
         "meta_description": "Paste a YouTube link and get it translated from Swahili to English (or "
                              "English to Swahili) - a transcript, subtitles, or a fully dubbed track "
-                             "back, human-reviewed before delivery, transparent per-minute pricing.",
+                             "back, optional human review before delivery, transparent per-minute pricing.",
         "kicker": "For YouTubers and content creators",
         "h1": "Translate your YouTube videos - Swahili to English, or English to Swahili",
         "intro": "Paste a YouTube link and Kauli fetches the audio itself - no downloading, re-uploading, or "
@@ -1491,8 +1504,8 @@ SOLUTION_PAGES = {
              "body": "Connect a channel or playlist and new public uploads show up as one-click pending "
                       "orders in your dashboard - you decide what actually gets processed and paid for, "
                       "nothing runs automatically."},
-            {"title": "Every order human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio before it's "
+            {"title": "Human-reviewed when you choose it",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio before it's "
                       "marked ready - accuracy your audience will actually notice."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process. First few minutes free to try the quality yourself, no card "
@@ -1545,7 +1558,7 @@ SOLUTION_PAGES = {
     "media-broadcast": {
         "title": "Subtitles and Dubbing for Media and Broadcast, On a Real Deadline",
         "meta_description": "Broadcast-ready subtitles, translated transcripts and dubbed video with burned "
-                             "captions - human-reviewed, priced per minute, with a real tracked delivery "
+                             "captions - with optional human review, priced per minute, with a real tracked delivery "
                              "deadline on every order.",
         "kicker": "For media houses and broadcasters",
         "h1": "Broadcast-ready subtitles and dubs, on a deadline you can actually see",
@@ -1555,14 +1568,14 @@ SOLUTION_PAGES = {
         "why_heading": "Built for real broadcast deadlines",
         "points": [
             {"title": "A real delivery estimate, tracked live",
-             "body": "Every order gets an internal and client-facing delivery deadline the moment it's "
+             "body": "Every Human-reviewed order gets an internal and client-facing delivery deadline the moment it's "
                       "confirmed, based on its actual length and service level - visible on your dashboard, "
                       "not a vague \"a few days.\""},
             {"title": "Broadcast-ready deliverables",
              "body": "Burned-in captions or a fully dubbed video file, not just a raw transcript - included "
                       "on Premium and Enterprise plans, or as a per-order add-on."},
-            {"title": "Every order human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it line by line against the source audio "
+            {"title": "Human-reviewed when you choose it",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it line by line against the source audio "
                       "before it's marked ready - broadcast accuracy, not best-effort."},
             {"title": "Enterprise turnaround and billing",
              "body": "A faster dedicated turnaround tier and bank-transfer billing for organizations with an "
@@ -1574,7 +1587,7 @@ SOLUTION_PAGES = {
         "tour": {"mode": "upload", "filename": "evening_bulletin_segment.mp4"},
         "faq": [
             {"q": "Can you actually meet a same-day broadcast deadline?",
-             "a": "Every order gets a real delivery estimate the moment it's confirmed, based on its "
+             "a": "Every Human-reviewed order gets a real delivery estimate the moment it's confirmed, based on its "
                   "actual length and service level - not a vague promise. Enterprise adds a faster "
                   "dedicated turnaround tier for organizations with an ongoing relationship; talk to us "
                   "about your specific deadline."},
@@ -1610,22 +1623,22 @@ SOLUTION_PAGES = {
     "e-learning": {
         "title": "E-Learning Localization - Swahili, Kikuyu and English",
         "meta_description": "Translate and dub course material between Swahili, Kikuyu and English with "
-                             "consistent terminology across every lesson - human-reviewed, priced per minute.",
+                             "consistent terminology across every lesson - with optional human review, priced per minute.",
         "kicker": "For e-learning and training teams",
         "h1": "Localize a course once, keep it consistent through every cohort",
         "intro": "Terminology that drifts from lesson to lesson confuses learners - Kauli's human editors work "
-                 "from the same review standard on every order, so a term translated one way in lesson one "
+                 "from the same review standard on every Human-reviewed order, so a term translated one way in lesson one "
                  "stays that way in lesson twelve, not whatever a memory-less AI tool happens to pick each time.",
         "why_heading": "Built for course content, not one-off clips",
         "points": [
-            {"title": "Every order human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio line by line "
+            {"title": "Human-reviewed when you choose it",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio line by line "
                       "before it's marked ready - the same standard on lesson one and lesson fifty."},
             {"title": "Subtitles, transcript, or a full dub",
              "body": "Pick what your course actually needs per module - translated subtitles for a video "
                       "lecture, a clean transcript for reading material, or a fully dubbed track."},
             {"title": "Real delivery estimates",
-             "body": "Every order gets a real turnaround estimate the moment it's confirmed, based on its "
+             "body": "Every Human-reviewed order gets a real turnaround estimate the moment it's confirmed, based on its "
                       "actual length and service level - useful when you're localizing a course against a "
                       "cohort start date."},
             {"title": "Transparent per-minute pricing",
@@ -1633,7 +1646,7 @@ SOLUTION_PAGES = {
                       "first few minutes free to try the quality yourself."},
         ],
         "cta_heading": "Try it on one lesson first",
-        "cta_body": "Upload a real module or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real module or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-translation", "video-transcription", "video-localization"],
         "tour": {"mode": "upload", "filename": "module_3_lesson.mp4"},
         "faq": [
@@ -1683,7 +1696,7 @@ SOLUTION_PAGES = {
         "title": "Swahili and Kikuyu Voice Over Services - AI or a Real Human Actor",
         "meta_description": "Swahili, Kikuyu and English voice over - AI-synthesized by default, or a real "
                              "human voice actor as an add-on. Consent required before any voice is cloned, "
-                             "human-reviewed before delivery, transparent per-minute pricing.",
+                             "optional human review before delivery, transparent per-minute pricing.",
         "kicker": "Voice over services",
         "h1": "Swahili and Kikuyu voice over, AI-fast or a real human actor",
         "intro": "Every dub starts as an AI-synthesized voice over, checked line by line against the "
@@ -1691,8 +1704,8 @@ SOLUTION_PAGES = {
                  "specific tone, a named voice actor - that's a real add-on, not a different product.",
         "why_heading": "Built for real voice over work, not just text-to-speech",
         "points": [
-            {"title": "AI voice over by default, human-reviewed",
-             "body": "Every dubbed track is synthesized and checked against the source audio before it's "
+            {"title": "AI voice over, human-reviewed when you choose it",
+             "body": "A dubbed track is synthesized, and on a Human-reviewed order it's also checked against the source audio before it's "
                       "marked ready - not just auto-generated and shipped."},
             {"title": "A real human voice actor, as an add-on",
              "body": "Need a real person's voice, not a synthesized one? Add a real voice actor to any "
@@ -1703,10 +1716,10 @@ SOLUTION_PAGES = {
                       "ever runs. Never assumed."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits. Your first few minutes are free to "
-                      "test the voice quality yourself, no card required."},
+                      "test the voice quality yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "Hear it on your own audio first",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-dubbing", "captioning", "video-localization"],
         "tour": {"mode": "upload", "filename": "product_explainer_voiceover.mp4"},
         "faq": [
@@ -1749,13 +1762,13 @@ SOLUTION_PAGES = {
                              "human-reviewed line by line, transparent per-minute pricing.",
         "kicker": "Subtitles, captions and closed captions",
         "h1": "Subtitles and closed captions for YouTube or any video, in Swahili and Kikuyu",
-        "intro": "An AI draft gets the captions fast, but a real editor checks every line against the "
+        "intro": "An AI draft gets the captions fast; on a Human-reviewed order a real editor checks every line against the "
                  "source audio before it's marked ready - burned into the video, or as a separate "
                  "subtitle file, your choice.",
         "why_heading": "Built for captions people actually rely on",
         "points": [
-            {"title": "Every caption human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio line by "
+            {"title": "Human-reviewed captions, when you choose them",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio line by "
                       "line before it's marked ready - accuracy matters when captions are how someone "
                       "actually follows the content."},
             {"title": "Burned-in or a separate file",
@@ -1767,10 +1780,10 @@ SOLUTION_PAGES = {
                       "model supports it yet), not a lower-quality automated fallback."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits. Your first few minutes are free to "
-                      "test the accuracy yourself, no card required."},
+                      "test the accuracy yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "See the accuracy on your own video",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-transcription", "voice-over", "video-localization"],
         "tour": {"mode": "upload", "filename": "webinar_recording.mp4"},
         "faq": [
@@ -1786,8 +1799,8 @@ SOLUTION_PAGES = {
                   f"${billing.ADDONS['video_deliverables']['rate_per_min']:.2f}/minute add-on on any "
                   "order - a plain subtitle file is included on every plan either way."},
             {"q": "How accurate are the captions really?",
-             "a": "An AI draft gets a first pass fast, but a real editor checks every line against the "
-                  "source audio before it's marked ready - on every order, every plan, not just the "
+             "a": "An AI draft gets a first pass fast; on a Human-reviewed order a real editor checks every line against the "
+                  "source audio before it's marked ready - on every Human-reviewed order, every plan, not just the "
                   "ones that look risky."},
         ],
         "fit_guide": [
@@ -1828,14 +1841,14 @@ SOLUTION_PAGES = {
                              "delivery. Transparent per-minute pricing, based in Kenya.",
         "kicker": "Swahili, Kikuyu and English video translation",
         "h1": "Convert a Swahili video to English - or English to Swahili, or Kikuyu - checked line by line",
-        "intro": "An AI draft translates fast, but a real editor checks every line against the "
+        "intro": "An AI draft translates fast; on a Human-reviewed order a real editor checks every line against the "
                  "source audio before it's marked ready - a translated transcript, subtitles, or a "
                  "fully dubbed track, whichever your video actually needs. Based in Kenya, built for "
                  "Swahili, Kikuyu and English specifically, not a generic hundred-language tool.",
         "why_heading": "Built for real translation work, not a generic tool",
         "points": [
             {"title": "Human-reviewed, not just machine-translated",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio "
                       "line by line before it's marked ready - accuracy that matters when a "
                       "mistranslation changes what was actually said."},
             {"title": "Transcript, subtitles, or a full dub",
@@ -1847,10 +1860,10 @@ SOLUTION_PAGES = {
                       "fallback bolted onto a tool built for other languages."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits. Your first few minutes are "
-                      "free to test the accuracy yourself, no card required."},
+                      "free to test the accuracy yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "See the translation quality on your own video",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-transcription", "video-dubbing", "video-localization"],
         "tour": {"mode": "upload", "filename": "interview_clip.mp4"},
         "faq": [
@@ -1890,10 +1903,178 @@ SOLUTION_PAGES = {
              "detail": "Negotiated volume rate, dedicated account manager, bank transfer billing."},
         ],
     },
+    "audio-to-text": {
+        "title": "Audio to Text Converter - Transcribe Audio in 70+ Languages",
+        "meta_description": "Convert audio and video to text in minutes in 70+ languages, from "
+                             f"${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per minute. Download as Word, "
+                             "text or SRT. Pay as you go, with optional human review for Swahili, Kikuyu "
+                             "and English.",
+        "kicker": "Audio to text",
+        "h1": "Convert audio to text in minutes - in 70+ languages",
+        "intro": "Upload a recording or paste a YouTube link and get a timestamped transcript back in "
+                 "minutes, ready to download as Word, plain text or SRT. Pay by the minute - no subscription.",
+        "why_heading": "Built for getting text out of audio, fast",
+        "points": [
+            {"title": "70+ languages, one upload",
+             "body": "Spanish, French, German, Arabic, Hindi, Mandarin, Swahili and dozens more. Pick the "
+                      "language the speaker uses and we transcribe it - no per-language pricing."},
+            {"title": "Word, text and SRT downloads",
+             "body": "Download your transcript as a Word document (.docx), plain text (.txt) or an SRT file "
+                      "with timestamps. Speaker labels are included where the recording has more than one voice."},
+            {"title": "Timestamped lines",
+             "body": "Every line carries its start time, so you can jump straight to a moment in a long "
+                      "recording. Timing is per line, not per word."},
+            {"title": "Honest about what AI can and can't do",
+             "body": "Instant AI is machine transcription, not reviewed by a person, and says so on every "
+                      "order. Accuracy depends on audio quality, accents and background noise - check names "
+                      "and numbers before you publish. For Swahili, Kikuyu and English you can add human review."},
+            {"title": "Simple per-minute pricing",
+             "body": f"Instant AI transcription is ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per "
+                      "audio-minute. Your first few minutes are free after a one-time $1 card check, "
+                      "credited to your account."},
+        ],
+        "cta_heading": "Transcribe your first file free",
+        "cta_body": "Upload a recording or paste a link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
+        "related": ["youtube-video-to-text", "podcast-transcription", "video-transcription"],
+        "faq": [
+            {"q": "What file types can I upload?",
+             "a": "Audio or video in any common format - for example MP3, WAV, M4A, MP4 and MOV. If a file "
+                  "won't process, the order form tells you why."},
+            {"q": "How long does it take?",
+             "a": "Instant AI orders are normally ready within minutes of upload. Very long files take "
+                  "longer. Human-reviewed orders take longer because a person checks them before delivery."},
+            {"q": "Is the transcript reviewed by a person?",
+             "a": "Not on Instant AI - it is machine-generated and labelled that way. Human review is "
+                  "available for Swahili, Kikuyu and English orders."},
+            {"q": "Can I get captions or subtitles too?",
+             "a": "Yes - SRT files are included. Translated subtitles and dubbing are available between "
+                  "Swahili, Kikuyu and English."},
+        ],
+    },
+    "youtube-video-to-text": {
+        "title": "YouTube Video to Text - Transcribe Any YouTube Link",
+        "meta_description": "Paste a YouTube link and get the transcript back as Word, text or SRT - "
+                             f"from ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per minute, in 70+ "
+                             "languages. Pay as you go.",
+        "kicker": "YouTube video to text",
+        "h1": "Turn a YouTube video into text - paste the link",
+        "intro": "Paste a YouTube link, choose the spoken language and get a timestamped transcript back "
+                 "in minutes. Download it as Word, plain text or SRT, or push finished captions straight "
+                 "back to your own channel.",
+        "why_heading": "From YouTube link to transcript",
+        "points": [
+            {"title": "No downloading or re-uploading",
+             "body": "Paste the link - we fetch the audio ourselves. Only submit videos you own or have "
+                      "the rights to use."},
+            {"title": "70+ spoken languages",
+             "body": "Choose the language spoken in the video. Instant AI transcribes it; for Swahili, "
+                      "Kikuyu and English you can add translation, dubbing and human review."},
+            {"title": "Captions back onto your channel",
+             "body": "Connect your YouTube channel and publish finished English or Swahili captions "
+                      "directly to your own video - no manual SRT upload."},
+            {"title": "If a link can't be fetched, upload the file",
+             "body": "YouTube sometimes blocks automated downloads for particular videos. If that happens "
+                      "to yours, upload the video file instead and the rest works exactly the same."},
+            {"title": "Pay per minute, no subscription",
+             "body": f"Instant AI transcription is ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} "
+                      "per audio-minute, with your first few minutes free."},
+        ],
+        "cta_heading": "Paste a YouTube link and try it",
+        "cta_body": "A one-time $1 card check, credited to your account, unlocks your free minutes.",
+        "related": ["audio-to-text", "captioning", "youtubers"],
+        "faq": [
+            {"q": "Can I transcribe someone else's YouTube video?",
+             "a": "Only submit videos you own or have the rights to use. Transcribing a video you don't "
+                  "have rights to may breach the creator's rights or YouTube's terms."},
+            {"q": "Why did my YouTube link fail?",
+             "a": "YouTube occasionally blocks automated access to specific videos. Upload the video file "
+                  "instead - the result is identical."},
+            {"q": "Can I get the captions onto my video automatically?",
+             "a": "Yes, for your own channel: connect your YouTube account from Settings and publish "
+                  "captions to a finished order with one click."},
+        ],
+    },
+    "podcast-transcription": {
+        "title": "Podcast Transcription - Episode Transcripts in Minutes",
+        "meta_description": "Transcribe podcast episodes to text in minutes, with timestamps and "
+                             f"speaker labels, from ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per "
+                             "minute. Download as Word, text or SRT. Pay as you go.",
+        "kicker": "Podcast transcription",
+        "h1": "Podcast transcripts in minutes, for pennies a minute",
+        "intro": "Upload an episode and get a timestamped transcript back in minutes - for show notes, "
+                 "blog posts, accessibility and search. Download as Word, plain text or SRT.",
+        "why_heading": "Built for show notes, not just archives",
+        "points": [
+            {"title": "Speaker labels",
+             "body": "Hosts and guests are labelled where the recording has multiple voices, so the "
+                      "transcript reads like a conversation."},
+            {"title": "Timestamped lines",
+             "body": "Jump to any moment from the transcript - handy for chapters, clips and quotes."},
+            {"title": "Word, text and SRT",
+             "body": "Paste into your CMS from the .txt, edit in the .docx, or use the SRT for captions "
+                      "on video versions of the episode."},
+            {"title": "Priced for a weekly show",
+             "body": f"At ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per audio-minute, a "
+                      f"60-minute episode costs about ${billing.PRICE_CARD['intl']['transcribe']['ai'] * 60:.2f}. "
+                      "Pay as you go, no subscription."},
+            {"title": "Swahili and Kikuyu shows",
+             "body": "Podcasts in Swahili, Kikuyu or English can add translation and human review - "
+                      "a niche generic tools handle poorly."},
+        ],
+        "cta_heading": "Transcribe your next episode",
+        "cta_body": "A one-time $1 card check, credited to your account, unlocks your free minutes.",
+        "related": ["audio-to-text", "youtube-video-to-text", "video-transcription"],
+        "faq": [
+            {"q": "How accurate is it?",
+             "a": "It depends on audio quality, accents and background noise. Instant AI is machine "
+                  "transcription and isn't reviewed by a person - skim it for names, numbers and "
+                  "jargon before publishing. We don't publish a headline accuracy figure we can't prove."},
+            {"q": "Do you label different speakers?",
+             "a": "Yes, where the recording has more than one voice, speakers are labelled in the transcript."},
+        ],
+    },
+    "interview-transcription": {
+        "title": "Interview Transcription - Researchers, Journalists and Teams",
+        "meta_description": "Transcribe interviews and recordings with speaker labels and timestamps in "
+                             "minutes, in 70+ languages. Word, text and SRT downloads. Human review "
+                             "available for Swahili, Kikuyu and English.",
+        "kicker": "Interview transcription",
+        "h1": "Interview transcripts with speaker labels and timestamps",
+        "intro": "For researchers, journalists and teams who need to get from a recording to quotable, "
+                 "searchable text quickly - in the language the interview was actually held in.",
+        "why_heading": "Built for interviews, not just meetings",
+        "points": [
+            {"title": "Speaker labels and timestamps",
+             "body": "Each line shows who spoke and when, so you can find and verify a quote against the "
+                      "recording."},
+            {"title": "Interviews in 70+ languages",
+             "body": "Transcribe the interview in the language it was held in. For Swahili, Kikuyu and "
+                      "English, add translation and human review."},
+            {"title": "Clean read or verbatim",
+             "body": "On human-reviewed Swahili, Kikuyu and English orders, choose a cleaned-up read or a "
+                      "verbatim record that keeps every false start."},
+            {"title": "Word and text exports",
+             "body": "Download a .docx to annotate or a .txt to feed your analysis tools."},
+            {"title": "Human review where it counts",
+             "body": "Instant AI isn't reviewed by a person. For a published quote or a research record in "
+                      "Swahili, Kikuyu or English, add human review so a real editor checks it against the audio."},
+        ],
+        "cta_heading": "Try it on a real interview",
+        "cta_body": "A one-time $1 card check, credited to your account, unlocks your free minutes.",
+        "related": ["audio-to-text", "video-transcription", "captioning"],
+        "faq": [
+            {"q": "Is my recording kept private?",
+             "a": "Files are processed to produce your transcript and are only visible to your account "
+                  "and our staff. See our privacy policy for how files and our transcription provider are handled."},
+            {"q": "Can you transcribe interviews in Swahili or Kikuyu?",
+             "a": "Yes - Swahili through our AI plus optional human review, and Kikuyu through a real human "
+                  "transcriber, since no speech-recognition model supports it yet."},
+        ],
+    },
     "video-transcription": {
         "title": "Swahili, Kikuyu and English Video & Audio Transcription Services",
-        "meta_description": "Swahili, Kikuyu or English video and audio transcription, with real "
-                             "per-word timestamps - AI-drafted, checked word-by-word by a real "
+        "meta_description": "Swahili, Kikuyu or English video and audio transcription, with "
+                             "timestamped segments - AI-drafted, checked word-by-word by a real "
                              "editor against the source before delivery. Transparent per-minute "
                              "pricing, based in Kenya.",
         "kicker": "Swahili, Kikuyu and English transcription services",
@@ -1903,13 +2084,13 @@ SOLUTION_PAGES = {
                  "choice, in Swahili, Kikuyu, or English.",
         "why_heading": "Built for real transcription work",
         "points": [
-            {"title": "Every transcript human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+            {"title": "Human-reviewed transcripts, when you choose them",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio "
                       "word by word before it's marked ready - not just auto-generated and shipped."},
-            {"title": "Real per-word timestamps, not estimated",
-             "body": "Every word in your transcript carries its actual timing from the source audio, "
-                      "not a guess spread evenly across a sentence - useful for a searchable archive, "
-                      "a deposition record, or cueing up an exact moment in a long recording."},
+            {"title": "Timestamped segments you can jump to",
+             "body": "Every line of your transcript carries its start and end time from the source audio - "
+                      "useful for a searchable archive, a deposition record, or cueing up an exact moment "
+                      "in a long recording. (Timing is per line, not per word.)"},
             {"title": "Kikuyu goes through real human transcription",
              "body": "No automated speech-recognition model supports Kikuyu yet - orders in Kikuyu "
                       "go straight to a real human transcriber, not a lower-quality automated "
@@ -1920,10 +2101,10 @@ SOLUTION_PAGES = {
                       "pick what your actual use case needs."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits. Your first few minutes are "
-                      "free to test the accuracy yourself, no card required."},
+                      "free to test the accuracy yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "See the accuracy on your own audio",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-translation", "captioning", "video-localization"],
         "tour": {"mode": "upload", "filename": "deposition_recording.mp4"},
         "faq": [
@@ -1933,8 +2114,8 @@ SOLUTION_PAGES = {
                   "spoken, which is what a legal or research record typically needs instead. You "
                   "choose per order."},
             {"q": "Do you provide timestamps?",
-             "a": "Yes - every word carries its real timing from the source audio, not a guess spread "
-                  "evenly across a sentence."},
+             "a": "Yes - every line of the transcript carries its start and end time from the source audio. "
+                  "Timing is per line (segment), not per word."},
             {"q": "How is Kikuyu transcription handled?",
              "a": "A real human transcriber types the source by ear, since no speech-recognition model "
                   "supports Kikuyu yet - it costs a bit more per minute to cover that real labor."},
@@ -1962,18 +2143,18 @@ SOLUTION_PAGES = {
         "title": "Swahili to English Video Dubbing Services (and Kikuyu)",
         "meta_description": "Dub a Swahili video into English, or English into Swahili or Kikuyu - "
                              "AI-synthesized by default, a real human voice actor as an add-on, "
-                             "human-reviewed before delivery. Transparent per-minute pricing, based "
+                             "optional human review before delivery. Transparent per-minute pricing, based "
                              "in Kenya.",
         "kicker": "Swahili, Kikuyu and English video dubbing",
         "h1": "Dub a video between Swahili, Kikuyu and English, reviewed before it ships",
-        "intro": "Kauli pairs fast AI voice synthesis with a real editor on every order - a fully "
+        "intro": "Kauli pairs fast AI voice synthesis with a real editor on every Human-reviewed order - a fully "
                  "dubbed track, checked against the source audio line by line before it's marked "
                  "ready. Want a real human voice instead of a synthesized one? That's a real "
                  "add-on, not a different product.",
         "why_heading": "Built for real dubbing work, not a one-click gimmick",
         "points": [
-            {"title": "Every dub human-reviewed",
-             "body": "An AI-synthesized voice track is fast, but a real editor checks the "
+            {"title": "Human-reviewed dubs, when you choose them",
+             "body": "An AI-synthesized voice track is fast; on a Human-reviewed order a real editor checks the "
                       "translation and the audio against the source before it's marked ready."},
             {"title": "Burned-in captions or a dubbed video file",
              "body": "Get the dubbed audio track alone, or a full video with burned-in captions "
@@ -1984,10 +2165,10 @@ SOLUTION_PAGES = {
                       "confirmation of rights and consent before that ever runs. Never assumed."},
             {"title": "Transparent per-minute pricing",
              "body": "Pay for what you process - no bundled credits. Your first few minutes are "
-                      "free to test the quality yourself, no card required."},
+                      "free to test the quality yourself, after a one-time $1 card check, credited to your account."},
         ],
         "cta_heading": "Hear it on your own video first",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["voice-over", "captioning", "video-localization"],
         "tour": {"mode": "upload", "filename": "training_video.mp4"},
         "faq": [
@@ -2040,8 +2221,8 @@ SOLUTION_PAGES = {
             {"title": "Transcription, translation, subtitles, or a full dub",
              "body": "Pick what your video actually needs, or combine them - a translated "
                       "transcript, burned-in subtitles, or a fully dubbed track with captions."},
-            {"title": "Every order human-reviewed",
-             "body": "An AI draft is fast, but a real editor checks it against the source audio "
+            {"title": "Human-reviewed when you choose it",
+             "body": "An AI draft is fast; on a Human-reviewed order a real editor checks it against the source audio "
                       "line by line before it's marked ready, at every step, not just the final "
                       "output."},
             {"title": "Swahili, Kikuyu and English, done properly",
@@ -2053,7 +2234,7 @@ SOLUTION_PAGES = {
                       "needs - no bundled credits, first few minutes free to try."},
         ],
         "cta_heading": "See the full process on your own video",
-        "cta_body": "Upload a real clip or paste a YouTube link - no card required to try it.",
+        "cta_body": "Upload a real clip or paste a YouTube link - a one-time $1 card check, credited to your account, unlocks your free minutes.",
         "related": ["video-translation", "video-dubbing", "captioning"],
         "tour": {"mode": "upload", "filename": "documentary_segment.mp4"},
         "faq": [
@@ -2113,7 +2294,7 @@ def solution_page(request: Request, slug: str):
         for s in page.get("related", []) if s in SOLUTION_PAGES
     ]
     return templates.TemplateResponse(request, "solution_page.html",
-        {**_marketing_context(home="/"), "page": page, "related_pages": related_pages})
+        {**_marketing_context(home="/", market=_display_market(request)), "page": page, "related_pages": related_pages})
 
 
 def _display_market(request: Request) -> str:
@@ -2146,7 +2327,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "whatsapp_url": f"https://wa.me/{CONTACT_PHONE_WHATSAPP}",
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
-        "source_languages": SOURCE_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "sent": sent,
         "lead_error": lead_error,
@@ -2542,18 +2723,20 @@ def llms_txt(request: Request):
     solution_lines = "\n".join(f"- [{p['title']}]({base}/solutions/{slug})" for slug, p in SOLUTION_PAGES.items())
     body = f"""# Kauli
 
-> AI-drafted, human-verified transcription, translation and dubbing between
-> Swahili, Kikuyu and English, operated by Forge Media Services. Every order
-> is checked line-by-line by a real editor against the source audio before
-> delivery; nothing ships on AI output alone.
+> Audio and video transcription in 70+ languages (Instant AI), plus
+> translation, dubbing and subtitles between Swahili, Kikuyu and English,
+> operated by Forge Media Services. Two ways to order: Instant AI (ready in
+> minutes, AI-generated, not reviewed by a person) and Human-reviewed (a real
+> editor checks every line against the source audio before delivery).
 
 ## Pricing
 Per audio-minute, no bundled credits:
 {rates}
-First {billing.FREE_MINUTES_PER_MONTH:.0f} minutes free to try, no card required.
+First {billing.FREE_MINUTES_PER_MONTH:.0f} minutes free to try, after a one-time $1 card check, credited to your account.
 
 ## Languages
-Source: {', '.join(SOURCE_LANGUAGES.values())}. Translates into English or Swahili.
+Instant AI transcription: {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages (transcription only).
+Full service (translation, dubbing, human review): {', '.join(SOURCE_LANGUAGES.values())}, translating into English or Swahili.
 
 ## Key pages
 - [Homepage]({base}/) - overview, pricing, FAQ
@@ -3240,7 +3423,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "api_key_row": api_key_row, "new_api_key": new_api_key,
         "webhook_row": webhook_row, "webhook_deliveries": webhook_deliveries,
         "defaults_saved": defaults_saved, "password_error": password_error, "password_saved": password_saved,
-        "source_languages": SOURCE_LANGUAGES, "service_levels": billing.SERVICE_LEVELS,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "service_levels": billing.SERVICE_LEVELS,
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "deletion_requested": db.has_pending_deletion_request(user["id"]) if user["role"] == "client" else False,
         "webhook_error": webhook_error,
@@ -3687,7 +3870,7 @@ def staff_voice_actors(request: Request, notice: str | None = None, error: str |
         "actors": db.list_voice_actors(),
         "payouts_owed": db.list_payouts("owed"),
         "payouts_paid": db.list_payouts("paid")[:50],  # recent history, not the whole ledger forever
-        "source_languages": SOURCE_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
     })
 
 
@@ -4159,7 +4342,7 @@ def client_home(request: Request):
     return templates.TemplateResponse(request, "client_home.html", {
         "user": user, "greeting": greeting,
         "stats": stats, "recent_orders": orders[:6],
-        "source_languages": SOURCE_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
     })
 
 
@@ -4208,7 +4391,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
-        "source_languages": SOURCE_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "form_values": reorder_form_values,
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
@@ -4259,7 +4442,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
-        "source_languages": SOURCE_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "error": error,
         "exception_context": exception_context,
@@ -4546,7 +4729,7 @@ def create_order(
             return RedirectResponse(f"/client/orders/{existing['id']}", status_code=303)
     if service_level not in billing.SERVICE_LEVELS:
         return _client_dashboard_error(request, user, "Unknown service level.", form_values=form_values)
-    if source_lang not in SOURCE_LANGUAGES:
+    if source_lang not in LANGUAGE_NAMES:
         return _client_dashboard_error(request, user, "Unknown source language.", form_values=form_values)
     if target_lang not in ("en", "sw"):
         return _client_dashboard_error(request, user, "Unknown target language.", form_values=form_values)
@@ -4563,6 +4746,13 @@ def create_order(
         # A person has to transcribe these by hand (no ASR model) - there is
         # no such thing as an instant, no-human version of that.
         review_tier = "human"
+    if source_lang in AI_ONLY_LANGUAGES and (service_level != "transcribe" or review_tier != "ai"):
+        # Only the machine can do these: no reviewer, translator or voice for them.
+        return _client_dashboard_error(
+            request, user,
+            f"{AI_ONLY_LANGUAGES[source_lang]} is available as Instant AI transcription only - choose "
+            "'Instant AI' and 'Transcription only', or pick Swahili, English or Kikuyu for translation, "
+            "dubbing and human review.", form_values=form_values)
     addons = ["video_deliverables"] if addon_video_deliverables else []
     # Only meaningful on a full dub - there's no voice to record on a
     # transcription/translation-only order. Enforced here, not just by
@@ -6763,6 +6953,24 @@ def download_deliverable(request: Request, order_id: str, kind: str):
         if kind in ("audio", "burned", "dubbed") and not order_level["tts"]:
             return HTMLResponse("This order doesn't include a dubbed audio/video deliverable.", status_code=404)
 
+    if kind in ("txt", "docx"):
+        # Generated on demand from the finished job - plain text and Word are
+        # what most people expect from a transcription service, next to SRT.
+        if order["status"] not in db.TERMINAL_OK_STATUSES and user["role"] == "client":
+            return HTMLResponse("This order isn't ready yet.", status_code=404)
+        job = _load_job(order)
+        if job is None:
+            return HTMLResponse("Not ready yet.", status_code=404)
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(order["original_filename"] or "transcript").stem).strip("_") or "transcript"
+        title = f"Transcript - {order['original_filename'] or order['id']}"
+        if kind == "txt":
+            data, media = transcript_export.to_txt(job, title), "text/plain; charset=utf-8"
+        else:
+            data = transcript_export.to_docx(job, title)
+            media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        return Response(content=data, media_type=media,
+                        headers={"Content-Disposition": f'attachment; filename="{stem}_transcript.{kind}"'})
+
     files = {
         "audio": f"dub_{order['target_lang']}.wav",
         "srt": f"subs_{order['target_lang']}.srt",
@@ -8035,7 +8243,7 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     return templates.TemplateResponse(request, "editor.html", {
         "user": user, "order": order, "job": job,
         "has_translation": order_level["mt"], "has_dub": order_level["tts"],
-        "source_lang_name": SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"]),
+        "source_lang_name": LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"]),
         "target_lang_name": SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]),
         # The alt+p pluralize shortcut (editor.js:pluralizeWord) is a real
         # English grammar-rules algorithm - it only ever produces a
@@ -8044,7 +8252,7 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
         # This is the other language, whichever side it's actually on.
         "non_english_lang_name": (
             SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]) if order["source_lang"] == "en"
-            else SOURCE_LANGUAGES.get(order["source_lang"], order["source_lang"])
+            else LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"])
         ),
         "is_video": is_video_file(order["audio_path"]),
         "youtube_video_id": order["source_youtube_id"],

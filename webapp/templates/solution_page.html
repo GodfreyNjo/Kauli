@@ -25,7 +25,7 @@
   "description": {{ page.meta_description|tojson }},
   "provider": { "@type": "Organization", "name": "Kauli",
                 "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
-  "areaServed": "KE",
+  "areaServed": "Worldwide",
   "url": "{{ request.url }}"
 }
 </script>
@@ -69,7 +69,7 @@
       <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
       <a href="/#book" class="btn secondary">Book a call</a>
     </div>
-    <p class="m-hero-note">No card required to try it. Pay only for what you process, when you're ready.</p>
+    <p class="m-hero-note">Your first minutes are free after a one-time $1 card check, credited to your account. Then pay only for what you process.</p>
     {% if page.tour %}
     {% set tour_mode = page.tour.mode %}
     {% set tour_filename = page.tour.filename %}
@@ -99,15 +99,20 @@
       <h2 class="m-h2">Transparent per-minute pricing</h2>
       <p class="m-lede">No bundled credits, no opaque tiers - pay for what you actually process.</p>
       <table>
-        <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+        <thead><tr><th>Service</th><th>Instant AI</th><th>Human-reviewed</th></tr></thead>
         <tbody>
           {% for key, sl in service_levels.items() %}
-          <tr><td>{{ sl['name'] }}</td><td>${{ "%.2f"|format(sl['rate_per_min']) }} / audio-minute</td></tr>
+          <tr><td>{{ sl['name'] }}</td>
+              <td>${{ "%.2f"|format(price_card[key]['ai']) }}</td>
+              <td>${{ "%.2f"|format(price_card[key]['human']) }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
+      <p class="muted" style="margin-top:10px; font-size:0.85rem;">Per audio-minute, in USD. <strong>Instant AI</strong>
+         is ready in minutes and is AI-generated - not reviewed by a person. <strong>Human-reviewed</strong> adds a real
+         editor who checks the result against the source audio before delivery (Swahili, Kikuyu and English).</p>
       <p class="muted" style="margin-top:14px; font-size:0.85rem;">Your first {{ free_minutes|int }} minutes are free
-         to try, no card required. See the full breakdown, plans and add-ons on the <a href="/#pricing">main pricing
+         to try, after a one-time $1 card check, credited to your account. See the full breakdown, plans and add-ons on the <a href="/#pricing">main pricing
          section →</a></p>
 
       {% if page.fit_guide %}

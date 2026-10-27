@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block theme %}dark{% endblock %}
 {% block body_class %}m-public{% endblock %}
-{% block title %}Swahili &amp; Kikuyu Dubbing, Translation and Subtitles{% endblock %}
+{% block title %}Audio &amp; Video Transcription in 70+ Languages - Swahili, Kikuyu Dubbing &amp; Subtitles{% endblock %}
 {% block head_extra %}
-<meta name="description" content="Convert a Swahili or Kikuyu video to English, or back - dubbing, translation, subtitles and captions for YouTube or any video, AI-drafted in minutes, verified line-by-line by a human editor. Transparent per-minute pricing.">
-<meta property="og:title" content="Kauli - Swahili, Kikuyu and English dubbing and translation">
-<meta property="og:description" content="Convert a Swahili or Kikuyu video to English, or back - AI-drafted, human-verified dubbing, translation and subtitles. Transparent per-minute pricing.">
+<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, from {{ '%.2f'|format(price_card['transcribe']['ai']) }} USD per minute - plus AI translation, dubbing and subtitles, with optional human review. Specialists in Swahili and Kikuyu. Pay as you go, first {{ free_minutes|int }} minutes free.">
+<meta property="og:title" content="Kauli - Audio &amp; video transcription in 70+ languages, with Swahili and Kikuyu done right">
+<meta property="og:description" content="Instant AI transcription, translation and dubbing - or add a real human reviewer. Transparent per-minute pricing, pay as you go.">
 <meta property="og:type" content="website">
 <meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png">
 <meta name="twitter:card" content="summary_large_image">
@@ -20,7 +20,7 @@
   "logo": "{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png",
   "email": "{{ email }}",
   "telephone": "{{ phone_tel }}",
-  "areaServed": "KE",
+  "areaServed": "Worldwide",
   "paymentAccepted": "Card, M-Pesa",
   "founder": { "@type": "Person", "name": "Godfrey Njoroge" },
   "parentOrganization": { "@type": "Organization", "name": "Forge Media Services" }
@@ -39,7 +39,7 @@
   "@context": "https://schema.org",
   "@type": "Product",
   "name": "Kauli",
-  "description": "AI-drafted, human-verified Swahili, Kikuyu and English dubbing, translation and subtitles, priced per audio-minute.",
+  "description": "Instant AI transcription in 70+ languages, plus translation, dubbing and subtitles for Swahili, Kikuyu and English with optional human review. Priced per audio-minute.",
   "brand": { "@type": "Brand", "name": "Forge Media Services" },
   "offers": [
     {% for key, sl in service_levels.items() %}
@@ -69,24 +69,26 @@
   {% include "_nav.html" %}
 
   <section class="m-hero">
-    <span class="kicker">AI-drafted, human-verified localization</span>
-    <h1>Swahili <span class="hero-arrow">↔</span> English dubbing, without the six-week turnaround</h1>
+    <span class="kicker">Instant AI · optional human review</span>
+    <h1>Turn audio and video into text in 70+ languages - and get Swahili &amp; Kikuyu right</h1>
     <p class="m-hero-sub">
-      Broadcast-ready subtitles, transcripts, or a full dub - priced by the minute,
-      human-reviewed before delivery.
+      Transcripts, subtitles, translation and dubbing in minutes, from
+      ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per audio-minute. Need it checked by a person?
+      Add human review for the work you'll put your name on.
     </p>
     <div class="m-hero-ctas">
-      <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
-      <a href="#book" class="btn secondary">Book a call</a>
+      <a href="/login?mode=signup" class="btn cta-olive">Transcribe free - first {{ free_minutes|int }} minutes on us</a>
+      <a href="#pricing" class="btn secondary">See pricing</a>
     </div>
-    <p class="m-hero-note">No card required to try it. Pay only for what you process, when you're ready.</p>
+    <p class="m-hero-note">Pay as you go - no subscription needed. Upload a file or paste a YouTube link.</p>
 
-    <!-- Real, true, already-substantiated claims - not aspirational badges.
-         Every line here is something the site can actually back up (see
-         "How it works" for the human-review step, the pricing page for
-         the published rate, the consent-gated-cloning card above). -->
+    <!-- Real, already-substantiated claims only - not aspirational badges,
+         and no borrowed logos or made-up usage counters. Instant AI is
+         labelled as AI-generated everywhere; human review is a separate,
+         optional tier. -->
     <div class="m-hero-trust">
-      <span>✓ Every order human-reviewed before delivery</span>
+      <span>✓ Instant AI - ready in minutes</span>
+      <span>✓ Optional human review before delivery</span>
       <span>✓ Transparent per-minute pricing, published below</span>
       <span>✓ Consent required before any voice is cloned</span>
     </div>
@@ -108,7 +110,75 @@
       {% for code, label in source_languages.items() %}
       <span class="m-lang-pill">{{ label }}</span>
       {% endfor %}
-      <span class="m-lang-pill m-lang-more">+ more Kenyan languages coming</span>
+      <span class="m-lang-pill m-lang-more">+ {{ ai_only_languages|length }} more languages</span>
+    </div>
+  </section>
+
+  <!-- The two ways to order - the single most important thing a new visitor
+       needs to understand, so it sits right under the hero. Prices come from
+       the visitor's own market card. -->
+  <section class="m-section" id="choose">
+    <div class="m-inner">
+      <h2 class="m-h2">Two ways to order - pick the speed you need</h2>
+      <p class="m-lede">Same upload, same deliverables. The only difference is whether a person checks the result first.</p>
+      <div class="m-grid-3">
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>Instant AI</h3>
+          <p style="margin:0 0 8px;"><strong>From ${{ '%.2f'|format(price_card['transcribe']['ai']) }}/min</strong>
+             - transcription. ${{ '%.2f'|format(price_card['translate']['ai']) }} with translation,
+             ${{ '%.2f'|format(price_card['dub']['ai']) }} for a full dub.</p>
+          <ul class="m-feature-bullets">
+            <li>Ready in minutes, not days</li>
+            <li>Transcription in {{ ai_only_languages|length + source_languages|length }} languages</li>
+            <li>AI-generated - not reviewed by a person, and labelled that way</li>
+            <li>Your first {{ free_minutes|int }} minutes are free</li>
+          </ul>
+        </div>
+        <div class="m-feature">
+          <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
+          <h3>Human-reviewed</h3>
+          <p style="margin:0 0 8px;"><strong>From ${{ '%.2f'|format(price_card['transcribe']['human']) }}/min</strong>
+             - transcription. ${{ '%.2f'|format(price_card['translate']['human']) }} with translation,
+             ${{ '%.2f'|format(price_card['dub']['human']) }} for a full dub.</p>
+          <ul class="m-feature-bullets">
+            <li>AI draft, then a real reviewer checks it against the audio</li>
+            <li>Catches names, idioms and context AI alone misses</li>
+            <li>For Swahili, Kikuyu and English</li>
+            <li>For subtitles, publishing and anything with your name on it</li>
+          </ul>
+        </div>
+        <div class="m-feature trust">
+          <div class="m-feature-icon shield">{% include "_icon_shield.svg" %}</div>
+          <h3>Swahili &amp; Kikuyu specialists</h3>
+          <ul class="m-feature-bullets">
+            <li>Kenyan Swahili and Kikuyu, which generic tools handle poorly</li>
+            <li>Translate to and from English with dubbed voice</li>
+            <li>Optional real human voice actor on a dub</li>
+            <li>Consent required before any voice is cloned</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted" style="text-align:center; margin-top:14px; font-size:0.88rem;">
+        Prices shown for {{ 'Kenya &amp; East Africa'|safe if display_market == 'ea' else 'the US &amp; international'|safe }}
+        - <a href="#pricing">full price list</a>.</p>
+    </div>
+  </section>
+
+  <section class="m-section" id="languages" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
+    <div class="m-inner">
+      <h2 class="m-h2">Transcribe in {{ ai_only_languages|length + source_languages|length }} languages</h2>
+      <p class="m-lede">Instant AI transcription covers all of these. Translation, dubbing and human review are
+         available for Swahili, Kikuyu and English.</p>
+      <div class="m-hero-langs" style="margin-top:8px;">
+        {% for code, label in source_languages.items() %}
+        <span class="m-lang-pill" style="border-color:var(--accent);">{{ label }}</span>
+        {% endfor %}
+        {% for code, label in ai_only_languages.items()|sort(attribute='1') %}
+        <span class="m-lang-pill">{{ label }}</span>
+        {% endfor %}
+      </div>
+      <p style="text-align:center; margin-top:18px;"><a href="/login?mode=signup" class="btn cta-olive">Try it free</a></p>
     </div>
   </section>
 
@@ -497,9 +567,9 @@
       <div class="m-grid-3">
         <div class="m-feature">
           <div class="m-feature-icon ok">{% include "_icon_check.svg" %}</div>
-          <h3>AI speed, human accuracy</h3>
+          <h3>AI speed, with human accuracy when you want it</h3>
           <ul class="m-feature-bullets">
-            <li>Every line human-checked, not just AI-drafted</li>
+            <li>Choose Human-reviewed and every line is checked by a person, not just AI-drafted</li>
             <li>Re-listened against the source audio</li>
             <li>Catches names, idioms and context AI alone misses</li>
           </ul>
@@ -570,13 +640,13 @@
               <td>Speed</td>
               <td class="m-compare-ok">Minutes</td>
               <td class="m-compare-bad">Often 1-2+ weeks</td>
-              <td class="m-compare-us"><span class="m-compare-pill ok">Minutes for the draft, human-checked after</span></td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Minutes (Instant AI), or human-checked (Human-reviewed)</span></td>
             </tr>
             <tr>
               <td>Human review before delivery</td>
               <td class="m-compare-bad">None. No human check.</td>
               <td class="m-compare-neutral">Yes, but adds weeks to turnaround</td>
-              <td class="m-compare-us"><span class="m-compare-pill ok">Yes, every line</span></td>
+              <td class="m-compare-us"><span class="m-compare-pill ok">Yes - every line, on Human-reviewed orders</span></td>
             </tr>
             <tr>
               <td>Pricing</td>
@@ -600,8 +670,8 @@
       <div class="m-compare-mobile">
         <div class="m-compare-card winner">
           <h4>Kauli</h4>
-          <div class="m-compare-card-row"><span>Speed</span><strong class="text-green">Minutes, human-checked</strong></div>
-          <div class="m-compare-card-row"><span>Human review</span><strong class="text-green">Yes, every line</strong></div>
+          <div class="m-compare-card-row"><span>Speed</span><strong class="text-green">Minutes, human-checked if you choose</strong></div>
+          <div class="m-compare-card-row"><span>Human review</span><strong class="text-green">Yes, on Human-reviewed orders</strong></div>
           <div class="m-compare-card-row"><span>Pricing</span><strong class="text-green">Published per-minute rate</strong></div>
           <div class="m-compare-card-row"><span>Voice-clone consent</span><strong class="text-green">Required, every time</strong></div>
         </div>
@@ -852,9 +922,9 @@
     </div>
     <div class="exit-popup-body">
       <h2 id="exit-popup-title">Still deciding?</h2>
-      <p class="exit-popup-lede">Try Kauli with your first {{ free_minutes|int }} minutes free -
-         no card required.</p>
-      <p class="exit-popup-sub">See real, human-verified results before you commit to anything.</p>
+      <p class="exit-popup-lede">Try Kauli with your first {{ free_minutes|int }} minutes of Instant AI transcription free -
+         after a one-time $1 card check that's credited to your account.</p>
+      <p class="exit-popup-sub">See real results before you commit to anything.</p>
       <a href="/login?mode=signup" class="btn cta-olive exit-popup-cta">Start free now</a>
     </div>
   </div>
