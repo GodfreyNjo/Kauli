@@ -1789,7 +1789,8 @@ def resolve_deletion_request(request_id: str, resolved_by: str, status: str = "d
 # ------------------------------------------------------------------ blog ----
 # Small, fixed set matching what's actually been written - not a full
 # taxonomy speculatively built ahead of having enough posts to need one.
-BLOG_CATEGORIES = ("Accessibility & Compliance", "Localization", "Process & Quality", "Trust & Safety")
+BLOG_CATEGORIES = ("Accessibility & Compliance", "Localization", "Process & Quality", "Trust & Safety",
+                   "Transcription Guides")
 
 
 def create_blog_post(slug: str, title: str, description: str, body_html: str,

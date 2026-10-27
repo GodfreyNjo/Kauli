@@ -14,12 +14,26 @@
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "{{ post['title']|replace('\\', '\\\\')|replace('"', '\\"') }}",
+  {% if post['description'] %}"description": {{ post['description']|tojson }},{% endif %}
+  "image": "{{ request.url.scheme }}://{{ request.url.netloc }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-logo-full.png' }}",
+  "inLanguage": "en",
   "author": { "@type": "Person", "name": "{{ author_name }}",
               "worksFor": { "@type": "Organization", "name": "Forge Media Services" } },
   "publisher": { "@type": "Organization", "name": "Forge Media Services" },
   {% if published_at_iso %}"datePublished": "{{ published_at_iso }}",{% endif %}
   {% if updated_at_iso %}"dateModified": "{{ updated_at_iso }}",{% endif %}
   "mainEntityOfPage": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Kauli", "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
+    { "@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog" },
+    { "@type": "ListItem", "position": 3, "name": {{ post['title']|tojson }}, "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}" }
+  ]
 }
 </script>
 {% include "_ga.html" %}
