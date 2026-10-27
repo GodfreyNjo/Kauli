@@ -177,6 +177,12 @@
         <td>
           {% if key == current_plan %}
             <span class="plan-active-pill">✓ Active</span>
+            {% if recurring and key != 'free' %}
+            <form method="post" action="/client/billing/cancel-subscription" style="margin-top:6px;"
+                  onsubmit="return confirm('Stop auto-renewal? You keep this plan until the period you paid for ends.');">
+              <button type="submit" class="secondary" style="border:1px solid var(--border); background:none; font-size:0.78rem;">Cancel auto-renewal</button>
+            </form>
+            {% endif %}
           {% elif key == 'free' %}
             -
           {% elif key == 'enterprise' %}
@@ -214,11 +220,13 @@
 <div class="card">
   <h2>Usage rates (charged per order, beyond your free minutes)</h2>
   <table class="usage-rates-table">
-    <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+    <thead><tr><th>Service</th>{% for tkey, tier in review_tiers.items() %}<th>{{ tier['name'] }}</th>{% endfor %}</tr></thead>
     <tbody>
-      <tr><td>Transcription only</td><td>$0.40/audio-minute</td></tr>
-      <tr><td>Transcription + translation</td><td>$0.90/audio-minute</td></tr>
-      <tr><td>Full dub (voice + video)</td><td>$1.50/audio-minute</td></tr>
+      {% for key, sl in service_levels.items() %}
+      <tr><td>{{ sl['name'] }}</td>
+        {% for tkey in review_tiers %}<td>${{ "%.2f"|format(price_card[key][tkey]) }}/audio-minute</td>{% endfor %}
+      </tr>
+      {% endfor %}
     </tbody>
   </table>
   <p class="muted" style="margin-top:10px;">Your plan's discount applies automatically at checkout. A rush

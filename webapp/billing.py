@@ -32,7 +32,81 @@ SERVICE_LEVELS = {
             "asr": True, "mt": True, "tts": True},
 }
 
-FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - transcription-only, preview-only, see below
+# ------------------------------------------------------- market pricing ----
+# Two products, two markets. "ai" is the instant tier: Transkriptor/Claude/
+# TTS output delivered the moment the pipeline finishes, with NO human in the
+# loop (so it must always be labelled "AI-generated, not human-reviewed").
+# "human" is the original Kauli product: AI draft, then a real reviewer signs
+# it off before the client sees it. Rates are USD per audio-minute.
+#
+# Approved 2026-10-27 after benchmarking Transkriptor ($0.0035-0.033/min
+# effective), Happy Scribe ($0.20/min PAYG, $2.00 human), Rev ($1.99 human),
+# Rask ($0.67-1.10 dub) and ElevenLabs (~$0.18-0.91 dub). Estimated cost to
+# us: ~$0.01-0.015 AI transcription, ~$0.05-0.08 AI dub (see
+# ESTIMATED_AI_COST_PER_MINUTE) - a planning figure until the real
+# Transkriptor API rate is confirmed.
+#
+# NOT in the approved card, my own interpolation - change freely: the human-
+# reviewed TRANSLATION rows ("translate"/"human": 1.40 intl, 0.75 ea), picked
+# so the human-review fee on top of the AI rate stays consistent with the
+# approved transcript and dub rows. Without them the core product
+# (human-verified Swahili<->English subtitles) would have no price at all.
+REVIEW_TIERS = {
+    "ai": {"name": "Instant AI", "human_reviewed": False,
+           "blurb": "Ready in minutes. AI-generated - not reviewed by a person."},
+    "human": {"name": "Human-reviewed", "human_reviewed": True,
+              "blurb": "AI draft, then a real reviewer checks and signs it off before delivery."},
+}
+MARKETS = {
+    "intl": "United States & international",
+    "ea": "Kenya & East Africa",
+    # Accounts created before market pricing existed. Keep paying what they
+    # always paid for the human-reviewed product (SERVICE_LEVELS rates above);
+    # they also get the new instant AI tier at East-Africa AI prices. Staff can
+    # move an account to a real market (db.set_billing_market).
+    "legacy": "Existing account pricing",
+}
+PRICE_CARD = {
+    "intl": {
+        "transcribe": {"ai": 0.12, "human": 1.20},
+        "translate": {"ai": 0.30, "human": 1.40},
+        "dub": {"ai": 0.80, "human": 2.00},
+    },
+    "ea": {
+        "transcribe": {"ai": 0.06, "human": 0.60},
+        "translate": {"ai": 0.15, "human": 0.75},
+        "dub": {"ai": 0.50, "human": 1.20},
+    },
+}
+DEFAULT_MARKET = "intl"
+# Display-only/signup default: where a visitor is, per Cloudflare's
+# CF-IPCountry header. A VPN can fake it - the account market is fixed at
+# signup and only staff can change it, so it's a nudge, not a lock.
+EAST_AFRICA_COUNTRIES = {"KE", "UG", "TZ", "RW", "BI", "ET", "SS", "SO", "DJ", "ER"}
+
+
+def market_for_country(country_code: str | None) -> str:
+    return "ea" if (country_code or "").strip().upper() in EAST_AFRICA_COUNTRIES else DEFAULT_MARKET
+
+
+def rate_for(service_level: str, market: str | None, review_tier: str = "human") -> float:
+    """The per-minute rate for one service level in one market/tier. Unknown
+    or legacy markets fall back to the original SERVICE_LEVELS rates for the
+    human tier, and to East-Africa AI prices for the AI tier."""
+    review_tier = review_tier if review_tier in REVIEW_TIERS else "human"
+    if market in PRICE_CARD:
+        return PRICE_CARD[market][service_level][review_tier]
+    if review_tier == "ai":
+        return PRICE_CARD["ea"][service_level]["ai"]
+    return SERVICE_LEVELS[service_level]["rate_per_min"]
+
+
+def price_card_for(market: str | None) -> dict:
+    """{service_level: {"ai": rate, "human": rate}} for templates/JS."""
+    return {sl: {t: rate_for(sl, market, t) for t in REVIEW_TIERS} for sl in SERVICE_LEVELS}
+
+
+FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - AI transcription only, preview-only, see below
 
 # The free allowance only ever buys transcription - not translation, not a
 # dub. It's a "see the AI transcription quality for yourself" trial, not a
@@ -200,7 +274,7 @@ def credits_to_usd(credits: float) -> float:
 
 def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_available: float,
                     addons: list[str] | None = None, wallet_credits_available: float = 0.0,
-                    rush: bool = False) -> dict:
+                    rush: bool = False, market: str | None = None, review_tier: str = "human") -> dict:
     """The actual per-order charge: apply whatever's left of the free
     monthly allowance first (in minutes - the trial is always denominated
     in minutes of transcription, see FREE_MINUTES_SERVICE_LEVEL), discount
@@ -214,7 +288,7 @@ def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_a
     breakdown, not just a number, so the checkout page can show its work
     rather than asking someone to trust a single figure."""
     addons = [a for a in (addons or []) if a in ADDONS and plan not in ADDONS[a]["included_in"]]
-    rate = SERVICE_LEVELS[service_level]["rate_per_min"]
+    rate = rate_for(service_level, market, review_tier)
     discount = PLANS[plan]["discount"]
 
     free_applied = min(minutes, max(0.0, free_minutes_available))
@@ -240,6 +314,7 @@ def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_a
     total = round(after_discount - credits_applied_usd + addon_cost + rush_surcharge_usd, 2)
     return {
         "minutes": round(minutes, 2), "rate_per_min": rate,
+        "market": market or "legacy", "review_tier": review_tier,
         "free_minutes_applied": round(free_applied, 2),
         "billable_minutes": round(billable_minutes, 2),
         "gross_usd": gross, "discount_pct": discount, "discount_usd": discount_amount,
@@ -307,6 +382,9 @@ def custom_credit_price(minutes_equiv: float) -> dict:
 # once you have real Claude billing data to calibrate against. Treat
 # anything the margin dashboard shows as directional, not exact accounting.
 ESTIMATED_AI_COST_PER_MINUTE = {
+    # Planning estimate for Transkriptor via the API (~$0.0035-0.033/min
+    # depending on plan) - replace with the real rate once confirmed.
+    "transkriptor": 0.015,
     "faster-whisper": 0.0, "stub": 0.0,
     "local": 0.0, "claude": 0.02,  # <- placeholder, replace with your real observed rate
     "piper": 0.0, "xtts": 0.0,
@@ -315,6 +393,13 @@ ESTIMATED_AI_COST_PER_MINUTE = {
 
 def test_client_emails() -> set[str]:
     return {e.strip().lower() for e in os.environ.get("KAULI_TEST_CLIENT_EMAILS", "").split(",") if e.strip()}
+
+
+def _is_recurring(subscription) -> bool:
+    try:
+        return bool(subscription["paystack_subscription_code"])
+    except (IndexError, KeyError):
+        return False
 
 
 def effective_plan(user, subscription) -> str:
@@ -328,7 +413,8 @@ def effective_plan(user, subscription) -> str:
         return "free"
     if subscription["status"] != "active":
         return "free"
-    if subscription["current_period_end"] and subscription["current_period_end"] < time.time():
+    grace = RECURRING_GRACE_DAYS * 86400 if _is_recurring(subscription) else 0
+    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time():
         return "free"  # lapsed - don't silently keep paid benefits past the period
     return subscription["plan"]
 
@@ -382,34 +468,67 @@ def paystack_configured() -> bool:
     return bool(_paystack_key())
 
 
-def paystack_initialize(email: str, amount_usd: float, reference: str, callback_url: str) -> dict:
+def paystack_currency() -> str:
+    """The currency Kauli asks Paystack to charge in: 'KES' (the default) or
+    'USD'. A Kenya-registered Paystack merchant account originally rejected
+    USD charges ("Currency not supported by merchant"); once Paystack enables
+    USD on the account, set PAYSTACK_CURRENCY=USD and every card charge is
+    taken in dollars - which is what a US customer needs, instead of seeing a
+    converted KES amount on their statement. Unset = KES, nothing changes."""
+    return "USD" if os.environ.get("PAYSTACK_CURRENCY", "").strip().upper() == "USD" else "KES"
+
+
+def paystack_plan_code(plan: str) -> str | None:
+    """Paystack plan code (PLN_...) for a subscription plan, from
+    PAYSTACK_PLAN_PRO / PAYSTACK_PLAN_PREMIUM. Created in the Paystack
+    dashboard (Products -> Plans, monthly, priced to match PLANS). Unset =
+    that plan is still sold as a one-off 30-day purchase, as before."""
+    return (os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}", "").strip() or None)
+
+
+# How long past current_period_end a RECURRING (Paystack-subscribed) account
+# keeps its plan, so a renewal that lands a day late - or a 31-day month
+# against our fixed 30-day period - never drops a paying client to Free.
+RECURRING_GRACE_DAYS = 3
+
+
+def paystack_initialize(email: str, amount_usd: float, reference: str, callback_url: str,
+                        plan_code: str | None = None) -> dict:
     """Returns {"authorization_url": ...} on success, {"error": ...} on
     failure - callers redirect the client to authorization_url, which is
     Paystack's own hosted checkout page. We never see or touch card data.
 
-    Charges in KES, not USD - discovered live against a real key that a
-    Kenya-registered Paystack merchant account doesn't accept USD charges
-    at all ("Currency not supported by merchant", not an auth error - the
-    key itself was valid). Converts with the same usd_to_kes() M-Pesa
-    already uses, so every payment path quotes in USD (the pricing model)
-    but actually charges in KES (what the merchant account supports) the
-    same way. All prices/pricing displayed to clients stay USD; only the
-    actual currency of the charge changes."""
+    Currency follows PAYSTACK_CURRENCY (see paystack_currency): KES by
+    default - converted with the same usd_to_kes() M-Pesa uses, because a
+    Kenya merchant account didn't accept USD at first - or USD directly once
+    that's enabled on the account. Prices shown to clients are always USD.
+
+    plan_code (a Paystack PLN_ code) turns the charge into a RECURRING
+    subscription: Paystack then bills the card every month on its own. For
+    a plan charge Paystack uses the plan's own amount/currency (it ignores
+    ours), so the plan in the dashboard must be priced like PLANS."""
     key = _paystack_key()
     if not key:
         return {"error": "Paystack isn't configured (PAYSTACK_SECRET_KEY missing)."}
-    amount_kes, _rate_source = usd_to_kes(amount_usd)
+    currency = paystack_currency()
+    if currency == "USD":
+        charge_amount = amount_usd
+    else:
+        charge_amount, _rate_source = usd_to_kes(amount_usd)
+    body = {
+        "email": email,
+        "amount": int(round(charge_amount * 100)),  # Paystack wants the smallest unit
+        "currency": currency,
+        "reference": reference,
+        "callback_url": callback_url,
+    }
+    if plan_code:
+        body["plan"] = plan_code
     try:
         resp = httpx.post(
             "https://api.paystack.co/transaction/initialize",
             headers={"Authorization": f"Bearer {key}"},
-            json={
-                "email": email,
-                "amount": int(round(amount_kes * 100)),  # Paystack wants the smallest unit
-                "currency": "KES",
-                "reference": reference,
-                "callback_url": callback_url,
-            },
+            json=body,
             timeout=10,
         )
         data = resp.json()
@@ -418,6 +537,27 @@ def paystack_initialize(email: str, amount_usd: float, reference: str, callback_
         return {"authorization_url": data["data"]["authorization_url"]}
     except Exception as exc:
         return {"error": f"Couldn't reach Paystack: {exc}"}
+
+
+def paystack_disable_subscription(subscription_code: str, email_token: str) -> dict:
+    """Cancel a recurring Paystack subscription (stops future renewals; the
+    client keeps what they've already paid for until the period ends)."""
+    key = _paystack_key()
+    if not key:
+        return {"ok": False, "error": "Paystack isn't configured."}
+    try:
+        resp = httpx.post(
+            "https://api.paystack.co/subscription/disable",
+            headers={"Authorization": f"Bearer {key}"},
+            json={"code": subscription_code, "token": email_token},
+            timeout=10,
+        )
+        data = resp.json()
+        if not data.get("status"):
+            return {"ok": False, "error": data.get("message", "Paystack rejected the cancellation.")}
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": f"Couldn't reach Paystack: {exc}"}
 
 
 def paystack_verify(reference: str) -> dict:

@@ -237,22 +237,53 @@
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
     const selected = $('input[name="service_level"]:checked');
+
+    // Review tier: Instant AI vs Human-reviewed. A manual-transcription
+    // language (no ASR model - a person types it) is always human-reviewed,
+    // mirroring create_order's server-side override.
+    const tierLangSelect = $("#source-lang-select");
+    const tierManualLangs = tierLangSelect ? (tierLangSelect.dataset.manualLangs || "").split(",").filter(Boolean) : [];
+    const tierForced = !!(tierLangSelect && tierManualLangs.includes(tierLangSelect.value));
+    if (tierForced) {
+      const humanRadio = $('input[name="review_tier"][value="human"]');
+      if (humanRadio) humanRadio.checked = true;
+    }
+    $all('input[name="review_tier"]').forEach((r) => { r.disabled = tierForced && r.value !== "human"; });
+    const forcedNote = $("#review-tier-forced-note");
+    if (forcedNote) forcedNote.hidden = !tierForced;
+    const tierRadio = $('input[name="review_tier"]:checked');
+    const tier = tierRadio ? tierRadio.value : "human";
+    const isAiTier = tier === "ai";
+    // Per-service rate for the chosen tier, from the account's own price card.
+    $all('input[name="service_level"]').forEach((r) => {
+      r.dataset.rate = isAiTier ? r.dataset.rateAi : r.dataset.rateHuman;
+    });
+    $all(".tier-price").forEach((el) => { el.textContent = "$" + (isAiTier ? el.dataset.ai : el.dataset.human); });
+    // Rush = manually jumping the human review queue; an instant order has none.
+    const rushField = $("#rush-checkbox");
+    if (rushField) {
+      const rushLabel = rushField.closest("label");
+      if (rushLabel) rushLabel.hidden = isAiTier;
+      if (isAiTier) rushField.checked = false;
+    }
+
     const rate = selected ? Number(selected.dataset.rate) : 0;
     const serviceName = selected ? selected.dataset.name : "-";
-    $("#price-service").textContent = serviceName;
+    $("#price-service").textContent = serviceName + (isAiTier ? " - Instant AI" : " - Human-reviewed");
     // Mirrors billing.FREE_MINUTES_SERVICE_LEVEL server-side - free minutes
-    // only ever apply to a transcription-only order, so the estimate here
-    // has to match what create_order() will actually charge.
-    const freeMinutesEligible = selected && selected.value === "transcribe";
+    // only ever apply to an INSTANT AI transcription-only order, so the
+    // estimate here has to match what create_order() will actually charge.
+    const freeMinutesEligible = selected && selected.value === "transcribe" && isAiTier;
 
     // Voice cloning only ever runs on a full dub - no point asking for
     // cloning consent on a transcription/translation-only order.
     const consentField = $("#voice-clone-consent-field");
     if (consentField) consentField.hidden = !(selected && selected.value === "dub");
 
-    // Same reasoning - a human voice actor only makes sense on a full dub.
+    // Same reasoning - a human voice actor only makes sense on a full dub,
+    // and only on the human-reviewed tier (it's a human step).
     const humanVoiceField = $("#human-voice-field");
-    const isDub = !!(selected && selected.value === "dub");
+    const isDub = !!(selected && selected.value === "dub") && !isAiTier;
     if (humanVoiceField) humanVoiceField.hidden = !isDub;
     const humanVoiceBox = $("#human-voice-checkbox");
     const humanVoiceChecked = isDub && humanVoiceBox && humanVoiceBox.checked;
@@ -337,6 +368,7 @@
 
   function bindPricing() {
     $all('input[name="service_level"]').forEach((r) => r.addEventListener("change", updatePricing));
+    $all('input[name="review_tier"]').forEach((r) => r.addEventListener("change", updatePricing));
     const addonBox = $("#addon-checkbox");
     if (addonBox) addonBox.addEventListener("change", updatePricing);
     const humanVoiceBoxEl = $("#human-voice-checkbox");

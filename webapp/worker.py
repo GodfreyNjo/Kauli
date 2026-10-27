@@ -28,6 +28,12 @@ from . import db, logging_setup, mailer, notifications  # noqa: E402
 
 log = logging_setup.get_logger("worker")
 
+# Set by app.py at import time (this module can't import app.py - circular).
+# Called with the order row after an instant-AI order is delivered, to do
+# what staff_approve does for a human-approved one: fire the client's
+# order.ready webhook and kick off any burned-caption/dubbed-video render.
+ai_order_ready_hook = None
+
 MAX_RETRIES = 2
 RETRY_BACKOFF_S = (5, 20)  # delay before retry attempt 1, then attempt 2
 
@@ -148,14 +154,30 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
         # flagged_count/content_safety_flagged still matter for how the
         # order is presented in the review queue, just not for whether
         # review happens at all.
-        final_status = "awaiting_review"
+        #
+        # The ONE exception is the instant AI tier (review_tier == 'ai'),
+        # which the client chose and paid for precisely because it skips
+        # review - it's delivered the moment the pipeline finishes, labelled
+        # everywhere as AI-generated and not human-reviewed. A content-safety
+        # flag still forces human review, so a flagged upload never
+        # auto-delivers.
+        is_instant_ai = (order["review_tier"] == "ai") and not order["content_safety_flagged"]
+        final_status = "ready_for_delivery" if is_instant_ai else "awaiting_review"
         db.update_order_status(order_id, final_status)
         db.set_order_ai_cost(order_id, job.cost_usd)
         log.info("job finished", extra={"job_id": order_id, "user_id": order["client_id"],
                                          "final_status": final_status, "flagged_count": job.flagged_count,
                                          "ai_cost_usd": job.cost_usd})
         order = db.get_order(order_id)  # re-fetch: status/ai_cost above are now current
-        notify_staff_needs_review(order)
+        if is_instant_ai:
+            notify_client_order_ready(order)
+            if ai_order_ready_hook:
+                try:
+                    ai_order_ready_hook(order)
+                except Exception:  # noqa: BLE001 - webhook/video-render trouble must not fail a delivered order
+                    log.warning("ai_order_ready_hook failed", extra={"job_id": order_id}, exc_info=True)
+        else:
+            notify_staff_needs_review(order)
     except Exception as exc:  # noqa: BLE001 - surface it to the client/staff UI
         retry_count = db.increment_retry_count(order_id)
         if retry_count <= MAX_RETRIES:

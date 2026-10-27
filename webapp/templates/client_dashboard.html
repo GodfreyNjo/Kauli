@@ -106,15 +106,33 @@
     <div class="wizard-pane" data-pane="2" hidden>
       <div class="wizard-grid">
         <div>
+          {% set chosen_tier = form_values.get('review_tier') or default_review_tier %}
+          <fieldset class="tiers" id="review-tier-fieldset">
+            <legend>How should we deliver it?</legend>
+            {% for tkey, tier in review_tiers.items() %}
+            <label class="tier-option">
+              <input type="radio" name="review_tier" value="{{ tkey }}" {% if tkey == chosen_tier %}checked{% endif %}>
+              <div>
+                <strong>{{ tier['name'] }}</strong>
+                <p>{{ tier['blurb'] }}</p>
+              </div>
+            </label>
+            {% endfor %}
+            <p class="muted" id="review-tier-forced-note" hidden style="font-size:0.82rem; margin:6px 0 0;">
+              This language is transcribed by one of our team by hand, so it is always human-reviewed.</p>
+          </fieldset>
+
           <fieldset class="tiers" id="tier-fieldset">
             <legend>What do you need?</legend>
             {% for key, level in service_levels.items() %}
             <label class="tier-option">
-              <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ level['rate_per_min'] }}"
+              <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ price_card[key][chosen_tier] }}"
+                     data-rate-ai="{{ price_card[key]['ai'] }}" data-rate-human="{{ price_card[key]['human'] }}"
                      data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'transcribe') %}checked{% endif %}>
               <div>
                 <strong>{{ level['name'] }}</strong>
-                <p>${{ "%.2f"|format(level['rate_per_min']) }}/audio-minute.</p>
+                <p><span class="tier-price" data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}"
+                         data-human="{{ '%.2f'|format(price_card[key]['human']) }}">${{ "%.2f"|format(price_card[key][chosen_tier]) }}</span>/audio-minute.</p>
               </div>
             </label>
             {% endfor %}

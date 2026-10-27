@@ -43,7 +43,8 @@
   "brand": { "@type": "Brand", "name": "Forge Media Services" },
   "offers": [
     {% for key, sl in service_levels.items() %}
-    { "@type": "Offer", "name": "{{ sl['name'] }}", "priceCurrency": "USD", "price": "{{ '%.2f'|format(sl['rate_per_min']) }}" }{{ "," if not loop.last }}
+    { "@type": "Offer", "name": "{{ sl['name'] }} - Instant AI (per audio-minute)", "priceCurrency": "USD", "price": "{{ '%.2f'|format(price_card[key]['ai']) }}" },
+    { "@type": "Offer", "name": "{{ sl['name'] }} - Human-reviewed (per audio-minute)", "priceCurrency": "USD", "price": "{{ '%.2f'|format(price_card[key]['human']) }}" }{{ "," if not loop.last }}
     {% endfor %}
   ]
 }
@@ -626,19 +627,27 @@
     <div class="m-inner">
       <span class="m-payg-badge">Pay as you go</span>
       <h2 class="m-h2">Simple, per-minute pricing</h2>
-      <p class="m-lede">No subscription required - pay only for the minutes you actually process. The first
-         {{ free_minutes|int }} minutes every month are free, on every plan, subscribed or not.</p>
+      <p class="m-lede">No subscription required - pay only for the minutes you actually process. Choose
+         <strong>Instant AI</strong> (ready in minutes, AI-generated, not reviewed by a person) or
+         <strong>Human-reviewed</strong> (AI draft, then a real reviewer signs it off). Your first
+         {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
+      <p class="muted" style="margin:-6px 0 14px; font-size:0.9rem;">
+        Prices shown for: <strong>{{ 'Kenya &amp; East Africa'|safe if display_market == 'ea' else 'United States &amp; international'|safe }}</strong>
+        - <a href="/?market={{ 'intl' if display_market == 'ea' else 'ea' }}#pricing">see {{ 'US &amp; international'|safe if display_market == 'ea' else 'Kenya &amp; East Africa'|safe }} prices</a>.
+        All prices in USD per audio-minute.</p>
 
       <div class="m-pricing-unified">
         <div class="m-rates-card">
           <table>
-            <thead><tr><th>Service</th><th>Rate</th></tr></thead>
+            <thead><tr><th>Service</th><th>Instant AI</th><th>Human-reviewed</th></tr></thead>
             <tbody>
               {% for key, sl in service_levels.items() %}
-              <tr><td>{{ sl['name'] }}</td><td>${{ "%.2f"|format(sl['rate_per_min']) }} / audio-minute</td></tr>
+              <tr><td>{{ sl['name'] }}</td>
+                  <td>${{ "%.2f"|format(price_card[key]['ai']) }}</td>
+                  <td>${{ "%.2f"|format(price_card[key]['human']) }}</td></tr>
               {% endfor %}
-              <tr><td>+ Real human voice actor (on a full dub)</td><td>+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }} / audio-minute</td></tr>
-              <tr><td>+ Video deliverables (burned captions + dubbed video)</td><td>+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }} / audio-minute</td></tr>
+              <tr><td>+ Real human voice actor (on a human-reviewed full dub)</td><td>-</td><td>+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }}</td></tr>
+              <tr><td>+ Video deliverables (burned captions + dubbed video)</td><td>+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}</td><td>+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}</td></tr>
             </tbody>
           </table>
         </div>
@@ -652,7 +661,10 @@
             <label>Service
               <select id="calc-service">
                 {% for key, sl in service_levels.items() %}
-                <option value="{{ sl['rate_per_min'] }}" {% if key == 'dub' %}selected{% endif %}>{{ sl['name'] }}</option>
+                {% for tkey, tier in review_tiers.items() %}
+                <option value="{{ price_card[key][tkey] }}" data-tier="{{ tkey }}" data-service="{{ key }}"
+                        {% if key == 'transcribe' and tkey == 'ai' %}selected{% endif %}>{{ sl['name'] }} - {{ tier['name'] }}</option>
+                {% endfor %}
                 {% endfor %}
               </select>
             </label>
@@ -680,7 +692,10 @@
             var minutes = Math.max(0, Number(minutesEl.value) || 0);
             var rate = Number(serviceEl.value) || 0;
             var serviceName = serviceEl.options[serviceEl.selectedIndex].text;
-            var freeApplied = Math.min(minutes, freeMinutes);
+            var opt = serviceEl.options[serviceEl.selectedIndex];
+            // Free minutes only ever apply to Instant AI transcription.
+            var freeEligible = opt.getAttribute('data-service') === 'transcribe' && opt.getAttribute('data-tier') === 'ai';
+            var freeApplied = freeEligible ? Math.min(minutes, freeMinutes) : 0;
             var billable = Math.max(0, minutes - freeApplied);
             var total = billable * rate;
             totalEl.textContent = '$' + total.toFixed(2);

@@ -127,6 +127,23 @@
 
   {% if tab == 'settings' %}
     <div class="card">
+      <h2 style="margin-top:0;">Price card</h2>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Which per-minute rates this account pays. Set automatically
+        at signup from the visitor's country; clients can't change it themselves. "Existing account pricing" keeps the
+        original human-reviewed rates.</p>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/market" class="row" style="align-items:flex-end;">
+        <label>Market
+          <select name="market">
+            {% for mkey, mlabel in markets.items() %}
+            <option value="{{ mkey }}" {% if mkey == client_market %}selected{% endif %}>{{ mlabel }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit" class="secondary">Save</button>
+      </form>
+    </div>
+
+    <div class="card">
       <h2 style="margin-top:0;">Internal notes</h2>
       <p class="muted" style="font-size:0.82rem; margin-top:0;">Never shown to the client - just for you.</p>
       <form method="post" action="/staff/clients/{{ client['id'] }}/notes">

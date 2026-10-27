@@ -1319,12 +1319,19 @@ templates.env.globals["status_bar_chart_svg"] = charts.status_bar_chart_svg
 # fabricated client counts.
 MARKETING_FAQ = [
     {"q": "How much does Swahili to English translation or dubbing cost?",
-     "a": f"Transcription is ${billing.SERVICE_LEVELS['transcribe']['rate_per_min']:.2f} per audio-minute, "
-          f"transcription plus translation is ${billing.SERVICE_LEVELS['translate']['rate_per_min']:.2f}, "
-          f"and a full dub (transcription, translation and a synthesized voice track) is "
-          f"${billing.SERVICE_LEVELS['dub']['rate_per_min']:.2f} per audio-minute. "
-          f"The first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes every month are free on every plan, "
-          "and a Pro or Premium plan discounts every minute beyond that."},
+     "a": "There are two ways to order, both priced per audio-minute. Instant AI is ready in minutes "
+          "and is AI-generated, not reviewed by a person: in the US and internationally it's "
+          f"${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} for transcription, "
+          f"${billing.PRICE_CARD['intl']['translate']['ai']:.2f} with translation and "
+          f"${billing.PRICE_CARD['intl']['dub']['ai']:.2f} for a full dub (Kenya and East Africa: "
+          f"${billing.PRICE_CARD['ea']['transcribe']['ai']:.2f}, ${billing.PRICE_CARD['ea']['translate']['ai']:.2f} "
+          f"and ${billing.PRICE_CARD['ea']['dub']['ai']:.2f}). Human-reviewed adds a real reviewer who checks and "
+          f"signs off the work before delivery: ${billing.PRICE_CARD['intl']['transcribe']['human']:.2f}, "
+          f"${billing.PRICE_CARD['intl']['translate']['human']:.2f} and ${billing.PRICE_CARD['intl']['dub']['human']:.2f} "
+          f"internationally (Kenya and East Africa: ${billing.PRICE_CARD['ea']['transcribe']['human']:.2f}, "
+          f"${billing.PRICE_CARD['ea']['translate']['human']:.2f} and ${billing.PRICE_CARD['ea']['dub']['human']:.2f}). "
+          f"Your first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are free, "
+          "and a Pro or Premium plan discounts every paid minute."},
     {"q": "What's the difference between verbatim and clean read?",
      "a": "Clean read is fully cleaned-up, grammatically readable text - the default, and what most "
           "subtitling and dubbing work uses. Verbatim keeps every false start, filler word and stutter "
@@ -2109,7 +2116,19 @@ def solution_page(request: Request, slug: str):
         {**_marketing_context(home="/"), "page": page, "related_pages": related_pages})
 
 
-def _marketing_context(sent: bool = False, lead_error: str | None = None, home: str = "") -> dict:
+def _display_market(request: Request) -> str:
+    """Which price card a PUBLIC page shows: an explicit ?market=intl|ea
+    wins (the on-page switcher), otherwise the visitor's country from
+    Cloudflare's CF-IPCountry header. Display only - an account's real
+    market is fixed at signup (see the signup block in the login handler)."""
+    explicit = request.query_params.get("market")
+    if explicit in ("intl", "ea"):
+        return explicit
+    return billing.market_for_country(request.headers.get("cf-ipcountry"))
+
+
+def _marketing_context(sent: bool = False, lead_error: str | None = None, home: str = "",
+                        market: str = billing.DEFAULT_MARKET) -> dict:
     """Shared by both marketing.html render points below - keeps them from
     quietly drifting apart the way two copies of the same context dict
     always eventually do. home="" on the homepage itself (bare #anchor
@@ -2117,6 +2136,8 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
     #how/#demo/etc. sections of its own to scroll to)."""
     return {
         "user": None, "home": home,
+        "display_market": market, "price_card": billing.price_card_for(market),
+        "review_tiers": billing.REVIEW_TIERS,
         "plans": billing.PLANS, "service_levels": billing.SERVICE_LEVELS,
         "addons": billing.ADDONS,
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
@@ -2344,7 +2365,7 @@ def index(request: Request):
         return RedirectResponse(
             "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
     return templates.TemplateResponse(request, "marketing.html",
-        _marketing_context(sent=request.query_params.get("sent") == "1"))
+        _marketing_context(sent=request.query_params.get("sent") == "1", market=_display_market(request)))
 
 
 @app.get("/terms", response_class=HTMLResponse)
@@ -2507,8 +2528,12 @@ def llms_txt(request: Request):
     already-published fact (pricing, languages, contact) - nothing
     invented for this file specifically."""
     base = f"{request.url.scheme}://{request.url.netloc}"
-    rates = "\n".join(f"- {sl['name']}: ${sl['rate_per_min']:.2f} per audio-minute"
-                       for sl in billing.SERVICE_LEVELS.values())
+    rates = "\n".join(
+        f"- {sl['name']}: Instant AI (not human-reviewed) ${billing.PRICE_CARD['intl'][key]['ai']:.2f}, "
+        f"human-reviewed ${billing.PRICE_CARD['intl'][key]['human']:.2f} per audio-minute "
+        f"(US/international; Kenya & East Africa: ${billing.PRICE_CARD['ea'][key]['ai']:.2f} / "
+        f"${billing.PRICE_CARD['ea'][key]['human']:.2f})"
+        for key, sl in billing.SERVICE_LEVELS.items())
     posts = db.list_blog_posts(published_only=True)
     post_lines = "\n".join(f"- [{p['title']}]({base}/blog/{p['slug']})" for p in posts[:20])
     # Derived from SOLUTION_PAGES itself, not hand-typed - a previous
@@ -2722,6 +2747,11 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
             _queue_welcome_message(user, base_url=str(request.base_url))
             _notify_internal_new_signup(user, base_url=str(request.base_url))
             _capture_signup_ip_intel(user["id"], request)
+            # Price card for this account: US/international vs East Africa,
+            # from Cloudflare's visitor-country header (absent when hit
+            # directly -> the international card). Fixed from here on; only
+            # staff can change it (see /staff/clients/{id}/market).
+            db.set_billing_market(user["id"], billing.market_for_country(request.headers.get("cf-ipcountry")))
     request.session["user_id"] = user["id"]
     # Clicking a deep link from an email (an order, a receipt, billing)
     # while logged out used to always land back on the generic dashboard
@@ -4171,6 +4201,9 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "user": user, "orders": orders, "unread": unread, "anthropic_available": anthropic_available,
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
+        "review_tiers": billing.REVIEW_TIERS,
+        "price_card": billing.price_card_for(db.get_billing_market(user["client_scope_id"])),
+        "default_review_tier": ("human" if db.get_billing_market(user["client_scope_id"]) == "legacy" else "ai"),
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
@@ -4219,6 +4252,9 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "anthropic_available": bool(os.environ.get("ANTHROPIC_API_KEY")),
         "plan": plan, "plans": billing.PLANS, "addons": billing.ADDONS,
         "service_levels": billing.SERVICE_LEVELS,
+        "review_tiers": billing.REVIEW_TIERS,
+        "price_card": billing.price_card_for(db.get_billing_market(user["client_scope_id"])),
+        "default_review_tier": ("human" if db.get_billing_market(user["client_scope_id"]) == "legacy" else "ai"),
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
@@ -4461,6 +4497,7 @@ def create_order(
     folder_name: str = Form(""),
     voice_clone_consent: str = Form(""),
     rush: str = Form(""),
+    review_tier: str = Form(""),
 ):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -4482,7 +4519,7 @@ def create_order(
         "instr_existing_subs": instr_existing_subs, "instr_no_audio": instr_no_audio,
         "instr_wrong_language": instr_wrong_language, "instr_instrumental_only": instr_instrumental_only,
         "instr_notes": instr_notes, "folder_name": folder_name,
-        "voice_clone_consent": voice_clone_consent, "rush": rush,
+        "voice_clone_consent": voice_clone_consent, "rush": rush, "review_tier": review_tier,
     }
     # Real ASR/MT/TTS work behind every accepted submission - a much
     # tighter budget than the global per-IP limit above, keyed on the
@@ -4513,12 +4550,26 @@ def create_order(
         return _client_dashboard_error(request, user, "Unknown source language.", form_values=form_values)
     if target_lang not in ("en", "sw"):
         return _client_dashboard_error(request, user, "Unknown target language.", form_values=form_values)
+    # Market pricing: the price card is the TEAM OWNER's (fixed at signup,
+    # staff-changeable) - never something the submitter picks per order.
+    # review_tier is the one thing they do pick: 'ai' (instant, no human
+    # review) or 'human' (the original reviewed flow). A missing/unknown
+    # value means the old behaviour (human), so any older client of this
+    # endpoint keeps working exactly as before.
+    billing_market = db.get_billing_market(user["client_scope_id"])
+    if review_tier not in billing.REVIEW_TIERS:
+        review_tier = "human"
+    if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
+        # A person has to transcribe these by hand (no ASR model) - there is
+        # no such thing as an instant, no-human version of that.
+        review_tier = "human"
     addons = ["video_deliverables"] if addon_video_deliverables else []
     # Only meaningful on a full dub - there's no voice to record on a
     # transcription/translation-only order. Enforced here, not just by
     # hiding the checkbox client-side - a submitted form field for the
-    # wrong service level is simply ignored, not trusted.
-    wants_human_voice_over = bool(addon_human_voice_over) and service_level == "dub"
+    # wrong service level is simply ignored, not trusted. Also human-tier
+    # only: a human voice actor is a human step, which the instant tier skips.
+    wants_human_voice_over = bool(addon_human_voice_over) and service_level == "dub" and review_tier == "human"
     if wants_human_voice_over:
         addons.append("human_voice_over")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
@@ -4708,7 +4759,10 @@ def create_order(
     # closes. Whatever's granted here is real and already spent the moment
     # this call returns, whether or not the rest of this order ends up
     # needing payment.
-    if service_level == billing.FREE_MINUTES_SERVICE_LEVEL:
+    if service_level == billing.FREE_MINUTES_SERVICE_LEVEL and review_tier == "ai":
+        # (The free trial only ever buys the INSTANT AI tier now - it's
+        # "see the AI transcription quality for yourself", and it must not
+        # cost us a human reviewer's time.)
         # Real-person gate before the first free minute is ever actually
         # spent - see billing.TRIAL_VERIFICATION_FEE_USD's own comment for
         # why this exists and what it costs the client (nothing real: it
@@ -4723,7 +4777,9 @@ def create_order(
         free_minutes_for_this_order = db.reserve_free_minutes(user["client_scope_id"], minutes, free_cap)
     else:
         free_minutes_for_this_order = 0.0
-    is_rush = bool(rush)
+    # Rush = Godfrey manually jumping the review queue - meaningless for an
+    # instant AI order, which has no queue.
+    is_rush = bool(rush) and review_tier == "human"
     # Same double-spend concern as free minutes above, for prepaid credits:
     # reserve atomically rather than read-then-consume-later. The ceiling a
     # reservation could possibly need is a pure function of minutes/rate/
@@ -4732,11 +4788,13 @@ def create_order(
     # ceiling, reserve up to it (see db.reserve_wallet_credits), then price
     # it again for real with whatever was actually granted.
     preliminary_cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
-                                               addons=addons, wallet_credits_available=0.0, rush=is_rush)
+                                               addons=addons, wallet_credits_available=0.0, rush=is_rush,
+                                               market=billing_market, review_tier=review_tier)
     credits_ceiling = billing.usd_to_credits(preliminary_cost["gross_usd"] - preliminary_cost["discount_usd"])
     reserved_credits = db.reserve_wallet_credits(user["client_scope_id"], credits_ceiling)
     cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
-                                   addons=addons, wallet_credits_available=reserved_credits, rush=is_rush)
+                                   addons=addons, wallet_credits_available=reserved_credits, rush=is_rush,
+                                   market=billing_market, review_tier=review_tier)
     # order_cost_usd silently drops any addon the plan already includes -
     # reflect that back so we never store/charge for one that didn't apply.
     applied_addons = [line["key"] for line in cost["addons"]]
@@ -4764,7 +4822,8 @@ def create_order(
         # longer "pending".
         db.mark_pending_import_ordered(user["id"], youtube_video_id)
     db.set_order_billing(order_id, service_level, minutes, cost["total_usd"], addons=applied_addons,
-                          cost_breakdown=cost, is_rush=is_rush)
+                          cost_breakdown=cost, is_rush=is_rush, review_tier=review_tier,
+                          billing_market=billing_market)
     if is_free_preview:
         db.set_order_free_preview(order_id, True)
     if content_safety_flagged:
@@ -4826,9 +4885,10 @@ def create_order(
         # straight to processing, same as the old free experience. Usage
         # was already recorded above by db.reserve_free_minutes at the
         # moment it was granted - not repeated here.
-        deadlines = tat.compute_deadlines(plan, service_level, minutes, rush=is_rush)
-        db.set_order_deadlines(order_id, deadlines["start_at"], deadlines["internal_deadline_at"],
-                                deadlines["deadline_at"])
+        if review_tier == "human":  # an instant AI order has no human turnaround to promise or watch
+            deadlines = tat.compute_deadlines(plan, service_level, minutes, rush=is_rush)
+            db.set_order_deadlines(order_id, deadlines["start_at"], deadlines["internal_deadline_at"],
+                                    deadlines["deadline_at"])
         worker.submit_job(order_id)
         return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
 
@@ -4858,7 +4918,7 @@ _STEP_FOR_STATUS = {
 }
 
 
-def _order_progress_steps(status: str) -> list[dict]:
+def _order_progress_steps(status: str, review_tier: str = "human") -> list[dict]:
     """Real step states for order_detail.html's progress tracker - never
     a fixed animation, always derived from the actual order.status. Two
     real statuses don't fit a clean "moving forward" story and get their
@@ -4867,10 +4927,16 @@ def _order_progress_steps(status: str) -> list[dict]:
     (something broke) both mark their step 'attention' instead of
     'current' or 'done'."""
     current_key = _STEP_FOR_STATUS.get(status, "submitted")
-    current_idx = next((i for i, (k, _) in enumerate(_PROGRESS_STEPS) if k == current_key), 0)
+    # An instant AI order never goes through staff review - don't show a
+    # "Staff review" step it skips. (If a content-safety flag DID route it to
+    # review, its status is awaiting_review and the step is needed.)
+    step_defs = _PROGRESS_STEPS
+    if review_tier == "ai" and status not in ("awaiting_review", "editor_returned", "returned_to_client"):
+        step_defs = [s for s in _PROGRESS_STEPS if s[0] != "staff_review"]
+    current_idx = next((i for i, (k, _) in enumerate(step_defs) if k == current_key), 0)
     attention = status in ("returned_to_client", "failed", "dead_letter")
     steps = []
-    for i, (key, label) in enumerate(_PROGRESS_STEPS):
+    for i, (key, label) in enumerate(step_defs):
         if i < current_idx:
             state = "done"
         elif i == current_idx:
@@ -4926,7 +4992,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
-        "progress_steps": _order_progress_steps(order["status"]),
+        "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
     })
@@ -5195,7 +5261,31 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "credit_packages": billing.CREDIT_PACKAGES,
         "service_levels": billing.SERVICE_LEVELS,
+        "price_card": billing.price_card_for(db.get_billing_market(user["client_scope_id"])),
+        "review_tiers": billing.REVIEW_TIERS,
+        "recurring": bool(subscription) and billing._is_recurring(subscription),
     })
+
+
+@app.post("/client/billing/cancel-subscription")
+def billing_cancel_subscription(request: Request):
+    """Stop a recurring Paystack subscription from renewing. The client keeps
+    the plan until the period they already paid for ends. Team owner only,
+    like every other billing action."""
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    subscription = db.get_subscription(user["id"])
+    if not subscription or not billing._is_recurring(subscription) or not subscription["paystack_email_token"]:
+        return RedirectResponse("/client/billing?error=No+auto-renewing+subscription+to+cancel.", status_code=303)
+    result = billing.paystack_disable_subscription(subscription["paystack_subscription_code"],
+                                                   subscription["paystack_email_token"])
+    if not result["ok"]:
+        return RedirectResponse(f"/client/billing?error={quote(result['error'])}", status_code=303)
+    db.set_paystack_subscription(user["id"], None, None)
+    return RedirectResponse(
+        "/client/billing?notice=Auto-renewal+cancelled.+You+keep+your+plan+until+the+period+you+paid+for+ends.",
+        status_code=303)
 
 
 @app.get("/client/verify-trial", response_class=HTMLResponse)
@@ -5258,6 +5348,19 @@ def buy_wallet_credits(request: Request, package: str = Form(""), provider: str 
                       payment_kind=f"credits_topup:{pkg['credits']}")
 
 
+def _order_rate_per_min(order) -> float:
+    """What this order's per-minute rate actually was - the rate frozen at
+    creation (cost_breakdown_json), not today's price card, so a later price
+    change can't alter an existing order's surcharge math. Orders from before
+    the breakdown existed fall back to the original service-level rate."""
+    try:
+        if order["cost_breakdown_json"]:
+            return float(json.loads(order["cost_breakdown_json"])["rate_per_min"])
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+        pass
+    return billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["rate_per_min"]
+
+
 def _order_receipt_line_items(order) -> list[dict] | None:
     """Real per-service breakdown for an order's receipt, straight from the
     billing.order_cost_usd() result frozen onto the order at creation time
@@ -5281,7 +5384,9 @@ def _order_receipt_line_items(order) -> list[dict] | None:
                    f"× ${rate:.2f}/min")
     else:
         detail = f"{minutes:.1f} min × ${rate:.2f}/min"
-    lines = [{"label": level["name"], "detail": detail, "amount_usd": cost["gross_usd"]}]
+    tier_label = ("Instant AI, not human-reviewed" if order["review_tier"] == "ai"
+                   else "Human-reviewed")
+    lines = [{"label": f"{level['name']} - {tier_label}", "detail": detail, "amount_usd": cost["gross_usd"]}]
     if cost.get("discount_pct"):
         lines.append({"label": f"Plan discount ({cost['discount_pct'] * 100:.0f}%)",
                        "detail": None, "amount_usd": -cost["discount_usd"]})
@@ -5349,10 +5454,11 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
             # moment they paid for one big order, even though they'd never
             # touched their free minutes. Found and fixed 2026-08-23.
             db.update_order_status(payment["order_id"], "queued")
-            deadlines = tat.compute_deadlines(order["tier"], order["service_level"],
-                                               order["duration_minutes"] or 0, rush=bool(order["is_rush"]))
-            db.set_order_deadlines(payment["order_id"], deadlines["start_at"],
-                                    deadlines["internal_deadline_at"], deadlines["deadline_at"])
+            if order["review_tier"] != "ai":  # instant AI orders have no human turnaround to promise
+                deadlines = tat.compute_deadlines(order["tier"], order["service_level"],
+                                                   order["duration_minutes"] or 0, rush=bool(order["is_rush"]))
+                db.set_order_deadlines(payment["order_id"], deadlines["start_at"],
+                                        deadlines["internal_deadline_at"], deadlines["deadline_at"])
             order = db.get_order(payment["order_id"])  # re-fetch with the deadline fields now set
             worker.submit_job(payment["order_id"])
         level = billing.SERVICE_LEVELS.get(order["service_level"]) if order else None
@@ -5497,7 +5603,12 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "paystack", order_id=order_id,
                            meta=json.dumps({"kind": payment_kind, "ga_client_id": ga_client_id}))
         callback_url = str(request.base_url).rstrip("/") + f"/billing/callback/paystack?payment_id={payment_id}"
-        result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url)
+        # A plan purchase (no order) on a plan that has a Paystack plan code
+        # configured becomes a RECURRING subscription; anything else (orders,
+        # top-ups, plans without a code) stays a one-off charge.
+        plan_code = billing.paystack_plan_code(plan) if (order_id is None and payment_kind == "order") else None
+        result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url,
+                                              plan_code=plan_code)
         if "error" in result:
             db.fail_payment(payment_id)
             _note_payment_failure(user["client_scope_id"], order_id, "Paystack", result["error"])
@@ -5736,13 +5847,72 @@ async def paystack_webhook(request: Request):
         return JSONResponse({"error": "invalid signature"}, status_code=401)
 
     event = json.loads(raw_body)
-    if event.get("event") == "charge.success":
-        data = event["data"]
+    kind = event.get("event")
+    data = event.get("data") or {}
+    base_url = str(request.base_url)
+    if kind == "charge.success":
         payment_id = data["reference"]
         payment = db.get_payment(payment_id)
         if payment:
-            _activate_payment(payment, data.get("id", payment_id), base_url=str(request.base_url))
+            _activate_payment(payment, data.get("id", payment_id), base_url=base_url)
+        else:
+            # Not a payment we initiated: a recurring subscription RENEWAL,
+            # which Paystack charges itself under its own reference.
+            _handle_subscription_renewal(data, base_url)
+    elif kind == "subscription.create":
+        # Gives us the code + email_token needed to cancel it later. The
+        # subscriptions row already exists by now (the first charge.success
+        # activated the plan), but webhook order isn't guaranteed - retry
+        # briefly by simply writing whenever we can find the user.
+        customer = (data.get("customer") or {})
+        user = db.get_user_by_email((customer.get("email") or "").strip().lower())
+        if user and data.get("subscription_code"):
+            db.set_paystack_subscription(user["id"], data["subscription_code"], data.get("email_token"))
+    elif kind in ("subscription.disable", "subscription.not_renew"):
+        # Nothing to revoke - the client keeps what they paid for until
+        # current_period_end, then effective_plan drops them to Free. Just
+        # stop treating them as auto-renewing (no more grace period).
+        customer = (data.get("customer") or {})
+        user = db.get_user_by_email((customer.get("email") or "").strip().lower())
+        if user:
+            db.set_paystack_subscription(user["id"], None, None)
+            db.create_notification(user["id"], "subscription_ended",
+                                    "Your Kauli subscription won't renew",
+                                    link="/client/billing")
+    elif kind == "invoice.payment_failed":
+        customer = (data.get("customer") or {})
+        user = db.get_user_by_email((customer.get("email") or "").strip().lower())
+        if user:
+            db.create_notification(user["id"], "subscription_payment_failed",
+                                    "Your Kauli subscription payment failed - update your card",
+                                    link="/client/billing")
+            notifications.notify_staff("Kauli: a subscription payment failed",
+                                        f"{user['email']}'s recurring subscription charge failed.")
     return JSONResponse({"ok": True})
+
+
+def _handle_subscription_renewal(data: dict, base_url: str) -> None:
+    """charge.success for a charge we didn't initiate = Paystack renewing a
+    recurring subscription. Matches the customer by email and the plan by its
+    Paystack plan code (PAYSTACK_PLAN_*), records a real payment row, and runs
+    it through _activate_payment so the plan period extends, a receipt is
+    issued and emailed - exactly like a first purchase. Anything that doesn't
+    match a known plan code + known customer is ignored, never guessed at."""
+    plan_code = ((data.get("plan") or {}).get("plan_code") or "").strip()
+    if not plan_code:
+        return
+    plan = next((p for p in billing.PLANS if p != "free" and billing.paystack_plan_code(p) == plan_code), None)
+    user = db.get_user_by_email(((data.get("customer") or {}).get("email") or "").strip().lower())
+    provider_ref = str(data.get("id") or data.get("reference") or "")
+    if not (plan and user and provider_ref):
+        return
+    payment_id = billing.new_reference()
+    amount_usd = billing.PLANS[plan]["price_usd"]
+    db.create_payment(payment_id, user["id"], plan, amount_usd, None, billing.paystack_currency(), "paystack",
+                       meta=json.dumps({"kind": "subscription_renewal"}))
+    payment = db.get_payment(payment_id)
+    if payment and not _activate_payment(payment, provider_ref, base_url=base_url):
+        db.fail_payment(payment_id)  # a webhook retry for a renewal already recorded - don't leave a pending orphan
 
 
 @app.post("/webhooks/mpesa")
@@ -6225,7 +6395,27 @@ def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
         "api_key_row": db.get_client_api_key(client_id) if tab == "settings" else None,
         "webhook_row": db.get_client_webhook(client_id) if tab == "settings" else None,
         "trial_payment": db.get_trial_verification_payment(client_id) if tab == "settings" else None,
+        "markets": billing.MARKETS, "client_market": db.get_billing_market(client_id),
     })
+
+
+@app.post("/staff/clients/{client_id}/market")
+def staff_client_set_market(request: Request, client_id: str, market: str = Form(...)):
+    """Move an account to another price card (US/international, Kenya & East
+    Africa, or back to the legacy rates). Staff-only on purpose - the market
+    is fixed at signup precisely so a client can't pick the cheaper card."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    client = db.get_user(client_id)
+    if not client or client["role"] != "client":
+        return HTMLResponse("Client not found.", status_code=404)
+    if market not in billing.MARKETS:
+        return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&error=Unknown+market.", status_code=303)
+    db.set_billing_market(client_id, market)
+    db.log_security_event("billing_market_changed", user_id=user["id"], email=client["email"],
+                           ip_address=rate_limit.client_ip(request), detail=f"-> {market}")
+    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Price+card+updated.", status_code=303)
 
 
 @app.post("/staff/clients/{client_id}/notes")
@@ -7399,9 +7589,7 @@ def staff_review(request: Request, order_id: str, error: str | None = None, noti
     has_video_source = is_video_file(order["audio_path"]) or bool(order["source_youtube_id"])
     difficulty_rate = audio_difficulty_rate(job) if job else 0.0
     suggested_surcharge_usd = round(
-        (order["duration_minutes"] or 0) * billing.SERVICE_LEVELS.get(
-            order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["rate_per_min"]
-        * DIFFICULTY_SURCHARGE_DEFAULT_PCT, 2)
+        (order["duration_minutes"] or 0) * _order_rate_per_min(order) * DIFFICULTY_SURCHARGE_DEFAULT_PCT, 2)
 
     assigned_actor = db.get_voice_actor(order["voice_actor_id"]) if order["voice_actor_id"] else None
     order_client = db.get_user(order["client_id"])
@@ -7443,8 +7631,7 @@ def staff_difficulty_surcharge(request: Request, order_id: str, action: str = Fo
         if reason not in db.EXTRA_CHARGE_REASONS:
             reason = "other"
         pct = max(0.01, min(1.0, pct / 100))
-        usd = round((order["duration_minutes"] or 0) * billing.SERVICE_LEVELS.get(
-            order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["rate_per_min"] * pct, 2)
+        usd = round((order["duration_minutes"] or 0) * _order_rate_per_min(order) * pct, 2)
         db.propose_difficulty_surcharge(order_id, pct, usd, note.strip() or None, reason=reason)
         reason_label = db.EXTRA_CHARGE_REASONS[reason]
         db.create_message(
@@ -7738,6 +7925,27 @@ def staff_approve(request: Request, order_id: str, next: str = Form("")):
             return RedirectResponse(f"/staff/orders/{nxt['id']}/editor", status_code=303)
         return RedirectResponse("/staff", status_code=303)
     return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
+
+
+class _PublicBaseRequest:
+    """Just enough of a Request for _order_to_api_dict/_deliverable_link
+    (they only read .base_url) when there's no real HTTP request - i.e. the
+    background worker finishing an instant-AI order."""
+    def __init__(self, base: str):
+        self.base_url = base.rstrip("/") + "/"
+
+
+def _on_instant_ai_order_ready(order) -> None:
+    """What staff_approve does for a human-approved order, for an instant-AI
+    one that just auto-delivered: the client's order.ready webhook (needs a
+    public base URL for the signed download links - skipped if
+    KAULI_PUBLIC_BASE_URL isn't set) and any paid video-deliverable render."""
+    if worker.PUBLIC_BASE_URL:
+        _fire_client_webhook(_PublicBaseRequest(worker.PUBLIC_BASE_URL), order, "order.ready")
+    _maybe_auto_render_video_deliverables(order)
+
+
+worker.ai_order_ready_hook = _on_instant_ai_order_ready
 
 
 # --------------------------------------------------------- word editor ----

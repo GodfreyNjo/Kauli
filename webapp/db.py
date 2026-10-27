@@ -732,6 +732,12 @@ def init_db() -> None:
         # actually logged in since this shipped would be misleading, not
         # just harmless; "never recorded yet" is the honest starting state.
         conn.execute("ALTER TABLE users ADD COLUMN last_seen_at REAL")
+    if "billing_market" not in existing_user_cols:
+        # Which price card this account pays (billing.PRICE_CARD). Every
+        # account that exists when this ships is 'legacy' - they keep paying
+        # what they always paid for the human-reviewed product. New client
+        # signups get 'intl' or 'ea' explicitly (see app.py's signup block).
+        conn.execute("ALTER TABLE users ADD COLUMN billing_market TEXT NOT NULL DEFAULT 'legacy'")
     if "mfa_enabled_at" not in existing_user_cols:
         # NULL = two-factor not enabled. The actual source of truth for
         # WHETHER a login needs the MFA challenge is Supabase's own
@@ -878,6 +884,13 @@ def init_db() -> None:
         conn.execute("ALTER TABLE orders ADD COLUMN service_level TEXT")
         conn.execute("ALTER TABLE orders ADD COLUMN duration_minutes REAL")
         conn.execute("ALTER TABLE orders ADD COLUMN cost_usd REAL")
+    if "review_tier" not in existing_order_cols:
+        # 'human' = the original flow (waits for staff sign-off), 'ai' = the
+        # instant tier (delivered when the pipeline finishes, never touches
+        # the review queue unless content-safety flagged). Every order that
+        # exists today is 'human' - which is exactly what it was.
+        conn.execute("ALTER TABLE orders ADD COLUMN review_tier TEXT NOT NULL DEFAULT 'human'")
+        conn.execute("ALTER TABLE orders ADD COLUMN billing_market TEXT")
     if "addons" not in existing_order_cols:
         # Paid upgrades this order bought above its plan's default features
         # (see billing.ADDONS) - a JSON list, e.g. '["video_deliverables"]'.
@@ -1095,6 +1108,12 @@ def init_db() -> None:
         # imported from billing.py to keep this file a pure data layer.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN wallet_credits REAL NOT NULL DEFAULT 0")
         conn.execute("UPDATE subscriptions SET wallet_credits = wallet_minutes * 15 WHERE wallet_minutes > 0")
+    if "paystack_subscription_code" not in existing_sub_cols:
+        # Set when a client subscribes through a Paystack PLAN (recurring,
+        # auto-renewing) rather than a one-off 30-day purchase - the code +
+        # email_token are what Paystack needs to cancel it later.
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN paystack_subscription_code TEXT")
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN paystack_email_token TEXT")
     if "wallet_low_alert_sent_at" not in existing_sub_cols:
         # Dedupes the low-balance email (see app.py's create_order) so it
         # fires once when the balance actually crosses the threshold, not
@@ -1467,6 +1486,20 @@ def count_recent_failed_payments(user_id: str, hours: float = 48) -> int:
     ).fetchone()[0]
     conn.close()
     return n
+
+
+def get_billing_market(user_id: str) -> str:
+    conn = get_conn()
+    row = conn.execute("SELECT billing_market FROM users WHERE id = ?", (user_id,)).fetchone()
+    conn.close()
+    return (row["billing_market"] if row and row["billing_market"] else "legacy")
+
+
+def set_billing_market(user_id: str, market: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET billing_market = ? WHERE id = ?", (market, user_id))
+    conn.commit()
+    conn.close()
 
 
 def set_signup_ip(user_id: str, ip: str) -> None:
@@ -2527,7 +2560,8 @@ def mark_sla_credit_issued(order_id: str) -> None:
 
 def set_order_billing(order_id: str, service_level: str, duration_minutes: float, cost_usd: float,
                        addons: list[str] | None = None, cost_breakdown: dict | None = None,
-                       is_rush: bool = False) -> None:
+                       is_rush: bool = False, review_tier: str = "human",
+                       billing_market: str | None = None) -> None:
     """Frozen at order-creation time (see billing.order_cost_usd) - a price
     change later must never retroactively change what an existing order
     owes or already paid. addons is stored as a small JSON list (e.g.
@@ -2538,9 +2572,10 @@ def set_order_billing(order_id: str, service_level: str, duration_minutes: float
     conn = get_conn()
     conn.execute(
         "UPDATE orders SET service_level = ?, duration_minutes = ?, cost_usd = ?, addons = ?, "
-        "cost_breakdown_json = ?, is_rush = ? WHERE id = ?",
+        "cost_breakdown_json = ?, is_rush = ?, review_tier = ?, billing_market = ? WHERE id = ?",
         (service_level, duration_minutes, cost_usd, json.dumps(addons or []),
-         json.dumps(cost_breakdown) if cost_breakdown else None, int(is_rush), order_id),
+         json.dumps(cost_breakdown) if cost_breakdown else None, int(is_rush),
+         review_tier, billing_market, order_id),
     )
     conn.commit()
     conn.close()
@@ -2938,6 +2973,24 @@ def set_subscription_plan(user_id: str, plan: str, period_days: int | None) -> N
              minutes_used_this_period = 0""",
         (user_id, plan, period_end, now),
     )
+    conn.commit()
+    conn.close()
+
+
+def set_paystack_subscription(user_id: str, code: str | None, email_token: str | None) -> None:
+    """Record (or clear, with None) the recurring Paystack subscription behind
+    an account's plan. An upsert, because Paystack's subscription.create
+    webhook can arrive before the charge that activates the plan has created
+    the row - set_subscription_plan later fills in plan/period and leaves
+    these columns alone."""
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO subscriptions (user_id, paystack_subscription_code, paystack_email_token)
+           VALUES (?, ?, ?)
+           ON CONFLICT(user_id) DO UPDATE SET
+             paystack_subscription_code = excluded.paystack_subscription_code,
+             paystack_email_token = excluded.paystack_email_token""",
+        (user_id, code, email_token))
     conn.commit()
     conn.close()
 
