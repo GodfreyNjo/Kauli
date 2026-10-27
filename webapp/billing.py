@@ -385,6 +385,9 @@ ESTIMATED_AI_COST_PER_MINUTE = {
     # Planning estimate for Transkriptor via the API (~$0.0035-0.033/min
     # depending on plan) - replace with the real rate once confirmed.
     "transkriptor": 0.015,
+    # Lara Translate: ~$25 per 1M source characters; a minute of speech is
+    # roughly 900-1,000 characters (much less in Chinese/Japanese/Korean).
+    "lara": 0.025,
     "faster-whisper": 0.0, "stub": 0.0,
     "local": 0.0, "claude": 0.02,  # <- placeholder, replace with your real observed rate
     "piper": 0.0, "xtts": 0.0,

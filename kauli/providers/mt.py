@@ -221,10 +221,37 @@ class LaraMT(MTProvider):
     # Kikuyu deliberately has no entry - app.py's create_order already
     # refuses a Kikuyu order any MT provider but Claude (see
     # MANUAL_TRANSCRIPTION_LANGUAGES), so this never needs to guess at one.
-    LANG_CODES = {"sw": "sw-KE", "en": "en-US"}
+    # Our short codes -> Lara's locale codes (checked against
+    # developers.laratranslate.com/docs/supported-languages, 2026-10-28). All
+    # 77 of our transcription languages are covered, plus Kikuyu (ki-KE), which
+    # Lara supports - quality on Kikuyu is unverified, so it is only ever used
+    # on the human-reviewed tier. Spanish uses Latin-American Spanish (es-419)
+    # for a US audience; Cantonese text maps to Hong Kong Chinese (zh-HK).
+    LANG_CODES = {
+        "sw": "sw-KE", "en": "en-US", "ki": "ki-KE",
+        "af": "af-ZA", "am": "am-ET", "ar": "ar-SA", "az": "az-AZ", "bg": "bg-BG", "bn": "bn-BD",
+        "bs": "bs-BA", "ca": "ca-ES", "cs": "cs-CZ", "cy": "cy-GB", "da": "da-DK", "de": "de-DE",
+        "el": "el-GR", "es": "es-419", "et": "et-EE", "eu": "eu-ES", "fa": "fa-IR", "fi": "fi-FI",
+        "tl": "fil-PH", "fr": "fr-FR", "ga": "ga-IE", "gl": "gl-ES", "gu": "gu-IN", "he": "he-IL",
+        "hi": "hi-IN", "hr": "hr-HR", "hu": "hu-HU", "hy": "hy-AM", "id": "id-ID", "is": "is-IS",
+        "it": "it-IT", "ja": "ja-JP", "jv": "jv-ID", "ka": "ka-GE", "kk": "kk-KZ", "km": "km-KH",
+        "kn": "kn-IN", "ko": "ko-KR", "lo": "lo-LA", "lt": "lt-LT", "lv": "lv-LV", "mk": "mk-MK",
+        "ml": "ml-IN", "mn": "khk-MN", "mr": "mr-IN", "ms": "ms-MY", "mt": "mt-MT", "my": "my-MM",
+        "ne": "ne-NP", "nl": "nl-NL", "no": "nb-NO", "pa": "pa-IN", "pl": "pl-PL", "ps": "ps-PK",
+        "pt": "pt-BR", "ro": "ro-RO", "ru": "ru-RU", "si": "si-LK", "sk": "sk-SK", "sl": "sl-SI",
+        "so": "so-SO", "sq": "sq-AL", "sr": "sr-Cyrl-RS", "sv": "sv-SE", "ta": "ta-IN", "te": "te-IN",
+        "th": "th-TH", "tr": "tr-TR", "uk": "uk-UA", "ur": "ur-PK", "uz": "uzn-UZ", "vi": "vi-VN",
+        "zh": "zh-CN", "yue": "zh-HK",
+    }
+    # Lara bills per SOURCE character (never on the translated output):
+    # about $25 per 1,000,000 characters on the Pro plan (USD list price;
+    # EUR 20 in some regions), $20 on Team. Planning figure for the margin
+    # dashboard, not an invoice.
+    PRICE_PER_CHAR_USD = 25.0 / 1_000_000
 
     def __init__(self):
         self._client = None
+        self.total_cost_usd = 0.0
         self.total_chars_used = 0  # against the real 10,000/month free quota - track it,
         # don't just assume it's fine (see the class docstring on how little that actually covers)
 
@@ -244,9 +271,10 @@ class LaraMT(MTProvider):
         res = self._c().translate(text, source=src, target=tgt)
         out = (res.translation or "").strip()
         self.total_chars_used += len(text)
+        self.total_cost_usd += len(text) * self.PRICE_PER_CHAR_USD
         return {
             "literal": out, "spoken": out, "shorter": None, "longer": None,
-            "notes": "Lara (free tier): one translation, no length-targeted paraphrase - "
+            "notes": "Lara: one translation, no length-targeted paraphrase - "
                      "duration fitting only has this one candidate to work with.",
             "confidence": 0.75 if out else 0.0,
             "flags": [] if out else ["unclear"],

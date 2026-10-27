@@ -131,7 +131,7 @@
              ${{ '%.2f'|format(price_card['dub']['ai']) }} for a full dub.</p>
           <ul class="m-feature-bullets">
             <li>Ready in minutes, not days</li>
-            <li>Transcription in {{ ai_only_languages|length + source_languages|length }} languages</li>
+            <li>Transcription in {{ ai_only_languages|length + source_languages|length }} languages, and translation between them (except Kikuyu)</li>
             <li>AI-generated - not reviewed by a person, and labelled that way</li>
             <li>Your first {{ free_minutes|int }} minutes are free</li>
           </ul>
@@ -169,8 +169,8 @@
   <section class="m-section" id="languages" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
     <div class="m-inner">
       <h2 class="m-h2">Transcribe in {{ ai_only_languages|length + source_languages|length }} languages</h2>
-      <p class="m-lede">Instant AI transcription covers all of these. Translation, dubbing and human review are
-         available for Swahili, Kikuyu and English.</p>
+      <p class="m-lede">Instant AI transcription covers all of these, and Instant AI translation works between
+         all of them except Kikuyu. Dubbing and human review are available for Swahili, Kikuyu and English.</p>
       <div class="m-hero-langs" style="margin-top:8px;">
         {% for code, label in source_languages.items() %}
         <span class="m-lang-pill" style="border-color:var(--accent);">{{ label }}</span>

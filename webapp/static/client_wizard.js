@@ -236,7 +236,7 @@
     const rushPct = Number(data.dataset.rushPct) || 0;
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
-    const selected = $('input[name="service_level"]:checked');
+    let selected = $('input[name="service_level"]:checked');
 
     // Review tier: Instant AI vs Human-reviewed. A manual-transcription
     // language (no ASR model - a person types it) is always human-reviewed,
@@ -249,15 +249,21 @@
     // translator or voice exists for them, so lock to Instant AI +
     // Transcription only (mirrors create_order's server-side check).
     const aiOnlyLang = !!(tierLangSelect && aiOnlyLangs.includes(tierLangSelect.value));
+    const laraOn = !!(tierLangSelect && tierLangSelect.dataset.lara === "1");
     if (aiOnlyLang) {
       const aiRadio = $('input[name="review_tier"][value="ai"]');
       if (aiRadio) aiRadio.checked = true;
+      // With Lara Translate connected the wider languages can also be
+      // translated (Instant AI); dubbing is never available for them.
+      const cur = $('input[name="service_level"]:checked');
       const trRadio = $('input[name="service_level"][value="transcribe"]');
-      if (trRadio) trRadio.checked = true;
+      if (trRadio && (!laraOn || !cur || cur.value === "dub")) trRadio.checked = true;
     }
-    $all('input[name="service_level"]').forEach((r) => { r.disabled = aiOnlyLang && r.value !== "transcribe"; });
+    $all('input[name="service_level"]').forEach((r) => {
+      r.disabled = aiOnlyLang && (r.value === "dub" || (!laraOn && r.value !== "transcribe"));
+    });
+    selected = $('input[name="service_level"]:checked'); // the forced choice above may have changed it
     const targetField = $("#target-lang-field");
-    if (targetField) targetField.hidden = aiOnlyLang;
     if (tierForced) {
       const humanRadio = $('input[name="review_tier"][value="human"]');
       if (humanRadio) humanRadio.checked = true;
@@ -269,12 +275,21 @@
     if (forcedNote) {
       forcedNote.hidden = !(tierForced || aiOnlyLang);
       forcedNote.textContent = aiOnlyLang
-        ? "This language is available as Instant AI transcription only (no translation, dubbing or human review)."
+        ? (laraOn
+            ? "This language is Instant AI only: transcription and translation, with no dubbing or human review."
+            : "This language is available as Instant AI transcription only (no translation, dubbing or human review).")
         : "This language is transcribed by one of our team by hand, so it is always human-reviewed.";
     }
     const tierRadio = $('input[name="review_tier"]:checked');
     const tier = tierRadio ? tierRadio.value : "human";
     const isAiTier = tier === "ai";
+    // Instant AI translation can target any of the wider languages (Lara).
+    const aiTranslating = laraOn && isAiTier && !!selected && selected.value === "translate";
+    $all("#target-lang-field option.ai-target").forEach((o) => { o.disabled = !aiTranslating; });
+    const targetSelect = $("#target-lang-field select");
+    if (targetSelect && !aiTranslating && targetSelect.selectedOptions[0]
+        && targetSelect.selectedOptions[0].classList.contains("ai-target")) targetSelect.value = "en";
+    if (targetField) targetField.hidden = aiOnlyLang && !aiTranslating;
     // Per-service rate for the chosen tier, from the account's own price card.
     $all('input[name="service_level"]').forEach((r) => {
       r.dataset.rate = isAiTier ? r.dataset.rateAi : r.dataset.rateHuman;

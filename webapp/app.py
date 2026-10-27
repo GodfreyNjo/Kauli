@@ -1270,6 +1270,47 @@ AI_ONLY_LANGUAGES = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES
 # Every code a stored order can carry, for display names.
 LANGUAGE_NAMES = {**AI_ONLY_LANGUAGES, **SOURCE_LANGUAGES}
 
+
+def _lara_configured() -> bool:
+    """Lara Translate is Kauli's translation engine for everything that is not
+    a premium plan's Claude upgrade. Instant AI translation across the wider
+    language list is only offered when its keys are set - never advertised in
+    the order form otherwise."""
+    return bool(os.environ.get("LARA_ACCESS_KEY_ID") and os.environ.get("LARA_ACCESS_KEY_SECRET"))
+
+
+def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str) -> tuple[str | None, str | None]:
+    """(mt provider name, None) or (None, user-facing error). Lara first
+    (the chosen engine); a priority plan's Claude upgrade, the Kikuyu
+    Claude-first rule, and the original local/Azure fallbacks are kept for
+    anything Lara can't take - so nothing changes for an account until Lara's
+    keys are actually set."""
+    lara_ok = _lara_configured()
+    if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
+        # Kikuyu: Claude if connected (as before), otherwise Lara (which
+        # supports ki-KE) - always followed by a human review.
+        if os.environ.get("ANTHROPIC_API_KEY"):
+            return "claude", None
+        if lara_ok:
+            return "lara", None
+        return None, ("Kikuyu translation needs our AI translation provider connected first, "
+                      "which isn't done yet - contact us and we'll handle this one manually "
+                      "in the meantime.")
+    if review_tier == "ai" and lara_ok:
+        return "lara", None
+    if plan_mt == "claude":
+        return "claude", None  # a Premium/Enterprise plan's priority-translation upgrade
+    if lara_ok:
+        return "lara", None
+    # Lara not connected: the original behaviour, unchanged.
+    mt = plan_mt
+    if mt == "local" and not (source_lang == "sw" and target_lang == "en"):
+        if os.environ.get("AZURE_TRANSLATOR_KEY"):
+            return "azure-translate", None
+        return None, ("Translating that language pair needs our translation provider connected first, "
+                      "which isn't done yet - contact us and we'll handle this one manually in the meantime.")
+    return mt, None
+
 # No ASR model available to us - local Whisper or any vendor we checked -
 # recognizes these languages at all. Orders in one of these get the
 # "manual" provider instead of faster-whisper: real ffmpeg-detected speech
@@ -1367,8 +1408,9 @@ MARKETING_FAQ = [
     {"q": "What languages do you support?",
      "a": f"Instant AI transcription covers {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages - "
           "from Spanish, French, Arabic, Hindi and Mandarin to Amharic, Somali and other languages - and "
-          "is transcription only. Full service (translation, dubbing and human review) is "
-          f"{', '.join(SOURCE_LANGUAGES.values())}, translating into English or Swahili. "
+          "Instant AI translates between all of them except Kikuyu (machine translation, not reviewed by a "
+          "person). Dubbing and human review are for "
+          f"{', '.join(SOURCE_LANGUAGES.values())}. "
           "Kikuyu goes through an extra manual transcription step since no speech-recognition model "
           "handles it yet - translation and voicing still run the same AI-plus-human-review pipeline "
           "as everything else, it just costs a bit more per minute to cover that step. We only add a "
@@ -1948,8 +1990,9 @@ SOLUTION_PAGES = {
              "a": "Not on Instant AI - it is machine-generated and labelled that way. Human review is "
                   "available for Swahili, Kikuyu and English orders."},
             {"q": "Can I get captions or subtitles too?",
-             "a": "Yes - SRT files are included. Translated subtitles and dubbing are available between "
-                  "Swahili, Kikuyu and English."},
+             "a": "Yes - SRT files are included, and Instant AI can translate your transcript into another "
+                  "language (machine translation, not reviewed by a person). Dubbing and human review are "
+                  "available for Swahili, Kikuyu and English."},
         ],
     },
     "youtube-video-to-text": {
@@ -1968,8 +2011,8 @@ SOLUTION_PAGES = {
              "body": "Paste the link - we fetch the audio ourselves. Only submit videos you own or have "
                       "the rights to use."},
             {"title": "70+ spoken languages",
-             "body": "Choose the language spoken in the video. Instant AI transcribes it; for Swahili, "
-                      "Kikuyu and English you can add translation, dubbing and human review."},
+             "body": "Choose the language spoken in the video. Instant AI transcribes it and can translate it; "
+                      "for Swahili, Kikuyu and English you can also add dubbing and human review."},
             {"title": "Captions back onto your channel",
              "body": "Connect your YouTube channel and publish finished English or Swahili captions "
                       "directly to your own video - no manual SRT upload."},
@@ -2019,7 +2062,7 @@ SOLUTION_PAGES = {
                       f"60-minute episode costs about ${billing.PRICE_CARD['intl']['transcribe']['ai'] * 60:.2f}. "
                       "Pay as you go, no subscription."},
             {"title": "Swahili and Kikuyu shows",
-             "body": "Podcasts in Swahili, Kikuyu or English can add translation and human review - "
+             "body": "Podcasts in Swahili, Kikuyu or English can add dubbing and human review - "
                       "a niche generic tools handle poorly."},
         ],
         "cta_heading": "Transcribe your next episode",
@@ -2049,8 +2092,8 @@ SOLUTION_PAGES = {
              "body": "Each line shows who spoke and when, so you can find and verify a quote against the "
                       "recording."},
             {"title": "Interviews in 70+ languages",
-             "body": "Transcribe the interview in the language it was held in. For Swahili, Kikuyu and "
-                      "English, add translation and human review."},
+             "body": "Transcribe the interview in the language it was held in, and translate it with Instant AI. "
+                      "For Swahili, Kikuyu and English, add human review."},
             {"title": "Clean read or verbatim",
              "body": "On human-reviewed Swahili, Kikuyu and English orders, choose a cleaned-up read or a "
                       "verbatim record that keeps every false start."},
@@ -2328,7 +2371,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "whatsapp_url": f"https://wa.me/{CONTACT_PHONE_WHATSAPP}",
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "sent": sent,
         "lead_error": lead_error,
@@ -2430,8 +2473,8 @@ def _language_page_dict(code: str) -> dict:
     name = f"{label} ({autonym})" if show_autonym else label
     return {
         "title": f"{label} Audio to Text - AI {label} Transcription",
-        "meta_description": f"Transcribe {name} audio and video to text in minutes, from ${price:.2f} per minute. "
-                             "Download as Word, text or SRT. Pay as you go, first minutes free.",
+        "meta_description": f"Transcribe {name} audio and video to text in minutes, from ${price:.2f} per minute, "
+                             "and translate it with Instant AI. Download as Word, text or SRT. Pay as you go, first minutes free.",
         "kicker": f"{label} transcription",
         "h1": f"{label} audio to text - transcribe {label} recordings in minutes",
         "intro": f"Upload a {label} recording or paste a YouTube link, choose {label} as the spoken language "
@@ -2450,8 +2493,8 @@ def _language_page_dict(code: str) -> dict:
             {"title": "Honest about the limits",
              "body": f"Instant AI is machine transcription and is not reviewed by a person; accuracy depends on "
                       f"audio quality, accent and background noise, so check names and numbers before you "
-                      f"publish. {label} is transcription only - translation, dubbing and human review are "
-                      "currently for Swahili, Kikuyu and English."},
+                      f"publish. Instant AI translation is machine translation, also not reviewed by a person. "
+                      "Dubbing and human review are currently for Swahili, Kikuyu and English."},
         ],
         "cta_heading": f"Transcribe your {label} audio",
         "cta_body": "A one-time $1 card check, credited to your account, unlocks your free minutes.",
@@ -2460,10 +2503,10 @@ def _language_page_dict(code: str) -> dict:
             {"q": f"Can you transcribe {label} audio?",
              "a": f"Yes. Choose {label} as the spoken language and Kauli's Instant AI transcribes it, returning "
                   "Word, text and SRT files."},
-            {"q": f"Do you translate {label} into English?",
-             "a": f"Not yet. For {label} we offer transcription only. Translation, dubbing and human review are "
-                  "currently available for Swahili, Kikuyu and English. If you need translation from "
-                  f"{label}, message us and tell us what you need."},
+            {"q": f"Can you translate {label} into English?",
+             "a": f"Yes. Choose 'Transcription + translation', pick {label} as the spoken language and English "
+                  "(or another language) as the target. It is Instant AI machine translation - not reviewed "
+                  "by a person. Dubbing and human review are currently for Swahili, Kikuyu and English."},
             {"q": f"How accurate is {label} transcription?",
              "a": "It depends on audio quality, accents and background noise. Instant AI is machine "
                   "transcription and is not reviewed by a person, so we don't publish a headline accuracy "
@@ -2503,7 +2546,7 @@ def languages_hub(request: Request):
     for code, label in sorted(AI_ONLY_LANGUAGES.items(), key=lambda kv: kv[1]):
         autonym, regions = seo_languages.LANGUAGE_FACTS[code]
         rows.append({"label": label, "autonym": autonym, "regions": regions,
-                     "available": "Instant AI transcription", "url": f"/transcribe/{seo_languages.slugify(label)}"})
+                     "available": "Instant AI transcription + translation", "url": f"/transcribe/{seo_languages.slugify(label)}"})
     return templates.TemplateResponse(request, "languages_hub.html", {
         **_marketing_context(home="/", market=_display_market(request)),
         "rows": rows, "total": len(rows), "base_url": _site_base(request),
@@ -2927,7 +2970,8 @@ First {billing.FREE_MINUTES_PER_MONTH:.0f} minutes free to try, after a one-time
 Instant AI transcription: {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages (transcription only).
 Full list of languages: {base}/languages (each language has its own page at {base}/transcribe/<language>).
 Translated landing pages: {', '.join(f"{base}/{c} ({m[0]})" for c, m in site_locales.LOCALES.items())}.
-Full service (translation, dubbing, human review): {', '.join(SOURCE_LANGUAGES.values())}, translating into English or Swahili.
+Instant AI translation: between all of them except Kikuyu (machine translation, not reviewed by a person).
+Dubbing and human review: {', '.join(SOURCE_LANGUAGES.values())}.
 
 ## Key pages
 - [Homepage]({base}/) - overview, pricing, FAQ
@@ -3614,7 +3658,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "api_key_row": api_key_row, "new_api_key": new_api_key,
         "webhook_row": webhook_row, "webhook_deliveries": webhook_deliveries,
         "defaults_saved": defaults_saved, "password_error": password_error, "password_saved": password_saved,
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "service_levels": billing.SERVICE_LEVELS,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(), "service_levels": billing.SERVICE_LEVELS,
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "deletion_requested": db.has_pending_deletion_request(user["id"]) if user["role"] == "client" else False,
         "webhook_error": webhook_error,
@@ -4061,7 +4105,7 @@ def staff_voice_actors(request: Request, notice: str | None = None, error: str |
         "actors": db.list_voice_actors(),
         "payouts_owed": db.list_payouts("owed"),
         "payouts_paid": db.list_payouts("paid")[:50],  # recent history, not the whole ledger forever
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
     })
 
 
@@ -4533,7 +4577,7 @@ def client_home(request: Request):
     return templates.TemplateResponse(request, "client_home.html", {
         "user": user, "greeting": greeting,
         "stats": stats, "recent_orders": orders[:6],
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
     })
 
 
@@ -4582,7 +4626,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "form_values": reorder_form_values,
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
@@ -4633,7 +4677,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
-        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES,
+        "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
         "error": error,
         "exception_context": exception_context,
@@ -4922,7 +4966,7 @@ def create_order(
         return _client_dashboard_error(request, user, "Unknown service level.", form_values=form_values)
     if source_lang not in LANGUAGE_NAMES:
         return _client_dashboard_error(request, user, "Unknown source language.", form_values=form_values)
-    if target_lang not in ("en", "sw"):
+    if target_lang not in LANGUAGE_NAMES or target_lang == "ki":
         return _client_dashboard_error(request, user, "Unknown target language.", form_values=form_values)
     # Market pricing: the price card is the TEAM OWNER's (fixed at signup,
     # staff-changeable) - never something the submitter picks per order.
@@ -4937,13 +4981,34 @@ def create_order(
         # A person has to transcribe these by hand (no ASR model) - there is
         # no such thing as an instant, no-human version of that.
         review_tier = "human"
-    if source_lang in AI_ONLY_LANGUAGES and (service_level != "transcribe" or review_tier != "ai"):
-        # Only the machine can do these: no reviewer, translator or voice for them.
-        return _client_dashboard_error(
-            request, user,
-            f"{AI_ONLY_LANGUAGES[source_lang]} is available as Instant AI transcription only - choose "
-            "'Instant AI' and 'Transcription only', or pick Swahili, English or Kikuyu for translation, "
-            "dubbing and human review.", form_values=form_values)
+    # Instant AI can transcribe the ~74 wider languages and, when Lara
+    # Translate is connected, translate between them. Dubbing and human review
+    # stay with Swahili, Kikuyu and English (there is no reviewer or voice for
+    # the rest).
+    ai_translation_ok = _lara_configured()
+    if source_lang in AI_ONLY_LANGUAGES:
+        allowed_services = ("transcribe", "translate") if ai_translation_ok else ("transcribe",)
+        if service_level not in allowed_services or review_tier != "ai":
+            what = "transcription and translation" if ai_translation_ok else "transcription"
+            return _client_dashboard_error(
+                request, user,
+                f"{AI_ONLY_LANGUAGES[source_lang]} is available as Instant AI {what} only - choose "
+                "'Instant AI' and " + ("'Transcription only' or 'Transcription + translation'" if ai_translation_ok
+                                       else "'Transcription only'") +
+                ", or pick Swahili, English or Kikuyu for dubbing and human review.", form_values=form_values)
+    if target_lang not in ("en", "sw"):
+        # A wider-language TARGET is Instant AI translation only (never a dub,
+        # never human-reviewed), and never Kikuyu without a human in the loop.
+        if not (target_lang in AI_ONLY_LANGUAGES and service_level == "translate"
+                and review_tier == "ai" and ai_translation_ok):
+            return _client_dashboard_error(
+                request, user,
+                f"Translating into {LANGUAGE_NAMES[target_lang]} is only available as Instant AI "
+                "'Transcription + translation'. For dubbing and human review choose English or Swahili.",
+                form_values=form_values)
+    if service_level != "transcribe" and target_lang == source_lang:
+        return _client_dashboard_error(request, user, "Choose a different target language than the source.",
+                                        form_values=form_values)
     addons = ["video_deliverables"] if addon_video_deliverables else []
     # Only meaningful on a full dub - there's no voice to record on a
     # transcription/translation-only order. Enforced here, not just by
@@ -5075,38 +5140,14 @@ def create_order(
                else "faster-whisper")
     if not level["mt"]:
         mt = "stub"
-    elif source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
-        # Local MT (Helsinki-NLP) is Congo-Swahili-only - it would silently
-        # mistranslate Kikuyu text into nonsense rather than failing loudly.
-        # Claude at least has a real shot at it; refuse the order instead of
-        # shipping a wrong translation if it isn't wired up yet.
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return _client_dashboard_error(request, user,
-                "Kikuyu translation needs our AI translation provider connected first, "
-                "which isn't done yet - contact us and we'll handle this one manually "
-                "in the meantime.", form_values=form_values)
-        mt = "claude"
     else:
-        mt = plan_mt
-        # Real bug this fixes, same class as the Kikuyu guard just above:
-        # LocalMT (kauli/providers/mt.py) is Helsinki-NLP/opus-mt-swc-en -
-        # a Swahili-TO-English-ONLY model that ignores source_lang/
-        # target_lang entirely. It only ever produces a real answer for
-        # sw->en; any other direction reaching "local" (most concretely,
-        # an en->sw order on Free/Pro tier) fed English text through a
-        # model built to output English, producing nonsense regardless of
-        # input - confirmed live, not hypothetical. AzureTranslateMT is
-        # genuinely bidirectional; refuse rather than ship garbage if it
-        # isn't configured yet, same pattern as Kikuyu and the dub-voice
-        # case below.
-        if mt == "local" and not (source_lang == "sw" and target_lang == "en"):
-            if os.environ.get("AZURE_TRANSLATOR_KEY"):
-                mt = "azure-translate"
-            else:
-                return _client_dashboard_error(request, user,
-                    "Translating that language pair needs our translation provider connected first, "
-                    "which isn't done yet - contact us and we'll handle this one manually in the meantime.",
-                    form_values=form_values)
+        # See _pick_mt: Lara first, with the Kikuyu/Claude rule and the old
+        # local/Azure guards (a Swahili-to-English-only local model must never
+        # be fed another direction - confirmed live to produce nonsense)
+        # kept as fallbacks for when Lara isn't connected.
+        mt, mt_error = _pick_mt(source_lang, target_lang, plan_mt, review_tier)
+        if mt_error:
+            return _client_dashboard_error(request, user, mt_error, form_values=form_values)
     # Real bug this fixes: this used to be tts = "piper" if level["tts"]
     # else "stub", with zero regard for target_lang - so every en->sw
     # full-dub order was read by an ENGLISH Piper voice attempting

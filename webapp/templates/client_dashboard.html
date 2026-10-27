@@ -84,7 +84,8 @@
         <label>From
           <select name="source_lang" id="source-lang-select"
                   data-manual-langs="{{ manual_transcription_languages|join(',') }}"
-                  data-ai-only-langs="{{ ai_only_languages.keys()|join(',') }}">
+                  data-ai-only-langs="{{ ai_only_languages.keys()|join(',') }}"
+                  data-lara="{{ 1 if lara_available else 0 }}">
             <optgroup label="Full service - translation, dubbing, human review">
               {% for code, label in source_languages.items() %}
               <option value="{{ code }}" {% if code == form_values.get('source_lang', 'sw') %}selected{% endif %}>{{ label }}</option>
@@ -101,6 +102,13 @@
           <select name="target_lang">
             <option value="en" {% if form_values.get('target_lang', 'en') == 'en' %}selected{% endif %}>English</option>
             <option value="sw" {% if form_values.get('target_lang') == 'sw' %}selected{% endif %}>Swahili</option>
+            {% if lara_available %}
+            <optgroup label="Instant AI translation only">
+              {% for code, label in ai_only_languages.items()|sort(attribute='1') %}
+              <option class="ai-target" value="{{ code }}" {% if form_values.get('target_lang') == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
           </select>
         </label>
       </div>
