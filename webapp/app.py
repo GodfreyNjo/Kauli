@@ -1440,7 +1440,7 @@ MARKETING_FAQ = [
     {"q": "How much does it cost?",
      "a": f"From ${billing.PRICE_CARD['intl']['transcribe']['ai']:.2f} per audio-minute for Instant AI "
           f"transcription and ${billing.PRICE_CARD['intl']['transcribe']['human']:.2f} with human review "
-          f"(US and international; lower in Kenya and East Africa). Your first {billing.FREE_MINUTES_PER_MONTH:.0f} "
+          f"(shown before you order). Your first {billing.FREE_MINUTES_PER_MONTH:.0f} "
           "minutes of Instant AI transcription are free.",
      "link": ("#pricing", "See all prices")},
     {"q": "What is the difference between Instant AI and Human-reviewed?",
@@ -2586,8 +2586,8 @@ def _language_page_dict(code: str) -> dict:
                   "transcription and is not reviewed by a person, so we don't publish a headline accuracy "
                   "figure. Skim the transcript for names, numbers and specialist terms before you publish."},
             {"q": f"How much does {label} transcription cost?",
-             "a": f"${price:.2f} per audio-minute for Instant AI transcription in the US and internationally "
-                  "(lower in Kenya and East Africa), with no subscription."},
+             "a": f"${price:.2f} per audio-minute for Instant AI transcription"
+                  ", with no subscription."},
         ],
     }
 
