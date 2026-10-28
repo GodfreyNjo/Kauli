@@ -76,8 +76,30 @@
   <section class="tk-hero">
     <div class="tk-hero-inner">
       <h1>Transcribe Audio to Text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ Languages</h1>
-      <p class="tk-hero-sub">Turn audio and video into accurate, time-stamped text in minutes, then translate it, add subtitles
-         or dub it. Instantly with AI, or human-reviewed for Swahili, Kikuyu and English.</p>
+      <p class="tk-hero-sub">Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it.</p>
+      <details class="tk-more">
+        <summary>
+          <span>Learn more</span>
+          <svg viewBox="0 0 12 8" width="12" height="8" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
+        </summary>
+        <div class="tk-more-body">
+          <p class="tk-more-lede">Instantly with AI, or human-reviewed for Swahili, Kikuyu and English.</p>
+          <ul class="tk-more-grid">
+            <li><strong>Instant AI</strong>
+              Ready in minutes. Transcription in {{ language_total }} languages and translation into
+              {{ language_total - 1 }}. Clearly labelled as AI-generated, not reviewed by a person.</li>
+            <li><strong>Human-reviewed</strong>
+              For Swahili, Kikuyu and English. A real editor checks the work against the audio before it is
+              marked ready.</li>
+            <li><strong>Transcripts, subtitles and dubbing</strong>
+              Time-stamped transcripts, synchronised subtitles, and dubbed voice tracks. Download Word, TXT,
+              SRT and VTT. Voice cloning only with the speaker's consent.</li>
+            <li><strong>Simple pricing</strong>
+              Pay as you go from ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per audio-minute, shown
+              before you order. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</li>
+          </ul>
+        </div>
+      </details>
       <div class="tk-hero-ctas">
         <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
         <a href="#book" class="btn secondary" data-cta="hero-demo">Book a Demo</a>

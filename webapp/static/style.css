@@ -3852,3 +3852,24 @@ body.m-public, .marketing-page { font-size: 16px; }
 .m-nav-dropdown-menu-3 { flex-direction: row; gap: 6px 18px; min-width: 700px; }
 .m-nav-dropdown-menu-3 .m-nav-dropdown-col { flex: 1 1 0; }
 @media (max-width: 900px) { .m-nav-dropdown-menu-3 { min-width: 0; flex-direction: column; } }
+
+/* hero "Learn more": native <details>, so it works by keyboard and screen reader with no script */
+.tk-more { max-width: 780px; margin: 10px auto 0; text-align: center; }
+.tk-more summary {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+  color: #1d4ed8; font-size: 1.05rem; font-weight: 500; padding: 6px 10px; border-radius: 8px;
+}
+.tk-more summary::-webkit-details-marker { display: none; }
+.tk-more summary:hover { background: rgba(37, 99, 235, 0.08); }
+.tk-more summary:focus-visible { outline: 2px solid #2262ec; outline-offset: 2px; }
+.tk-more summary svg { transition: transform 0.15s ease; }
+.tk-more[open] summary svg { transform: rotate(180deg); }
+.tk-more-body {
+  margin-top: 12px; text-align: left; background: #ffffff; border: 1px solid #d3def3; border-radius: 16px;
+  padding: 20px 22px; box-shadow: 0 10px 30px -16px rgba(30, 70, 160, 0.3);
+}
+.tk-more-lede { margin: 0 0 14px; font-size: 1.1rem; font-weight: 600; color: #030712; text-align: center; }
+.tk-more-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; }
+.tk-more-grid li { font-size: 0.97rem; line-height: 1.55; color: #334155; }
+.tk-more-grid strong { display: block; color: #0f2342; font-size: 1rem; margin-bottom: 2px; }
+@media (max-width: 640px) { .tk-more-grid { grid-template-columns: 1fr; } }

@@ -235,3 +235,16 @@ def test_use_case_menu_replaces_solutions_and_links_real_pages(client):
     for link in links:
         assert client.get(link).status_code == 200, link          # none of them is a dead link
     assert "Use cases" in html and ">Solutions<" not in html          # the footer column follows the same name
+
+
+def test_hero_subtitle_is_short_with_a_learn_more_that_holds_the_rest(client):
+    html = client.get("/").text
+    sub = re.search(r'<p class="tk-hero-sub">(.*?)</p>', html, re.S).group(1).strip()
+    assert sub == "Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it."
+    more = re.search(r'<details class="tk-more">.*?</details>', html, re.S).group(0)
+    assert "<summary" in more and "Learn more" in more and "<details class=\"tk-more\" open" not in html   # closed by default
+    assert "Instantly with AI, or human-reviewed for Swahili, Kikuyu and English." in more
+    for topic in ("Instant AI", "Human-reviewed", "Transcripts, subtitles and dubbing", "Simple pricing"):
+        assert topic in more
+    assert "from $0.12 per audio-minute" in more and "not reviewed by a person" in more
+    assert "card check" not in more and "$1 " not in more.replace("$1.", "")          # still no card-check wording
