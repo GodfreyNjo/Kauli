@@ -100,7 +100,7 @@ def test_a_client_on_the_free_plan_is_pointed_to_a_plan_and_nothing_is_sent(meet
 
 def test_a_client_who_is_nearly_out_of_minutes_cannot_send_the_bot(meet):
     conn = meet.env.db.get_conn()
-    conn.execute("UPDATE subscriptions SET minutes_used_this_period = 140 WHERE user_id = 'u1'")      # 10 of 150 left
+    conn.execute("UPDATE subscriptions SET minutes_used_this_period = 2490 WHERE user_id = 'u1'")      # 10 of 2,500 left
     conn.commit()
     conn.close()
     r = _send(meet)

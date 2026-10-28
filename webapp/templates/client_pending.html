@@ -3,6 +3,7 @@
 {% block title %}{{ t('pending_title') }}{% endblock %}
 {% block content %}
 {% from "_status_macros.html" import short_status, status_tone with context %}
+{% from "_pager.html" import pager %}
 <div class="ch">
   <div class="ch-top">
     <h1>{{ t('pending_title') }}</h1>
@@ -36,6 +37,7 @@
       </li>
       {% endfor %}
     </ul>
+    {{ pager(page, pages, '/client/pending') }}
     {% endif %}
   </section>
 </div>

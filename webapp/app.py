@@ -178,7 +178,7 @@ def explain_youtube_failure(exc: Exception) -> str:
         return "That video is a live stream or a premiere that has not finished. Try again once it has ended."
     if "unsupported url" in text or "is not a valid url" in text:
         return "That does not look like a YouTube video link. Paste the address of a single video."
-    return "We could not fetch that YouTube link. Please check it and try again, or " + upload[0].lower() + upload[1:]
+    return "Couldn't fetch that YouTube link. Please check it and try again, or " + upload[0].lower() + upload[1:]
 
 
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
@@ -294,6 +294,9 @@ _load_dotenv()
 db.init_db()
 blog_guides.seed_guides_at_startup()
 db.replace_blog_text("first 5 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")      # posts written when the allowance was 5
+db.replace_blog_text("first 60 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")
+db.replace_blog_text("Pro includes 150 Instant AI minutes a month and Premium includes 400",
+                     f"Pro includes {billing.PRO_MINUTES:,} Instant AI minutes a month and Premium includes {billing.PREMIUM_MINUTES:,}")
 
 IDLE_TIMEOUT_SECONDS = 30 * 60  # log out after 30 minutes of no requests
 
@@ -5055,18 +5058,29 @@ async def recall_webhook(request: Request):
 
 
 @app.get("/client/pending", response_class=HTMLResponse)
-def client_pending(request: Request):
+def client_pending(request: Request, page: int = 1):
     """Orders that are not finished yet, with the one thing each is waiting for."""
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    page, pages, shown = _paginate(db.list_pending_orders(user["client_scope_id"]), page, FILES_PER_PAGE + 2)
     return templates.TemplateResponse(request, "client_pending.html", {
-        "user": user, "orders": db.list_pending_orders(user["client_scope_id"]),
+        "user": user, "orders": shown, "page": page, "pages": pages,
     })
 
 
+FILES_PER_PAGE = 8
+
+
+def _paginate(items: list, page: int, per_page: int) -> tuple[int, int, list]:
+    """(the page to show, how many pages there are, that page's items). A page past the end shows the last one."""
+    pages = max(1, -(-len(items) // per_page))
+    page = min(max(int(page or 1), 1), pages)
+    return page, pages, items[(page - 1) * per_page: page * per_page]
+
+
 @app.get("/client/home", response_class=HTMLResponse)
-def client_home(request: Request):
+def client_home(request: Request, page: int = 1, q: str = ""):
     """The client portal's real landing page - summary stats + a preview
     of recent orders, separate from /client (the full order list +
     submission wizard, kept at its existing URL so none of the 'back to
@@ -5078,11 +5092,14 @@ def client_home(request: Request):
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
     orders = db.list_orders_for_client(user["client_scope_id"])
     stats = db.client_dashboard_stats(user["client_scope_id"])
+    needle = q.strip().lower()[:100]
+    matching = [o for o in orders if needle in (o["original_filename"] or "").lower()] if needle else orders
+    page, pages, recent = _paginate(matching, page, FILES_PER_PAGE)
     hour = datetime.now().hour
     greeting = "greet_morning" if hour < 12 else "greet_afternoon" if hour < 18 else "greet_evening"
     return templates.TemplateResponse(request, "client_home.html", {
         "user": user, "greeting": greeting,
-        "stats": stats, "recent_orders": orders[:8],
+        "stats": stats, "recent_orders": recent, "page": page, "pages": pages, "q": needle,
         "free_minutes_left": billing.free_minutes_remaining(db.get_subscription_current(user["client_scope_id"])),
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
     })
@@ -5822,7 +5839,13 @@ def create_order(
     # (The order is not created yet, so an empty list means this is their first.)
     first_impression = (free_covered and minutes <= billing.FIRST_ORDER_QUALITY_MINUTES
                         and not db.list_orders_for_client(user["client_scope_id"]))
-    asr = _route_asr(asr, source_lang=source_lang, free_covered=free_covered and not first_impression)
+    # On a paid plan the first "quality minutes" of each month are Transkriptor's; the rest of the included allowance is served by
+    # the low-cost providers, which is how thousands of included minutes stay affordable. Anything the customer pays for
+    # per minute beyond the allowance stays on Transkriptor.
+    used_before = (subscription["minutes_used_this_period"] or 0.0) if subscription else 0.0
+    bulk_allowance = (plan != "free" and review_tier == "ai" and cost["free_minutes_applied"] > 0 and cost["billable_minutes"] <= 0
+                      and not studio and used_before + minutes > billing.PLANS[plan].get("quality_minutes", 0))
+    asr = _route_asr(asr, source_lang=source_lang, free_covered=(free_covered and not first_impression) or bulk_allowance)
 
     db.create_order(
         order_id=order_id,
@@ -5943,6 +5966,76 @@ _PROC_STAGES = [
     ("translate", "Translating the text"), ("voice", "Creating the dubbed voice"), ("mix", "Mixing the final audio"),
     ("finalize", "Getting your files ready"),
 ]
+
+
+MAX_EDIT_CHARS = 5000
+MAX_EDITS_PER_SAVE = 600
+
+
+def _rewrite_caption_files(order, job) -> None:
+    """After a transcript edit: the subtitle and transcript files are rebuilt from the job so every download matches."""
+    out = Path(order["outdir"])
+    (out / f"subs_{order['target_lang']}.srt").write_text(to_srt(job), encoding="utf-8")
+    (out / f"subs_{order['target_lang']}.vtt").write_text(to_vtt(job), encoding="utf-8")
+    (out / f"transcript_{order['source_lang']}.srt").write_text(to_srt(job, source=True), encoding="utf-8")
+
+
+@app.post("/client/orders/{order_id}/transcript")
+def client_edit_transcript(request: Request, order_id: str, body: dict = Body(...)):
+    """A client corrects their own Instant AI transcript. Edits are stored beside the original text (never over it), the caption
+    files are rebuilt, and an empty text puts a line back as it was. Human-reviewed transcripts are not edited here: a person
+    signed them off, so changes go through a revision request."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "sign in"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if not _plan_chosen(user["client_scope_id"]):
+        return JSONResponse({"error": "Choose a plan to edit your transcript."}, status_code=403)
+    if order["review_tier"] != "ai":
+        return JSONResponse({"error": "This transcript was checked by a person, so changes go through a revision request."}, status_code=403)
+    if order["status"] not in db.TERMINAL_OK_STATUSES:
+        return JSONResponse({"error": "The transcript is not ready yet."}, status_code=409)
+    job = _load_job(order)
+    if job is None:
+        return JSONResponse({"error": "transcript not found"}, status_code=404)
+    edits = body.get("edits")
+    if not isinstance(edits, list) or len(edits) > MAX_EDITS_PER_SAVE:
+        return JSONResponse({"error": "nothing to save"}, status_code=400)
+    by_id = {s.segment_id: s for s in job.segments if s.segment_type == "speech"}
+    same_language = order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"]
+    changed = 0
+    for e in edits:
+        if not isinstance(e, dict) or str(e.get("segment_id")) not in by_id:
+            continue
+        seg = by_id[str(e["segment_id"])]
+        texts = {}
+        for field in ("source", "target"):
+            if field in e:
+                if not isinstance(e[field], str) or len(e[field]) > MAX_EDIT_CHARS:
+                    return JSONResponse({"error": "a line is too long to save"}, status_code=400)
+                texts[field] = " ".join(e[field].split())
+        before = (seg.source_final_text, seg.final_text)
+        if same_language and texts:
+            text = texts.get("source", texts.get("target"))
+            seg.source_edited_transcript = text or None
+            seg.edited_text = text or None
+        else:
+            if "source" in texts:
+                seg.source_edited_transcript = texts["source"] or None
+                if "target" not in texts and seg.source_final_text != before[0]:
+                    seg.translation_stale = True            # the translation no longer matches the text beside it
+            if "target" in texts:
+                seg.edited_text = texts["target"] or None
+                seg.translation_stale = False
+        if (seg.source_final_text, seg.final_text) != before:
+            changed += 1
+    if changed:
+        _rewrite_caption_files(order, job)
+        job.save(str(Path(order["outdir"]) / "manifest.json"))
+        db.set_order_ai_summary(order_id, "")               # the summary is written again from the corrected text
+    return JSONResponse({"ok": True, "changed": changed}, headers={"Cache-Control": "no-store"})
 
 
 def _caption_cues(job) -> list[dict]:
@@ -6105,6 +6198,8 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
         "live": _processing_state(order, _ui_lang(request, user)) if order["status"] in ("queued", "processing") else None,
         "caption_cues": _caption_cues(job),
+        "can_edit_transcript": order["review_tier"] == "ai" and order["status"] in db.TERMINAL_OK_STATUSES,
+        "same_language": order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"],
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
         "upsell": _order_upsell_prices(order),

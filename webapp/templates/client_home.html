@@ -3,6 +3,7 @@
 {% block title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
 {% from "_status_macros.html" import short_status, status_tone with context %}
+{% from "_pager.html" import pager %}
 
 <div class="ch">
   <div class="ch-top">
@@ -42,11 +43,12 @@
   <section class="ch-files" aria-labelledby="ch-files-title">
     <div class="ch-files-head">
       <h2 id="ch-files-title">{{ t('recent_files') }}</h2>
-      <div class="ch-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-        <input type="search" id="ch-search" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off"></div>
-      <a href="/client" class="ch-all">{{ t('view_all') }}</a>
+      <form class="ch-search" method="get" action="/client/home" role="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <input type="search" id="ch-search" name="q" value="{{ q }}" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off"></form>
     </div>
-    {% if not recent_orders %}
+    {% if not recent_orders and q %}
+    <p class="ch-none">{{ t('no_match') }}</p>
+    {% elif not recent_orders %}
     <div class="ch-empty">
       <p>{{ t('empty_files') }}</p>
       <a href="/client#order-form" class="btn cta-olive">{{ t('act_upload_t') }}</a>
@@ -66,22 +68,8 @@
       </li>
       {% endfor %}
     </ul>
-    <p class="ch-none" id="ch-none" hidden>{{ t('no_match') }}</p>
+    {{ pager(page, pages, '/client/home', {'q': q}) }}
     {% endif %}
   </section>
 </div>
-<script>
-  (function () {
-    var box = document.getElementById('ch-search'), list = document.getElementById('ch-list'), none = document.getElementById('ch-none');
-    if (!box || !list) return;
-    box.addEventListener('input', function () {
-      var q = box.value.trim().toLowerCase(), shown = 0;
-      [].forEach.call(list.children, function (li) {
-        var hit = !q || li.querySelector('.ch-row').getAttribute('data-name').indexOf(q) !== -1;
-        li.hidden = !hit; if (hit) shown++;
-      });
-      none.hidden = shown > 0;
-    });
-  })();
-</script>
 {% endblock %}

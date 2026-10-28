@@ -123,7 +123,7 @@ def price_card_for(market: str | None) -> dict:
 
 # A new account's very first upload, when it is this short, always gets Transkriptor: it is the first impression of our quality.
 FIRST_ORDER_QUALITY_MINUTES = 5.0
-FREE_MINUTES_PER_MONTH = 60.0  # monthly free allowance - Instant AI transcription only. Served by the low-cost providers (see app._route_asr), so it costs cents
+FREE_MINUTES_PER_MONTH = 30.0  # monthly free allowance - Instant AI transcription only. Served by the low-cost providers (see app._route_asr), so it costs cents
 
 # The free allowance only ever buys transcription - not translation, not a
 # dub. It's a "see the AI transcription quality for yourself" trial, not a
@@ -138,7 +138,7 @@ FREE_MINUTES_SERVICE_LEVEL = "transcribe"
 
 def allowance_covers(plan: str, service_level: str, review_tier: str) -> bool:
     """Whether a plan's monthly included minutes pay for an order. Instant AI only (a person's time is never free).
-    Every plan's allowance covers transcription; the paid plans' also covers Instant AI translation, so 150 or 400
+    Every plan's allowance covers transcription; the paid plans' also covers Instant AI translation, so the allowance (thousands of minutes on a paid plan)
     minutes can be spent on transcripts, translations or any mix. Dubbing is always priced on its own."""
     if review_tier != "ai":
         return False
@@ -171,6 +171,12 @@ TRIAL_VERIFICATION_FEE_USD = 1.00
 # their free minutes are used - just at 10% off. The discount numbers are
 # my own addition on top of what you specified (a standard usage+tier
 # hybrid, the same shape AWS/Twilio use) - say if you want them different.
+# Included Instant AI minutes a month. The first QUALITY minutes of each paid plan are transcribed by Transkriptor (our quality
+# provider); the rest of the allowance goes to the low-cost providers (Groq, then AssemblyAI), which is what makes thousands of
+# included minutes affordable. See app._route_asr and tests/test_plans_v2.py for the worst-case cost check.
+PRO_MINUTES, PREMIUM_MINUTES, ENTERPRISE_MINUTES = 2500, 6500, 25000
+PRO_QUALITY_MINUTES, PREMIUM_QUALITY_MINUTES, ENTERPRISE_QUALITY_MINUTES = 150, 400, 1000
+
 PLANS = {
     "free": {
         "name": "Free", "price_usd": 0, "price_usd_year": 0, "discount": 0.0, "included_ai_minutes": FREE_MINUTES_PER_MONTH,
@@ -184,19 +190,22 @@ PLANS = {
     # $0.015 a minute (worst case about $0.033), so even the yearly price leaves a wide margin - see the test
     # tests/test_plans_v2.py that fails if a change here would let a plan lose money.
     "pro": {
-        "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.10, "included_ai_minutes": 150,
+        "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.10, "included_ai_minutes": PRO_MINUTES,
+        "quality_minutes": PRO_QUALITY_MINUTES,
         "mt": "local", "video_deliverables": False, "support": "Email",
-        "blurb": "150 Instant AI minutes every month for transcription and translation, 10% off everything else, email support.",
+        "blurb": f"{PRO_MINUTES:,} Instant AI minutes every month for transcription and translation, 10% off everything else, email support.",
     },
     "premium": {
-        "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": 400,
+        "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": PREMIUM_MINUTES,
+        "quality_minutes": PREMIUM_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
-        "blurb": "400 Instant AI minutes every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
+        "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
                  "included, priority-quality translation and turnaround.",
     },
     # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).
     "enterprise": {
-        "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.30, "included_ai_minutes": 1000,
+        "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.30, "included_ai_minutes": ENTERPRISE_MINUTES,
+        "quality_minutes": ENTERPRISE_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Dedicated account manager",
         "blurb": "Negotiated volume rate, dedicated account manager, bank transfer billing.",
     },

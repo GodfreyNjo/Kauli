@@ -81,8 +81,12 @@
   {% if user %}
   <header class="topbar" lang="{{ page_lang() }}">
     <div class="topbar-brand">
-      <div class="wordmark">KAULI</div>
-      <div class="sub-wordmark">Forge Media Services</div>
+      <a href="{{ '/staff' if user['role'] == 'staff' else '/actor' if user['role'] == 'voice_actor' else '/client/home' }}" class="topbar-logo-link" aria-label="Kauli by Forge Media Services - home">
+        <picture>
+          <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
+          <img src="/static/kauli-logo-nav-light.png" alt="Kauli" class="topbar-logo" width="141" height="38">
+        </picture>
+      </a>
     </div>
     {% if user['role'] == 'staff' %}
     <form method="get" action="/staff/search" class="topbar-search">
@@ -117,8 +121,8 @@
         {% else %}
           <div class="avatar">{{ user['display_name'][0]|upper }}</div>
         {% endif %}
-        <span class="account-menu-name">{{ user['display_name'] }}</span>
-        <span class="chevron" aria-hidden="true">⌄</span>
+        <span class="account-menu-name">{{ (first_name(user) if user['role'] == 'client' else '') or user['display_name'] }}</span>
+        <svg class="chevron" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5"/></svg>
       </button>
       <div class="account-menu-panel" id="account-menu-panel" hidden>
         <div class="account-menu-identity">

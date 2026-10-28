@@ -159,7 +159,7 @@ def test_transkriptor_can_raise_instead_of_falling_back_so_the_chain_can_go_on(m
 def test_the_free_allowance_costs_cents_on_the_low_cost_providers():
     for provider in (asr_cloud.GroqWhisperASR, asr_cloud.AssemblyAIASR):
         assert provider.cost_per_minute_usd * billing.FREE_MINUTES_PER_MONTH <= 0.20, provider.name
-    assert billing.FREE_MINUTES_PER_MONTH == 60
+    assert billing.FREE_MINUTES_PER_MONTH == 30
 
 
 # ------------------------------------------------------------------------------------------------ routing

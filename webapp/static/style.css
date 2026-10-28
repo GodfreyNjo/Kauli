@@ -5086,3 +5086,38 @@ body.auth-page { background: #dfe9ff; }
 .hd-turn:last-child { margin-bottom: 0; }
 .hd-spk { color: var(--brand-blue-deep); font-size: 0.78em; letter-spacing: 0.04em; text-transform: uppercase; margin-right: 0.45em; }
 .hd-ts { color: #7b8aa3; font-size: 0.78em; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
+
+
+/* The Kauli logo in the app header (it sits on the dark navy bar, so it is the light version) */
+.topbar-logo-link { display: inline-flex; align-items: center; text-decoration: none; }
+.topbar-logo { display: block; height: 38px; width: auto; }
+@media (max-width: 600px) { .topbar-logo { height: 30px; } }
+
+
+/* The account button in the header: a clear pill, a real chevron that turns when the menu is open, a visible focus ring */
+.topbar .account-menu-trigger { gap: 10px; padding: 4px 12px 4px 4px; border-color: var(--chrome-border); background: rgba(255, 255, 255, 0.05); min-height: 44px; }
+.topbar .account-menu-trigger:hover, .topbar .account-menu-trigger[aria-expanded="true"] { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.28); }
+.topbar .account-menu-trigger:focus-visible { outline: 3px solid #7cc4f0; outline-offset: 2px; }
+.topbar .account-menu-trigger .avatar, .topbar .account-menu-trigger .avatar-img { width: 34px; height: 34px; }
+.topbar .account-menu-name { font-size: 0.9rem; max-width: 150px; letter-spacing: 0.01em; }
+.topbar .account-menu-trigger .chevron { width: 12px; height: 12px; color: var(--chrome-text-active); opacity: 0.8; transition: transform 0.18s ease; }
+.topbar .account-menu-trigger[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+
+
+/* Numbered pages */
+.pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin: 18px 0 4px; }
+.pager-num, .pager-step { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 40px; padding: 0 10px; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--panel); color: var(--heading-ink); font-weight: 600; text-decoration: none; }
+a.pager-num:hover, a.pager-step:hover { border-color: var(--brand-blue); background: var(--brand-blue-soft); }
+.pager-num.is-current { background: var(--brand-blue); border-color: var(--brand-blue); color: #ffffff; }
+.pager-step.is-off { opacity: 0.4; }
+.pager-gap { color: var(--faint); padding: 0 2px; }
+.pager a:focus-visible { outline: 3px solid #7cc4f0; outline-offset: 2px; }
+.ch-search { display: flex; align-items: center; }
+
+
+/* Editing a transcript */
+.tx-edit-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 10px; }
+.tx-edit-bar button { min-height: 40px; }
+#order-transcript-table td.is-editing { outline: 1px dashed var(--brand-blue); outline-offset: -2px; background: #fffef4; cursor: text; border-radius: 4px; }
+#order-transcript-table td.is-editing:focus { outline: 2px solid var(--brand-blue); background: #ffffff; }
+.tx-edited { background: #fff4e0; color: #8a4b00; border-color: #f2d19a; }

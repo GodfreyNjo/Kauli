@@ -356,19 +356,34 @@
           <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }}</span>
         </div>
       </div>
+      {% if can_edit_transcript %}
+      <div class="tx-edit-bar">
+        <button type="button" class="secondary" id="tx-edit">Edit transcript</button>
+        <span id="tx-edit-actions" hidden>
+          <button type="button" id="tx-save" disabled>Save changes</button>
+          <button type="button" class="secondary" id="tx-cancel">Cancel</button>
+        </span>
+        <span id="tx-status" class="muted" role="status" aria-live="polite"></span>
+      </div>
+      {% endif %}
       <div id="order-transcript-scroll">
-        <table id="order-transcript-table">
-          <thead><tr><th style="width:60px;">Time</th><th>Source</th><th>{{ language_names.get(order['target_lang'], order['target_lang']) }}</th></tr></thead>
+        <table id="order-transcript-table"{% if same_language %} class="tx-same"{% endif %}>
+          <thead><tr><th style="width:60px;">Time</th>{% if same_language %}<th>Transcript</th>{% else %}<th>Source</th><th>{{ language_names.get(order['target_lang'], order['target_lang']) }}</th>{% endif %}</tr></thead>
           <tbody>
             {% for seg in job.segments %}
             {% if seg.segment_type == 'speech' %}
-            <tr data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}" data-target-text="{{ seg.final_text }}">
+            <tr data-segment-id="{{ seg.segment_id }}" data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}" data-target-text="{{ seg.final_text }}">
               <td class="muted" style="font-size:0.76rem; white-space:nowrap;">
                 {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
                 {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.66rem;">{{ seg.speaker_id }}</span>{% endif %}
+                {% if seg.edited_text or seg.source_edited_transcript %}<br><span class="meta-pill tx-edited" style="font-size:0.66rem;">edited</span>{% endif %}
               </td>
-              <td lang="{{ order['source_lang'] }}" style="font-size:0.85rem;">{{ seg.source_final_text }}</td>
-              <td lang="{{ order['target_lang'] }}" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+              {% if same_language %}
+              <td lang="{{ order['source_lang'] }}" data-edit="source" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+              {% else %}
+              <td lang="{{ order['source_lang'] }}" data-edit="source" style="font-size:0.85rem;">{{ seg.source_final_text }}</td>
+              <td lang="{{ order['target_lang'] }}" data-edit="target" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+              {% endif %}
             </tr>
             {% endif %}
             {% endfor %}
@@ -508,7 +523,7 @@
     }
     [].forEach.call(rows, function (row) {
       row.title = "Play from here";
-      row.addEventListener("click", function () { seekTo(Number(row.dataset.startMs) / 1000); });
+      row.addEventListener("click", function () { if (!window.txEditing) seekTo(Number(row.dataset.startMs) / 1000); });
     });
 
     if (media && rows.length) {
@@ -520,6 +535,60 @@
         media.addEventListener("pause", function () { stage.classList.remove("is-playing"); });
         media.addEventListener("ended", function () { stage.classList.remove("is-playing"); });
       }
+    }
+
+    // Editing the transcript (Instant AI orders): the cells become editable, only the lines that changed are sent, and the page
+    // reloads so the downloads, captions and summary all show the corrected text.
+    var editBtn = document.getElementById("tx-edit");
+    if (editBtn) {
+      var saveBtn = document.getElementById("tx-save"), cancelBtn = document.getElementById("tx-cancel");
+      var actions = document.getElementById("tx-edit-actions"), statusEl = document.getElementById("tx-status");
+      var cells = [].slice.call(document.querySelectorAll("#order-transcript-table td[data-edit]"));
+      var plain = function (c) { return c.innerText.replace(/\s+/g, " ").trim(); };
+      var dirty = function () { return cells.some(function (c) { return plain(c) !== c.dataset.orig; }); };
+      var setEditing = function (on) {
+        window.txEditing = on;
+        editBtn.hidden = on; actions.hidden = !on;
+        cells.forEach(function (c) {
+          c.dataset.orig = plain(c);
+          c.setAttribute("contenteditable", on ? "plaintext-only" : "false");
+          c.classList.toggle("is-editing", on);
+        });
+        statusEl.textContent = on ? "Click a line to change it. Ctrl+Z undoes." : "";
+        saveBtn.disabled = true;
+      };
+      editBtn.addEventListener("click", function () { setEditing(true); });
+      cells.forEach(function (c) {
+        c.addEventListener("input", function () { saveBtn.disabled = !dirty(); });
+        c.addEventListener("paste", function (e) {            // never paste formatting, only the words
+          e.preventDefault();
+          document.execCommand("insertText", false, (e.clipboardData || window.clipboardData).getData("text/plain"));
+        });
+      });
+      cancelBtn.addEventListener("click", function () {
+        cells.forEach(function (c) { c.textContent = c.dataset.orig; });
+        setEditing(false);
+      });
+      saveBtn.addEventListener("click", function () {
+        var edits = [];
+        [].forEach.call(document.querySelectorAll("#order-transcript-table tr[data-segment-id]"), function (row) {
+          var e = { segment_id: row.dataset.segmentId }, any = false;
+          [].forEach.call(row.querySelectorAll("td[data-edit]"), function (c) {
+            if (plain(c) !== c.dataset.orig) { e[c.dataset.edit] = plain(c); any = true; }
+          });
+          if (any) edits.push(e);
+        });
+        saveBtn.disabled = true; statusEl.textContent = "Saving...";
+        fetch("/client/orders/" + orderId + "/transcript", { method: "POST", credentials: "same-origin",
+              headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edits: edits }) })
+          .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+          .then(function (res) {
+            if (!res.ok) { statusEl.textContent = res.d.error || "Could not save."; saveBtn.disabled = false; return; }
+            window.txEditing = false; statusEl.textContent = "Saved"; location.reload();
+          })
+          .catch(function () { statusEl.textContent = "Could not save. Check your connection."; saveBtn.disabled = false; });
+      });
+      window.addEventListener("beforeunload", function (e) { if (window.txEditing && dirty()) { e.preventDefault(); e.returnValue = ""; } });
     }
 
     // A YouTube video: ask the player for its time while it plays (the page cannot hear its <video>).

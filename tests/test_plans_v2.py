@@ -19,31 +19,45 @@ def _sub(plan, status="active", end_in_days=20, used=0.0, bonus=0.0):
             "minutes_used_this_period": used, "bonus_minutes": bonus, "paystack_subscription_code": None}
 
 
-def test_each_plan_includes_instant_ai_minutes_worth_about_what_it_costs():
-    assert billing.plan_included_minutes("free") == billing.FREE_MINUTES_PER_MONTH == 60 and billing.plan_included_minutes("pro") == 150 and billing.plan_included_minutes("premium") == 400
-    ai_rate = billing.PRICE_CARD["intl"]["transcribe"]["ai"]
-    for plan in ("pro", "premium"):
-        value = billing.plan_included_minutes(plan) * ai_rate
-        assert 0.85 * billing.PLANS[plan]["price_usd"] <= value <= 1.0 * billing.PLANS[plan]["price_usd"] + 1, plan   # "equivalent to the price"
+def test_each_plan_includes_a_generous_allowance_that_grows_with_the_price():
+    assert billing.plan_included_minutes("free") == billing.FREE_MINUTES_PER_MONTH == 30
+    assert (billing.plan_included_minutes("pro"), billing.plan_included_minutes("premium"), billing.plan_included_minutes("enterprise")) == (2500, 6500, 25000)
+    per_dollar = [billing.PLANS[p]["included_ai_minutes"] / billing.PLANS[p]["price_usd"] for p in ("pro", "premium", "enterprise")]
+    assert per_dollar == sorted(per_dollar) or min(per_dollar) > 100                    # the bigger plan is never a worse deal
+    for plan in ("pro", "premium", "enterprise"):
+        assert 0 < billing.PLANS[plan]["quality_minutes"] < billing.PLANS[plan]["included_ai_minutes"]
 
 
 def test_the_allowance_follows_the_plan_in_force_and_resets_with_the_period():
-    assert billing.free_minutes_remaining(None) == 60
-    assert billing.free_minutes_remaining(_sub("pro")) == 150
-    assert billing.free_minutes_remaining(_sub("premium", used=100)) == 300
-    assert billing.free_minutes_remaining(_sub("pro", used=500)) == 0
-    assert billing.free_minutes_remaining(_sub("pro", bonus=10)) == 160
-    assert billing.free_minutes_remaining(_sub("pro", status="cancelled")) == 60          # not active: back to the trial allowance
-    assert billing.free_minutes_remaining(_sub("pro", end_in_days=-30)) == 60             # lapsed: back to the trial allowance
+    assert billing.free_minutes_remaining(None) == 30
+    assert billing.free_minutes_remaining(_sub("pro")) == 2500
+    assert billing.free_minutes_remaining(_sub("premium", used=100)) == 6400
+    assert billing.free_minutes_remaining(_sub("pro", used=5000)) == 0
+    assert billing.free_minutes_remaining(_sub("pro", bonus=10)) == 2510
+    assert billing.free_minutes_remaining(_sub("pro", status="cancelled")) == 30          # not active: back to the trial allowance
+    assert billing.free_minutes_remaining(_sub("pro", end_in_days=-30)) == 30             # lapsed: back to the trial allowance
+
+
+TRANSKRIPTOR_WORST = 0.033          # dollars a minute: the dearer end of Transkriptor's range
+GROQ_WORST = 0.0007                 # whisper-large-v3-turbo, $0.04 an hour
+ASSEMBLYAI_WORST = 0.004            # $0.15 an hour plus speaker labels
+
+
+def _worst_case(plan, bulk_rate):
+    p = billing.PLANS[plan]
+    return p["quality_minutes"] * TRANSKRIPTOR_WORST + (p["included_ai_minutes"] - p["quality_minutes"]) * bulk_rate
 
 
 def test_yearly_prices_save_real_money_and_never_lose_money():
     for plan in ("pro", "premium"):
         p = billing.PLANS[plan]
         assert 25 <= billing.yearly_saving_pct(plan) <= 45, plan                          # a clear incentive, like the industry leaders
-        monthly_revenue = p["price_usd_year"] / 12 * (1 - billing.PAYMENT_FEE_RATE)
-        worst_case_cost = p["included_ai_minutes"] * WORST_CASE_COST_PER_AI_MINUTE
-        assert worst_case_cost <= 0.65 * monthly_revenue, (plan, worst_case_cost, monthly_revenue)   # at least 35% of the money is left even if every included minute is used at the worst-case cost
+        yearly_month = p["price_usd_year"] / 12 * (1 - billing.PAYMENT_FEE_RATE)
+        monthly = p["price_usd"] * (1 - billing.PAYMENT_FEE_RATE)
+        # every included minute used, quality minutes on Transkriptor and the rest on Groq: more than 40% of the money is left
+        assert _worst_case(plan, GROQ_WORST) <= 0.6 * yearly_month, (plan, _worst_case(plan, GROQ_WORST), yearly_month)
+        # and if Groq were down for the whole month and AssemblyAI served the rest, a monthly subscriber still pays for themselves
+        assert _worst_case(plan, ASSEMBLYAI_WORST) < monthly, (plan, _worst_case(plan, ASSEMBLYAI_WORST), monthly)
         assert billing.yearly_monthly_equivalent(plan) < p["price_usd"]
 
 
@@ -75,7 +89,7 @@ def test_activating_a_yearly_payment_sets_a_365_day_period(tmp_path, monkeypatch
     sub = db.get_subscription_current("u9")
     days = (sub["current_period_end"] - time.time()) / 86400
     assert sub["plan"] == "premium" and 360 < days <= 365.1
-    assert billing.free_minutes_remaining(sub) == 400
+    assert billing.free_minutes_remaining(sub) == 6500
     pid2 = billing.new_reference()
     db.create_payment(pid2, "u9", "pro", billing.PLANS["pro"]["price_usd"], None, "USD", "paystack", meta=json.dumps({"kind": "order"}))
     assert app_mod._activate_payment(db.get_payment(pid2), "ref-month-1")
@@ -89,7 +103,7 @@ def test_the_pricing_page_has_a_yearly_toggle_included_minutes_and_a_custom_tier
     html = TestClient(app_mod.app, follow_redirects=False).get("/").text
     section = html.split('id="pz-plans"')[1].split("</section>")[0]
     assert 'data-interval="month"' in section and 'data-interval="year"' in section
-    assert "150 Instant AI minutes" in section and "400 Instant AI minutes" in section
+    assert "2,500 Instant AI minutes" in section and "6,500 Instant AI minutes" in section
     assert "$12.42" in section and "billed $149 a year" in section and "$31.58" in section
     assert "Enterprise" in section and "Custom" in section and "/demo?interest=enterprise" in section
 

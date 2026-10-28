@@ -20,7 +20,7 @@ def test_each_cause_gets_a_plain_explanation(env):
     assert "live stream" in explain(Exception("ERROR: This live event will begin in 2 hours"))
     assert "single video" in explain(Exception("ERROR: Unsupported URL: https://example.com"))
     other = explain(RuntimeError("socket hang up"))
-    assert "could not fetch" in other and "socket" not in other
+    assert "fetch that YouTube link" in other and "socket" not in other
 
 
 def test_the_client_sees_the_plain_message_and_the_real_error_is_logged(env, wav_bytes, caplog):

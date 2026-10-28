@@ -527,7 +527,7 @@
             <p class="pz-plan-price"><span class="pz-m"><b>${{ pro['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(pro['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ pro['price_usd_year'] }} a year</span></span></p>
             <p class="pz-save pz-y">Save {{ save_pro }}% with yearly</p>
             <ul class="pz-list">
-              <li><strong>{{ pro['included_ai_minutes']|int }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
+              <li><strong>{{ '{:,}'.format(pro['included_ai_minutes']|int) }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
               <li>{{ (pro['discount'] * 100)|round|int }}% off everything beyond that</li>
               <li>Downloads and delivery unlocked</li>
               {% if meetings_enabled() %}<li>Kauli can join your meetings</li>{% endif %}
@@ -542,7 +542,7 @@
             <p class="pz-plan-price"><span class="pz-m"><b>${{ prem['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(prem['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ prem['price_usd_year'] }} a year</span></span></p>
             <p class="pz-save pz-y">Save {{ save_prem }}% with yearly</p>
             <ul class="pz-list">
-              <li><strong>{{ prem['included_ai_minutes']|int }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
+              <li><strong>{{ '{:,}'.format(prem['included_ai_minutes']|int) }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
               <li>{{ (prem['discount'] * 100)|round|int }}% off everything beyond that</li>
               <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
               <li>Priority-quality translation and faster turnaround</li>
