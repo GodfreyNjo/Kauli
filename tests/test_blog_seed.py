@@ -21,7 +21,7 @@ EXISTING_POST_SLUGS = {
 
 def test_slugs_unique_and_descriptions_fit():
     slugs = [p["slug"] for p in POSTS]
-    assert len(slugs) == len(set(slugs)) == 8
+    assert len(slugs) == len(set(slugs)) == 16
     for p in POSTS:
         assert re.fullmatch(r"[a-z0-9-]+", p["slug"]), p["slug"]
         assert 60 <= len(p["description"]) <= 160, (p["slug"], len(p["description"]))

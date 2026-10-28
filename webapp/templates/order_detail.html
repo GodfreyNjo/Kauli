@@ -225,7 +225,7 @@
       {% if youtube_connection %}
       <p class="muted" style="font-size:0.85rem; margin-bottom:10px;">
         Connected as <strong>{{ youtube_connection['channel_title'] or 'your channel' }}</strong>.
-        Uploads the human-verified subtitles (.srt) above directly onto the original video as a
+        Uploads the subtitles (.srt) above{% if order['review_tier'] == 'ai' %} (AI-generated, not human-reviewed){% endif %} directly onto the original video as a
         {{ order['target_lang']|upper }} caption track, published immediately - review the file first if
         you want to check it before it goes live on YouTube.
       </p>
@@ -277,7 +277,7 @@
       <div class="order-transcript-header">
         <div>
           <h2 style="margin:0; font-size:1.05rem;">Transcript &amp; translation</h2>
-          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">{{ job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length }} human-reviewed segment{{ '' if job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length == 1 else 's' }}</p>
+          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">{{ job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length }} {{ 'AI-generated' if order['review_tier'] == 'ai' else 'human-reviewed' }} segment{{ '' if job.segments|selectattr('segment_type', 'equalto', 'speech')|list|length == 1 else 's' }}</p>
         </div>
         <div class="order-transcript-langs">
           <span class="order-transcript-lang-pill">{{ order['source_lang']|upper }}</span>

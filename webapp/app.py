@@ -1583,8 +1583,8 @@ SOLUTION_PAGES = {
                   "plan - plain audio, transcript and subtitles are included on every plan."},
             {"q": "What if my video mixes Sheng and English mid-sentence?",
              "a": "That's exactly the kind of code-switching a generic AI translation tends to "
-                  "mishandle - it's why a real editor checks every line against the source audio on "
-                  "every order, not just the ones that look risky at a glance."},
+                  "mishandle - it's why, on a Human-reviewed order, a real editor checks every line against "
+                  "the source audio, not just the ones that look risky at a glance."},
         ],
         "fit_guide": [
             {"plan": "Free", "for": "Testing quality on one upload before you commit to a workflow.",
@@ -1645,8 +1645,8 @@ SOLUTION_PAGES = {
                   "transcript or subtitle file is included on every plan."},
             {"q": "What if our footage mixes English and Swahili mid-segment?",
              "a": "That's exactly the kind of code-switching a generic AI translation tends to "
-                  "mishandle - it's why a real editor checks every line against the source audio on "
-                  "every order, not just the ones that look risky at a glance."},
+                  "mishandle - it's why, on a Human-reviewed order, a real editor checks every line against "
+                  "the source audio, not just the ones that look risky at a glance."},
             {"q": "Can we get bank-transfer billing for an ongoing relationship?",
              "a": "Yes - it's the standard billing method on our Enterprise plan, alongside a "
                   "negotiated volume rate and a dedicated account manager."},
@@ -1698,8 +1698,8 @@ SOLUTION_PAGES = {
         "tour": {"mode": "upload", "filename": "module_3_lesson.mp4"},
         "faq": [
             {"q": "How do you keep terminology consistent across many lessons?",
-             "a": "The same human review standard applies to lesson one and lesson fifty - a real "
-                  "editor checking each order against the source audio, not a memory-less AI tool "
+             "a": "On Human-reviewed orders the same review standard applies to lesson one and lesson fifty - "
+                  "a real editor checking each order against the source audio, not a memory-less AI tool "
                   "picking a different translation each time a term comes up."},
             {"q": "Can you handle a whole course at once, or just one video?",
              "a": "Each module is its own order today, priced per minute - there's no separate "
@@ -2007,8 +2007,8 @@ SOLUTION_PAGES = {
         "kicker": "YouTube video to text",
         "h1": "Turn a YouTube video into text - paste the link",
         "intro": "Paste a YouTube link, choose the spoken language and get a timestamped transcript back "
-                 "in minutes. Download it as Word, plain text or SRT, or push finished captions straight "
-                 "back to your own channel.",
+                 "in minutes. Download it as Word, plain text or SRT, and add translated subtitles with "
+                 "Instant AI.",
         "why_heading": "From YouTube link to transcript",
         "points": [
             {"title": "No downloading or re-uploading",
@@ -2017,9 +2017,9 @@ SOLUTION_PAGES = {
             {"title": "70+ spoken languages",
              "body": "Choose the language spoken in the video. Instant AI transcribes it and can translate it; "
                       "for Swahili, Kikuyu and English you can also add dubbing and human review."},
-            {"title": "Captions back onto your channel",
-             "body": "Connect your YouTube channel and publish finished English or Swahili captions "
-                      "directly to your own video - no manual SRT upload."},
+            {"title": "Subtitle files ready for YouTube",
+             "body": "Download SRT or VTT files and upload them to your video in YouTube Studio, one per "
+                      "language, so viewers can pick their own."},
             {"title": "If a link can't be fetched, upload the file",
              "body": "YouTube sometimes blocks automated downloads for particular videos. If that happens "
                       "to yours, upload the video file instead and the rest works exactly the same."},
@@ -2037,9 +2037,9 @@ SOLUTION_PAGES = {
             {"q": "Why did my YouTube link fail?",
              "a": "YouTube occasionally blocks automated access to specific videos. Upload the video file "
                   "instead - the result is identical."},
-            {"q": "Can I get the captions onto my video automatically?",
-             "a": "Yes, for your own channel: connect your YouTube account from Settings and publish "
-                  "captions to a finished order with one click."},
+            {"q": "How do I get the subtitles onto my video?",
+             "a": "Download the SRT or VTT file from your finished order, then open the video in YouTube "
+                  "Studio, go to Subtitles, add the language and upload the file."},
         ],
     },
     "podcast-transcription": {
@@ -2682,7 +2682,8 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         "1. Open your dashboard.\n"
         "2. Upload a short video or audio clip, or paste a YouTube link.\n"
         "3. Pick your language pair (e.g. Swahili -> English).\n"
-        "4. We'll notify you the moment your AI-drafted, human-checked result is ready to download.\n\n"
+        "4. We'll notify you the moment your result is ready to download. Instant AI results arrive in "
+        "minutes and are AI-generated; Human-reviewed results are checked by a real editor first.\n\n"
         "If anything's unclear, or you'd rather just talk it through, reply to this email or "
         f"message me directly on WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
         f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
@@ -2698,7 +2699,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         f'<li style="margin-bottom:4px;">Open your dashboard.</li>'
         f'<li style="margin-bottom:4px;">Upload a short video or audio clip, or paste a YouTube link.</li>'
         f'<li style="margin-bottom:4px;">Pick your language pair (e.g. Swahili &rarr; English).</li>'
-        f'<li>We\'ll notify you the moment your AI-drafted, human-checked result is ready to download.</li>'
+        f'<li>We\'ll notify you the moment your result is ready to download. Instant AI results arrive in minutes and are AI-generated; Human-reviewed results are checked by a real editor first.</li>'
         f'</ol>'
         f'<p style="margin:0 0 14px;">If anything\'s unclear, or you\'d rather just talk it through, '
         f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email '
@@ -3558,7 +3559,9 @@ def push_captions_to_youtube(request: Request, order_id: str):
         access_token = youtube_captions.ensure_fresh_token(connection)
         youtube_captions.upload_caption(
             access_token, order["source_youtube_id"], order["target_lang"], str(srt_path),
-            name=f"{order['target_lang'].upper()} (Kauli, human-verified)",
+            # Label honestly: only a Human-reviewed order has been checked by a person.
+            name=(f"{order['target_lang'].upper()} (Kauli, AI translation)" if order["review_tier"] == "ai"
+                  else f"{order['target_lang'].upper()} (Kauli, human-verified)"),
         )
     except Exception as exc:  # noqa: BLE001 - a real, specific message beats a silent failure
         return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote(str(exc)[:250])}", status_code=303)

@@ -36,6 +36,9 @@ CHUNK_SIZE = 1024 * 1024  # stream in 1MB chunks - never buffer a whole upload i
 
 ALLOWED_MEDIA_EXTENSIONS = {
     ".mp3", ".wav", ".m4a", ".mp4", ".mov", ".mkv", ".flac", ".ogg", ".webm", ".aac", ".wma", ".avi",
+    # WhatsApp/Telegram voice notes are Ogg/Opus files named .opus - the
+    # container is the same OggS the sniffer below already recognises.
+    ".opus",
 }
 ALLOWED_STYLE_GUIDE_EXTENSIONS = {
     ".pdf", ".doc", ".docx", ".txt", ".md", ".rtf", ".png", ".jpg", ".jpeg",
@@ -51,6 +54,7 @@ _SIMPLE_SIGNATURES = [
     (b"RIFF", "riff"),          # WAV (also AVI - both are RIFF containers, ffprobe disambiguates later)
     (b"fLaC", "flac"),
     (b"OggS", "ogg"),
+    (b"\xff\xf1", "aac"), (b"\xff\xf9", "aac"),  # raw ADTS AAC (.aac) frame sync - was an allowed extension the sniffer rejected
     (b"\x1a\x45\xdf\xa3", "ebml"),  # Matroska / WebM
     (b"\x30\x26\xb2\x75\x8e\x66\xcf\x11", "asf"),  # WMA/WMV (ASF container)
 ]

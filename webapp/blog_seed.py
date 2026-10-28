@@ -431,6 +431,393 @@ POSTS = [
 
 <p>Ready to try it? Start from the <a href="/solutions/audio-to-text">audio to text</a> page - your first 5 minutes are free after a one-time $1 card check credited to your account.</p>""",
     },
+    {
+        "slug": "how-to-transcribe-a-zoom-recording",
+        "title": "How to Transcribe a Zoom Recording (and Get Notes You Can Actually Use)",
+        "category": "Transcription Guides",
+        "description": "Turn a Zoom meeting recording into a searchable transcript: where to find the file, which one to upload, and how to get speaker labels and clean notes.",
+        "body_html": """<p>A recorded Zoom meeting is useful right up until someone has to find what was decided in it.</p>
+<p>A transcript turns the recording into text you can search, skim and quote.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>Zoom can create transcripts for cloud recordings when it is enabled on the account, and any recording can be transcribed by uploading it to a transcription service.</li>
+<li>The audio file is usually all you need, and it uploads faster than the video.</li>
+<li>Speaker labels and timestamps are what make a meeting transcript useful, so check that your tool includes them.</li>
+</ul></div>
+
+<h2>Option 1: Zoom's own transcript</h2>
+<p>If your account has audio transcripts enabled for cloud recordings, Zoom can produce a transcript automatically after the meeting.</p>
+<p>It is convenient, but it only exists when the host or account admin turned it on before recording.</p>
+<p>It also only covers recordings stored in Zoom's cloud, not files saved on your computer.</p>
+
+<h2>Option 2: Upload the recording to a transcription service</h2>
+<p>This works for any recording, whether it is a cloud download or a local file.</p>
+<ol>
+<li><strong>Find the file.</strong> Local recordings usually include the video plus a separate audio-only file.</li>
+<li><strong>Upload the audio file if you have one.</strong> It is smaller and the text comes out the same.</li>
+<li><strong>Choose the spoken language.</strong> Meetings in a language other than English need the right setting.</li>
+<li><strong>Download the transcript.</strong> Word is best for editing and sharing, and text is best for pasting into notes.</li>
+</ol>
+<p>With Kauli, <a href="/solutions/audio-to-text">audio to text</a> starts at $0.12 per audio-minute, so a one-hour meeting costs about $7.20.</p>
+
+<h2>What makes a meeting transcript useful</h2>
+<ul>
+<li><strong>Speaker labels.</strong> A transcript without names is just a wall of text.</li>
+<li><strong>Timestamps.</strong> They let you jump back to the exact moment in the recording.</li>
+<li><strong>Clean audio.</strong> Separate microphones and a quiet room improve every transcript.</li>
+<li><strong>A quick proofread of names.</strong> Colleagues' names and product terms are the most common errors.</li>
+</ul>
+
+<h2>Turning a transcript into notes</h2>
+<p>Skim for decisions, owners and dates first, because that is what people look for later.</p>
+<p>Copy those into a short summary at the top and keep the full transcript underneath for reference.</p>
+
+<h2>A note on consent</h2>
+<p>Rules about recording and transcribing meetings differ by place, so check yours.</p>
+<p>The safe habit is to tell everyone that the meeting is recorded and will be transcribed.</p>
+<p>Instant AI transcription is machine-generated and not reviewed by a person, so give it a read before you circulate it as minutes.</p>""",
+    },
+    {
+        "slug": "mp3-to-text-how-to-convert-audio-files",
+        "title": "MP3 to Text: How to Convert Any Audio File Into a Transcript",
+        "category": "Transcription Guides",
+        "description": "How to convert an MP3 or other audio file to text: supported formats, the steps, how to get accurate results, and when you need a human to check it.",
+        "body_html": """<p>You have an MP3 - a lecture, a call, an interview - and you need the words as text.</p>
+<p>Converting it takes a few minutes, and a few habits make the result much better.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>Most common audio and video formats work, including MP3, WAV, M4A, FLAC, OGG and Opus.</li>
+<li>The two settings that matter most are the spoken language and the audio quality.</li>
+<li>Machine transcripts are drafts, so check names and numbers before you rely on them.</li>
+</ul></div>
+
+<h2>Which file types work</h2>
+<p>You don't need to convert anything first - upload the file as it is.</p>
+<ul>
+<li><strong>Audio:</strong> MP3, WAV, M4A, FLAC, OGG, Opus, AAC and WMA.</li>
+<li><strong>Video:</strong> MP4, MOV, MKV, WebM and AVI, where only the audio is used for the transcript.</li>
+</ul>
+
+<h2>How to convert MP3 to text</h2>
+<ol>
+<li><strong>Upload the file</strong> to a transcription tool, or paste a link if it is a video online.</li>
+<li><strong>Choose the spoken language.</strong> A wrong choice is the most common cause of nonsense output.</li>
+<li><strong>Wait a few minutes.</strong> Instant AI transcription is usually ready quickly.</li>
+<li><strong>Download as Word, text or SRT.</strong> Word suits editing, text suits pasting, and SRT adds timestamps for subtitles.</li>
+</ol>
+<p>Kauli's <a href="/solutions/audio-to-text">audio to text</a> page covers this in 77 languages.</p>
+
+<h2>How to get a more accurate transcript</h2>
+<ul>
+<li><strong>Start from the best recording you have.</strong> Re-recording is impossible, but picking the cleanest copy is not.</li>
+<li><strong>Reduce background noise before recording next time.</strong> It helps every tool more than any setting.</li>
+<li><strong>Separate speakers where possible.</strong> One microphone per person beats a single room microphone.</li>
+<li><strong>Proofread proper nouns.</strong> Names and specialist terms are where machines slip.</li>
+</ul>
+
+<h2>When a human should check it</h2>
+<p>AI is fine for notes and search, but anything you'll publish, quote or file should be checked against the audio.</p>
+<p>For Swahili, Kikuyu and English, Kauli's Human-reviewed option adds a real reviewer before delivery.</p>
+<p>Our guide to <a href="/blog/ai-vs-human-transcription-which-do-you-need">AI vs human transcription</a> explains how to choose.</p>
+
+<h2>What it costs</h2>
+<p>Instant AI transcription is $0.12 per audio-minute in the US, so a 30-minute MP3 comes to about $3.60.</p>
+<p>Your first 5 minutes are free after a one-time $1 card check that is credited to your account.</p>""",
+    },
+    {
+        "slug": "transcribe-whatsapp-voice-notes",
+        "title": "How to Transcribe WhatsApp Voice Notes to Text",
+        "category": "Transcription Guides",
+        "description": "How to turn WhatsApp voice notes into text: getting the audio file out of the app, uploading it, and handling Swahili and other languages.",
+        "body_html": """<p>Voice notes are quick to send and slow to search, skim or quote.</p>
+<p>If you have an important one - instructions, an order, a long story - turning it into text is worth a few minutes.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>WhatsApp voice notes are audio files you can share out of the app and upload to a transcription tool.</li>
+<li>Pick the language the speaker actually used, which matters a lot for Swahili mixed with English.</li>
+<li>Only transcribe a voice note you are allowed to use, because it is a personal recording.</li>
+</ul></div>
+
+<h2>Step 1: Get the voice note out of WhatsApp</h2>
+<p>Voice notes are saved as small audio files, usually with the extension .opus.</p>
+<p>Press and hold the voice message, choose the option to share or forward it, and send the file to yourself by email or save it to your files.</p>
+<p>The exact menu names differ between Android and iPhone and change between app versions, so look for "Share" or "Forward".</p>
+
+<h2>Step 2: Upload it to a transcription tool</h2>
+<p>Kauli accepts .opus files directly, so you don't need to convert the voice note first.</p>
+<p>Upload it on the <a href="/solutions/audio-to-text">audio to text</a> page and choose the language.</p>
+
+<h2>Step 3: Choose the right language</h2>
+<p>People often switch between languages in a single voice note.</p>
+<p>Choose the main language the speaker used, and expect to fix a few borrowed words afterwards.</p>
+<p>For Swahili specifically, see our guide to <a href="/blog/how-to-transcribe-swahili-audio">transcribing Swahili audio</a>.</p>
+
+<h2>What to check afterwards</h2>
+<ul>
+<li><strong>Names and places.</strong> They are usually the first things to go wrong.</li>
+<li><strong>Numbers and amounts.</strong> Money and phone numbers are costly mistakes.</li>
+<li><strong>Slang and mixed languages.</strong> Short informal notes are the hardest case for any tool.</li>
+</ul>
+
+<h2>A note on privacy</h2>
+<p>A voice note is a personal recording, and the person who sent it may not expect it to be processed by a service.</p>
+<p>Ask first when it isn't yours, and read our <a href="/privacy">privacy policy</a> to see how files are handled.</p>
+<p>WhatsApp has also been adding its own voice message transcripts on some devices and languages, which can be enough for a quick read.</p>""",
+    },
+    {
+        "slug": "srt-vs-vtt-which-subtitle-format-to-use",
+        "title": "SRT vs VTT: Which Subtitle Format Should You Use?",
+        "category": "Transcription Guides",
+        "description": "SRT and VTT compared: what each file looks like, where each works, and a simple rule for choosing the right subtitle format for your video.",
+        "body_html": """<p>If you have ever exported subtitles, you have seen two options: SRT and VTT.</p>
+<p>They look almost the same, and for most videos either one works.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>SRT is the simplest and most widely supported subtitle format.</li>
+<li>VTT is the web standard and adds styling, positioning and metadata.</li>
+<li>If you are unsure, export both - the text and timing are the same.</li>
+</ul></div>
+
+<h2>What an SRT file looks like</h2>
+<p>An SRT file is plain text: a number, a time range, and the subtitle text.</p>
+<pre><code>1
+00:00:01,000 --&gt; 00:00:03,500
+Welcome to the channel.
+
+2
+00:00:04,000 --&gt; 00:00:07,200
+Today we're looking at subtitles.</code></pre>
+<p>Notice that the time uses a comma before the milliseconds.</p>
+
+<h2>What a VTT file looks like</h2>
+<p>A VTT file starts with the word WEBVTT, and uses a period before the milliseconds.</p>
+<pre><code>WEBVTT
+
+00:00:01.000 --&gt; 00:00:03.500
+Welcome to the channel.
+
+00:00:04.000 --&gt; 00:00:07.200
+Today we're looking at subtitles.</code></pre>
+<p>The cue numbers are optional in VTT, and the format can also carry styling and positioning.</p>
+
+<h2>SRT vs VTT at a glance</h2>
+<table>
+<thead><tr><th></th><th>SRT</th><th>VTT</th></tr></thead>
+<tbody>
+<tr><td>Time format</td><td>00:00:01,000</td><td>00:00:01.000</td></tr>
+<tr><td>Header</td><td>None</td><td>Starts with WEBVTT</td></tr>
+<tr><td>Styling and positioning</td><td>Very limited</td><td>Supported</td></tr>
+<tr><td>Best known for</td><td>Wide compatibility</td><td>HTML5 web video</td></tr>
+</tbody></table>
+
+<h2>Which one should you use?</h2>
+<ul>
+<li><strong>Uploading to YouTube or most video tools:</strong> SRT is the safe default.</li>
+<li><strong>Using the HTML5 video element on your own website:</strong> use VTT, which is the format browsers expect.</li>
+<li><strong>Need styling or positioning:</strong> use VTT.</li>
+<li><strong>Not sure:</strong> keep both, because converting is easy and the content is the same.</li>
+</ul>
+
+<h2>Getting both from Kauli</h2>
+<p>Kauli provides SRT and VTT downloads for translated subtitles, and an SRT of the original transcript.</p>
+<p>Our guide to <a href="/blog/add-subtitles-to-video-in-another-language">adding subtitles in another language</a> walks through the whole workflow, and the <a href="/solutions/captioning">captioning</a> page has the details.</p>""",
+    },
+    {
+        "slug": "captions-vs-subtitles-vs-transcripts",
+        "title": "Captions vs Subtitles vs Transcripts: What's the Difference?",
+        "category": "Transcription Guides",
+        "description": "Captions, subtitles and transcripts are not the same thing. Here is what each one is, who it serves, and which you need for your video or audio.",
+        "body_html": """<p>People use "captions", "subtitles" and "transcripts" as if they were synonyms.</p>
+<p>They overlap, but each exists for a different reason, and choosing the wrong one can leave part of your audience out.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>Subtitles show the spoken words on screen, often translated, for viewers who can hear the audio.</li>
+<li>Captions also describe important sounds, so they work for viewers who can't hear the audio.</li>
+<li>A transcript is a separate text document, useful for reading, searching and quoting.</li>
+</ul></div>
+
+<h2>Subtitles</h2>
+<p>Subtitles display the dialogue as text while the video plays.</p>
+<p>They assume the viewer can hear the audio, and they are most often used to translate speech into another language.</p>
+
+<h2>Captions</h2>
+<p>Captions include the dialogue plus the sounds a viewer would otherwise miss.</p>
+<ul>
+<li><strong>Speaker names</strong> when the speaker is off screen.</li>
+<li><strong>Music and sound effects</strong> such as [applause] or [door slams].</li>
+<li><strong>Tone cues</strong> where they change the meaning.</li>
+</ul>
+<p>That is why captions are the accessible option for people who are deaf or hard of hearing.</p>
+
+<h2>Closed vs open captions</h2>
+<p>Closed captions can be turned on and off by the viewer.</p>
+<p>Open captions are burned into the picture, so they are always visible and can't be changed.</p>
+
+<h2>Transcripts</h2>
+<p>A transcript is the whole recording as text, without being tied to the picture.</p>
+<p>It is useful for people who prefer reading, for searching what was said, and for quoting accurately.</p>
+
+<h2>Which do you need?</h2>
+<table>
+<thead><tr><th>Goal</th><th>Use</th></tr></thead>
+<tbody>
+<tr><td>Reach viewers who speak another language</td><td>Subtitles</td></tr>
+<tr><td>Make video accessible to viewers who can't hear it</td><td>Captions</td></tr>
+<tr><td>Let people read, search or quote the content</td><td>Transcript</td></tr>
+<tr><td>Show text on platforms that ignore caption files</td><td>Open (burned-in) captions</td></tr>
+</tbody></table>
+
+<h2>You can usually make all three from one transcript</h2>
+<p>An accurate transcript with timestamps is the starting point for all of them.</p>
+<p>Kauli produces SRT and VTT files plus Word and text transcripts, so <a href="/solutions/audio-to-text">one upload</a> can cover each use.</p>
+<p>If you also need to translate, see <a href="/blog/add-subtitles-to-video-in-another-language">how to add subtitles in another language</a>, and for file formats see <a href="/blog/srt-vs-vtt-which-subtitle-format-to-use">SRT vs VTT</a>.</p>""",
+    },
+    {
+        "slug": "verbatim-vs-clean-read-transcription",
+        "title": "Verbatim vs Clean Read Transcription: Which Style Do You Need?",
+        "category": "Transcription Guides",
+        "description": "Verbatim keeps every um and false start, clean read tidies them up. Here is how the two transcript styles differ and how to choose the right one.",
+        "body_html": """<p>Two transcripts of the same recording can look very different, and both can be correct.</p>
+<p>The difference is whether the transcript records how something was said or only what was meant.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>Verbatim keeps every filler word, false start and stutter exactly as spoken.</li>
+<li>Clean read removes them so the text is easy to read, without changing the meaning.</li>
+<li>Choose verbatim for legal and research records, and clean read for most publishing and business use.</li>
+</ul></div>
+
+<h2>The same sentence, two ways</h2>
+<table>
+<thead><tr><th>Style</th><th>Transcript</th></tr></thead>
+<tbody>
+<tr><td>Verbatim</td><td>So, um, we were - we were thinking of, like, launching in March, maybe.</td></tr>
+<tr><td>Clean read</td><td>We were thinking of launching in March, maybe.</td></tr>
+</tbody></table>
+<p>Nothing was invented, and nothing important was lost, but the second version is far easier to read.</p>
+
+<h2>When verbatim is the right choice</h2>
+<ul>
+<li><strong>Legal records.</strong> Hesitations and exact wording can matter.</li>
+<li><strong>Research on speech.</strong> Linguistics and some qualitative methods analyse how people speak.</li>
+<li><strong>Interviews where tone matters.</strong> A pause or a repeated word can carry meaning.</li>
+</ul>
+
+<h2>When clean read is the right choice</h2>
+<ul>
+<li><strong>Subtitles and captions.</strong> Viewers need to read quickly.</li>
+<li><strong>Articles, quotes and show notes.</strong> Readers want the point, not the stumbles.</li>
+<li><strong>Business notes and training material.</strong> Clarity beats a literal record.</li>
+</ul>
+
+<h2>Is there something in between?</h2>
+<p>Many providers offer a middle option that removes pure filler but keeps meaningful repetitions and corrections.</p>
+<p>It goes by different names, so check what a service actually does before you order.</p>
+
+<h2>How Kauli handles it</h2>
+<p>On Human-reviewed orders you choose clean read or verbatim for each order.</p>
+<p>Our <a href="/formatting-standards">formatting standards</a> explain exactly how each style is applied, including how we treat non-speech sounds.</p>
+<p>Instant AI transcripts are machine-generated and may not be strict verbatim, so choose human review if you need an exact record.</p>""",
+    },
+    {
+        "slug": "how-does-ai-transcription-work",
+        "title": "How Does AI Transcription Work? A Plain-English Explanation",
+        "category": "Transcription Guides",
+        "description": "How AI turns speech into text: what happens to your audio, why errors happen, and why some languages and recordings are harder than others.",
+        "body_html": """<p>You upload an audio file, and a few minutes later you get text back.</p>
+<p>It feels like magic, but it is a sequence of understandable steps - and knowing them helps you predict where mistakes will appear.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>AI transcription works by predicting the most likely words for each stretch of sound, using a model trained on huge amounts of recorded speech.</li>
+<li>Accuracy depends on audio quality, accents, vocabulary and how much training data exists for the language.</li>
+<li>Because the model predicts likely words, its mistakes can read fluently, which is why important text needs a human check.</li>
+</ul></div>
+
+<h2>Step 1: The audio is prepared</h2>
+<p>The file is converted into a standard form and split into short slices of sound.</p>
+<p>Silence and background-only stretches are often detected so the model focuses on speech.</p>
+
+<h2>Step 2: A model predicts the words</h2>
+<p>A neural network trained on large amounts of transcribed speech looks at each slice and predicts the most likely words.</p>
+<p>It also uses context, so a sound that could be two words is resolved by the sentence around it.</p>
+
+<h2>Step 3: The text is finished</h2>
+<ul>
+<li><strong>Punctuation and capitals</strong> are added so the text reads naturally.</li>
+<li><strong>Timestamps</strong> record when each line starts and ends.</li>
+<li><strong>Speaker separation</strong> tries to work out who is talking when more than one person speaks.</li>
+</ul>
+
+<h2>Why mistakes happen</h2>
+<ul>
+<li><strong>Noise and music</strong> compete with the voice.</li>
+<li><strong>Accents and dialects</strong> that were rare in the training data are recognised less well.</li>
+<li><strong>Names and jargon</strong> aren't in the model's everyday vocabulary, so it guesses something similar.</li>
+<li><strong>Mixed languages</strong> confuse models that expect one language at a time.</li>
+<li><strong>Little training data</strong> for a language means weaker results, which is why some languages work far better than others.</li>
+</ul>
+
+<h2>Why a fluent mistake is the dangerous kind</h2>
+<p>Because the model predicts likely words, a wrong guess usually still reads like normal language.</p>
+<p>Nobody notices without the audio in front of them, which is exactly why a human check matters for text that will be published or relied on.</p>
+
+<h2>Where translation fits in</h2>
+<p>Machine translation is a second model applied to the transcript, so any transcription error carries straight into the translation.</p>
+<p>That's why we always suggest getting the transcript right first - our guide to <a href="/blog/ai-vs-human-transcription-which-do-you-need">AI vs human transcription</a> covers when to add a person.</p>
+
+<p>You can see all of this in practice by trying <a href="/solutions/audio-to-text">audio to text</a> on a short clip - the first 5 minutes are free after a one-time $1 card check, credited to your account.</p>""",
+    },
+    {
+        "slug": "translate-youtube-titles-descriptions-and-captions",
+        "title": "How to Translate Your YouTube Titles, Descriptions and Captions",
+        "category": "Transcription Guides",
+        "description": "Reach viewers in other languages: add translated titles, descriptions and subtitles to a YouTube video, and get the translations in the first place.",
+        "body_html": """<p>A viewer in Madrid or Mumbai searching in their own language won't find a video with only an English title.</p>
+<p>YouTube lets you add translated titles, descriptions and subtitles to the same video, so one upload can serve several audiences.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>One video can carry translated titles, descriptions and subtitles in many languages.</li>
+<li>Subtitles come from a transcript, and the title and description are short enough to check by hand.</li>
+<li>Machine translation is a fast first draft, but have a speaker of the language check anything that represents your brand.</li>
+</ul></div>
+
+<h2>What you can translate</h2>
+<ul>
+<li><strong>Subtitles and captions</strong> - the spoken words, as text on the video.</li>
+<li><strong>The title</strong> - what viewers see in search and recommendations.</li>
+<li><strong>The description</strong> - the supporting text under the video.</li>
+</ul>
+
+<h2>Step 1: Get an accurate transcript</h2>
+<p>Everything else is built on the transcript, so make it right in the original language first.</p>
+<p>Use <a href="/solutions/youtube-video-to-text">YouTube to text</a> if you want to start from a link, and fix names and terms.</p>
+
+<h2>Step 2: Translate the transcript</h2>
+<p>For subtitles, translate the transcript and export it as an SRT or VTT file.</p>
+<p>Kauli's Instant AI translates between 76 languages and delivers SRT and VTT, and it labels the output as machine translation that no person has reviewed.</p>
+<p>See our step-by-step guide to <a href="/blog/add-subtitles-to-video-in-another-language">adding subtitles in another language</a>.</p>
+
+<h2>Step 3: Translate the title and description</h2>
+<p>Titles and descriptions are short, so check them carefully rather than trusting a literal translation.</p>
+<ul>
+<li><strong>Keep the hook.</strong> A translated title should still make someone want to click.</li>
+<li><strong>Use the words people search for.</strong> The natural phrase in that language may not be a literal translation.</li>
+<li><strong>Keep names and brand terms consistent.</strong> Decide once and reuse.</li>
+</ul>
+
+<h2>Step 4: Add them in YouTube Studio</h2>
+<p>In YouTube Studio, open the video's Subtitles section and add a language.</p>
+<p>For each language you can upload the subtitle file and add the translated title and description.</p>
+<p>Viewers will then see the version that matches their language settings.</p>
+
+<h2>A sensible way to start</h2>
+<ul>
+<li>Pick your two or three highest-potential languages instead of translating into everything at once.</li>
+<li>Start with your best-performing videos.</li>
+<li>Ask a native speaker to review titles and descriptions, since they matter most for discovery.</li>
+</ul>
+
+<p>For videos in Swahili, Kikuyu or English, <a href="/solutions/youtubers">Kauli for YouTubers</a> adds human review, and our <a href="/languages">language list</a> shows everything else we transcribe and translate.</p>""",
+    },
 ]
 
 
