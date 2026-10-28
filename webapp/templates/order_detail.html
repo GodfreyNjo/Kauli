@@ -403,6 +403,12 @@
     <p class="muted" id="ai-summary-loading">Generating a summary from your reviewed transcript…</p>
     {% endif %}
   </div>
+  {% if can_export_transcript %}
+  <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
+    <button type="submit" class="secondary">Create AI notes</button>
+    <span class="muted">An editable note with the overview, key points and action items.</span>
+  </form>
+  {% endif %}
 
   <h2 style="margin-top:24px;">Ask about this transcript</h2>
   <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>

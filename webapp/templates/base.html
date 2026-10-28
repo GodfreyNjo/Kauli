@@ -157,6 +157,7 @@
         <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Reports</span></a>
         <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">CRM</span></a>
         <a href="/staff/clients" class="{{ 'active' if '/staff/clients' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">Clients</span></a>
+        <a href="/staff/support" class="{{ 'active' if '/staff/support' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Support</span></a>
         <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}">{{ nav_icon('alert') }}<span class="label">Exceptions</span></a>
         <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
         <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
@@ -185,6 +186,14 @@
         <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">{{ t('nav_files') }}</span></a>
         <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}">{{ nav_icon('message') }}<span class="label">{{ t('nav_messages') }}</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">{{ t('nav_billing') }}</span></a>
+        <a href="/client/plans" class="{{ 'active' if '/client/plans' in request.url.path else '' }}">{{ nav_icon('shield') }}<span class="label">{{ t('nav_plans') }}</span></a>
+        <div class="sidebar-divider"></div>
+        <a href="/client/notes" class="{{ 'active' if '/client/notes' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">{{ t('nav_notes') }}</span></a>
+        <a href="/client/analytics" class="{{ 'active' if '/client/analytics' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">{{ t('nav_analytics') }}</span></a>
+        <a href="/client/workspace" class="{{ 'active' if '/client/workspace' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">{{ t('nav_workspace') }}</span></a>
+        <a href="/client/vocabulary" class="{{ 'active' if '/client/vocabulary' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">{{ t('nav_vocabulary') }}</span></a>
+        <a href="/client/integrations" class="{{ 'active' if '/client/integrations' in request.url.path else '' }}">{{ nav_icon('gear') }}<span class="label">{{ t('nav_integrations') }}</span></a>
+        <a href="/client/rewards" class="{{ 'active' if '/client/rewards' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">{{ t('nav_rewards') }}</span></a>
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">{{ t('nav_help') }}</span></a>
         <div class="sidebar-contact-row">
@@ -680,5 +689,6 @@
     }
   </script>
   <script src="/static/studio_wave.js?v=1" defer></script>
+{% if user is defined and user and user['role'] == 'client' %}{% include "_assistant.html" %}{% endif %}
 </body>
 </html>

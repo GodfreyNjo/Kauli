@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Rewards{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Rewards</h1>
+      <p class="muted">Invite a friend and earn free Instant AI minutes. Earned minutes roll over until you use them.</p>
+    </div>
+  </div>
+
+  <section class="hub-card rw-hero">
+    <div class="rw-steps">
+      <div><strong>{{ signup_minutes }} minutes</strong><span>when a friend signs up with your link</span></div>
+      <div><strong>{{ '{:,}'.format(upgrade_minutes) }} minutes</strong><span>when they upgrade to a paid plan</span></div>
+    </div>
+    <label for="rw-link">Your invite link</label>
+    <div class="tx-copy">
+      <input type="text" id="rw-link" readonly value="{{ link }}">
+      <button type="button" id="rw-copy">Copy link</button>
+    </div>
+    <div class="tx-share-row">
+      <a class="btn secondary" href="{{ whatsapp }}" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="btn secondary" href="{{ mailto }}">Email</a>
+      <a class="btn secondary" href="{{ x_link }}" target="_blank" rel="noopener">Post on X</a>
+    </div>
+    <p class="muted tx-msg" id="rw-msg" role="status" aria-live="polite"></p>
+  </section>
+
+  <div class="an-tiles">
+    <div class="hub-card"><span class="muted">Friends invited</span><strong>{{ invited }}</strong></div>
+    <div class="hub-card"><span class="muted">Upgraded to a plan</span><strong>{{ upgraded }}</strong></div>
+    <div class="hub-card"><span class="muted">Minutes earned</span><strong>{{ '{:,.0f}'.format(earned) }}</strong></div>
+    <div class="hub-card"><span class="muted">Reward minutes left</span><strong>{{ '{:,.0f}'.format(balance) }}</strong></div>
+  </div>
+  <p class="muted an-note">Rewards cover up to {{ max_signups }} sign-ups and {{ max_upgrades }} upgrades per account. Rewards are for new customers, and we may remove minutes earned from fake sign-ups.</p>
+</div>
+<script>
+  document.getElementById("rw-copy").addEventListener("click", function () {
+    var i = document.getElementById("rw-link"), m = document.getElementById("rw-msg");
+    (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject())
+      .then(function () { m.textContent = "Link copied."; }).catch(function () { i.select(); m.textContent = "Press Ctrl+C to copy."; });
+  });
+</script>
+{% endblock %}

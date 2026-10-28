@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Plans{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Plans &amp; account</h1>
+      <p class="muted">See what you have, compare plans, switch or leave. Payments are processed securely by Paystack.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="hub-card pl-now" aria-labelledby="pl-now-h">
+    <div>
+      <span class="muted">Your plan</span>
+      <h2 id="pl-now-h">{{ 'Pay as you go' if current_plan == 'free' else plans[current_plan]['name'] }}</h2>
+      {% if ends %}<p class="muted">{{ 'Renews automatically' if recurring else 'Ends' }} on {{ ends }}{% if not recurring %}, then you move to Pay as you go{% endif %}.</p>{% endif %}
+    </div>
+    <div class="pl-meter" aria-label="Instant AI minutes this month">
+      <div class="pl-meter-text"><strong>{{ '{:,.0f}'.format(remaining) }}</strong> of {{ '{:,.0f}'.format(allowance) }} Instant AI minutes left{% if resets %} <span class="muted">(resets {{ resets }})</span>{% endif %}</div>
+      <div class="pl-bar"><i style="width: {{ '%.1f'|format(100 * used / allowance if allowance else 0) if used < allowance else 100 }}%"></i></div>
+    </div>
+  </section>
+
+  <div class="pl-cards">
+    {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
+    <article class="hub-card pl-card{% if key == current_plan %} is-current{% endif %}">
+      <h3>{{ 'Pay as you go' if key == 'free' else p['name'] }}</h3>
+      <p class="pl-price">{% if p['price_usd'] %}${{ p['price_usd'] }}<small>/month</small>{% else %}$0{% endif %}</p>
+      {% if key in ('pro', 'premium') %}<p class="muted">or ${{ p['price_usd_year'] }} a year (save {{ billing_saving(p) }}%)</p>{% endif %}
+      <ul>
+        <li><strong>{{ '{:,}'.format(p['included_ai_minutes']|int) }}</strong> Instant AI minutes a month, for transcription and translation</li>
+        <li>{{ ((p['discount'] * 100)|round|int ~ '% off everything else') if p['discount'] else 'Pay per minute for human review and dubbing' }}</li>
+        <li>{{ 'Priority translation' if p['mt'] == 'claude' else 'Standard translation' }}</li>
+        <li>{{ 'Burned-in captions and dubbed video' if p['video_deliverables'] else 'Transcripts, subtitles and dubbed audio' }}</li>
+        <li>{{ p['support'] }} support</li>
+      </ul>
+      {% if key == current_plan %}
+        <span class="plan-active-pill">&#10003; Your plan</span>
+        {% if key != 'free' and is_owner %}
+          {% if recurring %}
+          <form method="post" action="/client/billing/cancel-subscription" onsubmit="return confirm('Stop auto-renewal? You keep this plan until the period you paid for ends, then move to Pay as you go.');">
+            <button type="submit" class="secondary">Downgrade to Pay as you go</button>
+          </form>
+          {% else %}<p class="muted an-note">This plan does not renew by itself. After {{ ends or 'the period' }} you move to Pay as you go.</p>{% endif %}
+        {% endif %}
+      {% elif key == 'free' %}
+        <p class="muted an-note">{% if current_plan != 'free' %}Choose Downgrade on your current plan to move here at the end of the period.{% else %}&nbsp;{% endif %}</p>
+      {% elif key == 'enterprise' %}
+        <a class="btn secondary" href="mailto:{{ contact_email }}">Talk to us</a>
+      {% elif is_owner %}
+        <form method="post" action="/client/billing/checkout" class="pl-buy">
+          <input type="hidden" name="plan" value="{{ key }}">
+          <label>Billing
+            <select name="interval">
+              <option value="month">Monthly, ${{ p['price_usd'] }}</option>
+              <option value="year">Yearly, ${{ p['price_usd_year'] }}</option>
+            </select>
+          </label>
+          <label>Pay with
+            <select name="provider">
+              <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (Paystack)</option>
+              {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct</option>{% endif %}
+              {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
+            </select>
+          </label>
+          <button type="submit">{{ 'Switch to' if current_plan != 'free' else 'Subscribe to' }} {{ p['name'] }}</button>
+        </form>
+      {% else %}<p class="muted an-note">Ask the account owner to change the plan.</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  <p class="muted an-note">Need a different arrangement for a team or a newsroom? <a href="mailto:{{ contact_email }}">Email us</a>. See your payments and receipts on <a href="/client/billing">Billing</a>.</p>
+
+  {% if is_owner %}
+  <details class="hub-card pl-danger">
+    <summary>Close my account</summary>
+    <p>Closing your account signs you out everywhere and stops it being used. Your orders and payment records are kept for accounting; to have your files deleted as well, request deletion in <a href="/settings?tab=security">Settings</a>.</p>
+    <form method="post" action="/settings/close-account" class="vc-form">
+      <label for="pl-confirm">Type your email ({{ user['email'] }}) to confirm</label>
+      <input type="email" id="pl-confirm" name="confirm_text" autocomplete="off" required>
+      <button type="submit" class="secondary pl-close">Close my account</button>
+    </form>
+  </details>
+  {% endif %}
+</div>
+{% endblock %}

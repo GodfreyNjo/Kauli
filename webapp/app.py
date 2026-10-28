@@ -53,7 +53,7 @@ from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -391,7 +391,7 @@ async def limit_request_size(request: Request, call_next):
 # Pages a search engine has no business indexing: the signed-in app, the account utilities and machine endpoints.
 _NOINDEX_PREFIXES = ("/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password", "/reset-password",
                       "/logout", "/lang/", "/api/", "/webhooks/", "/billing/", "/receipts/", "/avatar/", "/notifications/",
-                      "/download/", "/status", "/s/")
+                      "/download/", "/status", "/s/", "/r/")
 
 
 def _seo_headers(request: Request, response) -> None:
@@ -2466,7 +2466,7 @@ def robots_txt(request: Request):
     ai_bots = ("GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot",
                "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "Amazonbot", "Meta-ExternalAgent")
     private = ("/client", "/staff", "/settings", "/actor", "/lang/", "/api/", "/receipts/", "/avatar/", "/status",
-              "/webhooks/", "/billing/", "/notifications/", "/download/", "/s/")
+              "/webhooks/", "/billing/", "/notifications/", "/download/", "/s/", "/r/")
     body = "User-agent: *\nAllow: /\n" + "".join(f"Disallow: {p}\n" for p in private)
     body += "".join(f"\nUser-agent: {bot}\nAllow: /\n" for bot in ai_bots)
     body += f"\nSitemap: {base}/sitemap.xml\n"
@@ -3130,6 +3130,7 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
             _queue_welcome_message(user, base_url=str(request.base_url))
             _notify_internal_new_signup(user, base_url=str(request.base_url))
             _capture_signup_ip_intel(user["id"], request)
+            account_hub.record_referral(user, request.cookies.get("kauli_ref"))
             # Price card for this account: US/international vs East Africa,
             # from Cloudflare's visitor-country header (absent when hit
             # directly -> the international card). Fixed from here on; only
@@ -5798,7 +5799,8 @@ def create_order(
         # straight away, and the card confirmation (billing.
         # TRIAL_VERIFICATION_FEE_USD, credited back) happens when the client
         # chooses the Free plan - which is what unlocks downloads.
-        free_cap = billing.plan_included_minutes(plan) + (subscription["bonus_minutes"] or 0.0 if subscription else 0.0)
+        free_cap = billing.plan_included_minutes(plan) + (
+            (subscription["bonus_minutes"] or 0.0) + billing._reward_minutes(subscription) if subscription else 0.0)
         free_minutes_for_this_order = db.reserve_free_minutes(user["client_scope_id"], minutes, free_cap)
     else:
         free_minutes_for_this_order = 0.0
@@ -6786,6 +6788,7 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         yearly = payment_kind in ("plan_year", "subscription_renewal_year")
         db.set_subscription_plan(payment["user_id"], payment["plan"], billing.PLAN_YEAR_DAYS if yearly else billing.PLAN_PERIOD_DAYS)
         description = f"{billing.PLANS[payment['plan']]['name']} plan subscription" + (" (yearly)" if yearly else "")
+        account_hub.on_plan_paid(payment["user_id"], payment["plan"])
     # A real receipt for every completed payment, whatever it was for -
     # not conditional on provider (Paystack/M-Pesa/bank all get one),
     # since this is Kauli's own receipt, not a copy of theirs.
@@ -10703,3 +10706,5 @@ def _activation_nudge_loop() -> None:
 
 
 threading.Thread(target=_activation_nudge_loop, daemon=True).start()
+
+account_hub.register(sys.modules[__name__])         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant

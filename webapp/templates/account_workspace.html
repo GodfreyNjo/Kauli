@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Workspace{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Workspace</h1>
+      <p class="muted">Work on transcripts together. Everyone you invite sees the same orders, notes and billing.</p>
+    </div>
+  </div>
+
+  <section class="hub-card ws-hero" aria-label="How your team's sources connect">
+    <div class="ws-orbit">
+      <div class="ws-core"><img src="/static/kauli-icon.png" alt="Kauli" width="56" height="56"></div>
+      {% for s in sources %}
+      <a class="ws-node ws-n{{ loop.index }} ws-{{ s.state }}" href="{{ s.href }}" title="{{ s.note }}">
+        <span class="ws-badge">{{ s.name[0] }}</span><span class="ws-name">{{ s.name }}</span>
+        <span class="ws-state">{{ 'Available' if s.state == 'live' else 'Coming soon' }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    <ul class="ws-legend">
+      {% for s in sources %}<li><strong>{{ s.name }}</strong> <span class="muted">{{ s.note }}{% if s.state != 'live' %} (coming soon){% endif %}</span></li>{% endfor %}
+    </ul>
+  </section>
+
+  <div class="an-grid-2">
+    <section class="hub-card" aria-labelledby="ws-team">
+      <h2 id="ws-team">Team</h2>
+      <ul class="ws-members">
+        <li><span class="ws-av">{{ (owner['display_name'] or owner['email'])[0]|upper }}</span><span><strong>{{ owner['display_name'] or owner['email'] }}</strong><small class="muted">Owner</small></span></li>
+        {% for m in members if m['status'] != 'removed' %}
+        <li><span class="ws-av">{{ m['invited_email'][0]|upper }}</span><span><strong>{{ m['invited_email'] }}</strong><small class="muted">{{ 'Member' if m['status'] == 'accepted' else 'Invite sent' }}</small></span>
+          {% if is_owner %}<form method="post" action="/settings/team/remove"><input type="hidden" name="member_id" value="{{ m['id'] }}"><button class="secondary" type="submit" aria-label="Remove {{ m['invited_email'] }}">Remove</button></form>{% endif %}</li>
+        {% endfor %}
+      </ul>
+      {% if is_owner %}
+      <form method="post" action="/settings/team/invite" class="ws-invite">
+        <input type="email" name="email" placeholder="teammate@company.com" required aria-label="Teammate's email">
+        <button type="submit">Invite</button>
+      </form>
+      <p class="muted an-note">They sign up or log in with that email to join.</p>
+      {% else %}
+      <p class="muted an-note">Only the account owner can invite or remove people.</p>
+      {% endif %}
+    </section>
+
+    <section class="hub-card" aria-labelledby="ws-files">
+      <h2 id="ws-files">Shared files</h2>
+      {% if orders %}
+      <ul class="ws-list">
+        {% for o in orders %}<li><a href="/client/orders/{{ o['id'] }}">{{ o['original_filename'] }}</a><small class="muted">{{ when(o['created_at']) }}</small></li>{% endfor %}
+      </ul>
+      <a href="/client/home">All files</a>
+      {% else %}<p class="muted">Files anyone on the team uploads appear here.</p>{% endif %}
+    </section>
+
+    <section class="hub-card" aria-labelledby="ws-notes">
+      <h2 id="ws-notes">Shared notes</h2>
+      {% if notes %}
+      <ul class="ws-list">
+        {% for n in notes %}<li><a href="/client/notes?id={{ n['id'] }}">{{ n['title'] }}</a><small class="muted">{{ when(n['updated_at']) }}</small></li>{% endfor %}
+      </ul>
+      <a href="/client/notes">All notes</a>
+      {% else %}<p class="muted">Notes your team writes appear here.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

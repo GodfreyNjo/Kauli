@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Integrations{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Integrations</h1>
+      <p class="muted">Connect Kauli to the tools you already use.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+
+  <section class="hub-card cal" aria-labelledby="cal-h">
+    <div>
+      <h2 id="cal-h">Connect your calendar</h2>
+      <p class="muted">Add event details such as attendees and agendas to improve your notes. Calendar connections are opening soon; tell us which one you want and we will email you the day it is ready.</p>
+    </div>
+    <div class="cal-cards">
+      {% for c in calendars %}
+      <form method="post" action="/client/calendar/interest" class="cal-card">
+        <span class="ws-badge">{{ c.name[0] }}</span><strong>{{ c.name }}</strong>
+        <input type="hidden" name="provider" value="{{ c.id }}">
+        {% if c.id in interest %}<span class="plan-active-pill">&#10003; We will email you</span>{% else %}<button type="submit" class="secondary">Notify me</button>{% endif %}
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="ig-bar">
+    <div class="ig-toggle" role="tablist" aria-label="Integration type">
+      <button type="button" role="tab" class="is-on" data-kind="all" aria-selected="true">All</button>
+      <button type="button" role="tab" data-kind="built" aria-selected="false">Built in</button>
+      <button type="button" role="tab" data-kind="zapier" aria-selected="false">Zapier &amp; Make</button>
+    </div>
+    <input type="search" id="ig-search" placeholder="Search integrations" aria-label="Search integrations">
+  </div>
+  <div class="hub-chips" id="ig-cats" role="group" aria-label="Category">
+    <button type="button" class="is-on" data-cat="all">All</button>
+    {% for c in categories %}<button type="button" data-cat="{{ c }}">{{ c }}</button>{% endfor %}
+  </div>
+
+  <div class="ig-grid" id="ig-grid">
+    {% for i in items %}
+    <article class="hub-card ig-card" data-kind="{{ i.kind }}" data-cat="{{ i.cat }}" data-text="{{ (i.name ~ ' ' ~ i.desc ~ ' ' ~ i.cat)|lower }}">
+      <div class="ig-head"><span class="ws-badge">{{ i.name[0] }}</span><div><h3>{{ i.name }}</h3><span class="ig-cat">{{ i.cat }}</span></div></div>
+      <p>{{ i.desc }}</p>
+      <div class="ig-actions">
+        {% if i.state == 'live' %}
+          <a class="btn" href="{{ i.href }}">{{ 'Connect' if i.kind == 'built' else 'Set up' }}</a>
+          {% if i.kind == 'zapier' %}<span class="ig-via">via Zapier / Make</span>{% endif %}
+        {% else %}
+          <span class="ig-via">Coming soon</span>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="muted" id="ig-none" hidden>No integrations match. Tell us what you need below.</p>
+
+  <section class="hub-card" aria-labelledby="ig-req">
+    <h2 id="ig-req">Feedback &amp; requests</h2>
+    <p class="muted">Missing the tool you need? Tell us and we will look at it.</p>
+    <form method="post" action="/client/integrations/request" class="vc-form">
+      <textarea name="body" rows="3" maxlength="1000" placeholder="I would like Kauli to connect to..." required aria-label="Your request"></textarea>
+      <button type="submit">Send request</button>
+    </form>
+  </section>
+</div>
+<script>
+  (function () {
+    var kind = "all", cat = "all", q = "";
+    var cards = [].slice.call(document.querySelectorAll(".ig-card")), none = document.getElementById("ig-none");
+    function apply() {
+      var shown = 0;
+      cards.forEach(function (c) {
+        var ok = (kind === "all" || c.dataset.kind === kind) && (cat === "all" || c.dataset.cat === cat) && (!q || c.dataset.text.indexOf(q) !== -1);
+        c.hidden = !ok; if (ok) shown++;
+      });
+      none.hidden = shown !== 0;
+    }
+    [].forEach.call(document.querySelectorAll(".ig-toggle button"), function (b) {
+      b.addEventListener("click", function () {
+        kind = b.dataset.kind;
+        [].forEach.call(document.querySelectorAll(".ig-toggle button"), function (x) { var on = x === b; x.classList.toggle("is-on", on); x.setAttribute("aria-selected", on); });
+        apply();
+      });
+    });
+    [].forEach.call(document.querySelectorAll("#ig-cats button"), function (b) {
+      b.addEventListener("click", function () {
+        cat = b.dataset.cat;
+        [].forEach.call(document.querySelectorAll("#ig-cats button"), function (x) { x.classList.toggle("is-on", x === b); });
+        apply();
+      });
+    });
+    document.getElementById("ig-search").addEventListener("input", function (e) { q = e.target.value.trim().toLowerCase(); apply(); });
+  })();
+</script>
+{% endblock %}

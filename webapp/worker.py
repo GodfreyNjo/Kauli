@@ -25,7 +25,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from kauli.pipeline import run as kauli_run  # noqa: E402
 from kauli.models import Job  # noqa: E402
-from . import db, logging_setup, mailer, notifications  # noqa: E402
+from . import account_hub, db, logging_setup, mailer, notifications  # noqa: E402
 
 log = logging_setup.get_logger("worker")
 
@@ -174,6 +174,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
             # per segment - see that function's own docstring.
             resume=is_retry,
             on_stage=lambda key: db.set_processing_stage(order_id, key),
+            fix_text=account_hub.vocabulary_fixer(order["client_id"]),
         )
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))

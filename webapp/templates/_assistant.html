@@ -1,0 +1,40 @@
+{#- The help assistant for signed-in customers: a button, and a panel with topics, a chat and a Messages tab. Behaviour: static/assistant.js. -#}
+<div id="as-root" class="as-root" lang="en" data-name="{{ (user['display_name'] or '').split(' ')[0] }}">
+  <button type="button" id="as-open" class="as-fab" aria-label="Open help assistant" aria-expanded="false" aria-controls="as-panel">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 10h7M8.5 13h4"/></svg>
+  </button>
+  <section id="as-panel" class="as-panel" role="dialog" aria-label="Kauli help assistant" hidden>
+    <header class="as-head">
+      <strong>Kauli assistant</strong>
+      <button type="button" id="as-close" class="as-x" aria-label="Close assistant">&times;</button>
+    </header>
+    <div class="as-body" id="as-home">
+      <p class="as-hello" id="as-hello">Hi, how can we help?</p>
+      <div class="as-topics" role="group" aria-label="Topics">
+        <button type="button" data-topic="product">Product &amp; features</button>
+        <button type="button" data-topic="support">Technical support</button>
+        <button type="button" data-topic="billing">Billing &amp; plans</button>
+      </div>
+      <div class="as-chips" id="as-chips"></div>
+    </div>
+    <div class="as-body as-chat" id="as-chat" hidden>
+      <div id="as-log" class="as-log" aria-live="polite"></div>
+      <div class="as-handoff" id="as-handoff" hidden>
+        <button type="button" id="as-escalate">Talk to the team</button>
+      </div>
+    </div>
+    <div class="as-body as-msgs" id="as-msgs" hidden>
+      <ul id="as-threads"></ul>
+      <p class="muted" id="as-nomsgs">No conversations yet.</p>
+    </div>
+    <form id="as-form" class="as-form" autocomplete="off">
+      <input type="text" id="as-input" maxlength="1500" placeholder="Ask anything about Kauli" aria-label="Your question">
+      <button type="submit" aria-label="Send">&uarr;</button>
+    </form>
+    <nav class="as-tabs" aria-label="Assistant sections">
+      <button type="button" id="as-tab-home" class="is-on">Home</button>
+      <button type="button" id="as-tab-msgs">Messages <span id="as-dot" class="as-dot" hidden></span></button>
+    </nav>
+  </section>
+</div>
+<script src="/static/assistant.js?v={{ static_version('assistant.js') }}" defer></script>

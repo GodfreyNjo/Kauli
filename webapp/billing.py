@@ -628,6 +628,14 @@ def _plan_in_force(subscription) -> str:
     return subscription["plan"] if subscription["plan"] in PLANS else "free"
 
 
+def _reward_minutes(subscription) -> float:
+    """One-time referral minutes on a subscription row (0 where the row predates them)."""
+    try:
+        return subscription["reward_minutes"] or 0.0
+    except (KeyError, IndexError):
+        return 0.0
+
+
 def free_minutes_remaining(subscription) -> float:
     """Instant AI transcription minutes left this month: the allowance of the plan in force (5 on the free plan,
     150 on Pro, 400 on Premium), plus any bonus_minutes an account manager has granted for onboarding (see
@@ -636,7 +644,7 @@ def free_minutes_remaining(subscription) -> float:
     if subscription is None:
         return FREE_MINUTES_PER_MONTH
     used = subscription["minutes_used_this_period"] or 0.0
-    bonus = subscription["bonus_minutes"] or 0.0
+    bonus = (subscription["bonus_minutes"] or 0.0) + _reward_minutes(subscription)
     return max(0.0, plan_included_minutes(_plan_in_force(subscription)) + bonus - used)
 
 

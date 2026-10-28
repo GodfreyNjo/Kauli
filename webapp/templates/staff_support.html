@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Support{% endblock %}
+{% block content %}
+<div class="hub">
+  {% if thread %}
+  <a href="/staff/support">&larr; All requests</a>
+  <h1>{{ thread['subject'] or 'Help request' }}</h1>
+  <p class="muted">{{ thread['name'] or thread['email'] }} &middot; {{ thread['email'] }} &middot; {{ thread['status'] }}</p>
+  <div class="hub-card sp-thread">
+    {% for m in messages %}
+    <div class="sp-msg sp-{{ m.sender }}"><small class="muted">{{ {'user': 'Customer', 'bot': 'Assistant', 'staff': 'Team'}[m.sender] }} &middot; {{ when(m.at) }}</small><p>{{ m.body }}</p></div>
+    {% endfor %}
+  </div>
+  <form method="post" action="/staff/support/{{ thread['id'] }}/reply" class="vc-form">
+    <label for="sp-body">Reply (the customer sees it in their account and by email)</label>
+    <textarea id="sp-body" name="body" rows="4" required></textarea>
+    <label class="tx-switch"><input type="checkbox" name="close" value="1"> Mark as resolved</label>
+    <button type="submit">Send reply</button>
+  </form>
+  {% else %}
+  <h1>Support</h1>
+  <section class="hub-card">
+    <h2>Help requests from the assistant</h2>
+    {% if threads %}
+    <ul class="ws-list">
+      {% for t in threads %}
+      <li><a href="/staff/support/{{ t['id'] }}">{{ t['subject'] or 'Help request' }}</a>
+        <small class="muted">{{ t['name'] or t['email'] }} &middot; {{ t['status'] }} &middot; {{ when(t['updated_at']) }}</small></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted">Nothing waiting.</p>{% endif %}
+  </section>
+  <section class="hub-card">
+    <h2>Integration requests</h2>
+    {% if requests %}<ul class="ws-list">{% for r in requests %}<li>{{ r['body'] }}<small class="muted">{{ r['email'] }} &middot; {{ when(r['created_at']) }}</small></li>{% endfor %}</ul>
+    {% else %}<p class="muted">None yet.</p>{% endif %}
+  </section>
+  <section class="hub-card">
+    <h2>Calendar interest</h2>
+    {% if interest %}<ul class="ws-list">{% for i in interest %}<li>{{ i['provider'] }}<small class="muted">{{ i['n'] }} account{{ '' if i['n'] == 1 else 's' }}</small></li>{% endfor %}</ul>
+    {% else %}<p class="muted">None yet.</p>{% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

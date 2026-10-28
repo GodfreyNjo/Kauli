@@ -33,7 +33,7 @@ def rows(job, side: str = "source") -> list[dict]:
         else:
             text = (getattr(seg, "source_final_text", "") or getattr(seg, "source_transcript", "") or "").strip()
         if text:
-            out.append({"start": seg.start_ms, "end": seg.end_ms, "speaker": getattr(seg, "speaker_id", None) or "", "text": text})
+            out.append({"start": seg.start_ms, "end": getattr(seg, "end_ms", seg.start_ms), "speaker": getattr(seg, "speaker_id", None) or "", "text": text})
     return out
 
 
@@ -71,11 +71,16 @@ def to_txt(job, title: str, timestamps: bool = True, speakers: bool = True, spli
 
 
 def to_docx(job, title: str, timestamps: bool = True, speakers: bool = True, split: str = "line", side: str = "source") -> bytes:
+    return docx_from_paragraphs(title, paragraphs(job, timestamps, speakers, split, side))
+
+
+def docx_from_paragraphs(title: str, lines: list[str]) -> bytes:
+    """A Word file with a bold title and one paragraph per line (transcripts and notes both use it)."""
     def para(text: str, bold: bool = False) -> str:
         run_props = "<w:rPr><w:b/><w:sz w:val=\"32\"/></w:rPr>" if bold else ""
         return (f'<w:p><w:r>{run_props}<w:t xml:space="preserve">{escape(text)}</w:t></w:r></w:p>')
 
-    body_paragraphs = [para(title, bold=True)] + [para(line) for line in paragraphs(job, timestamps, speakers, split, side)]
+    body_paragraphs = [para(title, bold=True)] + [para(line) for line in lines]
     document = (
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'

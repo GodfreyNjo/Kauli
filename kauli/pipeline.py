@@ -473,6 +473,7 @@ def run(
     clean_audio: bool = False,
     label_speakers: bool = False,
     on_stage=None,
+    fix_text=None,
 ) -> Job:
     out = Path(outdir)
     (out / "segments").mkdir(parents=True, exist_ok=True)
@@ -549,6 +550,9 @@ def run(
                 log(f"      audio clean-up skipped: {exc}")
         stage("transcribe")
         job.segments = asr_provider.transcribe(asr_input, language=source_lang)
+        if fix_text:        # the customer's custom vocabulary: their names and terms spelled the way they want
+            for seg in job.segments:
+                seg.source_transcript = fix_text(seg.source_transcript)
         # A chain of providers says which one really produced the text, and what failed before it.
         ran = getattr(asr_provider, "used_name", None)
         if ran:

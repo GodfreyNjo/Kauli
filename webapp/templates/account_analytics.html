@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Analytics</h1>
+      <p class="muted">How your team uses Kauli: how much, in which languages, and how conversations feel.</p>
+    </div>
+    <nav class="hub-chips" aria-label="Time range">
+      {% for r in ['3', '6', '12'] %}<a href="/client/analytics?range={{ r }}" class="{{ 'is-on' if range == r else '' }}"{% if range == r %} aria-current="true"{% endif %}>{{ r }} months</a>{% endfor %}
+    </nav>
+  </div>
+
+  {% if not files %}
+  <div class="hub-card hub-empty">
+    <p><strong>Nothing to chart yet.</strong></p>
+    <p class="muted">Once your first files are transcribed, your minutes, languages and conversation sentiment appear here.</p>
+    <a class="btn cta-olive" href="/client#order-form">Upload a file</a>
+  </div>
+  {% else %}
+  <div class="an-tiles">
+    <div class="hub-card"><span class="muted">Minutes, last {{ range }} months</span><strong>{{ '{:,.0f}'.format(range_minutes) }}</strong></div>
+    <div class="hub-card"><span class="muted">Minutes, all time</span><strong>{{ '{:,.0f}'.format(total_minutes) }}</strong></div>
+    <div class="hub-card"><span class="muted">Finished files</span><strong>{{ files }}</strong></div>
+  </div>
+
+  <div class="an-grid-2">
+    <section class="hub-card an-wide" aria-labelledby="an-minutes">
+      <h2 id="an-minutes">Total transcription minutes</h2>
+      {% if line %}{{ line|safe }}{% else %}<p class="muted">No files in this period.</p>{% endif %}
+    </section>
+
+    <section class="hub-card" aria-labelledby="an-lang">
+      <h2 id="an-lang">Distribution by language</h2>
+      {% if lang_rows %}
+      <ul class="an-bars">
+        {% for r in lang_rows %}
+        <li><span class="an-bar-label">{{ r.name }}</span>
+          <span class="an-bar"><i style="width: {{ '%.1f'|format(r.pct) }}%"></i></span>
+          <span class="an-bar-val">{{ '%.0f'|format(r.pct) }}%</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">No files in this period.</p>{% endif %}
+    </section>
+
+    <section class="hub-card" aria-labelledby="an-sent">
+      <h2 id="an-sent">Conversation sentiment</h2>
+      {% if donut %}
+      <div class="an-sent">
+        {{ donut|safe }}
+        <ul class="an-legend">
+          <li><i class="an-pos"></i> Positive <strong>{{ '%.0f'|format(100 * sentiment.pos / sentiment.n) }}%</strong></li>
+          <li><i class="an-neu"></i> Neutral <strong>{{ '%.0f'|format(100 * sentiment.neu / sentiment.n) }}%</strong></li>
+          <li><i class="an-neg"></i> Negative <strong>{{ '%.0f'|format(100 * sentiment.neg / sentiment.n) }}%</strong></li>
+        </ul>
+      </div>
+      <p class="muted an-note">Estimated from the wording of {{ sentiment.orders }} English transcript{{ '' if sentiment.orders == 1 else 's' }}. A guide to the mood, not a verdict.</p>
+      {% else %}
+      <p class="muted">Sentiment is shown for finished English transcripts. It will appear after your first one.</p>
+      {% endif %}
+    </section>
+
+    <section class="hub-card" aria-labelledby="an-svc">
+      <h2 id="an-svc">What you use</h2>
+      {% if svc_rows %}
+      <ul class="an-bars">
+        {% for r in svc_rows %}
+        <li><span class="an-bar-label">{{ r.name }}</span><span class="an-bar"><i style="width: {{ '%.1f'|format(r.pct) }}%"></i></span><span class="an-bar-val">{{ '%.0f'|format(r.minutes) }} min</span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">No files in this period.</p>{% endif %}
+    </section>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

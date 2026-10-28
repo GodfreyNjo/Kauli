@@ -678,6 +678,89 @@ CREATE TABLE IF NOT EXISTS order_shares (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_order_shares_order ON order_shares(order_id);
+
+-- AI Notes: a rich-text note, optionally made from one of the customer's transcripts. Belongs to the account (team) so
+-- teammates see the same notes; author_id says who wrote it. body_html is sanitised on every save (webapp/account_hub.py).
+CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    author_id TEXT NOT NULL,
+    order_id TEXT,
+    title TEXT NOT NULL DEFAULT '',
+    body_html TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_client ON notes(client_id, updated_at);
+
+-- How a finished transcript reads (counts of positive / negative / neutral lines), worked out once and kept for Analytics.
+CREATE TABLE IF NOT EXISTS order_sentiment (
+    order_id TEXT PRIMARY KEY,
+    positive INTEGER NOT NULL DEFAULT 0,
+    negative INTEGER NOT NULL DEFAULT 0,
+    neutral INTEGER NOT NULL DEFAULT 0,
+    computed_at REAL NOT NULL
+);
+
+-- Custom vocabulary: a name, brand or term the customer wants spelled exactly, with spellings the machine tends to get
+-- wrong. Applied to every new Instant AI transcript of that account.
+CREATE TABLE IF NOT EXISTS vocab_terms (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    term TEXT NOT NULL,
+    variants TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL,
+    UNIQUE (client_id, term)
+);
+
+-- Referral rewards: who invited whom, and what each step earned the inviter. One row per invited account.
+CREATE TABLE IF NOT EXISTS referrals (
+    id TEXT PRIMARY KEY,
+    referrer_id TEXT NOT NULL,
+    referred_id TEXT NOT NULL UNIQUE,
+    signed_up_at REAL NOT NULL,
+    signup_minutes REAL NOT NULL DEFAULT 0,
+    upgraded_at REAL,
+    upgrade_minutes REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+
+-- The help assistant: one thread per conversation; "escalated" hands it to the team, who answer from Messages in the
+-- staff area (support_messages sender 'staff').
+CREATE TABLE IF NOT EXISTS support_threads (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    subject TEXT NOT NULL DEFAULT '',
+    escalated INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_support_threads_client ON support_threads(client_id, updated_at);
+CREATE TABLE IF NOT EXISTS support_messages (
+    id TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL,
+    sender TEXT NOT NULL,                  -- 'user' | 'bot' | 'staff'
+    body TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id, created_at);
+
+-- "Feedback and requests" on the integrations page, and interest in calendar connections that are not live yet.
+CREATE TABLE IF NOT EXISTS integration_requests (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS calendar_interest (
+    client_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (client_id, provider)
+);
 """
 
 def get_conn() -> sqlite3.Connection:
@@ -854,6 +937,17 @@ def init_db() -> None:
         # The language this person's screens are shown in (webapp/ui_text.py): set from the translated site they
         # arrived on or the language switcher, then followed from every device. NULL = never chosen = English.
         conn.execute("ALTER TABLE users ADD COLUMN ui_lang TEXT")
+    if "referral_code" not in existing_user_cols:
+        # The short code in this person's invite link (/r/<code>). Made on first use (see account_hub.referral_code_for).
+        conn.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)")
+    if "referred_by" not in existing_user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN referred_by TEXT")
+    existing_sub_cols = {row["name"] for row in conn.execute("PRAGMA table_info(subscriptions)")}
+    if "reward_minutes" not in existing_sub_cols:
+        # One-time minutes earned from referrals. Unlike bonus_minutes (a standing monthly top-up) they are spent once and
+        # roll over from month to month until used; get_subscription_current takes what was used out of them at each reset.
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN reward_minutes REAL NOT NULL DEFAULT 0")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -3420,6 +3514,17 @@ def get_subscription(user_id: str):
 PERIOD_SECONDS = 30 * 86400
 
 
+def _reward_after_period(row) -> float:
+    """What is left of the one-time referral minutes when a usage period ends: whatever was used beyond the plan's own
+    allowance (and any staff bonus) came out of them."""
+    reward = row["reward_minutes"] or 0.0
+    if reward <= 0:
+        return 0.0
+    from . import billing
+    base = billing.plan_included_minutes(billing._plan_in_force(row)) + (row["bonus_minutes"] or 0.0)
+    return max(0.0, reward - max(0.0, (row["minutes_used_this_period"] or 0.0) - base))
+
+
 def get_subscription_current(user_id: str):
     """Like get_subscription, but rolls the usage period over first if 30
     days have passed since it started - this is what makes the free
@@ -3431,9 +3536,9 @@ def get_subscription_current(user_id: str):
     row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
     if row and row["period_started_at"] and time.time() - row["period_started_at"] > PERIOD_SECONDS:
         conn.execute(
-            "UPDATE subscriptions SET minutes_used_this_period = 0, period_started_at = ? "
+            "UPDATE subscriptions SET minutes_used_this_period = 0, period_started_at = ?, reward_minutes = ? "
             "WHERE user_id = ?",
-            (time.time(), user_id),
+            (time.time(), _reward_after_period(row), user_id),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
@@ -3448,6 +3553,7 @@ def set_subscription_plan(user_id: str, plan: str, period_days: int | None) -> N
     conn = get_conn()
     now = time.time()
     period_end = (now + period_days * 86400) if period_days else None
+    before = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
     conn.execute(
         """INSERT INTO subscriptions (user_id, plan, status, current_period_end, period_started_at)
            VALUES (?, ?, 'active', ?, ?)
@@ -3458,6 +3564,8 @@ def set_subscription_plan(user_id: str, plan: str, period_days: int | None) -> N
              minutes_used_this_period = 0""",
         (user_id, plan, period_end, now),
     )
+    if before is not None and (before["reward_minutes"] or 0) > 0:
+        conn.execute("UPDATE subscriptions SET reward_minutes = ? WHERE user_id = ?", (_reward_after_period(before), user_id))
     conn.commit()
     conn.close()
 
