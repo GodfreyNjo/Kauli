@@ -50,7 +50,7 @@ from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_f
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
-from . import locales as site_locales, seo_languages  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
@@ -1406,7 +1406,8 @@ MARKETING_FAQ = [
           "time when you order."},
     {"q": "Which languages do you support?",
      "a": f"Instant AI transcribes {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages and translates "
-          "between them (except Kikuyu). Dubbing and human review are available for Swahili, Kikuyu and English.",
+          "between them (except Kikuyu). Dubbing and human review are available now for Swahili, Kikuyu and English, "
+          "and more languages are coming soon.",
      "link": ("/languages", "See every language")},
     {"q": "What is the difference between verbatim and clean read?",
      "a": "Clean read tidies filler words and false starts for easy reading. Verbatim keeps everything exactly "
@@ -1498,8 +1499,8 @@ SOLUTION_PAGES = {
              "a": f"Yes - Pro is {billing.PLANS['pro']['discount']*100:.0f}% off every per-minute rate "
                   f"for ${billing.PLANS['pro']['price_usd']}/month, Premium is "
                   f"{billing.PLANS['premium']['discount']*100:.0f}% off for "
-                  f"${billing.PLANS['premium']['price_usd']}/month, and Enterprise is a negotiated "
-                  f"volume rate with a dedicated account manager and bank-transfer billing. The first "
+                  f"${billing.PLANS['premium']['price_usd']}/month. For invoices or a custom volume rate, "
+                  f"talk to us. The first "
                   f"{billing.FREE_MINUTES_PER_MONTH:.0f} minutes every month are free on every plan."},
             {"q": "Do you require consent before cloning an interview subject's or community leader's voice?",
              "a": "Yes, always - if a dub needs to sound like the original speaker rather than a "
@@ -2519,7 +2520,7 @@ def _language_page_dict(code: str) -> dict:
              "body": f"Instant AI is machine transcription and is not reviewed by a person; accuracy depends on "
                       f"audio quality, accent and background noise, so check names and numbers before you "
                       f"publish. Instant AI translation is machine translation, also not reviewed by a person. "
-                      "Dubbing and human review are currently for Swahili, Kikuyu and English."},
+                      "Dubbing and human review are currently for Swahili, Kikuyu and English; more languages are coming soon."},
         ],
         "cta_heading": f"Transcribe your {label} audio",
         "cta_body": "Your first minutes are free.",
@@ -2531,7 +2532,7 @@ def _language_page_dict(code: str) -> dict:
             {"q": f"Can you translate {label} into English?",
              "a": f"Yes. Choose 'Transcription + translation', pick {label} as the spoken language and English "
                   "(or another language) as the target. It is Instant AI machine translation - not reviewed "
-                  "by a person. Dubbing and human review are currently for Swahili, Kikuyu and English."},
+                  "by a person. Dubbing and human review are currently for Swahili, Kikuyu and English; more languages are coming soon."},
             {"q": f"How accurate is {label} transcription?",
              "a": "It depends on audio quality, accents and background noise. Instant AI is machine "
                   "transcription and is not reviewed by a person, so we don't publish a headline accuracy "
@@ -2904,6 +2905,7 @@ def sitemap(request: Request):
         (f"{base}/privacy", "0.2"),
         (f"{base}/developers", "0.5"),
         (f"{base}/demo", "0.6"),
+        (f"{base}/try", "0.7"),
     ]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
     static_urls += [(f"{base}/languages", "0.8")]
@@ -3002,7 +3004,7 @@ Instant AI transcription: {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} langu
 Full list of languages: {base}/languages (each language has its own page at {base}/transcribe/<language>).
 Translated landing pages: {', '.join(f"{base}/{c} ({m[0]})" for c, m in site_locales.LOCALES.items())}.
 Instant AI translation: between all of them except Kikuyu (machine translation, not reviewed by a person).
-Dubbing and human review: {', '.join(SOURCE_LANGUAGES.values())}.
+Dubbing and human review: {', '.join(SOURCE_LANGUAGES.values())} (available now). More languages are coming soon.
 
 ## Key pages
 - [Homepage]({base}/) - overview, pricing, FAQ
@@ -3226,6 +3228,47 @@ def _demo_response(request: Request, error: str | None = None, form: dict | None
 @app.get("/demo", response_class=HTMLResponse)
 def demo_page(request: Request):
     return _demo_response(request)
+
+
+def _try_context(request: Request) -> dict:
+    """What the /try demo needs: the clips, the captions and the visitor's likely language and service.
+    The audio is pre-rendered (scripts/make_demo_audio.py), so nothing here costs ElevenLabs characters."""
+    country = request.headers.get("cf-ipcountry")
+    accept = request.headers.get("accept-language")
+    suggested, language_why = demo_content.pick_language(country, accept, None)
+    language, _ = demo_content.pick_language(country, accept, request.query_params.get("lang"))
+    scenario_suggested, scenario_why = demo_content.pick_scenario(request.headers.get("referer"), None)
+    scenario, _ = demo_content.pick_scenario(request.headers.get("referer"), request.query_params.get("use"))
+    dub_live = _studio_languages()
+    static_dir = Path(__file__).parent / "static" / "demo"
+    scenarios = {}
+    for key, s in demo_content.SCENARIOS.items():
+        dub = {}
+        if s["service"] == "dub":
+            for lang in s["tr"]:
+                name = demo_content.audio_name(key, lang)
+                if (static_dir / name).exists():
+                    dub[lang] = f"/static/demo/{name}"
+        scenarios[key] = {
+            "label": s["label"], "service": s["service"], "service_label": s["service_label"], "speaker": s["speaker"],
+            "headline": s["headline"], "en": s["en"], "tr": s["tr"], "src": f"/static/demo/{demo_content.audio_name(key, None)}",
+            "dub": dub,
+        }
+    market = _display_market(request)
+    card = billing.price_card_for(market)
+    return {
+        "scenario": scenario, "language": language, "suggested": suggested, "language_why": language_why,
+        "scenario_suggested": scenario_suggested, "scenario_why": scenario_why, "scenarios": scenarios,
+        "languages": {code: {**l, "dub_live": code in dub_live} for code, l in demo_content.LANGUAGES.items()},
+        "rates": {k: {"ai": f"{card[k]['ai']:.2f}", "human": f"{card[k]['human']:.2f}"} for k in billing.SERVICE_LEVELS},
+    }
+
+
+@app.get("/try", response_class=HTMLResponse)
+def try_page(request: Request):
+    ctx = _marketing_context(home="/", market=_display_market(request))
+    ctx["demo"] = _try_context(request)
+    return templates.TemplateResponse(request, "try.html", ctx)
 
 
 @app.get("/demo/new")

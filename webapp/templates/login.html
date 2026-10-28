@@ -13,8 +13,8 @@
       <div class="auth-brand">
         <a href="/" aria-label="Kauli - back to home">
           <picture>
-            <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
-            <img src="/static/kauli-logo-nav-light.png" alt="Kauli" class="auth-brand-logo" width="155" height="42">
+            <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
+            <img src="/static/kauli-logo-nav-sm.png" alt="Kauli" class="auth-brand-logo" width="155" height="42">
           </picture>
         </a>
       </div>
@@ -97,8 +97,7 @@
         <p class="auth-switch">Already have an account? <button type="button" class="auth-link-btn" data-show="panel-signin">Sign in</button></p>
         <p class="auth-consent">By creating an account, you agree to Kauli's <a href="/terms">Terms of
            Service</a>, <a href="/privacy">Privacy Policy</a> and <a href="/privacy#cookies">Cookie
-           Policy</a>, and to receive service emails needed to run your account (order status, receipts,
-           security alerts).</p>
+           Policy</a>, and to receive service emails needed to run your account.</p>
       </div>
     </div>
   </div>
@@ -106,8 +105,8 @@
   <section class="auth-brand-panel auth-welcome" aria-label="About Kauli">
     <a href="/" class="auth-welcome-logo" aria-label="Kauli - back to home">
       <picture>
-        <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
-        <img src="/static/kauli-logo-nav-light.png" alt="Kauli" width="163" height="44">
+        <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
+        <img src="/static/kauli-logo-nav-sm.png" alt="Kauli" width="163" height="44">
       </picture>
     </a>
     <div class="auth-showcase">
@@ -117,7 +116,7 @@
       <p class="auth-welcome-kicker">What you get</p>
       <ul class="auth-facts">
         <li><strong>{{ language_total }}</strong><span>languages transcribed, and translated between</span></li>
-        <li><strong>3</strong><span>languages with human review: Swahili, Kikuyu and English</span></li>
+        <li><strong>3</strong><span>languages with human review today: Swahili, Kikuyu and English. More coming soon</span></li>
         <li><strong>{{ free_minutes|int }} min</strong><span>of Instant AI transcription free each month</span></li>
         <li><strong>API</strong><span>MCP server, Slack, Teams, Notion and webhooks</span></li>
       </ul>
@@ -179,6 +178,7 @@
     list.querySelectorAll('li[data-rule]').forEach(function (li) { items[li.dataset.rule] = li; });
     function paint() {
       var v = pw.value;
+      list.classList.toggle('is-open', v.length > 0);   // folded away until the person starts typing
       Object.keys(rules).forEach(function (key) {
         var ok = rules[key](v);
         items[key].classList.toggle('met', ok);

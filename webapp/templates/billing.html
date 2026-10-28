@@ -128,8 +128,7 @@
     </div>
   </div>
   <p class="muted" style="font-size:0.78rem; margin-top:14px;">
-    Pay securely via M-Pesa or Card (powered by Paystack) - or bank transfer, confirmed manually. KES and
-    mobile money both work with no card required.</p>
+    Pay securely by card (powered by Paystack){% if (request.headers.get('cf-ipcountry', '') | upper) == 'KE' %}, M-Pesa in KES,{% endif %} or bank transfer, confirmed manually. Prices are in US dollars.</p>
 </div>
 <script>
   (function () {
@@ -172,10 +171,10 @@
       <th>Video deliverables</th><th>Support</th><th>Choose</th>
     </tr></thead>
     <tbody>
-      {% for key, p in plans.items() %}
+      {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
       <tr>
-        <td><strong>{{ p['name'] }}</strong></td>
-        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}{% else %}Free{% endif %}</td>
+        <td><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
+        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}{% else %}$0{% endif %}</td>
         <td>{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
         <td>{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
         <td>{{ '✓' if p['video_deliverables'] else '-' }}</td>
@@ -183,7 +182,7 @@
         <td>
           {% if key == 'free' and not plan_is_chosen %}
             <form method="post" action="/client/billing/choose-free">
-              <button type="submit">Choose Free plan</button>
+              <button type="submit">Choose Pay as you go</button>
             </form>
           {% elif key == current_plan %}
             <span class="plan-active-pill">✓ Active</span>

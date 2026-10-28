@@ -44,7 +44,7 @@
         <tr><td><code>source_lang</code></td><td>Language spoken in the file, e.g. <code>en</code>, <code>sw</code>, <code>ki</code>, <code>fr</code>. See <code>GET /api/v1/languages</code>.</td></tr>
         <tr><td><code>target_lang</code></td><td>For translation or dubbing. Defaults to the source language for transcription, otherwise <code>en</code>.</td></tr>
         <tr><td><code>service_level</code></td><td><code>transcribe</code> (default), <code>translate</code> or <code>dub</code>.</td></tr>
-        <tr><td><code>review_tier</code></td><td><code>ai</code> (Instant AI, default) or <code>human</code> (reviewed by an editor; Swahili, Kikuyu and English only).</td></tr>
+        <tr><td><code>review_tier</code></td><td><code>ai</code> (Instant AI, default) or <code>human</code> (reviewed by an editor; Swahili, Kikuyu and English for now, more languages are coming soon).</td></tr>
         <tr><td><code>idempotency_key</code></td><td>Optional. Retrying with the same key returns the same order instead of creating another. The <code>Idempotency-Key</code> header works too.</td></tr>
         <tr><td><code>folder_name</code>, <code>notes</code></td><td>Optional. A folder to file the order under, and instructions for the editor.</td></tr>
       </tbody>

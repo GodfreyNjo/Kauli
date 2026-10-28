@@ -66,7 +66,7 @@ def test_files_page_lists_nothing_until_a_plan_is_chosen(env, wav_bytes):
 def test_billing_page_offers_the_free_plan_until_it_is_chosen(env):
     _unchoose(env)
     page = env.client.get("/client/billing?choose_plan=1").text
-    assert "Choose Free plan" in page and "Choose a plan to download your files" in page
+    assert "Choose Pay as you go" in page and "Choose a plan to download your files" in page
     env.db.set_plan_chosen("u1")
     page = env.client.get("/client/billing").text
     assert "Choose Free plan" not in page and "Active" in page

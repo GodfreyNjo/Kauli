@@ -289,7 +289,7 @@ def test_languages_flow_across_the_home_page_in_a_loop(visitor):
     html = visitor.client.get("/").text
     section = re.search(r'<section class="tk-langs".*?</section>', html, re.S).group(0)
     assert "Supported languages" in section
-    assert re.search(r"in \d+\+ languages", section) and "got you covered" in section
+    assert re.search(r"in \d+\+ languages", section) and "More languages are coming soon" in section
     tracks = re.findall(r'<ul class="tk-marquee-track"([^>]*)>', section)
     assert len(tracks) == 2 and 'aria-hidden="true"' in tracks[1] and 'aria-hidden' not in tracks[0]
     second = section.split('<ul class="tk-marquee-track" aria-hidden="true">')[1]

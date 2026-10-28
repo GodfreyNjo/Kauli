@@ -82,13 +82,13 @@
           <svg viewBox="0 0 12 8" width="12" height="8" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
         </summary>
         <div class="tk-more-body">
-          <p class="tk-more-lede">Instantly with AI, or human-reviewed for Swahili, Kikuyu and English.</p>
+          <p class="tk-more-lede">Instantly with AI, or human-reviewed for {{ human_review_languages }}. More languages are coming soon.</p>
           <ul class="tk-more-grid">
             <li><strong>Instant AI</strong>
               Ready in minutes. Transcription in {{ language_total }} languages and translation into
               {{ language_total - 1 }}. Clearly labelled as AI-generated, not reviewed by a person.</li>
             <li><strong>Human-reviewed</strong>
-              For Swahili, Kikuyu and English. A real editor checks the work against the audio before it is
+              For {{ human_review_languages }}, with more languages coming soon. A real editor checks the work against the audio before it is
               marked ready.</li>
             <li><strong>Transcripts, subtitles and dubbing</strong>
               Time-stamped transcripts, synchronised subtitles, and dubbed voice tracks. Download Word, TXT,
@@ -104,36 +104,41 @@
         <a href="/demo" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
       <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
-
-      <section class="tk-langs" aria-labelledby="langs-title">
-        <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
-        <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
-        <p class="tk-langs-sub">From global languages to Swahili and Kikuyu, we've got you covered.</p>
-        <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
-          {% for copy in (1, 2) %}
-          <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
-            {% for l in language_marquee %}
-            <li><a href="{{ l.href }}" class="tk-pill{{ ' is-first' if loop.first else '' }}"{% if copy == 2 %} tabindex="-1"{% endif %}>
-              {% if l.flag %}<span class="lang-flag {{ l.flag }}" aria-hidden="true"></span>{% else %}<span class="lang-dot tone-{{ l.tone }}" aria-hidden="true">{{ l.code|upper }}</span>{% endif %}{{ l.name }}</a></li>
-            {% endfor %}
-            <li><a href="/languages" class="tk-pill tk-pill-more"{% if copy == 2 %} tabindex="-1"{% endif %}><span aria-hidden="true">+</span> more</a></li>
-          </ul>
-          {% endfor %}
-        </div>
-        <button type="button" class="tk-marquee-toggle" id="lang-marquee-toggle" aria-controls="lang-marquee" aria-pressed="false">Pause</button>
-        <script>
-          (function () {
-            var m = document.getElementById("lang-marquee"), b = document.getElementById("lang-marquee-toggle");
-            if (!m || !b) return;
-            b.addEventListener("click", function () {
-              var paused = m.classList.toggle("is-paused");
-              b.setAttribute("aria-pressed", paused ? "true" : "false");
-              b.textContent = paused ? "Play" : "Pause";
-            });
-          })();
-        </script>
-      </section>
     </div>
+
+    <section class="tk-langs" aria-labelledby="langs-title">
+      <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
+      <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
+      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Swahili and Kikuyu. More languages are coming soon.</p>
+      <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
+        {% for copy in (1, 2) %}
+        <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
+          {% for l in language_marquee %}
+          <li><a href="{{ l.href }}" class="tk-pill{{ ' is-first' if loop.first else '' }}"{% if copy == 2 %} tabindex="-1"{% endif %}>
+            {% if l.flag %}<span class="lang-flag {{ l.flag }}" aria-hidden="true"></span>{% else %}<span class="lang-dot tone-{{ l.tone }}" aria-hidden="true">{{ l.code|upper }}</span>{% endif %}{{ l.name }}</a></li>
+          {% endfor %}
+          <li><a href="/languages" class="tk-pill tk-pill-more"{% if copy == 2 %} tabindex="-1"{% endif %}><span aria-hidden="true">+</span> more</a></li>
+        </ul>
+        {% endfor %}
+      </div>
+      <ul class="tk-legend" aria-label="Language availability">
+        <li><span class="tk-tag now">Available now</span> Instant AI transcription in {{ language_total }} languages</li>
+          <li><span class="tk-tag now">Available now</span> Human review and dubbing in {{ human_review_languages }}</li>
+          <li><span class="tk-tag soon">Coming soon</span> Human review and dubbing in more languages</li>
+        </ul>
+        <button type="button" class="tk-marquee-toggle" id="lang-marquee-toggle" aria-controls="lang-marquee" aria-pressed="false">Pause</button>
+      <script>
+        (function () {
+          var m = document.getElementById("lang-marquee"), b = document.getElementById("lang-marquee-toggle");
+          if (!m || !b) return;
+          b.addEventListener("click", function () {
+            var paused = m.classList.toggle("is-paused");
+            b.setAttribute("aria-pressed", paused ? "true" : "false");
+            b.textContent = paused ? "Play" : "Pause";
+          });
+        })();
+      </script>
+    </section>
 
     <div class="tk-cards">
       <a class="tk-card" href="/login?mode=signup" data-cta="hero-upload">
@@ -164,7 +169,7 @@
   <section class="tk-band">
     <div class="tk-band-inner">
       <h2>Audio to text in minutes. Checked by an expert when it matters.</h2>
-      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. For {{ human_review_languages }}, choose Human-reviewed and a real expert checks it before it is marked ready.</p>
+      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. For {{ human_review_languages }}, choose Human-reviewed and a real expert checks it before it is marked ready. More languages are coming soon.</p>
       <a href="/login?mode=signup" class="btn tk-band-btn" data-cta="band">Try It Now</a>
     </div>
   </section>
@@ -173,14 +178,14 @@
     <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length }}</b><span>transcription languages</span></div>
     <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length - 1 }}</b><span>translation languages</span></div>
     <div class="tk-stat"><b>3</b><span>human-reviewed languages</span></div>
-    <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>from ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per minute</span></div>
+    <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>starting from $0 &middot; first {{ free_minutes|int }} minutes free</span></div>
   </section>
 
   <section class="m-section" id="services">
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Services</span>
       <h2 class="m-h2">Everything your video or audio needs to travel</h2>
-      <p class="m-lede">Pick one service or combine them. Each is available instantly with AI, and {{ human_review_languages }} can add human review.</p>
+      <p class="m-lede">Pick one service or combine them. Each is available instantly with AI, and {{ human_review_languages }} can add human review. More languages are coming soon.</p>
       <div class="svc-grid">
         <article class="svc-card">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h6"/></svg></span>
@@ -199,7 +204,7 @@
         <article class="svc-card">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
           <h3>Video dubbing</h3>
-          <p>Dubbed voice tracks for Swahili, Kikuyu and English, with human review and consent for any voice cloning.</p>
+          <p>Dubbed voice tracks for {{ human_review_languages }}, with human review and consent for any voice cloning. More languages are coming soon.</p>
           <span class="svc-price">From ${{ '%.2f'|format(price_card['dub']['ai']) }} <small>per audio-minute</small></span>
           <a class="svc-link" href="/solutions/video-dubbing">Learn more →</a>
         </article>
@@ -410,6 +415,21 @@
   </script>
 
 
+  <section class="m-section" id="hear">
+    <div class="m-inner hd-teaser">
+      <span class="m-section-eyebrow m-eyebrow-lined">Hear it first</span>
+      <h2 class="m-h2">Hear Kauli in your language</h2>
+      <p class="m-lede">Pick what you are making and the language you need, then press play to hear and read the result. No sign-up needed.</p>
+      <div class="hd-teaser-pills" aria-hidden="true">
+        <span class="tk-pill"><i class="lang-flag flag-es"></i>Español</span>
+        <span class="tk-pill"><i class="lang-flag flag-de"></i>Deutsch</span>
+        <span class="tk-pill"><i class="lang-dot tone-3">ZH</i>中文</span>
+        <span class="tk-pill"><i class="lang-flag flag-ke"></i>Kiswahili</span>
+      </div>
+      <a href="/try" class="btn cta-olive" data-cta="home-try">Try the interactive demo</a>
+    </div>
+  </section>
+
   <section class="m-section tk-dark" id="why">
     <div class="m-inner">
       <span class="m-section-eyebrow">Why Kauli</span>
@@ -419,7 +439,7 @@
         <div class="why-item"><h3>Human review when you need it</h3><p>Choose Human-reviewed and a real editor checks the result before delivery. Instant AI is clearly labelled as AI-generated.</p></div>
         <div class="why-item"><h3>Transparent pricing</h3><p>Published per-minute rates, shown before you order. No hidden fees.</p></div>
         <div class="why-item"><h3>Consent-based voice cloning</h3><p>Where dubbing offers it, a voice is only cloned after the speaker's consent is confirmed.</p></div>
-        <div class="why-item"><h3>Swahili, Kikuyu and English first</h3><p>Specialists in East African languages, plus transcription in {{ ai_only_languages|length + source_languages|length }} languages.</p></div>
+        <div class="why-item"><h3>Swahili, Kikuyu and English first</h3><p>Specialists in these languages, plus Instant AI transcription in {{ ai_only_languages|length + source_languages|length }} languages, with more on the way.</p></div>
       </div>
     </div>
   </section>
@@ -464,8 +484,14 @@
         <article class="int-card" style="--i:{{ loop.index0 }}">
           <div class="int-head">
             <span class="int-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>
-            <div><h3>{{ title|safe }}</h3><p>{{ desc }}</p></div>
+            <div class="int-head-text">
+              <h3><button type="button" class="int-toggle" id="int-btn-{{ loop.index0 }}" aria-expanded="true" aria-controls="int-panel-{{ loop.index0 }}">{{ title|safe }}</button></h3>
+              <p>{{ desc }}</p>
+              <span class="int-peek" aria-hidden="true">{% for t in tools %}{% for part in t[3].split('+') %}<img src="/static/integrations/{{ part }}.svg" alt="" width="20" height="20" loading="lazy">{% endfor %}{% endfor %}<em>{{ tools|length }} tool{{ '' if tools|length == 1 else 's' }}</em></span>
+            </div>
+            <svg class="int-caret" viewBox="0 0 12 12" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5l4 4 4-4"/></svg>
           </div>
+          <div class="int-panel" id="int-panel-{{ loop.index0 }}" role="region" aria-labelledby="int-btn-{{ loop.index0 }}"><div class="int-panel-in">
           <ul class="int-list">
             {% for name, state, href, logo in tools %}
             <li data-state="{{ state }}">
@@ -478,6 +504,7 @@
             </li>
             {% endfor %}
           </ul>
+          </div></div>
         </article>
         {% endfor %}
       </div>
@@ -510,7 +537,49 @@
             status.textContent = filter === "all" ? "" :
               "Showing " + shown + " " + (filter === "live" ? "available" : "coming soon") + " integration" + (shown === 1 ? "" : "s");
           }
-          buttons.forEach(function (b) { b.addEventListener("click", function () { apply(b.getAttribute("data-filter")); }); });
+          // Cards start folded so the section is never a wall of logos. They open one at a time on their own
+          // while the section is on screen; the moment the visitor clicks, filters or tabs in, they are in charge.
+          var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          var taken = false, timer = null, current = -1, visible = false;
+          function setOpen(card, open) {
+            card.classList.toggle("is-open", open);
+            card.querySelector(".int-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+          }
+          function stopAuto() { taken = true; if (timer) { clearInterval(timer); timer = null; } }
+          function advance() {
+            var live = cards.filter(function (c) { return !c.hidden; });
+            if (!live.length) return;
+            if (current > -1 && cards[current]) setOpen(cards[current], false);
+            var from = live.indexOf(cards[current]);
+            var next = live[(from + 1) % live.length];
+            current = cards.indexOf(next);
+            setOpen(next, true);
+          }
+          function startAuto() { if (taken || reduce || timer || !visible) return; advance(); timer = setInterval(advance, 4200); }
+          sec.classList.add("int-js");
+          cards.forEach(function (c) { setOpen(c, reduce); });
+          cards.forEach(function (card) {
+            card.querySelector(".int-toggle").addEventListener("click", function () {
+              stopAuto();
+              setOpen(card, !card.classList.contains("is-open"));
+            });
+          });
+          sec.addEventListener("mouseenter", function () { if (timer) { clearInterval(timer); timer = null; } });
+          sec.addEventListener("mouseleave", function () { startAuto(); });
+          sec.addEventListener("focusin", function () { if (timer) { clearInterval(timer); timer = null; } });
+          if ("IntersectionObserver" in window) {
+            new IntersectionObserver(function (entries) {
+              visible = entries[0].isIntersecting;
+              if (visible) startAuto(); else if (timer) { clearInterval(timer); timer = null; }
+            }, { threshold: 0.3 }).observe(sec.querySelector(".int-grid"));
+          } else { cards.forEach(function (c) { setOpen(c, true); }); }
+          buttons.forEach(function (b) {
+            b.addEventListener("click", function () {
+              var f = b.getAttribute("data-filter");
+              apply(f);
+              if (f !== "all") { stopAuto(); cards.forEach(function (c) { setOpen(c, !c.hidden); }); }
+            });
+          });
           // Staggered reveal as the cards scroll into view (skipped for people who prefer reduced motion).
           if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
             sec.classList.add("int-anim");
@@ -533,115 +602,162 @@
 
   <section class="m-section" id="pricing">
     <div class="m-inner">
-      <span class="m-section-eyebrow">Pricing</span>
-      <h2 class="m-h2">Simple, per-minute pricing</h2>
-      <p class="m-lede">Pay for the minutes you process. <strong>Instant AI</strong> is ready in minutes and is not reviewed by a person;
-         <strong>Human-reviewed</strong> adds a real editor. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
-      <p class="price-market">Showing prices for {{ 'Kenya &amp; East Africa'|safe if display_market == 'ea' else 'the United States &amp; international'|safe }} in USD per audio-minute -
-        <a href="/?market={{ 'intl' if display_market == 'ea' else 'ea' }}#pricing">see {{ 'US &amp; international'|safe if display_market == 'ea' else 'Kenya &amp; East Africa'|safe }} prices</a>.</p>
+      <span class="m-section-eyebrow m-eyebrow-lined">Pricing</span>
+      <h2 class="m-h2">Simple pricing. Pay only for what you use.</h2>
+      <p class="m-lede">No subscription. You see the exact price before you order, and your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
 
-      <div class="price-group" style="margin-top:0;">
-        <h3 class="price-group-title">Pay as you go</h3>
-        <p class="price-group-sub">No subscription. Choose a service and how it is delivered.</p>
-        <div class="m-pricing-unified">
-          <div class="m-rates-card">
-            <table>
-              <thead><tr><th scope="col">Service</th><th scope="col">Instant AI</th><th scope="col">Human-reviewed</th></tr></thead>
-              <tbody>
-                {% for key, sl in service_levels.items() %}
-                <tr><th scope="row" style="font-weight:600;">{{ sl['name'] }}</th>
-                    <td>${{ "%.2f"|format(price_card[key]['ai']) }}</td>
-                    <td>${{ "%.2f"|format(price_card[key]['human']) }}</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-
-          <div class="m-calc">
-            <h3 style="margin-top:0;">Estimate your cost</h3>
-            <div class="m-calc-row">
-              <label for="calc-minutes">Length (minutes)
-                <input type="number" id="calc-minutes" min="0" step="1" value="10">
-              </label>
-              <label for="calc-service">Service
-                <select id="calc-service">
-                  {% for key, sl in service_levels.items() %}
-                  {% for tkey, tier in review_tiers.items() %}
-                  <option value="{{ price_card[key][tkey] }}" data-tier="{{ tkey }}" data-service="{{ key }}"
-                          {% if key == 'transcribe' and tkey == 'ai' %}selected{% endif %}>{{ sl['name'] }} - {{ tier['name'] }}</option>
-                  {% endfor %}
-                  {% endfor %}
-                </select>
-              </label>
-            </div>
-            <div class="m-calc-result" aria-live="polite">
-              <span id="calc-total">$0.00</span>
-              <span class="muted" id="calc-note"></span>
-            </div>
-            <a href="/demo" class="btn secondary m-calc-kes-btn">
-              Pay in KES or get volume discounts: talk to us
-            </a>
-          </div>
+      {% set in_kenya = (request.headers.get('cf-ipcountry', '') | upper) == 'KE' %}
+      <div class="pz-panel" id="pz">
+        <p class="pz-label">Pay as you go</p>
+        <fieldset class="pz-services">
+          <legend class="sr-only">What do you need?</legend>
+          {% set short = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
+          {% for key, sl in service_levels.items() %}
+          <label class="pz-service"><input type="radio" name="pz-service" value="{{ key }}"
+                 data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}" data-human="{{ '%.2f'|format(price_card[key]['human']) }}"{% if key == 'transcribe' %} checked{% endif %}>
+            <span>{{ short.get(key, sl['name']) }}</span></label>
+          {% endfor %}
+        </fieldset>
+        <div class="pz-minutes">
+          <label for="pz-min">How long is your audio?</label>
+          <span class="pz-minutes-field"><input type="number" id="pz-min" min="0" step="1" value="10" inputmode="numeric"> <span>minutes</span></span>
+          <span class="pz-chips" role="group" aria-label="Quick lengths">
+            <button type="button" data-min="10">10 min</button><button type="button" data-min="60">1 hour</button><button type="button" data-min="300">5 hours</button>
+          </span>
         </div>
-        <script>
-        (function () {
-          var minutesEl = document.getElementById('calc-minutes');
-          var serviceEl = document.getElementById('calc-service');
-          var totalEl = document.getElementById('calc-total');
-          var noteEl = document.getElementById('calc-note');
-          var freeMinutes = {{ free_minutes|int }};
-          if (!minutesEl) return;
-          function update() {
-            var minutes = Math.max(0, Number(minutesEl.value) || 0);
-            var rate = Number(serviceEl.value) || 0;
-            var serviceName = serviceEl.options[serviceEl.selectedIndex].text;
-            var opt = serviceEl.options[serviceEl.selectedIndex];
-            // Free minutes only ever apply to Instant AI transcription.
-            var freeEligible = opt.getAttribute('data-service') === 'transcribe' && opt.getAttribute('data-tier') === 'ai';
-            var freeApplied = freeEligible ? Math.min(minutes, freeMinutes) : 0;
-            var billable = Math.max(0, minutes - freeApplied);
-            var total = billable * rate;
-            totalEl.textContent = '$' + total.toFixed(2);
-            noteEl.textContent = freeApplied > 0
-              ? ' (' + freeApplied.toFixed(0) + ' free minute' + (freeApplied === 1 ? '' : 's') + ' applied - a paid plan discounts the rest further)'
-              : ' (a paid plan discounts this further)';
-          }
-          minutesEl.addEventListener('input', update);
-          serviceEl.addEventListener('change', update);
-          update();
-        })();
-      </script>
+        <h3 class="sr-only">Estimate your cost</h3>
+
+        <div class="pz-cards" aria-live="polite">
+          <article class="pz-card">
+            <header><h4>Instant AI</h4><span class="pz-free">First {{ free_minutes|int }} min free</span></header>
+            <p class="pz-price"><b id="pz-rate-ai">$0.00</b><span>/ audio-minute</span></p>
+            <p class="pz-est" id="pz-est-ai"></p>
+            <ul class="pz-list">
+              <li>Ready in minutes</li>
+              <li>Word, text and SRT downloads</li>
+              <li>{{ language_total }} languages</li>
+              <li>Clearly labelled as machine-generated</li>
+            </ul>
+            <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-ai">Try it free</a>
+          </article>
+          <article class="pz-card featured">
+            <header><h4>Human-reviewed</h4><span class="pz-flag">Checked by an expert</span></header>
+            <p class="pz-price"><b id="pz-rate-human">$0.00</b><span>/ audio-minute</span></p>
+            <p class="pz-est" id="pz-est-human"></p>
+            <ul class="pz-list">
+              <li>A real editor checks it against your audio</li>
+              <li>Marked ready only after review</li>
+              <li>{{ human_review_languages }} &middot; more coming soon</li>
+              <li>Word, text and SRT downloads</li>
+            </ul>
+            <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-human">Order human review</a>
+          </article>
+        </div>
+        <p class="pz-fine">All prices are in US dollars per audio-minute. Free minutes apply to Instant AI transcription only.
+          {% if in_kenya %}In Kenya you can pay in KES with M-Pesa at checkout. {% endif %}Need an invoice or volume pricing? <a href="/demo">Talk to us</a>.</p>
       </div>
 
-      <div class="price-group">
-        <h3 class="price-group-title">Optional extras</h3>
-        <p class="price-group-sub">Added per order, only if you want them.</p>
+      <ul class="pz-trust" aria-label="Why it is safe to start">
+        <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div><strong>Safe payments</strong><span>Card details go straight to Paystack{% if in_kenya %}, and M-Pesa PINs to Safaricom{% endif %}. We never see them.</span></div></li>
+        <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>
+          <div><strong>No surprises</strong><span>The exact price is shown before you confirm any order. No hidden fees.</span></div></li>
+        <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+          <div><strong>Private by default</strong><span>Your files stay in your account, and you can delete your data any time.</span></div></li>
+        <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg></span>
+          <div><strong>No lock-in</strong><span>Pay as you go. A subscription is optional and never required.</span></div></li>
+      </ul>
+
+      <details class="pz-more">
+        <summary><span><strong>Optional extras</strong> <em>added per order, only if you want them</em></span></summary>
         <div class="price-extras">
           <div class="price-extra"><div><strong>Video deliverables</strong><span class="small">Burned-in captions and a dubbed video file</span></div><span class="amt">+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}/min</span></div>
           <div class="price-extra"><div><strong>Real human voice actor</strong><span class="small">On a human-reviewed full dub</span></div><span class="amt">+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }}/min</span></div>
         </div>
-      </div>
+      </details>
 
-      <div class="price-group">
-        <h3 class="price-group-title">Monthly plans <span class="muted" style="font-weight:500; font-size:0.9rem;">(optional)</span></h3>
-        <p class="price-group-sub">A discount on every usage rate above, plus better turnaround and delivery options. Added on top of usage, not instead of it.</p>
-        <div class="m-pricing-grid">
-          {% for key, p in plans.items() %}
-          <div class="m-plan{% if key == 'premium' %} featured{% endif %}">
-            <div class="m-plan-name">{{ p['name'] }}</div>
-            <div class="m-plan-price">
-              {% if p['price_usd'] %}${{ p['price_usd'] }}<small>/mo</small>{% else %}$0<small>/mo</small>{% endif %}
-            </div>
-            <div class="m-plan-blurb">{{ p['blurb'] }}</div>
-            {% if key == 'enterprise' %}
-              <a href="/demo" class="btn secondary">Talk to us</a>
-            {% else %}
-              <a href="/login?mode=signup" class="btn secondary" data-cta="pricing-plan">Get started</a>
-            {% endif %}
-          </div>
-          {% endfor %}
+      {% set pro = plans['pro'] %}{% set prem = plans['premium'] %}
+      <div class="pz-plans" id="pz-plans">
+        <h3 class="pz-plans-title">Monthly plans</h3>
+        <p class="pz-plans-sub">For people who keep coming back. Pay one small monthly fee and every order costs less, in small or large amounts.</p>
+        <div class="pz-plan-grid">
+          <article class="pz-plan" data-discount="{{ pro['discount'] }}" data-fee="{{ pro['price_usd'] }}">
+            <h4>{{ pro['name'] }}</h4>
+            <p class="pz-plan-for">For steady, smaller projects</p>
+            <p class="pz-plan-price"><b>${{ pro['price_usd'] }}</b><span>/ month</span></p>
+            <ul class="pz-list">
+              <li>{{ (pro['discount'] * 100)|round|int }}% off every rate, every month</li>
+              <li>Downloads and delivery unlocked</li>
+              <li>Email support</li>
+            </ul>
+            <p class="pz-meter" aria-live="polite"></p>
+            <a href="/login?mode=signup" class="btn secondary" data-cta="pricing-plan-pro">Choose {{ pro['name'] }}</a>
+          </article>
+          <article class="pz-plan featured" data-discount="{{ prem['discount'] }}" data-fee="{{ prem['price_usd'] }}">
+            <span class="pz-plan-flag">Best for regular premium work</span>
+            <h4>{{ prem['name'] }}</h4>
+            <p class="pz-plan-for">For premium work, small or in bulk</p>
+            <p class="pz-plan-price"><b>${{ prem['price_usd'] }}</b><span>/ month</span></p>
+            <ul class="pz-list">
+              <li>{{ (prem['discount'] * 100)|round|int }}% off every rate, every month</li>
+              <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
+              <li>Priority-quality translation and faster turnaround</li>
+              <li>Early access to new languages and voices as they launch</li>
+            </ul>
+            <p class="pz-meter" aria-live="polite"></p>
+            <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-plan-premium">Choose {{ prem['name'] }}</a>
+          </article>
         </div>
+        <p class="pz-fine">Need invoices, bank transfer or a custom volume rate? <a href="/demo">Talk to us</a>.</p>
       </div>
+      <script>
+        (function () {
+          var panel = document.getElementById('pz');
+          if (!panel) return;
+          var free = {{ free_minutes|int }};
+          var min = document.getElementById('pz-min');
+          var radios = panel.querySelectorAll('input[name="pz-service"]');
+          function money(n) { return '$' + n.toFixed(2); }
+          function update() {
+            var m = Math.max(0, Number(min.value) || 0);
+            var r = panel.querySelector('input[name="pz-service"]:checked');
+            var ai = Number(r.getAttribute('data-ai')), hu = Number(r.getAttribute('data-human'));
+            var freeApplied = r.value === 'transcribe' ? Math.min(m, free) : 0;
+            document.getElementById('pz-rate-ai').textContent = money(ai);
+            document.getElementById('pz-rate-human').textContent = money(hu);
+            document.getElementById('pz-est-ai').textContent = m + ' min = ' + money(Math.max(0, m - freeApplied) * ai) +
+              (freeApplied > 0 ? ' (first ' + freeApplied + ' free)' : '');
+            document.getElementById('pz-est-human').textContent = m + ' min = ' + money(m * hu);
+          }
+          min.addEventListener('input', update);
+          [].forEach.call(radios, function (x) { x.addEventListener('change', update); });
+          [].forEach.call(panel.querySelectorAll('.pz-chips button'), function (b) {
+            b.addEventListener('click', function () { min.value = b.getAttribute('data-min'); update(); });
+          });
+          function meters() {
+            var m = Math.max(0, Number(min.value) || 0);
+            var r = panel.querySelector('input[name="pz-service"]:checked');
+            var hu = Number(r.getAttribute('data-human'));
+            [].forEach.call(document.querySelectorAll('.pz-plan'), function (card) {
+              var disc = Number(card.getAttribute('data-discount')), fee = Number(card.getAttribute('data-fee'));
+              var out = card.querySelector('.pz-meter'), save = m * hu * disc - fee;
+              if (!m) { out.textContent = ''; return; }
+              if (save > 0) {
+                out.className = 'pz-meter good';
+                out.textContent = 'At ' + m + ' min a month human-reviewed, you keep $' + save.toFixed(2) + ' a month after the fee.';
+              } else {
+                out.className = 'pz-meter';
+                out.textContent = 'Pays for itself from about ' + Math.ceil(fee / (hu * disc)) + ' human-reviewed minutes a month. Below that, pay as you go costs less.';
+              }
+            });
+          }
+          min.addEventListener('input', meters);
+          [].forEach.call(radios, function (x) { x.addEventListener('change', meters); });
+          [].forEach.call(panel.querySelectorAll('.pz-chips button'), function (b) { b.addEventListener('click', meters); });
+          update();
+          meters();
+        })();
+      </script>
     </div>
   </section>
 
@@ -650,12 +766,40 @@
       <span class="m-section-eyebrow">How it works</span>
       <h2 class="m-h2">From file to finished in four steps</h2>
       <p class="m-lede">The same simple flow for a five-minute clip or a full episode.</p>
-      <ol class="how-grid" style="list-style:none; padding:0; margin:0;">
-        <li class="how-step"><div class="how-num" aria-hidden="true">1</div><h3>Choose service and languages</h3><p>Pick transcription, subtitles or dubbing, and the languages you need.</p></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true">2</div><h3>Upload or paste a link</h3><p>Add an audio or video file, or a YouTube link for a video you have the rights to use.</p></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true">3</div><h3>Review price and submit</h3><p>See the exact price and what is included before you confirm.</p></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true">4</div><h3>Track and download</h3><p>Follow progress in your workspace, then download Word, text, SRT or VTT files.</p></li>
+      <ol class="how-grid" id="how-steps" style="list-style:none; padding:0; margin:0;">
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>1</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Choose service and languages</h3><p>Pick transcription, subtitles or dubbing, and the languages you need.</p>
+          <div class="how-vis" aria-hidden="true"><span class="how-chip on">Transcription</span><span class="how-chip">Subtitles</span><span class="how-chip">Dubbing</span></div></li>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>2</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Upload or paste a link</h3><p>Add an audio or video file, or a YouTube link for a video you have the rights to use.</p>
+          <div class="how-vis" aria-hidden="true"><div class="how-file"><b>interview.mp4</b><i class="how-bar"><u></u></i></div></div></li>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>3</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Review price and submit</h3><p>See the exact price and what is included before you confirm.</p>
+          <div class="how-vis" aria-hidden="true"><div class="how-price"><span>Price shown first</span><b>Confirm order</b></div></div></li>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>4</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Track and download</h3><p>Follow progress in your workspace, then download Word, text, SRT or VTT files.</p>
+          <div class="how-vis" aria-hidden="true"><div class="how-status"><span class="how-s-run">Processing...</span><span class="how-s-done">Ready</span></div>
+            <div class="how-files"><span>Word</span><span>Text</span><span>SRT</span><span>VTT</span></div></div></li>
       </ol>
+      <script>
+        (function () {
+          var sec = document.getElementById("how"), list = document.getElementById("how-steps");
+          if (!sec || !list) return;
+          var steps = [].slice.call(list.children);
+          var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (reduce || !("IntersectionObserver" in window)) return;       // the static, fully visible version stays
+          list.classList.add("how-js");
+          var n = -1, timer = null, visible = false, held = false;
+          function show(k) {
+            n = k;
+            steps.forEach(function (st, i) { st.classList.toggle("is-active", i === k); st.classList.toggle("done", i < k || k === steps.length); });
+          }
+          function next() { show(n >= steps.length ? 0 : n + 1); }     // 0..3, then everything done, then round again
+          function start() { if (timer || !visible || held) return; if (n < 0) next(); timer = setInterval(next, 2900); }
+          function stop() { if (timer) { clearInterval(timer); timer = null; } }
+          new IntersectionObserver(function (e) { visible = e[0].isIntersecting; if (visible) start(); else stop(); }, { threshold: 0.35 }).observe(list);
+          steps.forEach(function (st, i) {
+            st.addEventListener("mouseenter", function () { held = true; stop(); show(i); });
+          });
+          list.addEventListener("mouseleave", function () { held = false; start(); });
+        })();
+      </script>
     </div>
   </section>
 
@@ -663,7 +807,7 @@
     <div class="m-inner">
       <span class="m-section-eyebrow">Languages</span>
       <h2 class="m-h2">Transcription in {{ ai_only_languages|length + source_languages|length }} languages</h2>
-      <p class="m-lede">Instant AI transcribes and translates between them (except Kikuyu). Dubbing and human review are for Swahili, Kikuyu and English.</p>
+      <p class="m-lede">Instant AI transcribes and translates between them (except Kikuyu). Dubbing and human review are available now for {{ human_review_languages }}. More languages are coming soon.</p>
       <div class="lang-strip">
         {% for code, label in source_languages.items() %}<span class="m-lang-pill" style="border-color:var(--accent);">{{ label }}</span>{% endfor %}
         {% for code, label in (ai_only_languages.items()|sort(attribute='1'))[:14] %}<span class="m-lang-pill">{{ label }}</span>{% endfor %}

@@ -323,3 +323,17 @@ def test_the_integrations_section_is_dynamic(studio, monkeypatch):
     css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
     assert "@keyframes int-pulse" in css and "#integrations.int-anim .int-card:not(.is-in)" in css
     assert "@media (prefers-reduced-motion: reduce)" in css and ".int-badge.live::before { animation: none; }" in css
+
+
+def test_integration_cards_fold_into_dropdowns_that_open_on_their_own(studio, monkeypatch):
+    import re
+    monkeypatch.setattr(studio.app, "current_user", lambda request: None)
+    html = studio.client.get("/").text
+    section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
+    # every card has a real disclosure button wired to its panel, and the page works with the panel open when JS is off
+    toggles = re.findall(r'<button type="button" class="int-toggle" id="int-btn-(\d)" aria-expanded="true" aria-controls="int-panel-(\d)">', section)
+    assert len(toggles) == 9 and all(a == b for a, b in toggles)
+    assert section.count('class="int-panel"') == 9 and section.count('role="region"') == 9
+    assert "setInterval(advance" in section and "prefers-reduced-motion" in section and "stopAuto" in section
+    css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert ".int-js .int-card:not(.is-open) .int-panel" in css and "grid-template-rows: 0fr" in css
