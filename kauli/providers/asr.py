@@ -343,6 +343,8 @@ class TranskriptorASR(ASRProvider):
         # key needs attention - not the same as the real quality hit of
         # falling back to local Whisper.
         self.backup_api_key = backup_api_key or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
+        # A third key (another account, or a fresh key on the same one): tried only after the first two have failed.
+        self.backup_api_key_2 = os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP_2")
         self.poll_interval_s = poll_interval_s
         self.timeout_s = timeout_s
         self.fallback_used = False
@@ -355,33 +357,31 @@ class TranskriptorASR(ASRProvider):
                 "Content-Type": "application/json", "Accept": "application/json"}
 
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
-        primary_exc: Exception | None = None
-        if self.api_key:
+        # Real Transkriptor first, on each configured key in turn; local faster-whisper only when every key has failed.
+        keys = [(name, k) for name, k in (("primary", self.api_key), ("backup", self.backup_api_key),
+                                          ("second backup", self.backup_api_key_2)) if k]
+        failures: list[tuple[str, Exception]] = []
+        for i, (name, key) in enumerate(keys):
             try:
-                return self._transcribe_via_api(audio_path, language, self.api_key)
-            except Exception as exc:  # noqa: BLE001 - any failure here means "try the backup key, or fall back"
-                primary_exc = exc
-        if self.backup_api_key:
-            try:
-                segs = self._transcribe_via_api(audio_path, language, self.backup_api_key)
+                segs = self._transcribe_via_api(audio_path, language, key)
+            except Exception as exc:  # noqa: BLE001 - any failure here means "try the next key, or fall back"
+                failures.append((name, exc))
+                continue
+            if i > 0:
                 self.backup_key_used = True
+                first = failures[0][1] if failures else None
                 self.backup_key_note = (
-                    f"Primary Transkriptor key failed ({primary_exc.__class__.__name__}: {primary_exc}) - "
-                    "used the backup key instead. Worth checking on the primary key/account."
-                ) if primary_exc else "Used the backup Transkriptor key (no primary key configured)."
-                return segs
-            except Exception as exc2:  # noqa: BLE001 - both keys failed, now really fall back
-                self.fallback_used = True
-                self.fallback_reason = (
-                    f"Transkriptor ASR failed on both keys (primary: "
-                    f"{primary_exc.__class__.__name__ if primary_exc else 'not configured'}: {primary_exc}; "
-                    f"backup: {exc2.__class__.__name__}: {exc2}) - fell back to local faster-whisper.")
-                return FasterWhisperASR().transcribe(audio_path, language=language)
+                    f"{failures[0][0].capitalize()} Transkriptor key failed ({first.__class__.__name__}: {first}) - "
+                    f"used the {name} key instead. Worth checking on that key/account."
+                ) if failures else f"Used the {name} Transkriptor key (no earlier key configured)."
+            return segs
         self.fallback_used = True
-        self.fallback_reason = (
-            f"Transkriptor ASR failed ({primary_exc.__class__.__name__}: {primary_exc}) - "
-            "fell back to local faster-whisper." if primary_exc else
-            "Transkriptor ASR failed (no API key configured) - fell back to local faster-whisper.")
+        if failures:
+            detail = "; ".join(f"{n}: {e.__class__.__name__}: {e}" for n, e in failures)
+            self.fallback_reason = (f"Transkriptor ASR failed on {'both keys' if len(failures) == 2 else 'every key' if len(failures) > 2 else 'its key'} "
+                                    f"({detail}) - fell back to local faster-whisper.")
+        else:
+            self.fallback_reason = "Transkriptor ASR failed (no API key configured) - fell back to local faster-whisper."
         return FasterWhisperASR().transcribe(audio_path, language=language)
 
     def _transcribe_via_api(self, audio_path: str, language: str, api_key: str) -> list[Segment]:
