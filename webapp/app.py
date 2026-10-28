@@ -317,7 +317,7 @@ def _is_large_body_exempt(path: str) -> bool:
     suffix against request.url.path, NOT the route-template strings
     ("/client/orders/{order_id}/resume") those never equal - a request's
     actual path always has the real id substituted in."""
-    if path in ("/client/orders", "/settings"):
+    if path in ("/client/orders", "/settings", "/api/v1/orders"):
         return True
     if path.startswith("/client/orders/") and path.endswith("/resume"):
         return True
@@ -760,7 +760,18 @@ def _pct_change(current: float, previous: float) -> float | None:
     return round(((current - previous) / previous) * 100)
 
 
+class ApiOrderError(Exception):
+    """Raised by _client_dashboard_error when create_order() is being driven by
+    POST /api/v1/orders - the API has no form to re-render, so the same
+    validation message goes back as JSON instead."""
+
+
 def current_user(request: Request):
+    # Set ONLY by api_create_order, after it has checked a real API key, and
+    # only on that one request's state - a browser session can never reach it.
+    api_user = getattr(request.state, "api_user", None)
+    if api_user is not None:
+        return api_user
     user_id = request.session.get("user_id")
     if not user_id:
         return None
@@ -2758,6 +2769,13 @@ def terms_page(request: Request):
     return templates.TemplateResponse(request, "terms.html", _marketing_context(home="/"))
 
 
+@app.get("/developers", response_class=HTMLResponse)
+def developers_page(request: Request):
+    ctx = _marketing_context(home="/")
+    ctx["base"] = str(request.base_url).rstrip("/")
+    return templates.TemplateResponse(request, "developers.html", ctx)
+
+
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page(request: Request):
     return templates.TemplateResponse(request, "privacy.html", _marketing_context(home="/"))
@@ -2855,6 +2873,7 @@ def sitemap(request: Request):
         (f"{base}/formatting-standards", "0.4"),
         (f"{base}/terms", "0.2"),
         (f"{base}/privacy", "0.2"),
+        (f"{base}/developers", "0.5"),
     ]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
     static_urls += [(f"{base}/languages", "0.8")]
@@ -4645,6 +4664,8 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
     trigger under the error - only set it for limits a staff-granted
     exception can actually lift (see grant_trusted_submitter), not for
     every error message on this page."""
+    if getattr(request.state, "api_user", None) is not None:
+        raise ApiOrderError(error)
     subscription = db.get_subscription_current(user["client_scope_id"])
     plan = billing.effective_plan(user, subscription)
     return templates.TemplateResponse(request, "client_dashboard.html", {
@@ -7026,6 +7047,8 @@ def _deliverable_denied_reason(order, kind: str) -> str | None:
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     if kind in ("srt", "vtt") and not order_level["mt"]:
         return "This order doesn't include translated subtitles."
+    if kind in ("txt", "docx") and not order_level["asr"]:
+        return "This order doesn't include a transcript."
     if kind == "audio" and not order_level["tts"]:
         return "This order doesn't include a dubbed audio deliverable."
     if kind in ("burned", "dubbed"):
@@ -7053,6 +7076,19 @@ def api_signed_deliverable(request: Request, order_id: str, kind: str, expires: 
     denied = _deliverable_denied_reason(order, kind)
     if denied:
         return HTMLResponse(denied, status_code=404)
+    if kind in ("txt", "docx"):
+        job = _load_job(order)
+        if job is None:
+            return HTMLResponse("Not ready yet.", status_code=404)
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(order["original_filename"] or "transcript").stem).strip("_") or "transcript"
+        title = f"Transcript - {order['original_filename'] or order['id']}"
+        if kind == "txt":
+            data, media = transcript_export.to_txt(job, title), "text/plain; charset=utf-8"
+        else:
+            data = transcript_export.to_docx(job, title)
+            media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        return Response(content=data, media_type=media,
+                        headers={"Content-Disposition": f'attachment; filename="{stem}_transcript.{kind}"'})
     filename = _deliverable_filename(order, kind)
     if not filename:
         return HTMLResponse("Unknown file.", status_code=404)
@@ -7084,12 +7120,21 @@ def _order_to_api_dict(request: Request, order) -> dict:
     for kind in ("srt", "vtt", "audio", "burned", "dubbed"):
         if order_level["mt" if kind in ("srt", "vtt") else "tts"] and _deliverable_denied_reason(order, kind) is None:
             deliverables[kind] = _deliverable_link(request, order["id"], kind)
-    return {
+    for kind in ("txt", "docx"):
+        if _deliverable_denied_reason(order, kind) is None:
+            deliverables[kind] = _deliverable_link(request, order["id"], kind)
+    out = {
         "id": order["id"], "status": order["status"], "original_filename": order["original_filename"],
-        "service_level": order["service_level"], "source_lang": order["source_lang"],
-        "target_lang": order["target_lang"], "created_at": order["created_at"],
+        "service_level": order["service_level"], "review_tier": order["review_tier"],
+        "source_lang": order["source_lang"], "target_lang": order["target_lang"],
+        "duration_minutes": order["duration_minutes"], "cost_usd": order["cost_usd"],
+        "created_at": order["created_at"],
         "ready": order["status"] in db.TERMINAL_OK_STATUSES, "deliverables": deliverables,
     }
+    if order["status"] == "pending_payment":
+        out["payment_required"] = True
+        out["payment_url"] = f"{str(request.base_url).rstrip('/')}/client/orders/{order['id']}/pay"
+    return out
 
 
 def _api_rate_limited(request: Request) -> JSONResponse | None:
@@ -7131,6 +7176,76 @@ def api_list_orders(request: Request, limit: int = 25):
     limit = max(1, min(limit, 100))
     rows = db.list_orders_for_client(client_id)[:limit]
     return JSONResponse({"orders": [_order_to_api_dict(request, o) for o in rows]})
+
+
+@app.get("/api/v1/languages")
+def api_languages():
+    """Public (no key) - every language code the API accepts and what each can
+    be ordered as, so an integration can build its own picker."""
+    return JSONResponse({"languages": [
+        {"code": code, "name": name,
+         "transcription": True,
+         "translation_target": code != "ki" and (code in ("en", "sw") or _lara_configured()),
+         "human_review": code in ("sw", "en", "ki"), "dubbing": code in ("sw", "en")}
+        for code, name in sorted(LANGUAGE_NAMES.items(), key=lambda kv: kv[1])]})
+
+
+@app.post("/api/v1/orders")
+def api_create_order(
+    request: Request,
+    audio: UploadFile | None = File(None),
+    url: str = Form(""),
+    source_lang: str = Form("en"),
+    target_lang: str = Form(""),
+    service_level: str = Form("transcribe"),
+    review_tier: str = Form("ai"),
+    idempotency_key: str = Form(""),
+    folder_name: str = Form(""),
+    notes: str = Form(""),
+):
+    """Create an order from a file (multipart `audio`) or a YouTube `url`.
+    Runs the SAME create_order() the dashboard uses - same validation,
+    pricing, free-minutes and wallet rules - so the API can never be a way
+    around any of them. An order that still needs payment comes back 402 with
+    a payment_url; nothing is downloadable until it is paid, as everywhere."""
+    limited = _api_rate_limited(request)
+    if limited:
+        return limited
+    client_id = _client_id_from_api_key(request)
+    row = db.get_user(client_id) if client_id else None
+    if not row or row["account_status"] == "closed":
+        return JSONResponse({"error": "invalid or missing API key - use Authorization: Bearer <key>"},
+                             status_code=401)
+    user = dict(row)
+    if user["role"] != "client":
+        return JSONResponse({"error": "API keys can only create orders for client accounts"}, status_code=403)
+    user["client_scope_id"] = client_id
+    request.state.api_user = user
+    idem = (idempotency_key or request.headers.get("idempotency-key", "")).strip()
+    service_level = service_level.strip() or "transcribe"
+    target = target_lang.strip() or (source_lang if service_level == "transcribe" else "en")
+    base = str(request.base_url).rstrip("/")
+    try:
+        resp = create_order(
+            request, audio=audio, upload_key="", youtube_url=url, source_lang=source_lang.strip(),
+            target_lang=target, service_level=service_level, addon_video_deliverables="",
+            addon_human_voice_over="", instr_speaker_ids="", instr_verbatim_level="clean_read",
+            instr_transcribe_lyrics="", instr_use_italics="", instr_existing_subs="ignore",
+            instr_no_audio="tag", instr_wrong_language="tag", instr_instrumental_only="tag",
+            instr_notes=notes, style_guide=None, idempotency_key=idem, folder_name=folder_name,
+            voice_clone_consent="", rush="", review_tier=review_tier.strip())
+    except ApiOrderError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
+    if loc.startswith("/client/verify-trial"):
+        return JSONResponse({"error": "verification_required",
+                              "message": "Complete the one-time $1 card check (credited to your account) to unlock "
+                                         "free minutes, then retry.", "url": f"{base}{loc}"}, status_code=402)
+    m = re.match(r"^/client/orders/([0-9a-f]+)(/pay)?$", loc)
+    if not m:
+        return JSONResponse({"error": "could not create the order"}, status_code=400)
+    order = db.get_order(m.group(1))
+    return JSONResponse(_order_to_api_dict(request, order), status_code=402 if m.group(2) else 201)
 
 
 def _is_safe_webhook_url(url: str) -> bool:

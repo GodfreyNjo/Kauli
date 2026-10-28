@@ -163,3 +163,13 @@ def test_login_errors_are_announced(client):
 def test_footer_shows_contact_details(client):
     html = client.get("/").text
     assert 'href="tel:' in html and "mailto:" in html
+
+
+def test_developer_docs_page_is_public_and_linked(client):
+    page = client.get("/developers")
+    assert page.status_code == 200
+    html = page.text
+    for needed in ("POST /api/v1/orders", "Authorization: Bearer", "X-Kauli-Signature", "/api/v1/languages"):
+        assert needed in html
+    assert 'href="/developers"' in client.get("/").text            # reachable from the nav and footer
+    assert "/developers" in client.get("/sitemap.xml").text
