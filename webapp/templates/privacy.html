@@ -54,9 +54,12 @@
           text (not your original audio) is sent to generate the speech, using one of its ready-made voices; we never use
           it to clone a real person's voice. Audio clean-up and Identify speakers: your audio is sent to remove background
           noise or to work out who is speaking.</li>
-      <li><strong>Transkriptor</strong> - our primary transcription provider for some orders. It processes the
-          actual audio being transcribed, per its own privacy terms; if it's unavailable, we fall back to our
-          own local transcription model, which never leaves our own infrastructure.</li>
+      <li><strong>Transkriptor</strong> - our primary transcription provider for paid orders. It processes the
+          actual audio being transcribed, per its own privacy terms.</li>
+      <li><strong>Groq</strong> and <strong>AssemblyAI</strong> - lower-cost transcription providers, used for orders
+          covered by the free monthly minutes, and as a back-up if Transkriptor is unavailable. They process the actual
+          audio being transcribed, per their own privacy terms. If none of our providers can transcribe a file, we fall
+          back to our own local transcription model, which never leaves our own infrastructure.</li>
       <li><strong>Brevo</strong> - sends transactional email on our behalf (receipts, order-status updates,
           voice-actor assignment notices). It sees the recipient's email address and the message content.</li>
       <li><strong>Hetzner</strong> - hosts the server Kauli actually runs on. <strong>Cloudflare</strong> sits

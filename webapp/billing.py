@@ -121,7 +121,9 @@ def price_card_for(market: str | None) -> dict:
     return {sl: {t: rate_for(sl, market, t) for t in REVIEW_TIERS} for sl in SERVICE_LEVELS}
 
 
-FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - AI transcription only, preview-only, see below
+# A new account's very first upload, when it is this short, always gets Transkriptor: it is the first impression of our quality.
+FIRST_ORDER_QUALITY_MINUTES = 5.0
+FREE_MINUTES_PER_MONTH = 60.0  # monthly free allowance - Instant AI transcription only. Served by the low-cost providers (see app._route_asr), so it costs cents
 
 # The free allowance only ever buys transcription - not translation, not a
 # dub. It's a "see the AI transcription quality for yourself" trial, not a

@@ -331,7 +331,10 @@ class TranskriptorASR(ASRProvider):
     ASSUMED_CONFIDENCE = 0.90
 
     def __init__(self, api_key: str | None = None, backup_api_key: str | None = None,
-                 poll_interval_s: float = 5.0, timeout_s: float = 1800.0):
+                 poll_interval_s: float = 5.0, timeout_s: float = 1800.0, local_fallback: bool = True):
+        # local_fallback=False makes a failure raise instead of dropping to local Whisper, so a ChainASR can try the
+        # next cloud provider first (see asr_cloud.ChainASR).
+        self.local_fallback = local_fallback
         self.api_key = api_key or os.environ.get("TRANSKRIPTOR_API_KEY")
         # A second Transkriptor account's key, tried before ever giving up on
         # real Transkriptor quality and dropping to local Whisper - covers a
@@ -382,6 +385,9 @@ class TranskriptorASR(ASRProvider):
                                     f"({detail}) - fell back to local faster-whisper.")
         else:
             self.fallback_reason = "Transkriptor ASR failed (no API key configured) - fell back to local faster-whisper."
+        if not self.local_fallback:
+            self.fallback_used = False
+            raise RuntimeError(self.fallback_reason)
         return FasterWhisperASR().transcribe(audio_path, language=language)
 
     def _transcribe_via_api(self, audio_path: str, language: str, api_key: str) -> list[Segment]:
@@ -501,6 +507,14 @@ _REGISTRY["elevenlabs-scribe"] = ElevenLabsScribeASR
 
 
 def get_asr(name: str, **kwargs) -> ASRProvider:
+    """A provider by name. "chain:a,b,c" tries a, then b, then c (see asr_cloud.ChainASR); "groq-whisper" and "assemblyai"
+    are the low-cost cloud providers."""
+    if name.startswith("chain:"):
+        from .asr_cloud import ChainASR
+        return ChainASR(name[len("chain:"):].split(","))
+    if name in ("groq-whisper", "assemblyai"):
+        from .asr_cloud import AssemblyAIASR, GroqWhisperASR
+        return {"groq-whisper": GroqWhisperASR, "assemblyai": AssemblyAIASR}[name](**kwargs)
     if name not in _REGISTRY:
         raise ValueError(f"Unknown ASR provider '{name}'. Options: {list(_REGISTRY)}")
     return _REGISTRY[name](**kwargs)

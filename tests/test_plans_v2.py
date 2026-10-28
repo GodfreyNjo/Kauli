@@ -20,7 +20,7 @@ def _sub(plan, status="active", end_in_days=20, used=0.0, bonus=0.0):
 
 
 def test_each_plan_includes_instant_ai_minutes_worth_about_what_it_costs():
-    assert billing.plan_included_minutes("free") == 5 and billing.plan_included_minutes("pro") == 150 and billing.plan_included_minutes("premium") == 400
+    assert billing.plan_included_minutes("free") == billing.FREE_MINUTES_PER_MONTH == 60 and billing.plan_included_minutes("pro") == 150 and billing.plan_included_minutes("premium") == 400
     ai_rate = billing.PRICE_CARD["intl"]["transcribe"]["ai"]
     for plan in ("pro", "premium"):
         value = billing.plan_included_minutes(plan) * ai_rate
@@ -28,13 +28,13 @@ def test_each_plan_includes_instant_ai_minutes_worth_about_what_it_costs():
 
 
 def test_the_allowance_follows_the_plan_in_force_and_resets_with_the_period():
-    assert billing.free_minutes_remaining(None) == 5
+    assert billing.free_minutes_remaining(None) == 60
     assert billing.free_minutes_remaining(_sub("pro")) == 150
     assert billing.free_minutes_remaining(_sub("premium", used=100)) == 300
     assert billing.free_minutes_remaining(_sub("pro", used=500)) == 0
     assert billing.free_minutes_remaining(_sub("pro", bonus=10)) == 160
-    assert billing.free_minutes_remaining(_sub("pro", status="cancelled")) == 5          # not active: back to the trial allowance
-    assert billing.free_minutes_remaining(_sub("pro", end_in_days=-30)) == 5             # lapsed: back to the trial allowance
+    assert billing.free_minutes_remaining(_sub("pro", status="cancelled")) == 60          # not active: back to the trial allowance
+    assert billing.free_minutes_remaining(_sub("pro", end_in_days=-30)) == 60             # lapsed: back to the trial allowance
 
 
 def test_yearly_prices_save_real_money_and_never_lose_money():

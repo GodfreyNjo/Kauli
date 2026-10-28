@@ -549,6 +549,13 @@ def run(
                 log(f"      audio clean-up skipped: {exc}")
         stage("transcribe")
         job.segments = asr_provider.transcribe(asr_input, language=source_lang)
+        # A chain of providers says which one really produced the text, and what failed before it.
+        ran = getattr(asr_provider, "used_name", None)
+        if ran:
+            job.providers["asr"] = ran
+            for note in getattr(asr_provider, "notes", []):
+                job.warnings.append(note)
+                log(f"      {note}")
         # TranskriptorASR (and any future provider with a real fallback) sets
         # these on itself rather than raising - the manifest's own
         # providers["asr"] must reflect what actually ran, not what was asked

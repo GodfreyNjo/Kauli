@@ -52,6 +52,7 @@ from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_f
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
+from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
@@ -271,6 +272,7 @@ def _load_dotenv() -> None:
 _load_dotenv()
 db.init_db()
 blog_guides.seed_guides_at_startup()
+db.replace_blog_text("first 5 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")      # posts written when the allowance was 5
 
 IDLE_TIMEOUT_SECONDS = 30 * 60  # log out after 30 minutes of no requests
 
@@ -5790,6 +5792,16 @@ def create_order(
     is_free_preview = (cost["free_minutes_applied"] > 0 and cost["credits_applied"] <= 0
                         and cost["total_usd"] <= 0 and not is_rush)
 
+    # Free-allowance orders (the free plan, fully covered, Instant AI) go to the low-cost providers; everyone who pays keeps Transkriptor.
+    free_covered = (plan == "free" and review_tier == "ai" and cost["free_minutes_applied"] > 0
+                    and cost["billable_minutes"] <= 0 and cost["total_usd"] <= 0 and not studio)
+    # The first thing a new account uploads, if it is short, is transcribed by Transkriptor whatever the plan: that is the
+    # impression of our quality that wins the sign-up. Their later free minutes go to the low-cost providers, automatically.
+    # (The order is not created yet, so an empty list means this is their first.)
+    first_impression = (free_covered and minutes <= billing.FIRST_ORDER_QUALITY_MINUTES
+                        and not db.list_orders_for_client(user["client_scope_id"]))
+    asr = _route_asr(asr, source_lang=source_lang, free_covered=free_covered and not first_impression)
+
     db.create_order(
         order_id=order_id,
         client_id=user["client_scope_id"], original_filename=original_filename,
@@ -5917,6 +5929,32 @@ def _caption_cues(job) -> list[dict]:
         return cue_dicts(job) if job and job.segments else []
     except (AttributeError, TypeError):
         return []
+
+
+# The widely spoken languages the low-cost providers handle well. Anything else (Swahili and the smaller languages Kauli is known
+# for) stays on Transkriptor even for free minutes: the quality there is the product.
+CHEAP_ASR_LANGUAGES = {"en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "tr", "zh", "ja", "ko", "hi", "ar", "sv", "da", "no",
+                       "fi", "cs", "el", "hu", "ro", "uk", "id", "vi"}
+
+
+def _route_asr(default_asr: str, *, source_lang: str, free_covered: bool) -> str:
+    """Which transcription provider (or chain of them) an order uses.
+
+    Transkriptor stays the go-to for everyone who pays. The low-cost providers (Groq, AssemblyAI) take the orders that the
+    free allowance covers in full, in the widely spoken languages, which keeps the free offer at a few cents a user; and they
+    stand behind Transkriptor as the next stop if it fails or runs out, before local Whisper. KAULI_CHEAP_ASR=off turns
+    all of it off. With no low-cost key configured nothing changes."""
+    cheap = cheap_providers_configured()
+    if os.environ.get("KAULI_CHEAP_ASR", "").lower() == "off" or not cheap or default_asr not in ("transkriptor", "faster-whisper"):
+        return default_asr
+    has_transkriptor = default_asr == "transkriptor"
+    if free_covered and source_lang in CHEAP_ASR_LANGUAGES:
+        chain = cheap + (["transkriptor"] if has_transkriptor else [])
+    elif has_transkriptor:
+        chain = ["transkriptor"] + cheap
+    else:
+        chain = cheap
+    return "chain:" + ",".join(chain + ["faster-whisper"])
 
 
 def _processing_state(order, lang: str = "en") -> dict:

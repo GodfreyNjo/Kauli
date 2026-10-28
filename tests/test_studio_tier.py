@@ -272,7 +272,7 @@ def test_services_show_transcription_starting_from_zero_without_hiding_the_real_
     assert "m-eyebrow-lined" in section and "Everything your video or audio needs to travel" in section
     assert "and selected languages can add human review." in section and 'href="/human-review"' in section
     prices = [p.strip() for p in __import__("re").findall(r'<span class="svc-price">(.*?)</span>', section, __import__("re").S)]
-    assert prices[0].startswith("From $0") and "first 5 minutes free" in prices[0] and "/min" in prices[0]   # honest: free minutes, then a rate
+    assert prices[0].startswith("From $0") and "first 60 minutes free" in prices[0] and "/min" in prices[0]   # honest: free minutes, then a rate
     assert prices[1].startswith("From $") and prices[1].startswith("From $0 ") is False                      # translation and dubbing still show their rates
     assert prices[2].startswith("From $") and "per audio-minute" in prices[2]
 

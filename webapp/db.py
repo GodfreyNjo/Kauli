@@ -1608,6 +1608,17 @@ def set_billing_market(user_id: str, market: str) -> None:
     conn.close()
 
 
+def replace_blog_text(old: str, new: str) -> int:
+    """Swaps a phrase in every blog post (used to keep "your first N minutes are free" true when the allowance changes).
+    Returns how many posts changed; nothing happens when the phrase is not there."""
+    conn = get_conn()
+    cur = conn.execute("UPDATE blog_posts SET body_html = REPLACE(body_html, ?, ?) WHERE body_html LIKE ?", (old, new, f"%{old}%"))
+    conn.commit()
+    changed = cur.rowcount
+    conn.close()
+    return changed
+
+
 def set_ui_lang(user_id: str, code: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE users SET ui_lang = ? WHERE id = ?", (code, user_id))

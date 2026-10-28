@@ -821,6 +821,16 @@ Today we're looking at subtitles.</code></pre>
 ]
 
 
+def _current_allowance() -> None:
+    """The posts were written when the free allowance was 5 minutes; say what it is now."""
+    from .billing import FREE_MINUTES_PER_MONTH
+    for post in POSTS:
+        post["body_html"] = post["body_html"].replace("first 5 minutes", f"first {FREE_MINUTES_PER_MONTH:.0f} minutes")
+
+
+_current_allowance()
+
+
 def seed_blog_posts(author_id: str, publish: bool = False) -> list[tuple[str, str]]:
     """Insert every post whose slug doesn't exist yet. Returns [(slug, outcome)]."""
     from . import db
