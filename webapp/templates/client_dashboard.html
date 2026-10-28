@@ -50,6 +50,8 @@
        data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
        data-premium-voice-rate="{{ addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0 }}"
        data-audio-cleanup-rate="{{ addons['audio_cleanup']['rate_per_min'] if 'audio_cleanup' in addons else 0 }}"
+       data-premium-langs="{{ premium_voice_languages()|join(',') }}"
+       data-premium-asr-rate="{{ addons['premium_asr']['rate_per_min'] if 'premium_asr' in addons else 0 }}"
        data-rush-pct="{{ rush_surcharge_pct }}"></div>
 
   <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
@@ -120,15 +122,23 @@
         <label>From
           <select name="source_lang" id="source-lang-select"
                   data-manual-langs="{{ manual_transcription_languages|join(',') }}"
-                  data-ai-only-langs="{{ ai_only_languages.keys()|join(',') }}"
+                  data-ai-only-langs="{{ ai_only_languages.keys()|reject('in', extra_review_languages())|join(',') }}"
+                  data-extra-review-langs="{{ extra_review_languages()|join(',') }}"
                   data-lara="{{ 1 if lara_available else 0 }}">
             <optgroup label="Full service - translation, dubbing, human review">
               {% for code, label in source_languages.items() %}
               <option value="{{ code }}" {% if code == form_values.get('source_lang', 'sw') %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </optgroup>
+            {% if extra_review_languages() %}
+            <optgroup label="Human review by language specialists">
+              {% for code in extra_review_languages() %}
+              <option value="{{ code }}" {% if code == form_values.get('source_lang') %}selected{% endif %}>{{ ai_only_languages[code] }}</option>
+              {% endfor %}
+            </optgroup>
+            {% endif %}
             <optgroup label="Instant AI transcription only">
-              {% for code, label in ai_only_languages.items()|sort(attribute='1') %}
+              {% for code, label in ai_only_languages.items()|sort(attribute='1') if code not in extra_review_languages() %}
               <option value="{{ code }}" {% if code == form_values.get('source_lang') %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </optgroup>
@@ -160,6 +170,7 @@
       <div class="wizard-grid">
         <div>
           {% set chosen_tier = form_values.get('review_tier') or default_review_tier %}
+          {% set rate_tier = 'human' if chosen_tier == 'studio' else chosen_tier %}
           <fieldset class="tiers" id="review-tier-fieldset">
             <legend>How should we deliver it?</legend>
             {% for tkey, tier in review_tiers.items() %}
@@ -171,6 +182,19 @@
               </div>
             </label>
             {% endfor %}
+            {% if studio_available %}
+            <label class="tier-option tier-option-studio">
+              <input type="radio" name="review_tier" value="studio" {% if chosen_tier == 'studio' %}checked{% endif %}>
+              <div>
+                <strong>Studio <span class="tier-badge">Top tier</span></strong>
+                <p>Human-reviewed, with the best of our audio partner ElevenLabs: cleaned-up audio, premium speech
+                recognition with speaker labels, and a premium voice on dubs. English and Swahili. Adds
+                ${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min']) }}/audio-minute
+                to Human-reviewed (${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min'] + addons['premium_voice']['rate_per_min']) }}
+                for dubbing).</p>
+              </div>
+            </label>
+            {% endif %}
             <p class="muted" id="review-tier-forced-note" hidden style="font-size:0.82rem; margin:6px 0 0;">
               This language is transcribed by one of our team by hand, so it is always human-reviewed.</p>
           </fieldset>
@@ -179,13 +203,13 @@
             <legend>What do you need?</legend>
             {% for key, level in service_levels.items() %}
             <label class="tier-option">
-              <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ price_card[key][chosen_tier] }}"
+              <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ price_card[key][rate_tier] }}"
                      data-rate-ai="{{ price_card[key]['ai'] }}" data-rate-human="{{ price_card[key]['human'] }}"
                      data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'transcribe') %}checked{% endif %}>
               <div>
                 <strong>{{ level['name'] }}</strong>
                 <p><span class="tier-price" data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}"
-                         data-human="{{ '%.2f'|format(price_card[key]['human']) }}">${{ "%.2f"|format(price_card[key][chosen_tier]) }}</span>/audio-minute.</p>
+                         data-human="{{ '%.2f'|format(price_card[key]['human']) }}">${{ "%.2f"|format(price_card[key][rate_tier]) }}</span>/audio-minute.</p>
               </div>
             </label>
             {% endfor %}
@@ -222,7 +246,7 @@
 
           {% if premium_voice_available %}
           <div class="tier-option premium-voice-box" id="premium-voice-field" hidden style="margin-bottom:14px;">
-            <label class="checkbox" style="align-items:center; margin-bottom:6px;">
+            <label class="checkbox" id="premium-voice-toggle" style="align-items:center; margin-bottom:6px;">
               <input type="checkbox" name="addon_premium_voice" value="1" id="premium-voice-checkbox"
                      {% if form_values.get('addon_premium_voice') %}checked{% endif %}>
               <span><strong>Premium AI voice</strong> (+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/audio-minute).
@@ -266,6 +290,7 @@
           <div class="pricing-row" id="price-human-voice-row" hidden><span>Human voice actor</span><span id="price-human-voice">—</span></div>
           <div class="pricing-row" id="price-premium-voice-row" hidden><span>Premium AI voice</span><span id="price-premium-voice">—</span></div>
           <div class="pricing-row" id="price-audio-cleanup-row" hidden><span>Audio clean-up</span><span id="price-audio-cleanup">—</span></div>
+          <div class="pricing-row" id="price-studio-row" hidden><span>Studio recognition + speaker labels</span><span id="price-studio">—</span></div>
           <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
           <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
           <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>

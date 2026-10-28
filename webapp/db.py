@@ -928,6 +928,8 @@ def init_db() -> None:
         # during testing before this shipped).
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_flagged INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_detail TEXT")
+    if "premium_asr_refunded_at" not in existing_order_cols:
+        conn.execute("ALTER TABLE orders ADD COLUMN premium_asr_refunded_at REAL")
     if "audio_cleanup_refunded_at" not in existing_order_cols:
         conn.execute("ALTER TABLE orders ADD COLUMN audio_cleanup_refunded_at REAL")
     if "premium_voice_refunded_at" not in existing_order_cols:
@@ -2696,7 +2698,8 @@ def approve_difficulty_surcharge(order_id: str) -> None:
 
 def mark_addon_refunded(order_id: str, addon_key: str) -> bool:
     """True only for the call that sets it, so a retried job cannot refund the same add-on twice."""
-    column = {"premium_voice": "premium_voice_refunded_at", "audio_cleanup": "audio_cleanup_refunded_at"}[addon_key]
+    column = {"premium_voice": "premium_voice_refunded_at", "audio_cleanup": "audio_cleanup_refunded_at",
+              "premium_asr": "premium_asr_refunded_at"}[addon_key]
     conn = get_conn()
     cur = conn.execute(f"UPDATE orders SET {column} = ? WHERE id = ? AND {column} IS NULL", (time.time(), order_id))
     conn.commit()

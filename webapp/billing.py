@@ -238,6 +238,23 @@ ADDONS = {
         "rate_per_min": 0.30,
         "included_in": (),
     },
+    # Studio's recognition: ElevenLabs Scribe v2 (excellent English, high-accuracy Swahili) with speaker labels
+    # and word timings, instead of our standard recogniser. Scribe costs about $0.0037 a minute, so this is priced
+    # for its value rather than its cost; the margin guard below still applies.
+    # Human review by an outside language specialist for Chinese, German and Spanish (beyond Swahili, Kikuyu and
+    # English, whose reviewers the human-reviewed rate already covers). A STARTING PROPOSAL: it is only offered
+    # when base human rate + this add-on clears the cost floor below, so it cannot be sold under your contractor
+    # cost. Set KAULI_EXTRA_REVIEW_COST_PER_MIN to the real contractor cost per audio-minute.
+    "review_extra": {
+        "name": "Review by a language specialist (Chinese, German, Spanish)",
+        "rate_per_min": 1.20,
+        "included_in": (),
+    },
+    "premium_asr": {
+        "name": "Studio recognition + speaker labels (ElevenLabs Scribe)",
+        "rate_per_min": 0.10,
+        "included_in": (),
+    },
 }
 
 # ---- Premium voice unit economics --------------------------------------------------------
@@ -301,6 +318,41 @@ def audio_cleanup_margin_ok() -> bool:
 
 def audio_cleanup_credits_needed(minutes: float) -> int:
     return int(minutes * AUDIO_CLEANUP_CREDITS_PER_MIN) + 1
+
+
+EXTRA_REVIEW_COST_USD_PER_MIN = 1.50     # assumed contractor cost per audio-minute until you set the real quote
+MIN_EXTRA_REVIEW_MARGIN = 0.30
+
+
+def extra_review_cost_usd() -> float:
+    try:
+        return float(os.environ.get("KAULI_EXTRA_REVIEW_COST_PER_MIN") or EXTRA_REVIEW_COST_USD_PER_MIN)
+    except ValueError:
+        return EXTRA_REVIEW_COST_USD_PER_MIN
+
+
+def extra_review_min_total_rate() -> float:
+    """The lowest total per-minute price (base human rate + the add-on) that still keeps MIN_EXTRA_REVIEW_MARGIN
+    after the contractor's cost and the card fee."""
+    return extra_review_cost_usd() / (1.0 - PAYMENT_FEE_RATE - MIN_EXTRA_REVIEW_MARGIN)
+
+
+def review_extra_margin_ok(base_human_rate: float) -> bool:
+    return base_human_rate + ADDONS["review_extra"]["rate_per_min"] >= extra_review_min_total_rate()
+
+
+def premium_asr_margin_ok() -> bool:
+    cost = SPEAKER_LABELS_USD_PER_MIN
+    return ADDONS["premium_asr"]["rate_per_min"] >= cost / (1.0 - PAYMENT_FEE_RATE - MIN_PREMIUM_MARGIN)
+
+
+def studio_extras_per_min(service_level: str) -> float:
+    """What the Studio tier adds per audio-minute on top of the Human-reviewed rate: clean-up + Studio
+    recognition, plus the premium voice on a dub. Each part is its own add-on line on the receipt."""
+    total = ADDONS["audio_cleanup"]["rate_per_min"] + ADDONS["premium_asr"]["rate_per_min"]
+    if service_level == "dub":
+        total += ADDONS["premium_voice"]["rate_per_min"]
+    return round(total, 2)
 
 
 # Rush processing: a client-chosen surcharge on a single order in exchange

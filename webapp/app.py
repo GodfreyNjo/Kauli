@@ -908,7 +908,7 @@ def workflow_steps_for_order(order) -> list[dict]:
     # en->sw), where staff would see "Swahili source" on a step that's
     # actually the ENGLISH source transcript.
     source_name = LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"])
-    target_name = SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"])
+    target_name = LANGUAGE_NAMES.get(order["target_lang"], order["target_lang"])
     steps = []
     if level["asr"]:
         steps.append({"key": "source", "label": f"{source_name} source", "manual": True,
@@ -2356,6 +2356,13 @@ _MARQUEE_LANGUAGES = [
 ]
 
 
+def _human_review_language_list() -> str:
+    """"Swahili, Kikuyu and English", plus Chinese, German and Spanish once those are switched on."""
+    short = {"zh": "Chinese", "de": "German", "es": "Spanish"}
+    names = ["Swahili", "Kikuyu", "English"] + [short[c] for c in _EXTRA_REVIEW_CANDIDATES if c in _review_extra_languages()]
+    return ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def _language_marquee() -> list[dict]:
     """The languages shown flowing across the home page: only codes we really support, each linked to the
     page that exists for it."""
@@ -2386,6 +2393,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
         "email": CONTACT_EMAIL,
         "language_marquee": _language_marquee(),
+        "human_review_languages": _human_review_language_list(),
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
@@ -3068,6 +3076,37 @@ def _elevenlabs_configured() -> bool:
     """Premium voice is offered only while there is a key AND the add-on price still clears the
     margin floor at the current ElevenLabs cost - it is never sold at a loss."""
     return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.premium_voice_margin_ok()
+
+
+_EXTRA_REVIEW_CANDIDATES = ("zh", "de", "es")
+
+
+def _review_extra_languages() -> set[str]:
+    """Chinese, German and Spanish, human-reviewed by outside contractors. OFF until KAULI_REVIEW_EXTRA_LANGUAGES
+    lists them (e.g. "zh,de,es"): turning it on is the owner's call once the contractors are lined up and the
+    real cost per audio-minute is set (KAULI_EXTRA_REVIEW_COST_PER_MIN)."""
+    raw = os.environ.get("KAULI_REVIEW_EXTRA_LANGUAGES", "")
+    return {c.strip() for c in raw.split(",") if c.strip() in _EXTRA_REVIEW_CANDIDATES and c.strip() in LANGUAGE_NAMES}
+
+
+def _studio_languages() -> set[str]:
+    """Where Studio (human review + ElevenLabs) and the premium voice work: the human-reviewed languages
+    ElevenLabs also speaks. Kikuyu is out - no ElevenLabs model supports it."""
+    return {"en", "sw"} | _review_extra_languages()
+
+
+def _extra_review_ok(market: str | None, service_level: str) -> bool:
+    return billing.review_extra_margin_ok(billing.rate_for(service_level, market, "human"))
+
+
+templates.env.globals["extra_review_languages"] = lambda: sorted(_review_extra_languages())
+templates.env.globals["premium_voice_languages"] = lambda: sorted(_studio_languages())
+templates.env.globals["language_names"] = LANGUAGE_NAMES
+
+
+def _studio_available() -> bool:
+    """The Studio tier is offered only while every ElevenLabs part of it is on, and priced above its margin floor."""
+    return _elevenlabs_configured() and _audio_cleanup_available() and billing.premium_asr_margin_ok()
 
 
 def _audio_cleanup_available() -> bool:
@@ -5162,6 +5201,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "show_tour": not user["onboarding_tour_seen_at"],
         "premium_voice_available": _elevenlabs_configured(),
         "audio_cleanup_available": _audio_cleanup_available(),
+        "studio_available": _studio_available(),
     })
 
 
@@ -5219,6 +5259,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "show_tour": not user["onboarding_tour_seen_at"],
         "premium_voice_available": _elevenlabs_configured(),
         "audio_cleanup_available": _audio_cleanup_available(),
+        "studio_available": _studio_available(),
     })
 
 
@@ -5513,6 +5554,20 @@ def create_order(
     # value means the old behaviour (human), so any older client of this
     # endpoint keeps working exactly as before.
     billing_market = db.get_billing_market(user["client_scope_id"])
+    # Studio = a human-reviewed order that also gets ElevenLabs' best: audio clean-up, Scribe recognition with
+    # speaker labels and, on a dub, a premium voice. It is expressed as the existing add-ons, so every part is
+    # priced, refunded and guarded exactly like the same add-on bought on its own. English and Swahili only:
+    # those are the languages with both human reviewers and ElevenLabs support (nothing speaks Kikuyu).
+    studio = review_tier == "studio"
+    if studio:
+        review_tier = "human"
+        if not _studio_available():
+            return _client_dashboard_error(request, user, "The Studio tier isn't available right now.", form_values=form_values)
+        if source_lang not in _studio_languages() or target_lang not in _studio_languages():
+            return _client_dashboard_error(request, user, "Studio isn't available for that language pair.", form_values=form_values)
+        addon_audio_cleanup = "1"
+        if service_level == "dub":
+            addon_premium_voice = "1"
     if review_tier not in billing.REVIEW_TIERS:
         review_tier = "human"
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
@@ -5524,7 +5579,9 @@ def create_order(
     # stay with Swahili, Kikuyu and English (there is no reviewer or voice for
     # the rest).
     ai_translation_ok = _lara_configured()
-    if source_lang in AI_ONLY_LANGUAGES:
+    extras_on = _review_extra_languages()
+    # Chinese, German and Spanish may also be human-reviewed (outside contractors) when switched on.
+    if source_lang in AI_ONLY_LANGUAGES and not (source_lang in extras_on and review_tier == "human"):
         allowed_services = ("transcribe", "translate") if ai_translation_ok else ("transcribe",)
         if service_level not in allowed_services or review_tier != "ai":
             what = "transcription and translation" if ai_translation_ok else "transcription"
@@ -5536,9 +5593,11 @@ def create_order(
                 ", or pick Swahili, English or Kikuyu for dubbing and human review.", form_values=form_values)
     if target_lang not in ("en", "sw"):
         # A wider-language TARGET is Instant AI translation only (never a dub,
-        # never human-reviewed), and never Kikuyu without a human in the loop.
-        if not (target_lang in AI_ONLY_LANGUAGES and service_level == "translate"
-                and review_tier == "ai" and ai_translation_ok):
+        # never human-reviewed), and never Kikuyu without a human in the loop -
+        # except the human-reviewed extras (Chinese, German, Spanish) when switched on.
+        extra_target_ok = (target_lang in extras_on and review_tier == "human" and service_level in ("translate", "dub"))
+        if not extra_target_ok and not (target_lang in AI_ONLY_LANGUAGES and service_level == "translate"
+                                        and review_tier == "ai" and ai_translation_ok):
             return _client_dashboard_error(
                 request, user,
                 f"Translating into {LANGUAGE_NAMES[target_lang]} is only available as Instant AI "
@@ -5560,7 +5619,7 @@ def create_order(
     # speaks Kikuyu - using one of its premade voices. Enforced here, not just in the wizard.
     wants_premium_voice = bool(addon_premium_voice)
     if wants_premium_voice:
-        if service_level != "dub" or target_lang not in ("en", "sw"):
+        if service_level != "dub" or target_lang not in _studio_languages():
             return _client_dashboard_error(
                 request, user, "Premium voice is available on a full dub into English or Swahili.", form_values=form_values)
         if not _elevenlabs_configured():
@@ -5573,6 +5632,20 @@ def create_order(
         if not _audio_cleanup_available():
             return _client_dashboard_error(request, user, "Audio clean-up isn't available right now.", form_values=form_values)
         addons.append("audio_cleanup")
+    if studio:
+        addons.append("premium_asr")
+    # Human review by an outside specialist for Chinese/German/Spanish, only where it still clears the cost floor
+    # for this account's pricing region; a dub into one of them also needs a premium voice (no standard voice speaks it).
+    if review_tier == "human" and (source_lang in extras_on or target_lang in extras_on):
+        if not _extra_review_ok(billing_market, service_level):
+            return _client_dashboard_error(
+                request, user, "Human review for that language isn't available in your pricing region yet. "
+                               "Instant AI is, or contact us.", form_values=form_values)
+        if service_level == "dub" and target_lang in extras_on and not wants_premium_voice:
+            return _client_dashboard_error(
+                request, user, f"Dubbing into {LANGUAGE_NAMES[target_lang]} needs a premium voice: choose Studio, "
+                               "or add Premium AI voice.", form_values=form_values)
+        addons.append("review_extra")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Not a checkbox the client toggles - this is a real cost every
         # service level incurs for this language (every SERVICE_LEVELS tier
@@ -5702,6 +5775,8 @@ def create_order(
         # no attempt at all if no key is configured yet.
         asr = ("transkriptor" if os.environ.get("TRANSKRIPTOR_API_KEY") or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
                else "faster-whisper")
+    if studio and level["asr"]:
+        asr = "elevenlabs-scribe"                   # fell back to faster-whisper in the pipeline if ElevenLabs fails
     if not level["mt"]:
         mt = "stub"
     else:
@@ -9465,14 +9540,14 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
         "user": user, "order": order, "job": job,
         "has_translation": order_level["mt"], "has_dub": order_level["tts"],
         "source_lang_name": LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"]),
-        "target_lang_name": SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]),
+        "target_lang_name": LANGUAGE_NAMES.get(order["target_lang"], order["target_lang"]),
         # The alt+p pluralize shortcut (editor.js:pluralizeWord) is a real
         # English grammar-rules algorithm - it only ever produces a
         # correct result on English text, whichever STEP that happens to
         # be for this order (source for an en->sw job, target for sw->en).
         # This is the other language, whichever side it's actually on.
         "non_english_lang_name": (
-            SOURCE_LANGUAGES.get(order["target_lang"], order["target_lang"]) if order["source_lang"] == "en"
+            LANGUAGE_NAMES.get(order["target_lang"], order["target_lang"]) if order["source_lang"] == "en"
             else LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"])
         ),
         "is_video": is_video_file(order["audio_path"]),

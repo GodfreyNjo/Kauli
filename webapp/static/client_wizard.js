@@ -292,6 +292,7 @@
     const humanVoiceRate = Number(data.dataset.humanVoiceRate) || 0;
     const premiumVoiceRate = Number(data.dataset.premiumVoiceRate) || 0;
     const audioCleanupRate = Number(data.dataset.audioCleanupRate) || 0;
+    const premiumAsrRate = Number(data.dataset.premiumAsrRate) || 0;
     const rushPct = Number(data.dataset.rushPct) || 0;
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
@@ -303,6 +304,8 @@
     const tierLangSelect = $("#source-lang-select");
     const tierManualLangs = tierLangSelect ? (tierLangSelect.dataset.manualLangs || "").split(",").filter(Boolean) : [];
     const aiOnlyLangs = tierLangSelect ? (tierLangSelect.dataset.aiOnlyLangs || "").split(",").filter(Boolean) : [];
+    // Chinese, German and Spanish when switched on: not Instant-AI-only, they can also be human-reviewed.
+    const extraLangs = tierLangSelect ? (tierLangSelect.dataset.extraReviewLangs || "").split(",").filter(Boolean) : [];
     const tierForced = !!(tierLangSelect && tierManualLangs.includes(tierLangSelect.value));
     // The ~70 extra languages: machine transcription only - no reviewer,
     // translator or voice exists for them, so lock to Instant AI +
@@ -342,12 +345,17 @@
     const tierRadio = $('input[name="review_tier"]:checked');
     const tier = tierRadio ? tierRadio.value : "human";
     const isAiTier = tier === "ai";
+    // Studio is a human-reviewed order that bundles clean-up, Scribe recognition and (on a dub) a premium voice:
+    // the extra boxes are ticked for the customer while it is chosen and put back when it is not.
+    const isStudio = tier === "studio";
     // Instant AI translation can target any of the wider languages (Lara).
     const aiTranslating = laraOn && isAiTier && !!selected && selected.value === "translate";
-    $all("#target-lang-field option.ai-target").forEach((o) => { o.disabled = !aiTranslating; });
+    const humanTranslating = !isAiTier && !!selected && selected.value !== "transcribe";
+    $all("#target-lang-field option.ai-target").forEach((o) => {
+      o.disabled = !(aiTranslating || (humanTranslating && extraLangs.includes(o.value)));
+    });
     const targetSelect = $("#target-lang-field select");
-    if (targetSelect && !aiTranslating && targetSelect.selectedOptions[0]
-        && targetSelect.selectedOptions[0].classList.contains("ai-target")) targetSelect.value = "en";
+    if (targetSelect && targetSelect.selectedOptions[0] && targetSelect.selectedOptions[0].disabled) targetSelect.value = "en";
     if (targetField) targetField.hidden = aiOnlyLang && !aiTranslating;
     // Per-service rate for the chosen tier, from the account's own price card.
     $all('input[name="service_level"]').forEach((r) => {
@@ -364,7 +372,7 @@
 
     const rate = selected ? Number(selected.dataset.rate) : 0;
     const serviceName = selected ? selected.dataset.name : "-";
-    $("#price-service").textContent = serviceName + (isAiTier ? " - Instant AI" : " - Human-reviewed");
+    $("#price-service").textContent = serviceName + (isAiTier ? " - Instant AI" : (isStudio ? " - Studio" : " - Human-reviewed"));
     // Mirrors billing.FREE_MINUTES_SERVICE_LEVEL server-side - free minutes
     // only ever apply to an INSTANT AI transcription-only order, so the
     // estimate here has to match what create_order() will actually charge.
@@ -387,9 +395,16 @@
     // Premium AI voice (ElevenLabs): a dub into English or Swahili only - no model speaks Kikuyu.
     const premiumField = $("#premium-voice-field");
     const targetSel = document.querySelector('select[name="target_lang"]');
-    const premiumOk = !!(selected && selected.value === "dub") && !!targetSel && (targetSel.value === "en" || targetSel.value === "sw");
+    const premiumLangs = (data.dataset.premiumLangs || "en,sw").split(",").filter(Boolean);
+    const premiumOk = !!(selected && selected.value === "dub") && !!targetSel && premiumLangs.includes(targetSel.value);
     if (premiumField) premiumField.hidden = !premiumOk;
     const premiumBox = $("#premium-voice-checkbox");
+    if (premiumBox) {
+      if (isStudio && premiumOk) { premiumBox.checked = true; premiumBox.dataset.forced = "1"; }
+      else if (premiumBox.dataset.forced) { premiumBox.checked = false; delete premiumBox.dataset.forced; }
+    }
+    const premiumToggle = $("#premium-voice-toggle");
+    if (premiumToggle) premiumToggle.hidden = isStudio;
     const premiumVoiceChecked = premiumOk && premiumBox && premiumBox.checked;
     const premiumPicker = $("#premium-voice-picker");
     if (premiumPicker) premiumPicker.hidden = !premiumVoiceChecked;
@@ -398,6 +413,13 @@
 
     // Audio clean-up applies to every service level.
     const cleanupBox = $("#audio-cleanup-checkbox");
+    if (cleanupBox) {
+      if (isStudio) { cleanupBox.checked = true; cleanupBox.dataset.forced = "1"; }
+      else if (cleanupBox.dataset.forced) { cleanupBox.checked = false; delete cleanupBox.dataset.forced; }
+    }
+    const cleanupField = $("#audio-cleanup-field");
+    if (cleanupField) cleanupField.hidden = isStudio;
+    $("#price-studio-row").hidden = !isStudio;
     const cleanupChecked = !!(cleanupBox && cleanupBox.checked);
     $("#price-audio-cleanup-row").hidden = !cleanupChecked;
 
@@ -436,7 +458,7 @@
       $("#price-free").textContent = "-";
       let perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0)
         + (humanVoiceChecked ? humanVoiceRate : 0) + (premiumVoiceChecked ? premiumVoiceRate : 0)
-        + (cleanupChecked ? audioCleanupRate : 0);
+        + (cleanupChecked ? audioCleanupRate : 0) + (isStudio ? premiumAsrRate : 0);
       if (rushChecked) perMinExtras += rate * rushPct;
       $("#price-total").textContent = formatMoney(rate + perMinExtras) + "/min";
       if (addonChecked) $("#price-addon").textContent = formatMoney(addonRate) + "/min";
@@ -444,6 +466,7 @@
       if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceRate) + "/min";
       if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceRate) + "/min";
       if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(audioCleanupRate) + "/min";
+      if (isStudio) $("#price-studio").textContent = formatMoney(premiumAsrRate) + "/min";
       if (rushChecked) $("#price-rush").textContent = formatMoney(rate * rushPct) + "/min";
       return;
     }
@@ -467,8 +490,9 @@
     const humanVoiceCost = humanVoiceChecked ? humanVoiceRate * fileDurationMinutes : 0;
     const premiumVoiceCost = premiumVoiceChecked ? premiumVoiceRate * fileDurationMinutes : 0;
     const cleanupCost = cleanupChecked ? audioCleanupRate * fileDurationMinutes : 0;
+    const studioAsrCost = isStudio ? premiumAsrRate * fileDurationMinutes : 0;
     const rushSurcharge = rushChecked ? (fileDurationMinutes * rate) * rushPct : 0;
-    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + rushSurcharge;
+    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + studioAsrCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
       : (freeMinutesEligible ? "none applied" : "not eligible (transcription-only)");
@@ -481,6 +505,7 @@
     if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceCost);
     if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceCost);
     if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(cleanupCost);
+    if (isStudio) $("#price-studio").textContent = formatMoney(studioAsrCost);
     if (rushChecked) $("#price-rush").textContent = formatMoney(rushSurcharge);
     $("#price-total").textContent = formatMoney(Math.max(0, total));
   }

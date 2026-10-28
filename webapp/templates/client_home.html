@@ -69,7 +69,7 @@
           <td>
             <a href="/client/orders/{{ o['id'] }}">{{ o['original_filename'] }}</a><br>
             <span class="muted" style="font-size:0.78rem;">{{ o['created_at']|timestamp_to_str }}
-              &middot; {{ source_languages.get(o['source_lang'], o['source_lang']) }} &rarr; {{ 'English' if o['target_lang'] == 'en' else 'Swahili' }}</span>
+              &middot; {{ source_languages.get(o['source_lang'], o['source_lang']) }} &rarr; {{ language_names.get(o['target_lang'], o['target_lang']) }}</span>
           </td>
           <td>{{ o['service_level']|replace('_', ' ')|capitalize }}</td>
           <td>{{ "%.1f"|format(o['duration_minutes'] or 0) }} min</td>

@@ -118,11 +118,12 @@ def _refund_undelivered_elevenlabs_addons(order, job) -> None:
     credit - they never pay for what they did not get."""
     providers = getattr(job, "providers", None) or {}
     delivered = {"premium_voice": providers.get("tts", "elevenlabs") == "elevenlabs",
-                 "audio_cleanup": providers.get("audio_cleanup") == "elevenlabs"}
+                 "audio_cleanup": providers.get("audio_cleanup") == "elevenlabs",
+                 "premium_asr": providers.get("asr") == "elevenlabs-scribe"}
     for key, ok in delivered.items():
         if ok or not db.order_has_addon(order, key):
             continue
-        column = "premium_voice_refunded_at" if key == "premium_voice" else "audio_cleanup_refunded_at"
+        column = f"{key}_refunded_at"
         if order[column]:
             continue
         try:
@@ -158,6 +159,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
             clean_audio=db.order_has_addon(order, "audio_cleanup"),
             # "Identify speakers" at no extra charge: Scribe's speaker timing is about $0.004 a minute
             label_speakers=bool(order["instr_speaker_ids"]) and bool(os.environ.get("ELEVENLABS_API_KEY"))
+                           and order["asr"] != "elevenlabs-scribe"      # Studio's recogniser labels speakers itself
                            and os.environ.get("KAULI_SPEAKER_LABELS", "1") != "0",
             verbose=False,
             # Real cost bug this fixes: a retry used to always re-run ASR/MT

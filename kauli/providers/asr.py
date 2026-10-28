@@ -469,7 +469,35 @@ _REGISTRY = {
     "manual": ManualASR,
     "aws-transcribe": AwsTranscribeASR,
     "transkriptor": TranskriptorASR,
+    "elevenlabs-scribe": None,
 }
+
+
+class ElevenLabsScribeASR(ASRProvider):
+    """Studio-tier speech recognition: ElevenLabs Scribe v2 (English: excellent accuracy, Swahili: high accuracy)
+    with speaker diarization and word timestamps. If anything goes wrong it falls back to local faster-whisper
+    and says so, so an order is never lost - and the web app credits back the Studio recognition charge."""
+    name = "elevenlabs-scribe"
+    cost_per_minute_usd = 0.0037
+
+    def __init__(self):
+        self.fallback_used = False
+        self.fallback_reason: str | None = None
+
+    def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
+        from . import elevenlabs_audio
+        try:
+            segments = elevenlabs_audio.scribe_segments(audio_path, language)
+            if not segments:
+                raise RuntimeError("no speech was returned")
+            return segments
+        except Exception as exc:  # noqa: BLE001 - any failure means "fall back", not "fail the order"
+            self.fallback_used = True
+            self.fallback_reason = f"elevenlabs-scribe failed ({exc}) - used faster-whisper instead"
+            return FasterWhisperASR().transcribe(audio_path, language=language)
+
+
+_REGISTRY["elevenlabs-scribe"] = ElevenLabsScribeASR
 
 
 def get_asr(name: str, **kwargs) -> ASRProvider:

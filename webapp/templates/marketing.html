@@ -163,8 +163,8 @@
 
   <section class="tk-band">
     <div class="tk-band-inner">
-      <h2>Audio to text in minutes. Checked by a person when it matters.</h2>
-      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. For Swahili, Kikuyu and English, choose Human-reviewed and a real editor checks it before it is marked ready.</p>
+      <h2>Audio to text in minutes. Checked by an expert when it matters.</h2>
+      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. For {{ human_review_languages }}, choose Human-reviewed and a real expert checks it before it is marked ready.</p>
       <a href="/login?mode=signup" class="btn tk-band-btn" data-cta="band">Try It Now</a>
     </div>
   </section>
@@ -173,20 +173,20 @@
     <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length }}</b><span>transcription languages</span></div>
     <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length - 1 }}</b><span>translation languages</span></div>
     <div class="tk-stat"><b>3</b><span>human-reviewed languages</span></div>
-    <div class="tk-stat"><b>${{ '%.2f'|format(price_card['transcribe']['ai']) }}</b><span>per minute, from</span></div>
+    <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>from ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per minute</span></div>
   </section>
 
   <section class="m-section" id="services">
     <div class="m-inner">
-      <span class="m-section-eyebrow">Services</span>
+      <span class="m-section-eyebrow m-eyebrow-lined">Services</span>
       <h2 class="m-h2">Everything your video or audio needs to travel</h2>
-      <p class="m-lede">Pick one service or combine them. Each is available instantly with AI, and Swahili, Kikuyu and English can add human review.</p>
+      <p class="m-lede">Pick one service or combine them. Each is available instantly with AI, and {{ human_review_languages }} can add human review.</p>
       <div class="svc-grid">
         <article class="svc-card">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h6"/></svg></span>
           <h3>Transcription</h3>
           <p>Accurate, time-stamped transcripts for audio and video, as Word, text or SRT.</p>
-          <span class="svc-price">From ${{ '%.2f'|format(price_card['transcribe']['ai']) }} <small>per audio-minute</small></span>
+          <span class="svc-price">From $0 <small>first {{ free_minutes|int }} minutes free, then ${{ '%.2f'|format(price_card['transcribe']['ai']) }}/min</small></span>
           <a class="svc-link" href="/solutions/audio-to-text">Learn more →</a>
         </article>
         <article class="svc-card">
@@ -426,33 +426,54 @@
 
   <section class="m-section" id="integrations">
     <div class="m-inner">
-      <span class="m-section-eyebrow">Integrations</span>
+      <span class="m-section-eyebrow m-eyebrow-lined">Integrations</span>
       <h2 class="m-h2">Connect Kauli to the tools you already use</h2>
       <p class="m-lede">Send work in and pull results out with our API, MCP server and webhooks today.</p>
       {% set integrations = [
-        ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12",
-          [("API", "live", "/developers"), ("MCP server", "live", "/developers#mcp"),
-           ("Webhooks", "live", "/developers#webhooks"), ("Zapier, Make, n8n", "live", "/developers#webhooks")]),
-        ("Publishing", "M4 6h16v10H4zM9 20h6M12 16v4", [("YouTube captions", "live", None)]),
-        ("Video conferencing", "M3 7h11v10H3zM14 11l7-4v10l-7-4", [("Zoom", "soon", None), ("Teams meetings", "soon", None), ("Google Meet", "soon", None)]),
-        ("Storage", "M3 7l3-3h12l3 3v12H3zM3 7h18", [("Google Drive", "soon", None), ("Dropbox", "soon", None), ("OneDrive", "soon", None)]),
-        ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", [("Notion", "live", "/developers#notion"), ("Google Docs", "soon", None)]),
-        ("Collaboration", "M4 5h16v11H9l-5 4z", [("Slack", "live", "/developers#slack"), ("Microsoft Teams", "live", "/developers#teams"), ("Discord", "soon", None)]),
-        ("CRM", "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 3.5-6 8-6s8 2 8 6", [("HubSpot", "soon", None), ("Salesforce", "soon", None)]),
-        ("Project management", "M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z", [("Asana", "soon", None), ("Trello", "soon", None)]),
-        ("Calendar", "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", [("Google Calendar", "soon", None), ("Outlook Calendar", "soon", None)]),
+        ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12", "Integrate with your developer tools and automate your workflow.",
+          [("API", "live", "/developers", "api"), ("MCP server", "live", "/developers#mcp", "mcp"),
+           ("Webhooks", "live", "/developers#webhooks", "webhooks"), ("Zapier, Make, n8n", "live", "/developers#webhooks", "zapier+make+n8n")]),
+        ("Publishing", "M4 6h16v10H4zM9 20h6M12 16v4", "Publish and distribute your content automatically.", [("YouTube captions", "live", None, "youtube")]),
+        ("Video conferencing", "M3 7h11v10H3zM14 11l7-4v10l-7-4", "Work seamlessly with your meeting and collaboration tools.",
+          [("Zoom", "soon", None, "zoom"), ("Teams meetings", "soon", None, "microsoftteams"), ("Google Meet", "soon", None, "googlemeet")]),
+        ("Storage", "M3 7l3-3h12l3 3v12H3zM3 7h18", "Access and manage your files from anywhere.",
+          [("Google Drive", "soon", None, "googledrive"), ("Dropbox", "soon", None, "dropbox"), ("OneDrive", "soon", None, "microsoftonedrive")]),
+        ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", "Turn your notes and documents into structured content.",
+          [("Notion", "live", "/developers#notion", "notion"), ("Google Docs", "soon", None, "googledocs")]),
+        ("Collaboration", "M4 5h16v11H9l-5 4z", "Team up and get more done together.",
+          [("Slack", "live", "/developers#slack", "slack"), ("Microsoft Teams", "live", "/developers#teams", "microsoftteams"), ("Discord", "soon", None, "discord")]),
+        ("CRM", "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 3.5-6 8-6s8 2 8 6", "Keep your customer relationships in sync.",
+          [("HubSpot", "soon", None, "hubspot"), ("Salesforce", "soon", None, "salesforce")]),
+        ("Project management", "M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z", "Turn ideas into actionable plans.",
+          [("Asana", "soon", None, "asana"), ("Trello", "soon", None, "trello")]),
+        ("Calendar", "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", "Schedule and stay on track.",
+          [("Google Calendar", "soon", None, "googlecalendar"), ("Outlook Calendar", "soon", None, "microsoftoutlook")]),
       ] %}
+      {% set ns = namespace(live=0, soon=0) %}
+      {% for title, icon, desc, tools in integrations %}{% for t in tools %}{% if t[1] == 'live' %}{% set ns.live = ns.live + 1 %}{% else %}{% set ns.soon = ns.soon + 1 %}{% endif %}{% endfor %}{% endfor %}
+      <div class="int-toolbar">
+        <div class="int-filters" role="group" aria-label="Filter integrations">
+          <button type="button" class="int-filter is-on" data-filter="all" aria-pressed="true">All <span>{{ ns.live + ns.soon }}</span></button>
+          <button type="button" class="int-filter" data-filter="live" aria-pressed="false">Available now <span>{{ ns.live }}</span></button>
+          <button type="button" class="int-filter" data-filter="soon" aria-pressed="false">Coming soon <span>{{ ns.soon }}</span></button>
+        </div>
+        <p class="int-status" role="status" aria-live="polite"></p>
+      </div>
       <div class="int-grid">
-        {% for title, icon, tools in integrations %}
-        <article class="int-card">
-          <h3><span class="int-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>{{ title|safe }}</h3>
+        {% for title, icon, desc, tools in integrations %}
+        <article class="int-card" style="--i:{{ loop.index0 }}">
+          <div class="int-head">
+            <span class="int-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>
+            <div><h3>{{ title|safe }}</h3><p>{{ desc }}</p></div>
+          </div>
           <ul class="int-list">
-            {% for name, state, href in tools %}
-            <li>
+            {% for name, state, href, logo in tools %}
+            <li data-state="{{ state }}">
               {% if href %}<a href="{{ href }}" class="int-chip">{% else %}<span class="int-chip">{% endif %}
-                <span class="int-mono" aria-hidden="true">{{ name[0] }}</span>
+                <span class="int-logo{{ ' multi' if '+' in logo else '' }}" aria-hidden="true">{% for part in logo.split('+') %}<img src="/static/integrations/{{ part }}.svg" alt="" width="24" height="24" loading="lazy">{% endfor %}</span>
                 <span class="int-name">{{ name }}</span>
                 <span class="int-badge {{ state }}">{{ 'Available' if state == 'live' else 'Coming soon' }}</span>
+                <svg class="int-go" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2l4 4-4 4"/></svg>
               {% if href %}</a>{% else %}</span>{% endif %}
             </li>
             {% endfor %}
@@ -460,7 +481,53 @@
         </article>
         {% endfor %}
       </div>
-      <p class="int-note">Need a specific integration sooner? <a href="/demo">Tell us what you use</a> and it moves up the list.</p>
+      <p class="int-note"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Need a specific integration sooner? <a href="/demo">Tell us what you use</a> and it moves up the list.</p>
+      <p class="int-legal">Logos are trademarks of their respective owners, shown only to identify the tools Kauli works with. Their use does not imply endorsement.</p>
+      <script>
+        (function () {
+          var sec = document.getElementById("integrations");
+          if (!sec) return;
+          var cards = [].slice.call(sec.querySelectorAll(".int-card"));
+          var buttons = [].slice.call(sec.querySelectorAll(".int-filter"));
+          var status = sec.querySelector(".int-status");
+          // Filter: All / Available now / Coming soon. A card with nothing left to show hides itself.
+          function apply(filter) {
+            var shown = 0;
+            cards.forEach(function (card) {
+              var any = false;
+              [].forEach.call(card.querySelectorAll("li[data-state]"), function (li) {
+                var ok = filter === "all" || li.getAttribute("data-state") === filter;
+                li.hidden = !ok;
+                if (ok) { any = true; shown++; }
+              });
+              card.hidden = !any;
+            });
+            buttons.forEach(function (b) {
+              var on = b.getAttribute("data-filter") === filter;
+              b.classList.toggle("is-on", on);
+              b.setAttribute("aria-pressed", on ? "true" : "false");
+            });
+            status.textContent = filter === "all" ? "" :
+              "Showing " + shown + " " + (filter === "live" ? "available" : "coming soon") + " integration" + (shown === 1 ? "" : "s");
+          }
+          buttons.forEach(function (b) { b.addEventListener("click", function () { apply(b.getAttribute("data-filter")); }); });
+          // Staggered reveal as the cards scroll into view (skipped for people who prefer reduced motion).
+          if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            sec.classList.add("int-anim");
+            var io = new IntersectionObserver(function (entries) {
+              entries.forEach(function (e) {
+                if (!e.isIntersecting) return;
+                var card = e.target;
+                card.style.transitionDelay = (cards.indexOf(card) % 3) * 90 + "ms";
+                card.classList.add("is-in");
+                setTimeout(function () { card.style.transitionDelay = ""; }, 1100);
+                io.unobserve(card);
+              });
+            }, { threshold: 0.12 });
+            cards.forEach(function (c) { io.observe(c); });
+          }
+        })();
+      </script>
     </div>
   </section>
 

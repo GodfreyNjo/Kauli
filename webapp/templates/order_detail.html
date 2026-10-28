@@ -301,7 +301,7 @@
       </div>
       <div id="order-transcript-scroll">
         <table id="order-transcript-table">
-          <thead><tr><th style="width:60px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
+          <thead><tr><th style="width:60px;">Time</th><th>Source</th><th>{{ language_names.get(order['target_lang'], order['target_lang']) }}</th></tr></thead>
           <tbody>
             {% for seg in job.segments %}
             {% if seg.segment_type == 'speech' %}
@@ -456,7 +456,7 @@
      editor. See something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
   <div style="max-height:420px; overflow-y:auto; margin-top:10px;">
     <table>
-      <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ 'English' if order['target_lang'] == 'en' else 'Swahili' }}</th></tr></thead>
+      <thead><tr><th style="width:70px;">Time</th><th>Source</th><th>{{ language_names.get(order['target_lang'], order['target_lang']) }}</th></tr></thead>
       <tbody>
         {% for seg in job.segments %}
         {% if seg.segment_type == 'speech' %}
