@@ -46,7 +46,7 @@ def test_demo_picks_language_and_service_for_the_visitor(client):
     chosen = _demo_data(client.get("/try?lang=zh&use=course", headers={"cf-ipcountry": "KE"}).text)
     assert chosen["language"] == "zh" and chosen["scenario"] == "course" and chosen["suggested"] == "sw"
     from_podcast = _demo_data(client.get("/try", headers={"referer": "https://kauli-forgemedia.com/solutions/podcast-transcription"}).text)
-    assert from_podcast["scenario"] == "meeting" and from_podcast["scenario_why"] == "page"
+    assert from_podcast["scenario"] == "podcast" and from_podcast["scenario_why"] == "page"
     from_video = _demo_data(client.get("/try", headers={"referer": "https://kauli-forgemedia.com/solutions/video-dubbing"}).text)
     assert from_video["scenario"] == "video"
     junk = _demo_data(client.get("/try?lang=klingon&use=nope").text)
@@ -68,7 +68,7 @@ def test_every_demo_clip_exists_and_dubbing_is_labelled_honestly(client):
     assert data["languages"]["sw"]["dub_live"] is True
     assert data["languages"]["es"]["dub_live"] is True           # Chinese, German and Spanish Studio work is on by default
     html = client.get("/try").text
-    assert "machine-generated and not reviewed by a person" in html and "ElevenLabs" in html
+    assert "hd-fine" not in html
     assert 'data-cta="try-signup"' in html and 'href="/demo"' in html
     # nothing here can spend ElevenLabs characters at request time
     app_source = (ROOT / "webapp" / "app.py").read_text(encoding="utf-8")

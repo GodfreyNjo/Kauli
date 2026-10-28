@@ -18,6 +18,15 @@ from __future__ import annotations
 QUALITY = "Human-reviewed orders reach up to 99% accuracy"
 
 
+# The demo (/try?use=...) that shows each service best: a scenario with the same kind of people and content.
+DEMO_FOR = {
+    "ngos": "field", "youtubers": "video", "media-broadcast": "news", "e-learning": "course", "voice-over": "video",
+    "captioning": "news", "video-translation": "video", "video-transcription": "meeting", "video-dubbing": "video",
+    "video-localization": "video", "audio-to-text": "meeting", "youtube-video-to-text": "video",
+    "podcast-transcription": "podcast", "interview-transcription": "interview",
+}
+
+
 def build(billing, hr_names: str, dub_names: str) -> dict:
     free = billing.FREE_MINUTES_PER_MONTH
     pro, prem = billing.PLANS["pro"], billing.PLANS["premium"]
@@ -47,7 +56,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
     human = {"name": "Human-reviewed", "best": "Anything you will publish, air, submit or quote.",
              "get": f"A real editor checks the work against your audio, and {QUALITY[0].lower()}{QUALITY[1:]}. Available in {hr_names}."}
 
-    return {
+    pages = {
         # ------------------------------------------------------------------ translation
         "video-translation": {
             "title": "AI Video Translation and Subtitles, Human-Reviewed on Request",
@@ -487,6 +496,10 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                                "A multi-country programme needing invoicing."),
         },
     }
+    for slug, demo in DEMO_FOR.items():
+        if slug in pages:
+            pages[slug]["demo"] = demo
+    return pages
 
 
 def refresh(pages: dict, hr_names: str) -> None:
@@ -531,3 +544,6 @@ def refresh(pages: dict, hr_names: str) -> None:
     for slug, extra in extras.items():
         if slug in pages:
             pages[slug].update(extra)
+    for slug, demo in DEMO_FOR.items():
+        if slug in pages:
+            pages[slug]["demo"] = demo

@@ -27,17 +27,46 @@
     if (lang === "zh") { return text.match(/.{1,2}/g) || [text]; }
     return text.split(/(\s+)/).filter(function (x) { return x.length; });
   }
-  function paint(el, text, lang) {
+  // A transcript: one line per turn, each opened by the speaker's ID and the time they start, then the words (which the highlight
+  // walks through while the audio plays). Text with a single speaker has no labels.
+  function paint(el, text, lang, names, starts) {
     el.textContent = "";
     el.setAttribute("lang", lang);
-    pieces(text, lang).forEach(function (p) {
-      var s = document.createElement("span");
-      s.textContent = p;
-      el.appendChild(s);
+    var words = [];
+    text.split("\n").forEach(function (line, i) {
+      var turn = document.createElement("span");
+      turn.className = "hd-turn";
+      var label = null;
+      (names || []).forEach(function (n) { if (line.indexOf(n + ": ") === 0) label = n; });
+      if (label) {
+        var b = document.createElement("b");
+        b.className = "hd-spk";
+        b.textContent = label;
+        turn.appendChild(b);
+        if (starts && starts[i] != null) {
+          var ts = document.createElement("small");
+          ts.className = "hd-ts";
+          ts.textContent = fmt(starts[i]);
+          turn.appendChild(ts);
+        }
+      }
+      pieces(label ? line.slice(label.length + 2) : line, lang).forEach(function (p) {
+        var s = document.createElement("span");
+        s.className = "w";
+        s.textContent = p;
+        turn.appendChild(s);
+        words.push(s);
+      });
+      el.appendChild(turn);
     });
+    el._words = words;
+  }
+  function turnStarts(url) {
+    var marks = (D.timing || {})[(url || "").split("/").pop()] || [];
+    return marks.map(function (m) { return m[1]; });
   }
   function highlight(el, frac) {
-    var spans = el.children, n = spans.length, upto = Math.floor(frac * n + 0.0001);
+    var spans = el._words || [], n = spans.length, upto = Math.floor(frac * n + 0.0001);
     for (var i = 0; i < n; i++) spans[i].className = i < upto ? "done" : (i === upto ? "now" : "");
   }
   function waveProgress(el, frac) {
@@ -77,12 +106,10 @@
       return;
     }
     box.hidden = false;
-    if (vid.getAttribute("src") !== url) { vid.pause(); vid.setAttribute("src", url); }
+    if (vid.getAttribute("src") !== url) { vid.pause(); vid.setAttribute("poster", url.replace(/\.mp4$/, ".jpg")); vid.setAttribute("src", url); }
     $("hd-video-sub").textContent = dubbed
       ? "The video dubbed in " + L.name + ", with " + L.name + " captions burned into the picture."
       : "The original audio with " + L.name + " subtitles burned into the picture.";
-    $("hd-video-note").textContent = "An illustrated speaker, an AI voice (ElevenLabs)" + (s.music ? " and an original music bed" : "")
-      + ". Burned-in captions are part of the picture, included on Premium.";
   }
 
   function render() {
@@ -96,7 +123,9 @@
     $("hd-headline").textContent = toEn ? (s.headline_en || s.headline) : s.headline;
     $("hd-in-title").textContent = (toEn ? L.native : "English") + ", as recorded";
     $("hd-dir-lang").textContent = L.name;
-    paint($("hd-text-in"), inText, inLang);
+    var names = s.multi ? s.cast : [];
+    var startsIn = turnStarts(clipFor("in")), startsOut = turnStarts(dubbed ? clipFor("out") : clipFor("in"));
+    paint($("hd-text-in"), inText, inLang, names, startsIn);
     buildWave($("hd-wave-in"), 3);
     buildWave($("hd-wave-out"), dubbed ? 11 : 3);
     $("hd-time-in").textContent = "0:00";
@@ -105,9 +134,10 @@
     $("hd-speaker").textContent = s.speaker;
     var transcript = s.service === "transcribe";
     $("hd-transcript").hidden = !transcript;
-    paint($("hd-text-src"), inText, inLang);
+    $("hd-speaker").closest(".hd-line").hidden = !!s.multi;           // with several speakers each line carries its own ID
+    paint($("hd-text-src"), inText, inLang, names, startsIn);
     // transcription shows the transcript plus its translation; the other two show the translated text as captions
-    paint($("hd-text-out"), outText, outLang);
+    paint($("hd-text-out"), outText, outLang, names, startsOut);
     $("hd-text-out").className = "hd-text hd-text-out" + (transcript ? " hd-translated" : "");
     var play = $("hd-play-out");
     play.setAttribute("aria-label", dubbed ? "Play the dubbed " + (toEn ? "English" : L.name) + " audio" : "Play the audio with " + (toEn ? "English" : L.name) + " captions");

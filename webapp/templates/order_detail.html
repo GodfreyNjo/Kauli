@@ -303,6 +303,7 @@
 
 {% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and plan_chosen(user) %}
 <div class="card">
+  <script type="application/json" id="order-cues">{{ caption_cues|tojson }}</script>
   <div class="order-workspace-grid">
     <div class="order-workspace-media">
       {# What plays here is the finished product, whatever the order was: the dubbed or captioned video if there is one,
@@ -469,8 +470,21 @@
     var scrollBox = document.getElementById("order-transcript-scroll");
     var captionOverlay = document.getElementById("order-caption-overlay");
     var activeRow = null, ytPlayer = null, ytTimer = null;
+    var cues = [];
+    try { cues = JSON.parse(document.getElementById("order-cues").textContent || "[]"); } catch (e) { cues = []; }
+
+    // The live captions follow the same cues as the downloadable files: two lines at most, on screen while the words are
+    // spoken, gone in the pauses, never more than 6 seconds.
+    function paintCue(nowMs) {
+      if (!captionOverlay) return;
+      var cue = null;
+      for (var i = 0; i < cues.length; i++) { if (nowMs >= cues[i].s && nowMs < cues[i].e) { cue = cues[i]; break; } }
+      if (cue) { captionOverlay.textContent = cue.t; captionOverlay.hidden = false; }
+      else { captionOverlay.hidden = true; }
+    }
 
     function highlight(nowMs) {
+      paintCue(nowMs);
       var match = null;
       for (var i = 0; i < rows.length; i++) {
         var start = Number(rows[i].dataset.startMs), end = Number(rows[i].dataset.endMs);
@@ -486,12 +500,6 @@
         }
       }
       activeRow = match;
-      // The same real text the transcript highlights, shown as live subtitles over the picture (never when the file
-      // already has captions burned into it).
-      if (captionOverlay) {
-        if (match && match.dataset.targetText) { captionOverlay.textContent = match.dataset.targetText; captionOverlay.hidden = false; }
-        else { captionOverlay.hidden = true; }
-      }
     }
 
     function seekTo(sec) {

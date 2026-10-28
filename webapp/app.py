@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import functools
 import json
 import os
 import re
@@ -54,7 +55,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
-from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
+from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
 UPLOAD_DIR = WEBAPP_DIR / "data" / "uploads"
@@ -226,9 +227,13 @@ def render_burned_captions(video_path: Path, srt_path: Path, out_path: Path) -> 
     # ffmpeg's subtitles filter needs colon-escaping in the path on top of
     # the usual shell quoting, since ':' also separates filter options.
     escaped = str(srt_path).replace("\\", "/").replace(":", "\\:")
+    # Lower-centre, clear of the bottom edge (where players and platforms crop or cover) and of the side margins:
+    # Alignment=2 is bottom-centre, MarginV lifts it about a tenth of the picture off the edge. The captions
+    # themselves are already two lines at most (kauli/subtitles.py).
+    style = "Alignment=2,MarginV=30,MarginL=40,MarginR=40,FontSize=18,Outline=1.5,Shadow=0.5,BorderStyle=1"
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_path),
-         "-vf", f"subtitles='{escaped}'",
+         "-vf", f"subtitles='{escaped}':force_style='{style}'",
          "-c:a", "copy", str(out_path)],
         check=True, timeout=1800,  # bounded, not unlimited - a crafted/corrupt file shouldn't hang this forever
     )
@@ -2777,6 +2782,15 @@ def demo_page(request: Request):
     return _demo_response(request)
 
 
+@functools.lru_cache(maxsize=1)
+def _demo_timing() -> dict:
+    """Who speaks when in every demo clip (scripts/make_demo_audio.py writes it): clip file name -> [[speaker, start_s, end_s], ...]."""
+    try:
+        return json.loads((Path(__file__).parent / "static" / "demo" / "timing.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
 def _try_context(request: Request) -> dict:
     """What the /try demo needs: the clips, the captions and the visitor's likely language and service.
     The audio is pre-rendered (scripts/make_demo_audio.py), so nothing here costs ElevenLabs characters."""
@@ -2800,6 +2814,7 @@ def _try_context(request: Request) -> dict:
                   if (static_dir / demo_content.video_name(key, lang)).exists()}
         scenarios[key] = {
             "video": videos, "music": key in demo_content.MUSIC_BEDS,
+            "multi": len(s["cast"]) > 1, "cast": [c["name"] for c in s["cast"]],
             "label": s["label"], "service": s["service"], "service_label": s["service_label"], "speaker": s["speaker"],
             "headline": s["headline"], "en": s["en"], "tr": s["tr"], "src": f"/static/demo/{demo_content.audio_name(key, None)}",
             "dub": dub, "inlang": inlang, "headline_en": s["headline_en"],
@@ -2810,6 +2825,7 @@ def _try_context(request: Request) -> dict:
         "scenario": scenario, "language": language, "suggested": suggested, "language_why": language_why,
         "dir": "to" if request.query_params.get("dir") == "to" else "from",
         "scenario_suggested": scenario_suggested, "scenario_why": scenario_why, "scenarios": scenarios,
+        "timing": _demo_timing(),
         "languages": {code: {**l, "dub_live": code in dub_live} for code, l in demo_content.LANGUAGES.items()},
         "rates": {k: {"ai": f"{card[k]['ai']:.2f}", "human": f"{card[k]['human']:.2f}"} for k in billing.SERVICE_LEVELS},
     }
@@ -5895,6 +5911,14 @@ _PROC_STAGES = [
 ]
 
 
+def _caption_cues(job) -> list[dict]:
+    """The live captions for the order preview. A job that cannot be laid out shows none, and never breaks the page."""
+    try:
+        return cue_dicts(job) if job and job.segments else []
+    except (AttributeError, TypeError):
+        return []
+
+
 def _processing_state(order, lang: str = "en") -> dict:
     """What a running order is doing right now, for the live panel: the steps THIS order goes through (a transcript
     has fewer than a dub), which one is current, and a percentage that only ever moves forward. The percentage is
@@ -6020,6 +6044,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "folders": db.list_folders_for_client(user["client_scope_id"]),
         "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
         "live": _processing_state(order, _ui_lang(request, user)) if order["status"] in ("queued", "processing") else None,
+        "caption_cues": _caption_cues(job),
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
         "upsell": _order_upsell_prices(order),

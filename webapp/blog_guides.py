@@ -64,7 +64,7 @@ def valid(secret, timestamp, body, header):
 <p>The <a href="/blog/ai-vs-human-transcription-which-do-you-need">guide to choosing between them</a> goes through the trade-off.</p>
 
 <h2>Where to go next</h2>
-<p>See what the output looks like on the <a href="/solutions/podcast-transcription">podcast transcription page</a>, or hear it in the <a href="/try?use=meeting">demo</a>.</p>
+<p>See what the output looks like on the <a href="/solutions/podcast-transcription">podcast transcription page</a>, or hear it in the <a href="/try?use=podcast">demo</a>.</p>
 <p>If you want help wiring it up to your site, <a href="/demo">book a demo</a> and we will walk through it with you.</p>""",
     },
     {

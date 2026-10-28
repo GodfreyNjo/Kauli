@@ -5074,3 +5074,15 @@ body.auth-page { background: #dfe9ff; }
   .pricing-card { flex: 1 1 100%; }
   .usage-rates-table th, .usage-rates-table td { font-size: 0.82rem; padding: 8px 6px; }
 }
+
+
+/* Live captions in the order preview: lower-centre, two lines at most, clear of the bottom edge */
+.order-caption-overlay { white-space: pre-line; max-width: 88%; margin-inline: auto; width: fit-content; }
+.order-media-wrap .order-caption-overlay { bottom: 12%; }
+
+
+/* Speaker IDs and times in the demo transcripts */
+.hd-turn { display: block; margin: 0 0 0.55em; }
+.hd-turn:last-child { margin-bottom: 0; }
+.hd-spk { color: var(--brand-blue-deep); font-size: 0.78em; letter-spacing: 0.04em; text-transform: uppercase; margin-right: 0.45em; }
+.hd-ts { color: #7b8aa3; font-size: 0.78em; margin-right: 0.5em; font-variant-numeric: tabular-nums; }

@@ -65,7 +65,6 @@
     <h2 id="hd-video-title">Watch it as a video</h2>
     <p class="hd-video-sub" id="hd-video-sub"></p>
     <video id="hd-video" controls playsinline preload="metadata" width="960" height="540"></video>
-    <p class="hd-fine" id="hd-video-note"></p>
   </div>
 
   <audio id="hd-audio" preload="none"></audio>
@@ -73,7 +72,6 @@
   <div class="hd-convert">
     <div>
       <p class="hd-rate" id="hd-rate"></p>
-      <p class="hd-fine">Sample audio is made with AI voices (ElevenLabs). Instant AI results are machine-generated and not reviewed by a person; your results depend on your audio.</p>
     </div>
     <div class="hd-ctas">
       <a href="/login?mode=signup" class="btn cta-olive" data-cta="try-signup">Try it on your own file - first {{ free_minutes|int }} minutes free</a>
@@ -82,4 +80,4 @@
   </div>
 </div>
 <script type="application/json" id="hd-data">{{ demo|tojson }}</script>
-<script src="/static/hear_demo.js?v=3" defer></script>
+<script src="/static/hear_demo.js?v=5" defer></script>

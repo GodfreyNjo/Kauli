@@ -1,9 +1,13 @@
-"""Render the demo videos shown on /try: an illustrated speaker, the pre-rendered ElevenLabs voice, and the captions burned
-into the picture. Nothing here calls ElevenLabs: it reads the MP3s that scripts/make_demo_audio.py already made.
+"""Render the demo videos shown on /try: people on screen who speak with the pre-rendered ElevenLabs voices, with the captions
+burned into the picture. Nothing here calls ElevenLabs: it reads the MP3s and timing.json that scripts/make_demo_audio.py made.
 
-For every scenario there is one video of the original (English audio, English captions) and, for every language, one of the
-result: a dubbing scenario is the dubbed audio with captions in that language, the others are the English audio with that
-language's subtitles burned in. The speakers are drawn, not filmed: no real person's face or voice is used or implied.
+Each scenario has a cast (webapp/demo_content.py), one person on screen for every voice and the same gender as the voice: a
+man's voice is a man on screen, a woman's a woman. Whoever is speaking has their mouth move with the audio and their name tag lit;
+in a two-person scene the other listens. In the marketing video the narrator holds up the product while he talks about it.
+
+For every scenario there is a video of the original (English audio, English captions) and, for every language, one of the result:
+a dubbing scenario is the dubbed audio with captions in that language, the others are the English audio with that language's
+subtitles burned in. The people are drawn, not filmed: no real person's face or voice is used or implied.
 
     python scripts/make_demo_videos.py            # all videos
     python scripts/make_demo_videos.py video es   # one scenario, one language ("en" for the original)
@@ -14,9 +18,9 @@ CJK font: Microsoft YaHei on Windows, Noto Sans CJK on Linux).
 from __future__ import annotations
 
 import array
+import json
 import math
 import pathlib
-import re
 import shutil
 import subprocess
 import sys
@@ -32,19 +36,28 @@ STATIC = ROOT / "webapp" / "static"
 DEMO = STATIC / "demo"
 W, H, FPS = 960, 540, 15
 NAVY, BLUE, DEEP, SOFT, ORANGE = (8, 40, 72), (8, 120, 200), (8, 88, 168), (227, 241, 251), (244, 122, 10)
+LABEL_COLOUR = (124, 196, 240, 255)
 
 WIN = pathlib.Path("/mnt/c/Windows/Fonts")
 DEJAVU = pathlib.Path("/usr/share/fonts/truetype/dejavu")
 CJK_CANDIDATES = [WIN / "msyh.ttc", pathlib.Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")]
 
-# Which demos have a music bed (scripts/make_demo_music.py): the marketing video and the course, not the meeting.
+# Which demos have a music bed under the voice (scripts/make_demo_music.py).
 MUSIC = demo_content.MUSIC_BEDS
 MUSIC_VOLUME = 0.2
 
-PEOPLE = {
-    "meeting": {"skin": (226, 178, 146), "hair": (38, 28, 32), "shirt": (14, 116, 144), "long": True, "glasses": False, "prop": "meeting", "name": "Speaker 1"},
-    "course": {"skin": (186, 136, 104), "hair": (28, 24, 24), "shirt": (8, 120, 200), "long": False, "glasses": True, "prop": "board", "name": "Instructor"},
-    "video": {"skin": (244, 204, 174), "hair": (150, 70, 38), "shirt": (244, 122, 10), "long": True, "glasses": False, "prop": "backpack", "name": "Narrator"},
+# How each person looks. The gender matches the voice in demo_content.SCENARIOS[...]["cast"] (a test checks that).
+LOOKS = {
+    ("meeting", 0): dict(skin=(226, 178, 146), hair=(38, 28, 32), style="long", shirt=(14, 116, 144)),
+    ("meeting", 1): dict(skin=(205, 156, 124), hair=(58, 40, 30), style="short", beard=True, shirt=(40, 62, 120)),
+    ("interview", 0): dict(skin=(232, 190, 160), hair=(120, 108, 100), style="short", glasses=True, shirt=(92, 104, 120)),
+    ("interview", 1): dict(skin=(168, 118, 90), hair=(30, 24, 24), style="bob", shirt=(150, 44, 76)),
+    ("podcast", 0): dict(skin=(240, 200, 170), hair=(70, 46, 32), style="short", headphones=True, shirt=(48, 132, 96)),
+    ("podcast", 1): dict(skin=(230, 182, 152), hair=(214, 170, 92), style="long", headphones=True, shirt=(118, 80, 170)),
+    ("course", 0): dict(skin=(186, 136, 104), hair=(28, 24, 24), style="bun", glasses=True, shirt=(8, 120, 200)),
+    ("news", 0): dict(skin=(236, 196, 166), hair=(62, 56, 62), style="short", tie=True, shirt=(28, 40, 66)),
+    ("field", 0): dict(skin=(150, 102, 76), hair=(26, 20, 20), style="bun", vest=True, shirt=(214, 168, 70)),
+    ("video", 0): dict(skin=(244, 204, 174), hair=(46, 36, 30), style="short", shirt=(34, 54, 108)),
 }
 
 
@@ -66,7 +79,7 @@ def duration(path: pathlib.Path) -> float:
 
 
 def mouth_levels(path: pathlib.Path, seconds: float) -> list[float]:
-    """How open the mouth is on each frame: the audio's loudness, smoothed, 0 to 1."""
+    """How open a mouth is on each frame: the audio's loudness, smoothed, 0 to 1."""
     raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "s16le", "-ac", "1", "-ar", "8000", "-"],
                          capture_output=True, check=True).stdout
     samples = array.array("h")
@@ -85,11 +98,6 @@ def mouth_levels(path: pathlib.Path, seconds: float) -> list[float]:
     return out
 
 
-def sentences(text: str) -> list[str]:
-    parts = re.findall(r"[^.!?。！？]+[.!?。！？]*", text)
-    return [p.strip() for p in parts if p.strip()]
-
-
 def wrap(text: str, fnt: ImageFont.FreeTypeFont, width: int, cjk: bool) -> list[str]:
     tokens = list(text) if cjk else text.split(" ")
     lines, cur = [], ""
@@ -105,52 +113,85 @@ def wrap(text: str, fnt: ImageFont.FreeTypeFont, width: int, cjk: bool) -> list[
     return lines
 
 
-def caption_pages(text: str, lang: str, total: float) -> list[tuple[float, float, list[str]]]:
-    """(start, end, lines) for each caption on screen. Time is shared out by how much text each sentence has."""
+def caption_pages(key: str, text: str, lang: str, marks: list, total: float) -> list[tuple[float, float, list[str], str]]:
+    """(start, end, lines, speaker label) for each caption on screen. Each turn's captions fill that turn's time in the audio, and the
+    caption that opens a turn names the speaker when the scene has more than one."""
+    cast = demo_content.SCENARIOS[key]["cast"]
     fnt = font(lang, 26, bold=True)
     cjk = lang == "zh"
+    turns = demo_content.turns(key, text)
     pages = []
-    for s in sentences(text):
-        lines = wrap(s, fnt, W - 180, cjk)
-        for i in range(0, len(lines), 2):
-            pages.append(lines[i:i + 2])
-    weights = [sum(len(l) for l in p) for p in pages]
-    lead, tail = 0.25, 0.2
-    span = max(0.5, total - lead - tail)
-    out, t = [], lead
-    for p, w in zip(pages, weights):
-        d = span * w / sum(weights)
-        out.append((t, t + d, p))
-        t += d
-    return out
+    for (who, body), mark in zip(turns, marks):
+        label = cast[who]["name"] if len(cast) > 1 else ""
+        t0, t1 = float(mark[1]) + 0.05, float(mark[2]) + 0.1
+        prefix = f"{label}: " if label else ""
+        sentences = [s.strip() for s in __import__("re").findall(r"[^.!?。！？]+[.!?。！？]*", body) if s.strip()]
+        groups = []
+        for n, sent in enumerate(sentences):
+            lines = wrap((prefix if n == 0 else "") + sent, fnt, W - 180, cjk)
+            for i in range(0, len(lines), 2):
+                groups.append((lines[i:i + 2], label if (n == 0 and i == 0) else ""))
+        weights = [sum(len(l) for l in g[0]) for g in groups]
+        span, t = max(0.5, t1 - t0), t0
+        for (lines, lab), w in zip(groups, weights):
+            d = span * w / sum(weights)
+            pages.append((t, t + d, lines, lab))
+            t += d
+    return pages
 
 
-def make_background(spec: dict) -> Image.Image:
+# ----------------------------------------------------------------------------- scenery
+def backdrop(key: str) -> Image.Image:
     img = Image.new("RGBA", (W, H), NAVY + (255,))
     px = img.load()
     for y in range(H):
         for x in range(W):
             t = min(1.0, (x / W) * 0.6 + (y / H) * 0.5)
             px[x, y] = tuple(int(NAVY[i] + (DEEP[i] - NAVY[i]) * t) for i in range(3)) + (255,)
-    over = Image.new("RGBA", (W, H), (0, 0, 0, 0))             # drawn apart, so translucent fills blend
+    over = Image.new("RGBA", (W, H), (0, 0, 0, 0))                # drawn apart, so translucent fills blend
     d = ImageDraw.Draw(over)
     d.ellipse((560, -120, 1100, 380), fill=(124, 196, 240, 28))
     d.ellipse((-160, 260, 340, 700), fill=(8, 120, 200, 34))
-    prop = spec["prop"]
-    if prop == "board":                                 # a whiteboard with a ruled table drawn on it
+    if key == "course":                                           # a whiteboard with a ruled table
         d.rounded_rectangle((590, 110, 900, 330), radius=14, fill=(245, 249, 253, 235))
         for i in range(5):
             d.line((614, 150 + i * 36, 876, 150 + i * 36), fill=(160, 190, 215, 255), width=3)
         d.line((745, 138, 745, 308), fill=(160, 190, 215, 255), width=3)
-    elif prop == "backpack":                            # the product on a shelf
-        d.rounded_rectangle((640, 150, 820, 330), radius=46, fill=ORANGE + (255,))
-        d.rounded_rectangle((668, 250, 792, 322), radius=18, fill=(214, 98, 6, 255))
-        d.arc((676, 112, 784, 200), 190, 350, fill=(255, 255, 255, 230), width=9)
-    elif prop == "meeting":                             # a few other call participants as tiles
-        for i, (x, y) in enumerate(((620, 120), (770, 120), (620, 250), (770, 250))):
-            d.rounded_rectangle((x, y, x + 130, y + 110), radius=12, fill=(255, 255, 255, 30), outline=(255, 255, 255, 60))
-            d.ellipse((x + 45, y + 22, x + 85, y + 62), fill=(255, 255, 255, 70))
-            d.ellipse((x + 28, y + 66, x + 102, y + 140), fill=(255, 255, 255, 50))
+    elif key == "meeting":                                        # other people on the call, as tiles
+        for x, y in ((395, 70), (525, 70), (655, 70), (785, 70)):
+            d.rounded_rectangle((x, y, x + 110, y + 90), radius=10, fill=(255, 255, 255, 26), outline=(255, 255, 255, 60))
+            d.ellipse((x + 38, y + 14, x + 72, y + 48), fill=(255, 255, 255, 70))
+            d.ellipse((x + 22, y + 52, x + 88, y + 118), fill=(255, 255, 255, 50))
+    elif key == "interview":                                      # a warm room: a lamp and a plant
+        d.ellipse((425, 60, 535, 170), fill=(255, 214, 140, 70))
+        d.rectangle((476, 150, 484, 330), fill=(255, 255, 255, 60))
+        d.rounded_rectangle((430, 340, 530, 366), radius=8, fill=(255, 255, 255, 40))
+        for ang in range(-50, 51, 25):
+            d.ellipse((860 + ang, 230 - abs(ang) // 2, 900 + ang, 330), fill=(60, 160, 110, 150))
+        d.rounded_rectangle((850, 330, 910, 400), radius=8, fill=(190, 120, 80, 190))
+    elif key == "podcast":                                        # acoustic panels and an ON AIR light
+        for i in range(5):
+            d.rounded_rectangle((60 + i * 180, 90, 60 + i * 180 + 150, 300), radius=10, fill=(255, 255, 255, 20), outline=(255, 255, 255, 38))
+        d.rounded_rectangle((420, 28, 540, 66), radius=19, fill=(214, 40, 40, 255))
+        f_air = font("en", 18, True)
+        d.text((480 - f_air.getlength("ON AIR") / 2, 36), "ON AIR", font=f_air, fill=(255, 255, 255, 255))
+    elif key == "news":                                           # a city skyline, a bridge, and the bulletin desk
+        for i, (x, h) in enumerate(((500, 210), (560, 280), (620, 190), (690, 320), (760, 240), (830, 300), (890, 200))):
+            d.rectangle((x, 400 - h, x + 52, 400), fill=(255, 255, 255, 30 + 8 * (i % 3)))
+        d.arc((480, 330, 940, 470), 200, 340, fill=(244, 122, 10, 220), width=7)
+        d.rectangle((0, 392, W, 410), fill=(244, 122, 10, 230))
+    elif key == "field":                                          # hills, huts, a tree and the sun
+        d.ellipse((780, 60, 860, 140), fill=(255, 222, 130, 230))
+        d.ellipse((380, 300, 1000, 640), fill=(60, 140, 90, 120))
+        d.ellipse((520, 340, 1100, 700), fill=(40, 110, 80, 140))
+        for x in (560, 700, 830):
+            d.rectangle((x, 300, x + 70, 360), fill=(200, 150, 100, 220))
+            d.polygon([(x - 10, 300), (x + 35, 255), (x + 80, 300)], fill=(150, 100, 70, 240))
+        d.rectangle((905, 250, 915, 345), fill=(110, 80, 60, 255))
+        d.ellipse((880, 200, 940, 270), fill=(46, 140, 80, 240))
+    elif key == "video":                                          # a soft spotlight on a studio floor
+        d.ellipse((120, 60, 700, 520), fill=(255, 255, 255, 22))
+        d.ellipse((90, 440, 740, 540), fill=(0, 0, 0, 50))
     img.alpha_composite(over)
     logo = Image.open(STATIC / "kauli-logo-nav-light.png").convert("RGBA")
     logo = logo.resize((int(logo.width * 0.62), int(logo.height * 0.62)), Image.LANCZOS)
@@ -158,52 +199,151 @@ def make_background(spec: dict) -> Image.Image:
     return img
 
 
-def draw_person(d: ImageDraw.ImageDraw, spec: dict, level: float, t: float) -> None:
-    cx, cy = 330, 235 + int(math.sin(t * 2.2) * 3)
-    skin, hair, shirt = spec["skin"], spec["hair"], spec["shirt"]
-    if spec["long"]:
-        d.ellipse((cx - 88, cy - 98, cx + 88, cy + 150), fill=hair)
-    d.ellipse((cx - 150, cy + 105, cx + 150, cy + 420), fill=shirt)                # shoulders
-    d.polygon([(cx - 30, cy + 108), (cx + 30, cy + 108), (cx, cy + 160)], fill=skin)
-    d.rectangle((cx - 24, cy + 55, cx + 24, cy + 118), fill=skin)                  # neck
-    d.ellipse((cx - 68, cy - 82, cx + 68, cy + 80), fill=skin)                     # head
-    d.pieslice((cx - 74, cy - 100, cx + 74, cy + 36), 180, 360, fill=hair)         # hair
+def bag_image() -> Image.Image:
+    """The Aurora backpack, drawn once, with its top handle near the top edge so a hand can hold it."""
+    im = Image.new("RGBA", (190, 250), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.arc((55, 6, 135, 90), 190, 350, fill=(250, 250, 250, 255), width=9)                       # handle
+    d.rounded_rectangle((20, 50, 170, 240), radius=46, fill=ORANGE + (255,))                  # body
+    d.rounded_rectangle((20, 50, 170, 240), radius=46, outline=(190, 84, 4, 255), width=4)
+    d.rounded_rectangle((42, 150, 148, 226), radius=18, fill=(214, 98, 6, 255))                # front pocket
+    d.line((42, 168, 148, 168), fill=(250, 250, 250, 220), width=4)                          # zip
+    d.rounded_rectangle((8, 110, 28, 210), radius=8, fill=(34, 54, 108, 255))                  # side strap
+    d.rounded_rectangle((162, 110, 182, 210), radius=8, fill=(34, 54, 108, 255))
+    d.ellipse((72, 88, 118, 134), outline=(255, 255, 255, 230), width=5)                       # a badge
+    d.line((86, 112, 106, 100), fill=(255, 255, 255, 230), width=4)
+    d.rounded_rectangle((34, 66, 70, 80), radius=6, fill=(255, 190, 120, 160))                 # a highlight
+    return im
+
+
+# ----------------------------------------------------------------------------- people
+def draw_person(d: ImageDraw.ImageDraw, look: dict, gender: str, cx: int, cy: int, k: float, level: float, t: float) -> None:
+    S = lambda v: int(round(v * k))                                                    # noqa: E731
+    skin, hair, shirt = look["skin"], look["hair"], look["shirt"]
+    style = look.get("style", "short")
+    wide = 175 if gender == "m" else 150
+    if style == "long":
+        d.ellipse((cx - S(88), cy - S(98), cx + S(88), cy + S(150)), fill=hair)
+    elif style == "bob":
+        d.ellipse((cx - S(86), cy - S(96), cx + S(86), cy + S(52)), fill=hair)
+    elif style == "bun":
+        d.ellipse((cx - S(28), cy - S(122), cx + S(28), cy - S(70)), fill=hair)
+    d.ellipse((cx - S(wide), cy + S(105), cx + S(wide), cy + S(420)), fill=shirt)               # shoulders
+    if look.get("vest"):
+        d.polygon([(cx - S(wide) + S(14), cy + S(150)), (cx - S(24), cy + S(112)), (cx - S(24), cy + S(420)), (cx - S(wide) + S(40), cy + S(420))], fill=(70, 100, 70))
+        d.polygon([(cx + S(wide) - S(14), cy + S(150)), (cx + S(24), cy + S(112)), (cx + S(24), cy + S(420)), (cx + S(wide) - S(40), cy + S(420))], fill=(70, 100, 70))
+    d.polygon([(cx - S(30), cy + S(108)), (cx + S(30), cy + S(108)), (cx, cy + S(160))], fill=skin if not look.get("tie") else (245, 245, 245))
+    if look.get("tie"):
+        d.polygon([(cx - S(9), cy + S(112)), (cx + S(9), cy + S(112)), (cx + S(14), cy + S(200)), (cx, cy + S(222)), (cx - S(14), cy + S(200))], fill=(196, 40, 52))
+    d.rectangle((cx - S(24), cy + S(55), cx + S(24), cy + S(118)), fill=skin)                  # neck
+    head_w = 70 if gender == "m" else 64
+    d.ellipse((cx - S(head_w), cy - S(82), cx + S(head_w), cy + S(80)), fill=skin)             # head
+    if style in ("long", "bob"):
+        d.pieslice((cx - S(74), cy - S(100), cx + S(74), cy + S(36)), 180, 360, fill=hair)
+        d.rectangle((cx - S(74), cy - S(36), cx - S(60), cy + S(20)), fill=hair)
+        d.rectangle((cx + S(60), cy - S(36), cx + S(74), cy + S(20)), fill=hair)
+    elif style == "bun":
+        d.pieslice((cx - S(72), cy - S(98), cx + S(72), cy + S(30)), 180, 360, fill=hair)
+    else:
+        d.pieslice((cx - S(76), cy - S(104), cx + S(76), cy + S(16)), 180, 360, fill=hair)
+        d.rectangle((cx - S(76), cy - S(50), cx - S(66), cy - S(8)), fill=hair)
+        d.rectangle((cx + S(66), cy - S(50), cx + S(76), cy - S(8)), fill=hair)
+    if look.get("beard"):
+        stubble = tuple((a + b) // 2 for a, b in zip(hair, skin))
+        d.chord((cx - S(66), cy - S(6), cx + S(66), cy + S(84)), 0, 180, fill=stubble)
     blink = (t % 3.4) < 0.13
     for dx in (-27, 27):
-        ey = cy - 6
+        ex, ey = cx + S(dx), cy - S(6)
         if blink:
-            d.line((cx + dx - 9, ey, cx + dx + 9, ey), fill=(40, 30, 30), width=3)
+            d.line((ex - S(9), ey, ex + S(9), ey), fill=(40, 30, 30), width=max(2, S(3)))
         else:
-            d.ellipse((cx + dx - 8, ey - 10, cx + dx + 8, ey + 10), fill=(250, 250, 250))
-            d.ellipse((cx + dx - 4, ey - 6, cx + dx + 5, ey + 6), fill=(40, 28, 24))
-        d.line((cx + dx - 12, ey - 22, cx + dx + 12, ey - 24), fill=hair, width=4)
-    if spec["glasses"]:
+            d.ellipse((ex - S(8), ey - S(10), ex + S(8), ey + S(10)), fill=(250, 250, 250))
+            d.ellipse((ex - S(4), ey - S(6), ex + S(5), ey + S(6)), fill=(40, 28, 24))
+        brow = max(2, S(5 if gender == "m" else 3))
+        d.line((ex - S(12), ey - S(22), ex + S(12), ey - S(24)), fill=hair, width=brow)
+        if gender == "f" and not blink:
+            d.line((ex - S(10), ey - S(11), ex - S(6), ey - S(15)), fill=(40, 30, 30), width=2)
+            d.line((ex + S(10), ey - S(11), ex + S(6), ey - S(15)), fill=(40, 30, 30), width=2)
+    if look.get("glasses"):
         for dx in (-27, 27):
-            d.ellipse((cx + dx - 19, cy - 26, cx + dx + 19, cy + 14), outline=(30, 40, 60), width=3)
-        d.line((cx - 8, cy - 8, cx + 8, cy - 8), fill=(30, 40, 60), width=3)
-    d.line((cx, cy + 4, cx - 5, cy + 26), fill=tuple(max(0, c - 40) for c in skin), width=3)
-    open_h = 3 + int(level * 24)
-    my = cy + 44
+            d.ellipse((cx + S(dx) - S(19), cy - S(26), cx + S(dx) + S(19), cy + S(14)), outline=(30, 40, 60), width=max(2, S(3)))
+        d.line((cx - S(8), cy - S(8), cx + S(8), cy - S(8)), fill=(30, 40, 60), width=max(2, S(3)))
+    if look.get("headphones"):
+        d.arc((cx - S(84), cy - S(110), cx + S(84), cy + S(40)), 200, 340, fill=(36, 38, 48), width=max(3, S(9)))
+        for sx in (-1, 1):
+            d.rounded_rectangle((cx + sx * S(78) - S(13), cy - S(22), cx + sx * S(78) + S(13), cy + S(34)), radius=S(10), fill=(36, 38, 48))
+    d.line((cx, cy + S(4), cx - S(5), cy + S(26)), fill=tuple(max(0, c - 40) for c in skin), width=max(2, S(3)))
+    my = cy + S(46)
+    lip = (190, 84, 96) if gender == "f" else (150, 60, 60)
     if level < 0.08:
-        d.arc((cx - 20, my - 12, cx + 20, my + 8), 20, 160, fill=(150, 60, 60), width=4)
+        d.arc((cx - S(20), my - S(12), cx + S(20), my + S(8)), 20, 160, fill=lip, width=max(2, S(4)))
     else:
-        d.ellipse((cx - 17, my - open_h // 3, cx + 17, my + open_h), fill=(120, 36, 44))
-        d.ellipse((cx - 11, my + open_h - 8, cx + 11, my + open_h), fill=(214, 110, 120))
-    # a name tag under the speaker
-    return
+        open_h = S(3 + level * 24)
+        d.ellipse((cx - S(17), my - open_h // 3, cx + S(17), my + open_h), fill=(120, 36, 44))
+        d.ellipse((cx - S(11), my + open_h - S(8), cx + S(11), my + open_h), fill=(214, 110, 120))
+    if look.get("earrings"):
+        pass
 
 
-def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: str, badge: str, out: pathlib.Path) -> None:
-    spec = PEOPLE[key]
+def name_tag(d: ImageDraw.ImageDraw, label: str, cx: int, y: int, active: bool, fnt: ImageFont.FreeTypeFont) -> None:
+    w = fnt.getlength(label) + 34
+    d.rounded_rectangle((cx - w / 2, y, cx + w / 2, y + 34), radius=17, fill=(BLUE + (255,)) if active else (255, 255, 255, 235))
+    d.text((cx - fnt.getlength(label) / 2, y + 5), label, font=fnt, fill=(255, 255, 255) if active else NAVY)
+
+
+def show_bag(frame: Image.Image, d: ImageDraw.ImageDraw, look: dict, cx: int, cy: int, bag: Image.Image, t: float) -> None:
+    """The narrator's arm lifts the product towards the viewer and turns it, over and over while he talks."""
+    lift = abs(math.sin(t * 1.5))
+    hx, hy = cx + 215 + int(10 * math.sin(t * 2.1)), cy + 118 - int(150 * lift)                   # hand
+    sx, sy = cx + 120, cy + 150                                                                 # shoulder
+    d.line((sx, sy, hx, hy), fill=look["shirt"], width=46)
+    d.ellipse((sx - 23, sy - 23, sx + 23, sy + 23), fill=look["shirt"])
+    d.ellipse((hx - 23, hy - 23, hx + 23, hy + 23), fill=look["shirt"])
+    scale = 1.05 + 0.1 * lift
+    img = bag.resize((int(bag.width * scale), int(bag.height * scale)), Image.BICUBIC).rotate(9 * math.sin(t * 1.5), resample=Image.BICUBIC, expand=True)
+    frame.alpha_composite(img, (hx - img.width // 2, hy - int(34 * scale) - (img.height - int(bag.height * scale)) // 2))
+    d2 = ImageDraw.Draw(frame)
+    d2.ellipse((hx - 20, hy - 14, hx + 20, hy + 22), fill=look["skin"])                          # the hand holding the handle
+    if lift > 0.8:                                                                              # a sparkle when it is held up high
+        for dx, dy in ((-96, -70), (88, -92), (110, 20)):
+            x, y = hx + dx, hy + dy - 60
+            d2.line((x - 11, y, x + 11, y), fill=(255, 255, 255, 235), width=3)
+            d2.line((x, y - 11, x, y + 11), fill=(255, 255, 255, 235), width=3)
+
+
+def layout(key: str, n: int) -> list[tuple[int, int, float]]:
+    """(centre x, centre y, scale) for each person."""
+    if n == 2:
+        return [(250, 240, 0.9), (690, 240, 0.9)]
+    if key == "video":
+        return [(330, 235, 1.0)]
+    return [(330, 235, 1.0)]
+
+
+def badge_text(key: str, lang: str) -> str:
+    s = demo_content.SCENARIOS[key]
+    if lang == "en":
+        return "Original, English"
+    name = demo_content.LANGUAGES[lang]["name"]
+    return f"Dubbed in {name}" if s["service"] == "dub" else f"{name} subtitles"
+
+
+def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: str, out: pathlib.Path, timing: dict) -> None:
+    scenario = demo_content.SCENARIOS[key]
+    cast = scenario["cast"]
+    marks = timing.get(audio.name) or [[0, 0.0, duration(audio)]]
     secs = duration(audio) + 0.4
     levels = mouth_levels(audio, secs)
-    pages = caption_pages(text, caption_lang, secs)
-    bg = make_background(spec)
-    f_badge, f_tag, f_cap = font("en", 20, True), font("en", 22, True), font(caption_lang, 26, True)
+    pages = caption_pages(key, text, caption_lang, marks, secs)
+    bg = backdrop(key)
+    bag = bag_image() if key == "video" else None
+    f_badge, f_tag, f_cap = font("en", 20, True), font("en", 20, True), font(caption_lang, 26, True)
+    spots = layout(key, len(cast))
     cache: dict[tuple, Image.Image] = {}
+    badge = badge_text(key, lang)
 
-    def caption_layer(lines: list[str]) -> Image.Image:
-        k = tuple(lines)
+    def caption_layer(lines: list[str], label: str) -> Image.Image:
+        k = (tuple(lines), label)
         if k not in cache:
             layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
             d = ImageDraw.Draw(layer)
@@ -213,18 +353,23 @@ def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: st
             d.rounded_rectangle((70, top, W - 70, top + box_h), radius=16, fill=(0, 0, 0, 175))
             for i, line in enumerate(lines):
                 w = f_cap.getlength(line)
-                d.text(((W - w) / 2, top + 13 + i * lh), line, font=f_cap, fill=(255, 255, 255, 255))
+                x = (W - w) / 2
+                if i == 0 and label and line.startswith(label + ": "):
+                    head = label + ": "
+                    d.text((x, top + 13), head, font=f_cap, fill=LABEL_COLOUR)
+                    d.text((x + f_cap.getlength(head), top + 13), line[len(head):], font=f_cap, fill=(255, 255, 255, 255))
+                else:
+                    d.text((x, top + 13 + i * lh), line, font=f_cap, fill=(255, 255, 255, 255))
             cache[k] = layer
         return cache[k]
 
-    tag_text = spec["name"]
     n = int(secs * FPS)
     work = pathlib.Path(tempfile.gettempdir()) / out.name          # encode off the (slow, picky) mounted drive, then move
     bed = MUSIC.get(key)
     bed_path = DEMO / f"bed-{bed}.mp3" if bed else None
     cmd = ["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
            "-i", str(audio)]
-    if bed_path and bed_path.exists():                       # the voice on top, a quiet music bed underneath, faded out at the end
+    if bed_path and bed_path.exists():                       # the voices on top, a quiet music bed underneath, faded out at the end
         fade_from = max(0.0, n / FPS - 1.2)
         cmd += ["-stream_loop", "-1", "-i", str(bed_path), "-filter_complex",
                 f"[2:a]volume={MUSIC_VOLUME}[m];[1:a]apad[v];[v][m]amix=inputs=2:duration=longest:normalize=0,"
@@ -236,17 +381,26 @@ def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: st
     ff = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     for i in range(n):
         t = i / FPS
+        active = next((int(m[0]) for m in marks if float(m[1]) - 0.02 <= t < float(m[2]) + 0.12), None)
         frame = bg.copy()
         d = ImageDraw.Draw(frame)
-        draw_person(d, spec, levels[min(i, len(levels) - 1)], t)
-        d.rounded_rectangle((220, 372 - 40, 440, 372 - 6), radius=17, fill=(255, 255, 255, 235))      # name tag
-        d.text((330 - f_tag.getlength(tag_text) / 2, 372 - 38), tag_text, font=f_tag, fill=NAVY)
+        for idx, (cx, cy, k) in enumerate(spots):
+            person = cast[idx]
+            look = LOOKS[(key, idx)]
+            speaking = active == idx
+            level = levels[min(i, len(levels) - 1)] if speaking else 0.0
+            draw_person(d, look, person["gender"], cx, cy + int(math.sin(t * 2.2 + idx) * 3), k, level, t + idx * 0.9)
+            if bag is not None:
+                show_bag(frame, d, look, cx, cy, bag, t)
+                d = ImageDraw.Draw(frame)
+            if len(cast) > 1 or key != "course":
+                name_tag(d, person["name"], cx, int(cy + 118 * k), speaking, f_tag)
         bw = f_badge.getlength(badge) + 30
         d.rounded_rectangle((W - 28 - bw, 28, W - 28, 66), radius=19, fill=BLUE + (255,))
         d.text((W - 28 - bw + 15, 36), badge, font=f_badge, fill=(255, 255, 255))
-        for start, end, lines in pages:
+        for start, end, lines, label in pages:
             if start <= t < end:
-                frame.alpha_composite(caption_layer(lines))
+                frame.alpha_composite(caption_layer(lines, label))
                 break
         ff.stdin.write(frame.convert("RGB").tobytes())
     ff.stdin.close()
@@ -260,23 +414,23 @@ def jobs(only_key: str | None, only_lang: str | None):
         if only_key and key != only_key:
             continue
         if not only_lang or only_lang == "en":
-            yield key, "en", DEMO / demo_content.audio_name(key, None), s["en"], "en", "Original, English"
+            yield key, "en", DEMO / demo_content.audio_name(key, None), s["en"], "en"
         for lang, text in s["tr"].items():
             if only_lang and lang != only_lang:
                 continue
-            name = demo_content.LANGUAGES[lang]["name"]
             if s["service"] == "dub":
-                yield key, lang, DEMO / demo_content.audio_name(key, lang), text, lang, f"Dubbed in {name}"
+                yield key, lang, DEMO / demo_content.audio_name(key, lang), text, lang
             else:
-                yield key, lang, DEMO / demo_content.audio_name(key, None), text, lang, f"{name} subtitles"
+                yield key, lang, DEMO / demo_content.audio_name(key, None), text, lang
 
 
 def main() -> None:
     only_key = sys.argv[1] if len(sys.argv) > 1 else None
     only_lang = sys.argv[2] if len(sys.argv) > 2 else None
-    for key, lang, audio, text, cap_lang, badge in jobs(only_key, only_lang):
+    timing = json.loads((DEMO / "timing.json").read_text(encoding="utf-8"))
+    for key, lang, audio, text, cap_lang in jobs(only_key, only_lang):
         out = DEMO / demo_content.video_name(key, lang)
-        render(key, lang, audio, text, cap_lang, badge, out)
+        render(key, lang, audio, text, cap_lang, out, timing)
         print(f"{out.name}  {out.stat().st_size // 1024} KB")
 
 
