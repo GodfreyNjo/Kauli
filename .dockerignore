@@ -21,3 +21,4 @@ data/audio/
 !webapp/static/*.wav
 .DS_Store
 tests/
+!webapp/static/demo/*.mp3
