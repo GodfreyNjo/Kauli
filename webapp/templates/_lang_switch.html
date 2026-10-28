@@ -1,0 +1,16 @@
+{#- The language switcher. lang_dropdown() is a button that opens a list (sign-in page); lang_menu() is the same list laid out
+    flat for the account menu. Both are plain links to /lang/<code>, so they work without JavaScript and keep the page you are on. -#}
+{% macro _globe() %}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>{% endmacro %}
+{% macro _links(back) %}{% for code, name in ui_languages %}<li><a href="/lang/{{ code }}?next={{ back|urlencode }}" rel="nofollow" lang="{{ code }}" hreflang="{{ code }}"{% if code == ui_lang() %} aria-current="true" class="is-current"{% endif %}>{{ name }}</a></li>{% endfor %}{% endmacro %}
+{% macro lang_dropdown(back) %}
+<details class="lang-switch">
+  <summary aria-label="{{ t('menu_language') }}">{{ _globe() }}<span>{{ ui_native[ui_lang()] }}</span></summary>
+  <ul>{{ _links(back) }}</ul>
+</details>
+{% endmacro %}
+{% macro lang_menu(back) %}
+<div class="lang-menu" role="group" aria-label="{{ t('menu_language') }}">
+  <div class="lang-menu-title">{{ _globe() }}{{ t('menu_language') }}</div>
+  <ul>{{ _links(back) }}</ul>
+</div>
+{% endmacro %}

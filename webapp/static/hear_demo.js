@@ -64,6 +64,27 @@
     });
   }
 
+  // The video of the result: the dubbed (or subtitled) video with the captions burned in. Only the "into this language"
+  // direction has one; the other direction keeps the audio player.
+  function showVideo(s, L, dubbed, toEn) {
+    var box = $("hd-video-box"), vid = $("hd-video");
+    var url = !toEn && s.video && s.video[state.lang];
+    if (!vid.dataset.bound) { vid.dataset.bound = "1"; vid.addEventListener("play", stop); }      // the video and the audio player never talk at once
+    if (!url) {
+      vid.pause();
+      vid.removeAttribute("src");
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    if (vid.getAttribute("src") !== url) { vid.pause(); vid.setAttribute("src", url); }
+    $("hd-video-sub").textContent = dubbed
+      ? "The video dubbed in " + L.name + ", with " + L.name + " captions burned into the picture."
+      : "The original audio with " + L.name + " subtitles burned into the picture.";
+    $("hd-video-note").textContent = "An illustrated speaker, an AI voice (ElevenLabs)" + (s.music ? " and an original music bed" : "")
+      + ". Burned-in captions are part of the picture, included on Premium.";
+  }
+
   function render() {
     stop();
     var s = scenario(), L = D.languages[state.lang];
@@ -90,6 +111,7 @@
     $("hd-text-out").className = "hd-text hd-text-out" + (transcript ? " hd-translated" : "");
     var play = $("hd-play-out");
     play.setAttribute("aria-label", dubbed ? "Play the dubbed " + (toEn ? "English" : L.name) + " audio" : "Play the audio with " + (toEn ? "English" : L.name) + " captions");
+    showVideo(s, L, dubbed, toEn);
     var avail = $("hd-avail");
     if (dubbed && !toEn) {
       var live = !!L.dub_live;

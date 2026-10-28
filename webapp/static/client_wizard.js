@@ -423,10 +423,11 @@
     const rate = selected ? Number(selected.dataset.rate) : 0;
     const serviceName = selected ? selected.dataset.name : "-";
     $("#price-service").textContent = serviceName + (isAiTier ? " - Instant AI" : (isStudio ? " - Studio" : " - Human-reviewed"));
-    // Mirrors billing.FREE_MINUTES_SERVICE_LEVEL server-side - free minutes
-    // only ever apply to an INSTANT AI transcription-only order, so the
+    // Mirrors billing.allowance_covers server-side - included minutes only ever
+    // apply to an INSTANT AI order (transcription, and translation on paid plans), so the
     // estimate here has to match what create_order() will actually charge.
-    const freeMinutesEligible = selected && selected.value === "transcribe" && isAiTier;
+    const allowanceTranslate = data.dataset.allowanceTranslate === "1";      // paid plans: the included minutes cover translation too
+    const freeMinutesEligible = !!selected && isAiTier && (selected.value === "transcribe" || (allowanceTranslate && selected.value === "translate"));
 
     // Voice cloning only ever runs on a full dub - no point asking for
     // cloning consent on a transcription/translation-only order.
@@ -545,7 +546,7 @@
     const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + studioAsrCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
-      : (freeMinutesEligible ? "none applied" : "not eligible (transcription-only)");
+      : (freeMinutesEligible ? "none applied" : "not eligible");
     $("#price-wallet-row").hidden = creditsAppliedUsd <= 0;
     if (creditsAppliedUsd > 0) {
       $("#price-wallet").textContent = Math.round(creditsAppliedUsd * CREDITS_PER_DOLLAR) + " credits (" + formatMoney(creditsAppliedUsd) + ")";

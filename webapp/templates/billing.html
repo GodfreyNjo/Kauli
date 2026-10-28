@@ -60,10 +60,11 @@
   </div>
   <p class="muted" style="margin:14px 0 0; font-size:0.85rem;">
     {{ "%.1f"|format(subscription['minutes_used_this_period'] or 0) if subscription else 0 }} /
-    {{ "%.1f"|format(free_minutes_total) }} free minutes used this month
-    ({{ "%.0f"|format(free_minutes_base) }} standard{% if bonus_minutes %} + {{ "%.0f"|format(bonus_minutes) }} bonus{% endif %}).
-    Usage beyond that is billed per order at checkout - see any order you submit.
+    {{ "%.1f"|format(free_minutes_total) }} included minutes used this month.
   </p>
+  <details class="od-more"><summary>How included minutes work</summary>
+    <p>{{ "%.0f"|format(free_minutes_base) }} standard{% if bonus_minutes %} + {{ "%.0f"|format(bonus_minutes) }} bonus{% endif %}. They cover Instant AI transcription, and translation too on Pro and Premium. Usage beyond them is billed per order at checkout.</p>
+  </details>
   {% if bonus_minutes and subscription and subscription['bonus_note'] %}
   <p class="muted" style="margin-top:6px; font-size:0.85rem;">Bonus grant: {{ subscription['bonus_note'] }}</p>
   {% endif %}
@@ -72,11 +73,11 @@
 <div class="card">
   <h2>Prepaid credits</h2>
   <p class="muted" style="margin-top:0;">
-    {{ "%.0f"|format(wallet_credits) }} credit{{ '' if wallet_credits == 1 else 's' }} in your balance -
-    never expires, applied automatically on every order right after your monthly free minutes, at a fixed
-    $0.10/credit regardless of which service you use it on (10 credits covers 1 transcription-only minute,
-    ~1.1 translation minutes, or 2/3 of a full-dub minute - see Usage rates below).
+    {{ "%.0f"|format(wallet_credits) }} credit{{ '' if wallet_credits == 1 else 's' }} in your balance. They never expire and are used automatically after your included minutes, at $0.10 each.
   </p>
+  <details class="od-more"><summary>What a credit buys</summary>
+    <p>At a fixed $0.10 a credit on any service: 10 credits covers 1 transcription-only minute, about 1.1 translation minutes, or 2/3 of a full-dub minute. See the usage rates below.</p>
+  </details>
   <div class="row" style="gap:10px; flex-wrap:wrap;">
     {% for key, pkg in credit_packages.items() %}
     <div class="pricing-card">
@@ -103,15 +104,14 @@
     {% endfor %}
     <div class="pricing-card" style="border-style:dashed;">
       <div class="pricing-card-credits">Custom amount</div>
-      <p class="muted" style="font-size:0.78rem; margin:4px 0 10px;">Type the exact spend you need.</p>
+      <p class="muted" style="font-size:0.78rem; margin:4px 0 10px;">Choose your own amount.</p>
       <form method="post" action="/client/billing/wallet" id="wallet-custom-form">
         <label style="font-size:0.78rem;">Minutes-of-value to prepay
           <input type="number" name="custom_minutes" id="wallet-custom-minutes" min="5" max="2000" step="1"
                  placeholder="e.g. 90" required>
         </label>
         <p class="muted" style="font-size:0.76rem; margin:4px 0 10px;" id="wallet-custom-preview">
-          The more you prepay at once, the more you save: 10% off from 30, 15% off from 60, 20% off from 150
-          - same discount the fixed packages above use, just for whatever amount you actually need.
+          Save 10% from 30, 15% from 60 and 20% from 150 minutes' worth.
         </p>
         <label style="font-size:0.78rem;">Pay with
           <select name="provider">
@@ -165,21 +165,21 @@
 </script>
 
 <div class="card" style="padding:0; overflow-x:auto;">
-  <table>
+  <table class="plans-table">
     <thead><tr>
-      <th>Plan</th><th>Price</th><th>Instant AI minutes / month</th><th>Usage discount</th><th>Translation</th>
+      <th>Plan</th><th>Price</th><th>Instant AI minutes / month<br><span class="muted" style="font-weight:400;font-size:0.76rem;">transcription + translation</span></th><th>Usage discount</th><th>Translation</th>
       <th>Video deliverables</th><th>Support</th><th>Choose</th>
     </tr></thead>
     <tbody>
       {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
       <tr>
-        <td><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
-        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}/mo{% if key in ('pro', 'premium') %}<br><span class="muted" style="font-size:0.78rem;">or ${{ p['price_usd_year'] }}/yr (save {{ billing_saving(p) }}%)</span>{% endif %}{% else %}$0{% endif %}</td>
-        <td>{{ p['included_ai_minutes']|int }}</td>
-        <td>{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
-        <td>{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
-        <td>{{ '✓' if p['video_deliverables'] else '-' }}</td>
-        <td>{{ p['support'] }}</td>
+        <td data-label="Plan"><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
+        <td data-label="Price">{% if p['price_usd'] %}${{ p['price_usd'] }}/mo{% if key in ('pro', 'premium') %}<br><span class="muted" style="font-size:0.78rem;">or ${{ p['price_usd_year'] }}/yr (save {{ billing_saving(p) }}%)</span>{% endif %}{% else %}$0{% endif %}</td>
+        <td data-label="Instant AI minutes a month">{{ p['included_ai_minutes']|int }}</td>
+        <td data-label="Discount on the rest">{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
+        <td data-label="Translation">{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
+        <td data-label="Video files">{{ '✓' if p['video_deliverables'] else '-' }}</td>
+        <td data-label="Support">{{ p['support'] }}</td>
         <td>
           {% if key == 'free' and not plan_is_chosen %}
             <form method="post" action="/client/billing/choose-free">

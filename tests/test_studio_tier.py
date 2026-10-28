@@ -175,7 +175,12 @@ def test_the_worker_does_not_double_label_speakers_for_studio_and_refunds_a_fail
 
 
 # --------------------------------------------------------- Chinese, German and Spanish
-def test_extra_languages_are_off_until_the_owner_turns_them_on(studio):
+def test_extra_languages_are_on_by_default_and_the_owner_can_switch_them_off(studio, monkeypatch):
+    monkeypatch.delenv("KAULI_REVIEW_EXTRA_LANGUAGES", raising=False)
+    assert studio.app._review_extra_languages() == {"zh", "de", "es"}
+    monkeypatch.setenv("KAULI_REVIEW_EXTRA_LANGUAGES", "zh")
+    assert studio.app._review_extra_languages() == {"zh"}
+    monkeypatch.setenv("KAULI_REVIEW_EXTRA_LANGUAGES", "none")
     assert studio.app._review_extra_languages() == set()
     r = studio.go(source_lang="zh", target_lang="en", review_tier="human")
     assert "Instant AI" in r.text and studio.db.list_orders_for_client("u1") == []         # as before: AI only

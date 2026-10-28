@@ -2,12 +2,12 @@
 {% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}{{ post['title'] }}{% endblock %}
+{% block og_image %}<meta property="og:image" content="{{ site_origin() }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-social.png' }}">{% endblock %}
 {% block head_extra %}
 {% if post['description'] %}<meta name="description" content="{{ post['description'] }}">{% endif %}
 <meta property="og:title" content="{{ post['title'] }}">
 {% if post['description'] %}<meta property="og:description" content="{{ post['description'] }}">{% endif %}
 <meta property="og:type" content="article">
-<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-logo-full.png' }}">
 <link rel="icon" href="/static/kauli-icon.png">
 <script type="application/ld+json">
 {
@@ -15,14 +15,14 @@
   "@type": "Article",
   "headline": "{{ post['title']|replace('\\', '\\\\')|replace('"', '\\"') }}",
   {% if post['description'] %}"description": {{ post['description']|tojson }},{% endif %}
-  "image": "{{ request.url.scheme }}://{{ request.url.netloc }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-logo-full.png' }}",
+  "image": "{{ site_origin() }}{{ '/blog-cover/' + post['id'] if post['cover_image_path'] else '/static/kauli-logo-full.png' }}",
   "inLanguage": "en",
   "author": { "@type": "Person", "name": "{{ author_name }}",
               "worksFor": { "@type": "Organization", "name": "Forge Media Services" } },
   "publisher": { "@type": "Organization", "name": "Forge Media Services" },
   {% if published_at_iso %}"datePublished": "{{ published_at_iso }}",{% endif %}
   {% if updated_at_iso %}"dateModified": "{{ updated_at_iso }}",{% endif %}
-  "mainEntityOfPage": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}"
+  "mainEntityOfPage": "{{ site_origin() }}/blog/{{ post['slug'] }}"
 }
 </script>
 <script type="application/ld+json">
@@ -30,9 +30,9 @@
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
-    { "@type": "ListItem", "position": 1, "name": "Kauli", "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
-    { "@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog" },
-    { "@type": "ListItem", "position": 3, "name": {{ post['title']|tojson }}, "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/blog/{{ post['slug'] }}" }
+    { "@type": "ListItem", "position": 1, "name": "Kauli", "item": "{{ site_origin() }}/" },
+    { "@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ site_origin() }}/blog" },
+    { "@type": "ListItem", "position": 3, "name": {{ post['title']|tojson }}, "item": "{{ site_origin() }}/blog/{{ post['slug'] }}" }
   ]
 }
 </script>
@@ -52,7 +52,7 @@
     <img src="/blog-cover/{{ post['id'] }}" alt="{{ post['title'] }}" class="m-blog-hero-image" loading="eager">
     {% endif %}
 
-    {% set post_url = request.url.scheme + '://' + request.url.netloc + '/blog/' + post['slug'] %}
+    {% set post_url = site_origin() + '/blog/' + post['slug'] %}
     <div class="m-share-row">
       <span class="muted" style="font-size:0.78rem;">Share:</span>
       <a href="https://twitter.com/intent/tweet?url={{ post_url|urlencode }}&text={{ post['title']|urlencode }}"

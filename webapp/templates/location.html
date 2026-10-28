@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}{{ office.title }}{% endblock %}
+{% block head_extra %}
+<meta name="description" content="{{ office.description }}">
+<meta property="og:title" content="{{ office.title }}">
+<meta property="og:description" content="{{ office.description }}">
+<meta property="og:type" content="website">
+{% for block in jsonld %}<script type="application/ld+json">{{ block|tojson }}</script>
+{% endfor %}
+{% include "_ga.html" %}
+{% if not user %}{% include "_one_tap.html" %}{% endif %}
+{% endblock %}{% block content %}
+{% include "_nav.html" %}
+
+<section class="loc-hero">
+  <span class="m-section-eyebrow m-eyebrow-lined">Kauli {{ office.city }}</span>
+  <h1>{{ office.h1 }}</h1>
+  <p class="loc-lede">{{ office.lede }}</p>
+  <div class="loc-actions">
+    <a class="btn cta-olive" href="/login?mode=signup" data-cta="location-{{ slug }}">Try it free</a>
+    <a class="btn secondary" href="/try">Hear a demo</a>
+  </div>
+</section>
+
+<section class="m-section loc-body">
+  <div class="m-inner">
+    <address class="loc-address">
+      <span class="loc-pin" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></span>
+      <span><strong>Kauli {{ office.city }}</strong>{{ office.address_line }}<br><a href="mailto:{{ email }}">{{ email }}</a></span>
+    </address>
+
+    <h2 class="m-h2 loc-h2">What we do for you</h2>
+    <div class="loc-grid">
+      {% for title, text, href in office.serves %}
+      <a class="loc-card" href="{{ href }}"><strong>{{ title }}</strong><span>{{ text }}</span></a>
+      {% endfor %}
+    </div>
+
+    <h2 class="m-h2 loc-h2">Made for</h2>
+    <p class="loc-who">{{ office.who }}</p>
+    <p class="loc-links">See <a href="/languages">all {{ language_total }} languages</a>, the <a href="/human-review">languages with human review</a> and <a href="/#pricing">pricing</a>.</p>
+
+    <h2 class="m-h2 loc-h2">Questions</h2>
+    <div class="loc-faq">
+      {% for q, a in office.faq %}
+      <details><summary>{{ q }}</summary><p>{{ a }}</p></details>
+      {% endfor %}
+    </div>
+
+    <p class="loc-other">Also: <a href="/locations/{{ other.slug }}">Kauli {{ other.city }}</a></p>
+  </div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

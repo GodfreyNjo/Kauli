@@ -132,6 +132,7 @@ def test_wider_language_translation_needs_lara_and_ai_tier(env, wav_bytes):
 
 
 def test_wider_languages_can_never_be_dubbed_or_human_reviewed(env, wav_bytes):
+    env.monkeypatch.setenv("KAULI_REVIEW_EXTRA_LANGUAGES", "none")        # Chinese, German and Spanish review switched off
     _set_lara(env)
     before = len(_orders(env))
     for overrides in ({"source_lang": "zh", "service_level": "dub"},
@@ -252,7 +253,7 @@ def test_client_pages_render_with_both_tiers_and_the_upsell_buttons(env, wav_byt
     env.db.update_order_status(paid["id"], "ready_for_delivery")
     page = env.client.get(f"/client/orders/{paid['id']}")
     assert page.status_code == 200
-    assert "Instant AI" in page.text and "has <strong>not</strong> been reviewed by a person" in page.text
+    assert "Instant AI" in page.text and "not reviewed by a person" in page.text
     assert "Add human review" in page.text and "Transcript (.docx)" in page.text
     assert "human-verified" not in page.text.lower()
 

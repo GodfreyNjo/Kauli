@@ -4,6 +4,9 @@
 {% block title %}Privacy Policy{% endblock %}
 {% block head_extra %}
 <meta name="description" content="How Kauli handles your account, uploaded audio and video, transcripts and payment details, and which providers process them.">
+<meta property="og:title" content="Kauli Privacy Policy">
+<meta property="og:description" content="How Kauli handles your account, uploaded files, transcripts and payment details.">
+<meta property="og:type" content="website">
 {% include "_ga.html" %}
 {% if not user %}{% include "_one_tap.html" %}{% endif %}
 {% endblock %}{% block content %}

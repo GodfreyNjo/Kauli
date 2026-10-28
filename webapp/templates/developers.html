@@ -4,7 +4,9 @@
 {% block title %}Kauli API: transcribe, translate and dub from your own software{% endblock %}
 {% block head_extra %}
 <meta name="description" content="The Kauli REST API: create transcription, translation and dubbing orders from a file or a link, track them, and download TXT, DOCX, SRT and VTT with signed links and webhooks.">
-<link rel="canonical" href="{{ request.base_url }}developers">
+<meta property="og:title" content="The Kauli API">
+<meta property="og:description" content="Create transcription, translation and dubbing orders from a file or a link, track them and download TXT, DOCX, SRT and VTT.">
+<meta property="og:type" content="website">
 {% include "_ga.html" %}
 {% endblock %}{% block content %}
 {% include "_nav.html" %}
@@ -44,7 +46,7 @@
         <tr><td><code>source_lang</code></td><td>Language spoken in the file, e.g. <code>en</code>, <code>sw</code>, <code>ki</code>, <code>fr</code>. See <code>GET /api/v1/languages</code>.</td></tr>
         <tr><td><code>target_lang</code></td><td>For translation or dubbing. Defaults to the source language for transcription, otherwise <code>en</code>.</td></tr>
         <tr><td><code>service_level</code></td><td><code>transcribe</code> (default), <code>translate</code> or <code>dub</code>.</td></tr>
-        <tr><td><code>review_tier</code></td><td><code>ai</code> (Instant AI, default) or <code>human</code> (reviewed by an editor; Swahili, Kikuyu and English for now, more languages are coming soon).</td></tr>
+        <tr><td><code>review_tier</code></td><td><code>ai</code> (Instant AI, default) or <code>human</code> (reviewed by an editor; {{ human_review_languages }} for now, more languages are coming soon).</td></tr>
         <tr><td><code>idempotency_key</code></td><td>Optional. Retrying with the same key returns the same order instead of creating another. The <code>Idempotency-Key</code> header works too.</td></tr>
         <tr><td><code>folder_name</code>, <code>notes</code></td><td>Optional. A folder to file the order under, and instructions for the editor.</td></tr>
       </tbody>

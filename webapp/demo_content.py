@@ -119,3 +119,14 @@ def pick_scenario(referer: str | None, asked: str | None) -> tuple[str, str]:
         if any(w in ref for w in words):
             return scenario, "page"
     return "meeting", "default"
+
+
+# Which demo videos have an original music bed under the voice (see scripts/make_demo_music.py): the marketing video and the
+# course, not the meeting.
+MUSIC_BEDS = {"video": "bright", "course": "calm"}
+
+
+def video_name(scenario: str, lang: str) -> str:
+    """The demo video of a scenario: "en" is the original, any other code is the result in that language
+    (scripts/make_demo_videos.py makes them from the pre-rendered audio)."""
+    return f"vid-{scenario}-{lang}.mp4"

@@ -44,6 +44,7 @@
   <div id="pricing-data" hidden
        data-discount="{{ plans[plan]['discount'] }}"
        data-free-minutes="{{ free_minutes_remaining }}"
+       data-allowance-translate="{{ 1 if allowance_translate(user) else 0 }}"
        data-wallet-credits="{{ wallet_credits }}"
        data-addon-rate="{{ addons['video_deliverables']['rate_per_min'] if 'video_deliverables' in addons else 0 }}"
        data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"
@@ -77,8 +78,7 @@
           </div>
           <div id="source-file">
             {% if error and not form_values.get('youtube_url') %}
-            <p class="muted src-note" style="margin:0 0 10px;">Everything else below was kept as you had it -
-               just re-choose your file, browsers don't let a page do that part for you.</p>
+            <p class="muted src-note" style="margin:0 0 10px;">Your other choices were kept. Choose your file again.</p>
             {% endif %}
             <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a file to upload">
               <input type="file" name="audio" id="file-input" accept="audio/*,video/*" multiple style="display:none;">
@@ -113,8 +113,7 @@
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </button>
             </label>
-            <p class="muted src-note">Only submit videos you have the rights to use for dubbing. Large videos can take
-               several minutes to fetch before processing even starts. If a link can't be fetched, upload the file instead.</p>
+            <p class="muted src-note">Only submit videos you have the rights to use. If a link can't be fetched, upload the file instead.</p>
           </div>
           <ul class="src-chips" aria-label="What you can order"><li>Transcript</li><li>Subtitles</li><li>Translation</li><li>Dubbing</li></ul>
         </section>
@@ -298,14 +297,13 @@
           <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
           <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>
           <div class="pricing-total"><span>Estimated total</span><span id="price-total">$0.00</span></div>
-          <p class="muted" style="font-size:0.76rem; margin-bottom:0;">
+          <p class="muted" style="font-size:0.78rem; margin-bottom:0;">
              {{ "%.1f"|format(free_minutes_remaining)|replace('.0', '') }} free minute{{ '' if free_minutes_remaining == 1 else 's' }}
-             left this month are applied automatically. Final cost is confirmed once we've processed the file.
-             <a href="/client/billing">See your plan &amp; usage →</a></p>
-          <p class="muted" style="font-size:0.76rem; margin-top:8px;">
-             Free minutes apply to <strong>Transcription only</strong> orders. Your results download once
-             you have chosen a plan (the Free plan is enough). Translation and dub orders are billed at the
-             normal rate from the first minute either way.</p>
+             left this month. <a href="/client/billing">Plan &amp; usage &rarr;</a></p>
+          <details class="od-more">
+            <summary>How free minutes apply</summary>
+            <p>Free minutes cover Instant AI transcription, and on Pro and Premium translation too. They are applied automatically, and the final cost is confirmed once we have processed the file. Results download once you have chosen a plan. Dubbing and human review are billed from the first minute.</p>
+          </details>
         </div>
       </div>
     </div>
@@ -319,8 +317,7 @@
           <div><dt>Service</dt><dd id="rv-service">-</dd></div>
           <div><dt>Estimated total</dt><dd id="rv-total">-</dd></div>
         </dl>
-        <p class="muted" style="margin:10px 0 0; font-size:0.86rem;">Use Back to change anything. If your free minutes or prepaid
-           credits don't cover this order, you'll pay securely on the next page before processing starts.</p>
+        <p class="muted" style="margin:10px 0 0; font-size:0.86rem;">If your minutes or credits don't cover this order, you pay securely on the next page before processing starts.</p>
       </div>
       <h3 class="wizard-subtitle">Optional details</h3>
       <label>Project / folder (optional)
@@ -330,8 +327,7 @@
           {% for f in folders %}<option value="{{ f }}">{% endfor %}
         </datalist>
       </label>
-      <p class="muted" style="margin-top:-8px;">Group related orders together - pick an existing one or type a new
-         name. Shows up as a filter on your order list below.</p>
+      <p class="muted" style="margin-top:-8px;">Optional. Groups related orders and adds a filter to your list.</p>
 
       <label class="checkbox">
         <input type="checkbox" name="instr_speaker_ids" value="1" {% if form_values.get('instr_speaker_ids') %}checked{% endif %}>
@@ -353,9 +349,7 @@
           <div><strong>Full verbatim</strong><p>Every false start, stutter and filler word, exactly as spoken - for legal/research use.</p></div>
         </label>
       </fieldset>
-      <p class="muted" style="font-size:0.82rem; margin-top:-8px;">Not sure which one you need, or want to
-         see exactly how we punctuate, label speakers and format captions by default before deciding?
-         <a href="/formatting-standards" target="_blank" rel="noopener">See our formatting standards →</a></p>
+      <p class="muted" style="font-size:0.82rem; margin-top:-8px;"><a href="/formatting-standards" target="_blank" rel="noopener">See how we format by default &rarr;</a></p>
 
       <details class="accordion" {% if form_values.get('instr_transcribe_lyrics') or form_values.get('instr_use_italics') or form_values.get('instr_existing_subs', 'ignore') != 'ignore' or form_values.get('instr_no_audio', 'tag') != 'tag' or form_values.get('instr_wrong_language', 'tag') != 'tag' or form_values.get('instr_instrumental_only', 'tag') != 'tag' or form_values.get('instr_notes') %}open{% endif %}>
         <summary>+ Advanced settings (optional)</summary>
@@ -397,18 +391,13 @@
           <label style="margin-top:4px;">Style guide or reference file (optional)
             <input type="file" name="style_guide">
           </label>
-          <p class="muted" style="margin-top:-8px;">Terminology, names, brand standards - anything that helps us transcribe and dub this more accurately. Want something different from our own
-             <a href="/formatting-standards" target="_blank" rel="noopener">default formatting</a>? Upload
-             your own style guide here and we'll follow it instead, wherever the two disagree - you'll be
-             able to see it was received and re-download it from this order's page.</p>
+          <p class="muted" style="margin-top:-8px;">Terminology, names, brand standards. We follow it over our <a href="/formatting-standards" target="_blank" rel="noopener">defaults</a>.</p>
 
           <label>Anything else we should know?
             <textarea name="instr_notes" rows="2"
-                      placeholder="e.g. there's a Swahili section around the 4-minute mark in this otherwise-English video">{{ form_values.get('instr_notes', '') }}</textarea>
+                      placeholder="e.g. a Spanish section around the 4-minute mark in this otherwise-English video">{{ form_values.get('instr_notes', '') }}</textarea>
           </label>
-          <p class="muted" style="margin-top:-8px;">If your file mixes languages in different sections -
-             mostly English with a Swahili or Kikuyu part, for example - mention it here so the editor
-             knows to expect the switch.</p>
+          <p class="muted" style="margin-top:-8px;">If the file mixes languages, say where, so the editor expects the switch.</p>
         </div>
       </details>
     </div>
@@ -449,16 +438,15 @@
 </script>
 {% endif %}
 
-<div class="card" style="margin-top:32px;">
+<div class="card" style="margin-top:20px;">
   <h2 style="margin-top:0;">YouTube auto-import</h2>
-  <p class="muted" style="font-size:0.86rem;">Track a channel or playlist and we'll check it periodically for new
-     public uploads - they show up below to turn into an order with one click, instead of you having to go check
-     YouTube yourself. This only <em>detects</em> new videos; nothing is ever processed or billed until you
-     actually submit an order for one.</p>
+  <p class="muted" style="font-size:0.86rem;">Track a channel or playlist and new public uploads show up here as one-click orders.</p>
+  <details class="od-more"><summary>How it works</summary>
+    <p>We check periodically and only detect new videos. Nothing is processed or billed until you submit an order for one.</p>
+  </details>
 
   {% if not youtube_polling_configured %}
-  <p class="muted" style="font-size:0.85rem;">Not set up yet on our end - ask us if you'd like this enabled for
-     your account.</p>
+  <p class="muted" style="font-size:0.85rem;">Not enabled for your account yet. Ask us to switch it on.</p>
   {% else %}
     {% if request.query_params.get('yt_added') %}<p class="ok">✓ Now watching that channel.</p>{% endif %}
     {% if request.query_params.get('yt_error') == 'unrecognized' %}<p class="error">Couldn't recognize that as a YouTube channel or playlist link.</p>{% endif %}

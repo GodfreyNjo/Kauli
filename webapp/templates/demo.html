@@ -4,7 +4,9 @@
 {% block title %}Book a demo - see Kauli on your own audio and video{% endblock %}
 {% block head_extra %}
 <meta name="description" content="Book a 30-minute Kauli demo: we run your own file or YouTube link live, then talk through languages, human review, the API, integrations and pricing for your team.">
-<link rel="canonical" href="{{ request.base_url }}demo">
+<meta property="og:title" content="Book a Kauli demo">
+<meta property="og:description" content="We run your own file or YouTube link live, then talk through languages, human review, the API, integrations and pricing.">
+<meta property="og:type" content="website">
 {% include "_ga.html" %}
 {% endblock %}{% block content %}
 {% include "_nav.html" %}

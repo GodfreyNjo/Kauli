@@ -1,12 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Pay for order{% endblock %}
+{% set translated = true %}
+{% block title %}{{ t('pay_summary') }}{% endblock %}
 {% block content %}
 {% set show_mobile_money = mpesa_ok(request, user) %}
 {% set bank_allowed = bank_ok(user) %}
-{% set tier_name = 'Human-reviewed' if order['review_tier'] == 'human' else 'Instant AI' %}
-{% set service_names = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
+{% set tier_name = t('tier_human') if order['review_tier'] == 'human' else t('tier_ai') %}
+{% set service_names = {'transcribe': t('svc_transcribe'), 'translate': t('svc_translate'), 'dub': t('svc_dub')} %}
 <div class="pay-wrap">
-  <a href="/client" class="breadcrumb">&larr; back to my orders</a>
+  <a href="/client" class="breadcrumb">&larr; {{ t('pay_back') }}</a>
 
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -47,30 +48,30 @@
   {% endif %}
 
   {% if order['status'] != 'pending_payment' %}
-    <div class="pay-card"><p class="ok" style="margin:0;">This order's already paid for - <a href="/client/orders/{{ order['id'] }}">view it here</a>.</p></div>
+    <div class="pay-card"><p class="ok" style="margin:0;">{{ t('pay_paid') }} <a href="/client/orders/{{ order['id'] }}">{{ t('view') }}</a></p></div>
   {% else %}
   <div class="pay-grid">
     <section class="pay-card pay-summary" aria-labelledby="pay-file">
-      <span class="pay-chip">Order summary</span>
+      <span class="pay-chip">{{ t('pay_summary') }}</span>
       <h1 class="pay-file" id="pay-file" title="{{ order['original_filename'] }}">{{ order['original_filename'] }}</h1>
       <dl class="pay-facts">
-        <div><dt>Length</dt><dd>{{ "%.1f"|format(order['duration_minutes'] or 0) }} minutes</dd></div>
-        <div><dt>Service</dt><dd>{{ service_names.get(order['service_level'], order['service_level']) }}</dd></div>
-        <div><dt>Delivery</dt><dd>{{ tier_name }}</dd></div>
+        <div><dt>{{ t('pay_length') }}</dt><dd>{{ t('minutes_n', n="%.1f"|format(order['duration_minutes'] or 0)) }}</dd></div>
+        <div><dt>{{ t('pay_service') }}</dt><dd>{{ service_names.get(order['service_level'], order['service_level']) }}</dd></div>
+        <div><dt>{{ t('pay_delivery') }}</dt><dd>{{ tier_name }}</dd></div>
         {% if has_video_addon %}<div><dt>Add-on</dt><dd>Video deliverables (burned captions + dubbed video)</dd></div>{% endif %}
       </dl>
-      <div class="pay-total"><span>Total due</span><b>${{ "%.2f"|format(order['cost_usd']) }}</b></div>
-      <p class="pay-sub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>Processing starts the moment this is confirmed.</p>
+      <div class="pay-total"><span>{{ t('pay_total') }}</span><b>${{ "%.2f"|format(order['cost_usd']) }}</b></div>
+      <p class="pay-sub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>{{ t('pay_starts') }}</p>
     </section>
 
     <form method="post" action="/client/orders/{{ order['id'] }}/pay" id="pay-form" class="pay-card pay-method">
-      <h2>Pay with</h2>
+      <h2>{{ t('pay_with') }}</h2>
       <div class="pay-options" role="radiogroup" aria-label="Payment method" id="provider-select">
         <label class="pay-option{% if not paystack_configured %} is-off{% endif %}">
           <input type="radio" name="provider" value="paystack" {% if not paystack_configured %}disabled{% else %}checked{% endif %}>
           <span class="pay-option-body">
-            <strong>{% if show_mobile_money %}Card, M-Pesa or Airtel Money{% else %}Card{% endif %}</strong>
-            <small>{% if paystack_configured %}Secure checkout by Paystack{% else %}Unavailable right now{% endif %}</small>
+            <strong>{% if show_mobile_money %}{{ t('pay_card_mobile') }}{% else %}{{ t('pay_card') }}{% endif %}</strong>
+            <small>{% if paystack_configured %}{{ t('pay_secure') }}{% else %}Unavailable right now{% endif %}</small>
           </span>
         </label>
         {% if show_mobile_money %}
@@ -92,11 +93,11 @@
       {% endif %}
       <p class="pay-note" id="bank-note" hidden>We'll email transfer instructions and confirm manually once
          it lands - usually within one business day.</p>
-      <button type="submit" id="pay-submit" class="pay-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
+      <button type="submit" id="pay-submit" class="pay-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>{{ t('pay_btn', amount='$' ~ "%.2f"|format(order['cost_usd'])) }}</button>
       <ul class="pay-trust" aria-label="Why it is safe to pay">
-        <li>Card details go straight to Paystack. We never see them.</li>
-        <li>The price above is final. No hidden fees.</li>
-        <li>Your files stay private in your account.</li>
+        <li>{{ t('pay_t1') }}</li>
+        <li>{{ t('pay_t2') }}</li>
+        <li>{{ t('pay_t3') }}</li>
       </ul>
     </form>
   </div>

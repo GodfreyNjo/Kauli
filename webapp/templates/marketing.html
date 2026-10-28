@@ -1,31 +1,54 @@
 {% extends "base.html" %}
 {% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
-{% block title %}Audio &amp; Video Transcription in 70+ Languages - Swahili, Kikuyu Dubbing &amp; Subtitles{% endblock %}
+{% block title %}Audio &amp; Video Transcription in 70+ Languages, Dubbing &amp; Subtitles{% endblock %}
 {% block head_extra %}
-<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, from {{ '%.2f'|format(price_card['transcribe']['ai']) }} USD per minute - plus AI translation, dubbing and subtitles, with optional human review. Specialists in Swahili and Kikuyu. Pay as you go, first {{ free_minutes|int }} minutes free.">
-<meta property="og:title" content="Kauli - Audio &amp; video transcription in 70+ languages, with Swahili and Kikuyu done right">
+<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, from {{ '%.2f'|format(price_card['transcribe']['ai']) }} USD per minute - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
+<meta property="og:title" content="Kauli - Audio &amp; video transcription in 70+ languages, with human review when it counts">
 <meta property="og:description" content="Instant AI transcription, translation and dubbing - or add a real human reviewer. Transparent per-minute pricing, pay as you go.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png">
-<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/static/kauli-icon.png">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "Organization",
+  "@id": "{{ site_origin() }}/#organization",
   "name": "Kauli",
-  "alternateName": "Kauli by Forge Media Services",
-  "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/",
-  "logo": "{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png",
+  "alternateName": ["Kauli by Forge Media Services"],
+  "url": "{{ site_origin() }}/",
+  "logo": "{{ site_origin() }}/static/kauli-logo-full.png",
+  "image": "{{ site_origin() }}/static/kauli-social.png",
+  "description": "Kauli turns audio and video into transcripts, subtitles, translations and dubbed audio in {{ language_total }} languages, with human review in selected languages.",
   "email": "{{ email }}",
+  "contactPoint": [{ "@type": "ContactPoint", "contactType": "customer support", "email": "{{ email }}", "availableLanguage": ["English", "Swahili", "Kikuyu"] }],
+  "knowsLanguage": ["en", "sw", "ki", "es", "zh", "ar", "fr", "pt", "de", "hi", "ja", "ko"],
+  "knowsAbout": ["Audio transcription", "Video transcription", "Subtitles and captions", "Video dubbing", "Translation", "Swahili", "Kikuyu"],
   "areaServed": "Worldwide",
   "paymentAccepted": "Card, M-Pesa",
   "founder": { "@type": "Person", "name": "Godfrey Njoroge" },
   "parentOrganization": { "@type": "Organization", "name": "Forge Media Services" },
   "location": [
-    { "@type": "Place", "name": "Kauli Nairobi", "address": { "@type": "PostalAddress", "streetAddress": "9th floor, Nation Centre, Kimathi Street", "addressLocality": "Nairobi", "addressCountry": "KE" } },
-    { "@type": "Place", "name": "Kauli Dallas", "address": { "@type": "PostalAddress", "streetAddress": "3710 Rawlins St, Suite 1420", "addressLocality": "Dallas", "addressRegion": "TX", "postalCode": "75219", "addressCountry": "US" } }
+    { "@type": "Place", "name": "Kauli Nairobi", "url": "{{ site_origin() }}/locations/nairobi", "address": { "@type": "PostalAddress", "streetAddress": "9th floor, Nation Centre, Kimathi Street", "addressLocality": "Nairobi", "addressCountry": "KE" } },
+    { "@type": "Place", "name": "Kauli Dallas", "url": "{{ site_origin() }}/locations/dallas", "address": { "@type": "PostalAddress", "streetAddress": "3710 Rawlins St, Suite 1420", "addressLocality": "Dallas", "addressRegion": "TX", "postalCode": "75219", "addressCountry": "US" } }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Kauli",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "url": "{{ site_origin() }}/",
+  "publisher": { "@id": "{{ site_origin() }}/#organization" },
+  "inLanguage": ["en", "es", "zh", "ar", "fr", "pt", "de", "hi", "ja", "ko", "sw"],
+  "offers": [
+    { "@type": "Offer", "name": "Free", "price": "0", "priceCurrency": "USD" },
+    { "@type": "Offer", "name": "Pro, monthly", "price": "{{ plans['pro']['price_usd'] }}", "priceCurrency": "USD" },
+    { "@type": "Offer", "name": "Pro, yearly", "price": "{{ plans['pro']['price_usd_year'] }}", "priceCurrency": "USD" },
+    { "@type": "Offer", "name": "Premium, monthly", "price": "{{ plans['premium']['price_usd'] }}", "priceCurrency": "USD" },
+    { "@type": "Offer", "name": "Premium, yearly", "price": "{{ plans['premium']['price_usd_year'] }}", "priceCurrency": "USD" }
   ]
 }
 </script>
@@ -34,7 +57,7 @@
   "@context": "https://schema.org",
   "@type": "WebSite",
   "name": "Kauli",
-  "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/"
+  "url": "{{ site_origin() }}/"
 }
 </script>
 <script type="application/ld+json">
@@ -42,7 +65,7 @@
   "@context": "https://schema.org",
   "@type": "Product",
   "name": "Kauli",
-  "description": "Instant AI transcription in 70+ languages, plus translation, dubbing and subtitles for Swahili, Kikuyu and English with optional human review. Priced per audio-minute.",
+  "description": "Instant AI transcription in 70+ languages, plus translation, dubbing and subtitles, with optional human review in {{ human_review_languages }}. Priced per audio-minute.",
   "brand": { "@type": "Brand", "name": "Forge Media Services" },
   "offers": [
     {% for key, sl in service_levels.items() %}
@@ -128,7 +151,7 @@
     <section class="tk-langs" aria-labelledby="langs-title">
       <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
       <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
-      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Swahili and Kikuyu. More languages are coming soon.</p>
+      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Chinese, Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
       <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
         {% for copy in (1, 2) %}
         <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
@@ -471,7 +494,7 @@
 
       <ul class="pz-trust" aria-label="Why it is safe to start">
         <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
-          <div><strong>Safe payments</strong><span>Card details go straight to Paystack{% if in_kenya %}, and M-Pesa PINs to Safaricom{% endif %}. We never see them.</span></div></li>
+          <div><strong>Secure payment via Paystack</strong></div></li>
         <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></span>
           <div><strong>No surprises</strong><span>The exact price is shown before you confirm any order. No hidden fees.</span></div></li>
         <li><span class="pz-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
@@ -492,7 +515,7 @@
       {% set save_pro = billing_saving(pro) %}{% set save_prem = billing_saving(prem) %}
       <div class="pz-plans" id="pz-plans">
         <h3 class="pz-plans-title">Monthly plans</h3>
-        <p class="pz-plans-sub">Commit once and Instant AI minutes are included every month, with a discount on everything beyond them. Pay yearly and keep even more.</p>
+        <p class="pz-plans-sub">Commit once and Instant AI minutes, for both transcription and translation, are included every month, with a discount on everything beyond them. Pay yearly and keep even more.</p>
         <div class="pz-interval" role="group" aria-label="Billing period">
           <button type="button" class="is-on" data-interval="month" aria-pressed="true">Monthly</button>
           <button type="button" data-interval="year" aria-pressed="false">Yearly <em>save up to {{ [save_pro, save_prem]|max }}%</em></button>
@@ -504,7 +527,7 @@
             <p class="pz-plan-price"><span class="pz-m"><b>${{ pro['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(pro['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ pro['price_usd_year'] }} a year</span></span></p>
             <p class="pz-save pz-y">Save {{ save_pro }}% with yearly</p>
             <ul class="pz-list">
-              <li><strong>{{ pro['included_ai_minutes']|int }} Instant AI minutes</strong> included every month</li>
+              <li><strong>{{ pro['included_ai_minutes']|int }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
               <li>{{ (pro['discount'] * 100)|round|int }}% off everything beyond that</li>
               <li>Downloads and delivery unlocked</li>
               {% if meetings_enabled() %}<li>Kauli can join your meetings</li>{% endif %}
@@ -519,7 +542,7 @@
             <p class="pz-plan-price"><span class="pz-m"><b>${{ prem['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(prem['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ prem['price_usd_year'] }} a year</span></span></p>
             <p class="pz-save pz-y">Save {{ save_prem }}% with yearly</p>
             <ul class="pz-list">
-              <li><strong>{{ prem['included_ai_minutes']|int }} Instant AI minutes</strong> included every month</li>
+              <li><strong>{{ prem['included_ai_minutes']|int }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
               <li>{{ (prem['discount'] * 100)|round|int }}% off everything beyond that</li>
               <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
               <li>Priority-quality translation and faster turnaround</li>

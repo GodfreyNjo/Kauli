@@ -26,7 +26,7 @@ def test_an_audio_upload_plays_with_live_captions_and_a_transcript_that_follows(
     order = _finished(env, wav_bytes)
     page = env.client.get(f"/client/orders/{order['id']}").text
     assert 'class="order-audio-stage"' in page and f'src="/client/orders/{order["id"]}/download/source"' in page
-    assert 'id="order-caption-overlay"' in page and "Press play to preview your result" in page
+    assert 'id="order-caption-overlay"' in page and "Tap any line of the transcript to jump to it." in page
     assert "highlight(media.currentTime * 1000)" in page and 'row.addEventListener("click"' in page
     import os
     if os.environ.get("ORDER_DUMP_PATH"):

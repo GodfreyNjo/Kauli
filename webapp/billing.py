@@ -133,6 +133,17 @@ FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - AI transcription only, preview
 # until a real paid order covers it.
 FREE_MINUTES_SERVICE_LEVEL = "transcribe"
 
+
+def allowance_covers(plan: str, service_level: str, review_tier: str) -> bool:
+    """Whether a plan's monthly included minutes pay for an order. Instant AI only (a person's time is never free).
+    Every plan's allowance covers transcription; the paid plans' also covers Instant AI translation, so 150 or 400
+    minutes can be spent on transcripts, translations or any mix. Dubbing is always priced on its own."""
+    if review_tier != "ai":
+        return False
+    if service_level == FREE_MINUTES_SERVICE_LEVEL:
+        return True
+    return service_level == "translate" and plan in ("pro", "premium", "enterprise")
+
 # Until an account has chosen a plan it only gets to read this share of a
 # finished transcript on screen; the rest is hidden (see app.py's
 # _transcript_teaser). Choosing the Free plan - which costs nothing - shows it all.
@@ -173,12 +184,12 @@ PLANS = {
     "pro": {
         "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.10, "included_ai_minutes": 150,
         "mt": "local", "video_deliverables": False, "support": "Email",
-        "blurb": "150 Instant AI minutes every month, 10% off everything else, email support.",
+        "blurb": "150 Instant AI minutes every month for transcription and translation, 10% off everything else, email support.",
     },
     "premium": {
         "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": 400,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
-        "blurb": "400 Instant AI minutes every month, 20% off everything else, burned captions & dubbed video "
+        "blurb": "400 Instant AI minutes every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
                  "included, priority-quality translation and turnaround.",
     },
     # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).

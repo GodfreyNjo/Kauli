@@ -61,6 +61,13 @@
     </article>
   </div>
 
+  <div class="hd-video" id="hd-video-box" role="region" aria-labelledby="hd-video-title" hidden>
+    <h2 id="hd-video-title">Watch it as a video</h2>
+    <p class="hd-video-sub" id="hd-video-sub"></p>
+    <video id="hd-video" controls playsinline preload="metadata" width="960" height="540"></video>
+    <p class="hd-fine" id="hd-video-note"></p>
+  </div>
+
   <audio id="hd-audio" preload="none"></audio>
 
   <div class="hd-convert">
@@ -75,4 +82,4 @@
   </div>
 </div>
 <script type="application/json" id="hd-data">{{ demo|tojson }}</script>
-<script src="/static/hear_demo.js?v=2" defer></script>
+<script src="/static/hear_demo.js?v=3" defer></script>

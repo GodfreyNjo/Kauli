@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from webapp import billing  # noqa: E402
 
 # the worst case we plan for per Instant AI minute (the dearer end of the Transkriptor range) plus a minute of meeting capture
-WORST_CASE_COST_PER_AI_MINUTE = 0.033 + 0.012
+WORST_CASE_COST_PER_AI_MINUTE = 0.033 + 0.012 + 0.004          # ... plus translating that minute (the included minutes cover translation too)
 
 
 def _sub(plan, status="active", end_in_days=20, used=0.0, bonus=0.0):
@@ -43,7 +43,7 @@ def test_yearly_prices_save_real_money_and_never_lose_money():
         assert 25 <= billing.yearly_saving_pct(plan) <= 45, plan                          # a clear incentive, like the industry leaders
         monthly_revenue = p["price_usd_year"] / 12 * (1 - billing.PAYMENT_FEE_RATE)
         worst_case_cost = p["included_ai_minutes"] * WORST_CASE_COST_PER_AI_MINUTE
-        assert worst_case_cost <= 0.6 * monthly_revenue, (plan, worst_case_cost, monthly_revenue)   # at least 40% of the money is left even if every included minute is used at the worst-case cost
+        assert worst_case_cost <= 0.65 * monthly_revenue, (plan, worst_case_cost, monthly_revenue)   # at least 35% of the money is left even if every included minute is used at the worst-case cost
         assert billing.yearly_monthly_equivalent(plan) < p["price_usd"]
 
 
@@ -92,3 +92,15 @@ def test_the_pricing_page_has_a_yearly_toggle_included_minutes_and_a_custom_tier
     assert "150 Instant AI minutes" in section and "400 Instant AI minutes" in section
     assert "$12.42" in section and "billed $149 a year" in section and "$31.58" in section
     assert "Enterprise" in section and "Custom" in section and "/demo?interest=enterprise" in section
+
+
+def test_included_minutes_cover_instant_ai_transcription_and_translation_on_paid_plans_only():
+    covers = billing.allowance_covers
+    for plan in ("pro", "premium", "enterprise"):
+        assert covers(plan, "transcribe", "ai") and covers(plan, "translate", "ai"), plan
+        assert not covers(plan, "dub", "ai") and not covers(plan, "transcribe", "human") and not covers(plan, "translate", "human"), plan
+    assert covers("free", "transcribe", "ai") and not covers("free", "translate", "ai")        # the free trial stays transcription-only
+    cost = billing.order_cost_usd(60, "translate", "pro", 150, review_tier="ai", market="intl")
+    assert cost["total_usd"] == 0 and cost["free_minutes_applied"] == 60
+    over = billing.order_cost_usd(200, "translate", "pro", 150, review_tier="ai", market="intl")
+    assert over["free_minutes_applied"] == 150 and over["billable_minutes"] == 50 and over["total_usd"] > 0

@@ -24,7 +24,7 @@
   "name": {{ page.title|tojson }},
   "description": {{ page.meta_description|tojson }},
   "provider": { "@type": "Organization", "name": "Kauli",
-                "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
+                "url": "{{ site_origin() }}/" },
   "areaServed": "Worldwide",
   "url": "{{ request.url }}"
 }
@@ -35,7 +35,7 @@
   "@type": "BreadcrumbList",
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "Kauli",
-      "item": "{{ request.url.scheme }}://{{ request.url.netloc }}/" },
+      "item": "{{ site_origin() }}/" },
     { "@type": "ListItem", "position": 2, "name": {{ page.title|tojson }}, "item": "{{ request.url }}" }
   ]
 }
@@ -94,6 +94,29 @@
     </div>
   </section>
 
+  {% if page.choose %}
+  <section class="m-section" id="choose">
+    <div class="m-inner">
+      <h2 class="m-h2">Choose what fits</h2>
+      <p class="m-lede">Every job is different. Here is what each option gets you, so you can pick the one that fits yours.</p>
+      <div class="m-choose-grid">
+        {% for c in page.choose %}
+        <div class="m-choose-card">
+          <h3>{{ c.name }}</h3>
+          <p class="m-choose-best"><strong>Best for:</strong> {{ c.best }}</p>
+          <p>{{ c.get }}</p>
+        </div>
+        {% endfor %}
+      </div>
+      <p class="m-choose-links">
+        {% if page.demo %}<a class="btn secondary" href="/try?use={{ page.demo }}" data-cta="solution-demo">Hear and read a live demo</a>{% endif %}
+        <a href="/human-review">How human review works</a>
+        <a href="/#pricing">Plans and pricing</a>
+      </p>
+    </div>
+  </section>
+  {% endif %}
+
   <section class="m-section" id="pricing" style="background:var(--sidebar-bg); border-top:1px solid var(--border-subtle); border-bottom:1px solid var(--border-subtle);">
     <div class="m-inner narrow">
       <h2 class="m-h2">Transparent per-minute pricing</h2>
@@ -110,7 +133,8 @@
       </table>
       <p class="muted" style="margin-top:10px; font-size:0.85rem;">Per audio-minute, in USD. <strong>Instant AI</strong>
          is ready in minutes and is AI-generated - not reviewed by a person. <strong>Human-reviewed</strong> adds a real
-         editor who checks the result against the source audio before delivery (Swahili, Kikuyu and English; more languages are coming soon).</p>
+         editor who checks the result against the source audio before delivery ({{ human_review_languages }}; more languages are coming soon).</p>
+      <p class="muted" style="margin-top:10px; font-size:0.85rem;">With human review, accuracy reaches up to 99%, depending on audio quality.</p>
       <p class="muted" style="margin-top:14px; font-size:0.85rem;">Your first {{ free_minutes|int }} minutes are free
          to try. See the full breakdown, plans and add-ons on the <a href="/#pricing">main pricing
          section →</a></p>
@@ -156,6 +180,23 @@
       </div>
     </div>
   </section>
+
+  {% if guides %}
+  <section class="m-section" id="guides" style="border-top:1px solid var(--border-subtle);">
+    <div class="m-inner">
+      <h2 class="m-h2">Guides to read next</h2>
+      <div class="m-related-grid">
+        {% for g in guides %}
+        <a href="/blog/{{ g.slug }}" class="m-related-card">
+          <span class="m-related-kicker">Guide</span>
+          <span class="m-related-h1">{{ g.title }}</span>
+          <span class="m-related-arrow">Read the guide →</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   {% if related_pages %}
   <section class="m-section" id="related-services" style="border-top:1px solid var(--border-subtle);">

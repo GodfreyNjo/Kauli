@@ -86,3 +86,12 @@ def test_instant_ai_reaches_the_ticked_state_with_no_staff_approval(env, wav_byt
     assert done["status"] == "ready_for_delivery"                      # nobody approved anything
     page = env.client.get(f"/client/orders/{ai['id']}").text
     assert page.count("order-progress-done") == 3 and "order-progress-current" not in page
+
+
+def test_the_progress_panel_styles_cannot_leak_onto_other_elements_called_live():
+    """The "Available" badges on the home page carry a class named live; an unscoped .live rule once turned each into a
+    large padded card."""
+    import re
+    css = (Path(__file__).parent.parent / "webapp/static/style.css").read_text(encoding="utf-8")
+    assert not re.search(r"^\.live[\s,{.:]", css, re.M), "unscoped .live rule"      # unscoped
+    assert re.search(r"^section\.live\s*\{", css, re.M)

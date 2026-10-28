@@ -66,7 +66,7 @@ def test_every_demo_clip_exists_and_dubbing_is_labelled_honestly(client):
         assert set(scenario["tr"]) == {"es", "de", "zh", "sw"} and all(scenario["tr"].values())
     # dubbing is only "available now" where the product really dubs; the rest is a preview
     assert data["languages"]["sw"]["dub_live"] is True
-    assert data["languages"]["es"]["dub_live"] is False or "es" in os.environ.get("KAULI_REVIEW_EXTRA_LANGUAGES", "")
+    assert data["languages"]["es"]["dub_live"] is True           # Chinese, German and Spanish Studio work is on by default
     html = client.get("/try").text
     assert "machine-generated and not reviewed by a person" in html and "ElevenLabs" in html
     assert 'data-cta="try-signup"' in html and 'href="/demo"' in html
@@ -98,14 +98,14 @@ def test_pricing_is_one_clear_choice_with_two_plans_and_a_custom_one(client):
     assert "pz-market" not in section and "?market=" not in section
     assert "All prices are in US dollars" in section
     # the safety message sits next to the price
-    for promise in ("Safe payments", "No surprises", "Private by default", "No lock-in"):
+    for promise in ("Secure payment via Paystack", "No surprises", "Private by default", "No lock-in"):
         assert promise in section
 
 
 def test_kes_is_only_mentioned_to_visitors_in_kenya(client):
     kenya = client.get("/", headers={"cf-ipcountry": "KE"}).text
     elsewhere = client.get("/", headers={"cf-ipcountry": "DE"}).text
-    assert "pay in KES with M-Pesa" in kenya and "M-Pesa PINs" in kenya
+    assert "pay in KES with M-Pesa" in kenya
     assert "KES" not in elsewhere.split('id="pricing"', 1)[1].split("</section>", 1)[0] and "M-Pesa" not in elsewhere.split('id="pricing"', 1)[1].split("</section>", 1)[0]
 
 

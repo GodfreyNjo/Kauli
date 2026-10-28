@@ -1,15 +1,21 @@
 {% extends "base.html" %}
+{% set translated = true %}
+{% from "_lang_switch.html" import lang_dropdown with context %}
 {% block theme %}light{% endblock %}
 {% block theme_locked %}1{% endblock %}
 {% block body_class %}auth-page{% endblock %}
-{% block title %}Sign in or create an account{% endblock %}
+{% block title %}{{ t('lg_signin') }} / {{ t('lg_create') }}{% endblock %}
 {% block head_extra %}
 <meta name="description" content="Sign in to Kauli to manage your transcription, subtitle, translation and dubbing projects and download your files, or create an account.">
 {% endblock %}
 {% block content %}
+{% set terms_link %}<a href="/terms">{{ t('lg_terms') }}</a>{% endset %}
+{% set privacy_link %}<a href="/privacy">{{ t('lg_privacy') }}</a>{% endset %}
+{% set cookies_link %}<a href="/privacy#cookies">{{ t('lg_cookies') }}</a>{% endset %}
 <div class="auth-shell auth-shell--welcome">
   <div class="auth-form-panel">
     <div class="auth-form-inner">
+      <div class="auth-lang">{{ lang_dropdown('/login?mode=signup' if mode == 'signup' else '/login') }}</div>
       <div class="auth-brand">
         <a href="/" aria-label="Kauli - back to home">
           <picture>
@@ -19,85 +25,82 @@
         </a>
       </div>
 
-      <div class="auth-tabs" role="group" aria-label="Sign in or create an account">
-        <button type="button" class="auth-tab {{ 'active' if mode != 'signup' else '' }}" data-show="panel-signin" aria-pressed="{{ 'true' if mode != 'signup' else 'false' }}">Sign in</button>
-        <button type="button" class="auth-tab {{ 'active' if mode == 'signup' else '' }}" data-show="panel-signup" aria-pressed="{{ 'true' if mode == 'signup' else 'false' }}">Create account</button>
+      <div class="auth-tabs" role="group">
+        <button type="button" class="auth-tab {{ 'active' if mode != 'signup' else '' }}" data-show="panel-signin" aria-pressed="{{ 'true' if mode != 'signup' else 'false' }}">{{ t('lg_signin') }}</button>
+        <button type="button" class="auth-tab {{ 'active' if mode == 'signup' else '' }}" data-show="panel-signup" aria-pressed="{{ 'true' if mode == 'signup' else 'false' }}">{{ t('lg_create') }}</button>
       </div>
 
       <div class="auth-panel" id="panel-signin" {% if mode == 'signup' %}hidden{% endif %}>
-        <h1>Welcome back</h1>
-        <p class="auth-sub">Sign in to continue.</p>
+        <h1>{{ t('lg_welcome') }}</h1>
+        <p class="auth-sub">{{ t('lg_signin_sub') }}</p>
         {% if mode == 'signin' and error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
         {% if mode == 'signin' and notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
         <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
           {% include "_google_g_icon.svg" %}
-          Continue with Google
+          {{ t('lg_google') }}
         </a>
-        <div class="auth-divider"><span>or</span></div>
+        <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/login">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
-            <span class="auth-field-label">Email address</span>
+            <span class="auth-field-label">{{ t('lg_email') }}</span>
             <input type="email" name="email" placeholder="you@example.com" required autocomplete="username" autocapitalize="off" spellcheck="false" {% if mode != 'signup' %}autofocus{% endif %}>
           </label>
           <label class="auth-field">
-            <span class="auth-field-label">Password</span>
+            <span class="auth-field-label">{{ t('lg_password') }}</span>
             <span class="auth-input-icon-group">
-              <input type="password" name="password" placeholder="Your password" required minlength="6" autocomplete="current-password" class="auth-password-input">
+              <input type="password" name="password" placeholder="{{ t('lg_password') }}" required minlength="6" autocomplete="current-password" class="auth-password-input">
               <button type="button" class="auth-password-toggle" aria-label="Show password" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
               </button>
             </span>
           </label>
-          <p class="auth-forgot"><a href="/forgot-password">Forgot your password?</a></p>
-          <button type="submit">Sign in</button>
+          <p class="auth-forgot"><a href="/forgot-password">{{ t('lg_forgot') }}</a></p>
+          <button type="submit">{{ t('lg_btn_signin') }}</button>
         </form>
-        <p class="auth-switch">New here? <button type="button" class="auth-link-btn" data-show="panel-signup">Create a free account</button></p>
-        <p class="auth-consent">By signing in, you agree to Kauli's <a href="/terms">Terms of Service</a>,
-           <a href="/privacy">Privacy Policy</a> and <a href="/privacy#cookies">Cookie Policy</a>.</p>
+        <p class="auth-switch">{{ t('lg_new_here') }} <button type="button" class="auth-link-btn" data-show="panel-signup">{{ t('lg_create_link') }}</button></p>
+        <p class="auth-consent">{{ t('lg_consent_in', terms=terms_link, privacy=privacy_link, cookies=cookies_link) }}</p>
       </div>
 
       <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
-        <h1>Create your free account</h1>
-        <p class="auth-sub">Your first {{ free_minutes|int }} minutes are free.</p>
+        <h1>{{ t('lg_create_title') }}</h1>
+        <p class="auth-sub">{{ t('lg_create_sub', n=free_minutes|int) }}</p>
         {% if mode == 'signup' and error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
         <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
           {% include "_google_g_icon.svg" %}
-          Continue with Google
+          {{ t('lg_google') }}
         </a>
-        <div class="auth-divider"><span>or</span></div>
+        <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/signup" id="signup-form">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
-            <span class="auth-field-label">Email address</span>
+            <span class="auth-field-label">{{ t('lg_email') }}</span>
             <input type="email" name="email" value="{{ email or '' }}" placeholder="you@example.com" required autocomplete="email" autocapitalize="off" spellcheck="false" {% if mode == 'signup' %}autofocus{% endif %}>
           </label>
           <label class="auth-field">
-            <span class="auth-field-label">Password</span>
+            <span class="auth-field-label">{{ t('lg_password') }}</span>
             <span class="auth-input-icon-group">
-              <input type="password" name="password" id="signup-password" placeholder="Create a password" required minlength="{{ password_min_length }}" autocomplete="new-password" aria-describedby="signup-password-checklist" class="auth-password-input">
+              <input type="password" name="password" id="signup-password" placeholder="{{ t('lg_password') }}" required minlength="{{ password_min_length }}" autocomplete="new-password" aria-describedby="signup-password-checklist" class="auth-password-input">
               <button type="button" class="auth-password-toggle" aria-label="Show password" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
               </button>
             </span>
           </label>
           <ul class="password-checklist" id="signup-password-checklist">
-            <li data-rule="length">At least {{ password_min_length }} characters</li>
-            <li data-rule="lower">A lowercase letter</li>
-            <li data-rule="upper">An uppercase letter</li>
-            <li data-rule="digit">A number</li>
-            <li data-rule="symbol">A symbol (e.g. ! @ # $ %)</li>
+            <li data-rule="length">{{ t('pw_len', n=password_min_length) }}</li>
+            <li data-rule="lower">{{ t('pw_lower') }}</li>
+            <li data-rule="upper">{{ t('pw_upper') }}</li>
+            <li data-rule="digit">{{ t('pw_digit') }}</li>
+            <li data-rule="symbol">{{ t('pw_symbol') }}</li>
           </ul>
           <label class="auth-checkbox-row">
             <input type="checkbox" name="marketing_consent" value="1" {% if marketing_consent %}checked{% endif %}>
-            <span>Send me Kauli tips and updates</span>
+            <span>{{ t('lg_tips') }}</span>
           </label>
-          <button type="submit">Create free account</button>
+          <button type="submit">{{ t('lg_btn_create') }}</button>
         </form>
-        <p class="auth-switch">Already have an account? <button type="button" class="auth-link-btn" data-show="panel-signin">Sign in</button></p>
-        <p class="auth-consent">By creating an account, you agree to Kauli's <a href="/terms">Terms of
-           Service</a>, <a href="/privacy">Privacy Policy</a> and <a href="/privacy#cookies">Cookie
-           Policy</a>, and to receive service emails needed to run your account.</p>
+        <p class="auth-switch">{{ t('lg_have_account') }} <button type="button" class="auth-link-btn" data-show="panel-signin">{{ t('lg_signin') }}</button></p>
+        <p class="auth-consent">{{ t('lg_consent_up', terms=terms_link, privacy=privacy_link, cookies=cookies_link) }}</p>
       </div>
     </div>
   </div>
@@ -110,12 +113,12 @@
       </picture>
     </a>
     <div class="auth-showcase">
-      <h2>Audio to text in minutes</h2>
-      <p class="auth-welcome-lede">Your first {{ free_minutes|int }} minutes are free.</p>
+      <h2>{{ t('lg_panel_h') }}</h2>
+      <p class="auth-welcome-lede">{{ t('lg_panel_sub', n=free_minutes|int) }}</p>
       <ul class="auth-facts">
-        <li><strong>{{ language_total }} languages</strong><span>Transcribe and translate</span></li>
-        <li><strong>Human review</strong><span>When it has to be right</span></li>
-        <li><strong>{{ free_minutes|int }} free minutes</strong><span>Every month</span></li>
+        <li><strong>{{ t('lg_f1_t', n=language_total) }}</strong><span>{{ t('lg_f1_s') }}</span></li>
+        <li><strong>{{ t('lg_f2_t') }}</strong><span>{{ t('lg_f2_s') }}</span></li>
+        <li><strong>{{ t('lg_f3_t', n=free_minutes|int) }}</strong><span>{{ t('lg_f3_s') }}</span></li>
       </ul>
     </div>
   </section>

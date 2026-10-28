@@ -1,53 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% set translated = true %}
+{% block title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
-{% from "_status_macros.html" import short_status, status_tone %}
+{% from "_status_macros.html" import short_status, status_tone with context %}
 
 <div class="ch">
   <div class="ch-top">
-    <h1>{{ greeting }}{% set fn = first_name(user) %}{% if fn %}, {{ fn }}{% endif %}</h1>
+    <h1>{{ t(greeting) }}{% set fn = first_name(user) %}{% if fn %}{{ {'zh': '，', 'ja': '、', 'ar': '،'}.get(ui_lang(), ', ') }}{{ fn }}{% endif %}</h1>
     {% if free_minutes_left and free_minutes_left > 0 %}
-    <a href="/client#order-form" class="ch-plan"><b>{{ free_minutes_left|round|int }}</b> free minutes left this month</a>
+    {% set free_n %}<b>{{ free_minutes_left|round|int }}</b>{% endset %}
+    <a href="/client#order-form" class="ch-plan">{{ t('free_left', n=free_n) }}</a>
     {% endif %}
   </div>
 
-  <div class="ch-actions" aria-label="Start something new">
+  <div class="ch-actions">
     <a class="ch-action" href="/client#order-form">
       <span class="ch-art ch-art-upload" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5M7 10l5-5 5 5M5 19h14"/></svg></span>
-      <strong>Upload files</strong><small>Audio or video</small>
+      <strong>{{ t('act_upload_t') }}</strong><small>{{ t('act_upload_s') }}</small>
     </a>
     <a class="ch-action" href="/client?source=youtube#order-form">
       <span class="ch-art ch-art-link" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
-      <strong>YouTube link</strong><small>No download needed</small>
+      <strong>{{ t('act_yt_t') }}</strong><small>{{ t('act_yt_s') }}</small>
     </a>
     <a class="ch-action" href="/try">
       <span class="ch-art ch-art-demo" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6M9 6v12M13 4v16M17 8v8M21 11v2"/></svg></span>
-      <strong>Hear a demo</strong><small>See what we make</small>
+      <strong>{{ t('act_demo_t') }}</strong><small>{{ t('act_demo_s') }}</small>
     </a>
     <a class="ch-action" href="/client/billing">
       <span class="ch-art ch-art-plan" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
-      <strong>Plans &amp; billing</strong><small>Save with a plan</small>
+      <strong>{{ t('act_plan_t') }}</strong><small>{{ t('act_plan_s') }}</small>
     </a>
   </div>
 
-  <div class="ch-pills" aria-label="Your orders at a glance">
-    <a href="/client"><b>{{ stats['in_progress'] }}</b> Processing</a>
-    <a href="/client"><b>{{ stats['in_review'] }}</b> In review</a>
-    <a href="/client" class="{{ 'is-attention' if stats['needs_you'] > 0 else '' }}"><b>{{ stats['needs_you'] }}</b> Needs you</a>
-    <a href="/client" class="is-ok"><b>{{ stats['completed'] }}</b> Ready</a>
+  <div class="ch-pills">
+    <a href="/client"><b>{{ stats['in_progress'] }}</b> {{ t('pill_processing') }}</a>
+    <a href="/client"><b>{{ stats['in_review'] }}</b> {{ t('pill_review') }}</a>
+    <a href="/client" class="{{ 'is-attention' if stats['needs_you'] > 0 else '' }}"><b>{{ stats['needs_you'] }}</b> {{ t('pill_needs') }}</a>
+    <a href="/client" class="is-ok"><b>{{ stats['completed'] }}</b> {{ t('pill_ready') }}</a>
   </div>
 
   <section class="ch-files" aria-labelledby="ch-files-title">
     <div class="ch-files-head">
-      <h2 id="ch-files-title">Recent files</h2>
+      <h2 id="ch-files-title">{{ t('recent_files') }}</h2>
       <div class="ch-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-        <input type="search" id="ch-search" placeholder="Search files" aria-label="Search your files" autocomplete="off"></div>
-      <a href="/client" class="ch-all">View all</a>
+        <input type="search" id="ch-search" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off"></div>
+      <a href="/client" class="ch-all">{{ t('view_all') }}</a>
     </div>
     {% if not recent_orders %}
     <div class="ch-empty">
-      <p>Nothing here yet. Upload your first file and it will show up here.</p>
-      <a href="/client#order-form" class="btn cta-olive">Upload files</a>
+      <p>{{ t('empty_files') }}</p>
+      <a href="/client#order-form" class="btn cta-olive">{{ t('act_upload_t') }}</a>
     </div>
     {% else %}
     <ul class="ch-list" id="ch-list">
@@ -57,14 +59,14 @@
           <span class="ch-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
           <span class="ch-row-main">
             <strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong>
-            <small>{{ o['created_at']|timestamp_to_str }} &middot; {{ "%.1f"|format(o['duration_minutes'] or 0) }} min &middot; {{ o['service_level']|replace('_', ' ')|capitalize }}</small>
+            <small>{{ o['created_at']|ts_ui }} &middot; {{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }} &middot; {{ t('svc_' ~ o['service_level']) if o['service_level'] in ('transcribe', 'translate', 'dub') else o['service_level']|replace('_', ' ')|capitalize }}</small>
           </span>
           <span class="ch-state ch-{{ status_tone(o['status']) }}">{{ short_status(o['status']) }}</span>
         </a>
       </li>
       {% endfor %}
     </ul>
-    <p class="ch-none" id="ch-none" hidden>No files match that search.</p>
+    <p class="ch-none" id="ch-none" hidden>{{ t('no_match') }}</p>
     {% endif %}
   </section>
 </div>

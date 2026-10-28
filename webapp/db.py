@@ -836,6 +836,10 @@ def init_db() -> None:
         # "two-factor is on" without an extra Supabase API round-trip on
         # every page load. Kept in sync at enroll/disable time.
         conn.execute("ALTER TABLE users ADD COLUMN mfa_enabled_at REAL")
+    if "ui_lang" not in existing_user_cols:
+        # The language this person's screens are shown in (webapp/ui_text.py): set from the translated site they
+        # arrived on or the language switcher, then followed from every device. NULL = never chosen = English.
+        conn.execute("ALTER TABLE users ADD COLUMN ui_lang TEXT")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank
@@ -1600,6 +1604,13 @@ def get_billing_market(user_id: str) -> str:
 def set_billing_market(user_id: str, market: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE users SET billing_market = ? WHERE id = ?", (market, user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_ui_lang(user_id: str, code: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET ui_lang = ? WHERE id = ?", (code, user_id))
     conn.commit()
     conn.close()
 
