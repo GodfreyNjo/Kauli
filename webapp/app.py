@@ -1317,6 +1317,27 @@ def _mobile_money_ok(request: Request, user) -> bool:
         return False
 
 
+def _first_name(user) -> str:
+    """What to call a client in a greeting. A real name ("Edwin G K") gives its first word. An account that only has
+    the start of its email address ("esirachewww6", "jane.doe42") gives the first letters-only chunk, without the
+    digits. Nothing usable gives an empty string, so the greeting simply drops the name."""
+    import re as _re
+    try:
+        name = (user["display_name"] or "").strip()
+        email_prefix = (user["email"] or "").split("@")[0].strip()
+    except (KeyError, IndexError, TypeError):
+        return ""
+    if not name:
+        name = email_prefix
+    looks_like_handle = name.lower() == email_prefix.lower() and " " not in name
+    word = name.split()[0] if name.split() else ""
+    if looks_like_handle:
+        word = next((c for c in _re.split(r"[^A-Za-z]+", name) if len(c) >= 3), "")
+    word = _re.sub(r"[^A-Za-z\u00C0-\u024F'\-]", "", word)
+    return (word[:1].upper() + word[1:].lower()) if len(word) >= 2 else ""
+
+
+templates.env.globals["first_name"] = _first_name
 templates.env.globals["bank_ok"] = _bank_transfer_ok
 templates.env.globals["mpesa_ok"] = _mobile_money_ok
 templates.env.globals["pending_count"] = lambda u: db.pending_orders_count(u["client_scope_id"]) if (u and u["role"] == "client") else 0

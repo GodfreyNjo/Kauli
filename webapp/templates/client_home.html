@@ -5,7 +5,7 @@
 
 <div class="ch">
   <div class="ch-top">
-    <h1>{{ greeting }}, {{ user['display_name'] or user['email'].split('@')[0] }}</h1>
+    <h1>{{ greeting }}{% set fn = first_name(user) %}{% if fn %}, {{ fn }}{% endif %}</h1>
     {% if free_minutes_left and free_minutes_left > 0 %}
     <a href="/client#order-form" class="ch-plan"><b>{{ free_minutes_left|round|int }}</b> free minutes left this month</a>
     {% endif %}

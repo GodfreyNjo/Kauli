@@ -49,3 +49,23 @@ def test_pending_tab_lists_unfinished_orders_and_shows_a_count(env, wav_bytes):
     conn.commit()
     conn.close()
     assert env.db.pending_orders_count("u1") == 1 and "clip.wav" in env.client.get("/client/pending").text
+
+
+def test_the_greeting_uses_a_first_name():
+    from webapp import app as app_mod
+    f = app_mod._first_name
+    assert f({"display_name": "Edwin G K", "email": "gkedwin9@gmail.com"}) == "Edwin"
+    assert f({"display_name": "amina yusuf", "email": "a@x.com"}) == "Amina"
+    assert f({"display_name": "esirachewww6", "email": "esirachewww6@gmail.com"}) == "Esirachewww"     # only an email start: no digits
+    assert f({"display_name": "jane.doe42", "email": "jane.doe42@x.com"}) == "Jane"
+    assert f({"display_name": None, "email": "wanjiku_k@x.com"}) == "Wanjiku"
+    assert f({"display_name": "", "email": "42@x.com"}) == ""                                           # nothing usable: no name
+
+
+def test_the_home_greeting_has_no_username_and_no_digits(env, wav_bytes):
+    conn = env.db.get_conn()
+    conn.execute("UPDATE users SET display_name = 'Edwin G K' WHERE id = 'u1'")
+    conn.commit()
+    conn.close()
+    page = env.client.get("/client/home").text
+    assert ", Edwin</h1>" in page and "G K" not in page.split("<h1>", 1)[1].split("</h1>", 1)[0]
