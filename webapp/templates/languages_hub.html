@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block theme %}dark{% endblock %}
+{% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}AI Transcription in {{ total }} Languages - Full Language List{% endblock %}
 {% block head_extra %}
@@ -32,7 +32,7 @@
     <p class="m-hero-sub">Upload audio or video, pick the spoken language and get a transcript back in minutes -
       from ${{ price }} per audio-minute. Instant AI translation works between all of them except Kikuyu; dubbing and human review are available for Swahili, Kikuyu and English.</p>
     <div class="m-hero-ctas">
-      <a href="/login?mode=signup" class="btn cta-olive">Transcribe free - first {{ free_minutes|int }} minutes on us</a>
+      <a href="/login?mode=signup" class="btn cta-olive" data-cta="languages-hub">Start a project</a>
       <a href="/#pricing" class="btn secondary">See pricing</a>
     </div>
     <p class="m-hero-note">Also available in:

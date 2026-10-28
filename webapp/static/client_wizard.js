@@ -106,16 +106,44 @@
     currentStep = n;
     logWizardEvent(String(n));
     $all(".wizard-pane").forEach((p) => { p.hidden = Number(p.dataset.pane) !== n; });
-    $all(".wizard-step").forEach((s) => {
+    $all(".wizard-step[data-step]").forEach((s) => {
       const stepNum = Number(s.dataset.step);
       s.classList.toggle("active", stepNum === n);
       s.classList.toggle("done", stepNum < n);
+      if (stepNum === n) s.setAttribute("aria-current", "step"); else s.removeAttribute("aria-current");
+      s.setAttribute("aria-disabled", String(stepNum >= n));   // only earlier steps are clickable
     });
     $("#wizard-back").hidden = n === 1;
     $("#wizard-next").hidden = n === TOTAL_STEPS;
     $("#wizard-submit").hidden = n !== TOTAL_STEPS;
     if (n === 2) updatePricing();
+    if (n === 3) { updatePricing(); updateReview(); }
     $(".wizard-card").scrollIntoView({ block: "start", behavior: "smooth" });
+  }
+
+  // "Review your order" summary on the last step - read straight off the
+  // controls the person already filled in, so it can never disagree with
+  // what is actually submitted.
+  function updateReview() {
+    const set = (id, text) => { const el = $("#" + id); if (el) el.textContent = text; };
+    const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
+    const file = $("#file-input").files[0];
+    set("rv-file", usingYoutube ? ($("#youtube-url-input").value.trim() || "-")
+                                : (file ? file.name : (resumedUploadKey ? "Your uploaded file" : "-")));
+    const src = $("#source-lang-select");
+    const tgtField = $("#target-lang-field");
+    const tgt = tgtField ? tgtField.querySelector("select") : null;
+    const srcText = src && src.selectedOptions[0] ? src.selectedOptions[0].text : "";
+    const showsTarget = tgtField && !tgtField.hidden;
+    const svc = $('input[name="service_level"]:checked');
+    const wantsTranslation = svc && svc.value !== "transcribe";
+    set("rv-langs", showsTarget && wantsTranslation && tgt && tgt.selectedOptions[0]
+        ? srcText + " \u2192 " + tgt.selectedOptions[0].text : srcText);
+    const tier = $('input[name="review_tier"]:checked');
+    const tierName = tier ? (tier.value === "ai" ? "Instant AI" : "Human-reviewed") : "";
+    set("rv-service", (svc ? svc.dataset.name : "-") + (tierName ? " - " + tierName : ""));
+    const total = $("#price-total");
+    set("rv-total", total ? total.textContent : "-");
   }
 
   function step1Valid() {
@@ -141,9 +169,16 @@
     $all(".wizard-step[data-step]").forEach((s) => {
       // Clicking an earlier, already-visited step jumps back to it -
       // clicking ahead does nothing (still gated by step1Valid()).
-      s.addEventListener("click", () => {
+      // Real keyboard access: focusable, announced as a button, Enter/Space.
+      s.tabIndex = 0;
+      s.setAttribute("role", "button");
+      const go = () => {
         const target = Number(s.dataset.step);
         if (target < currentStep) showStep(target);
+      };
+      s.addEventListener("click", go);
+      s.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); }
       });
     });
   }

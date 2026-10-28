@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block html_lang %}{{ hreflang }}{% endblock %}
 {% block html_dir %} dir="{{ text_dir }}"{% endblock %}
-{% block theme %}dark{% endblock %}
+{% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}{{ s.title|replace(' | Kauli', '') }}{% endblock %}
 {% block head_extra %}
@@ -49,7 +49,7 @@
 <div class="marketing-page">
 
   <header style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:14px 22px; border-bottom:1px solid var(--border-subtle);">
-    <a href="/" aria-label="Kauli"><img src="/static/kauli-logo-nav.png" alt="Kauli" height="38" style="height:38px; width:auto;"></a>
+    <a href="/" aria-label="Kauli"><img src="/static/kauli-logo-nav-sm.png" alt="Kauli" height="38" style="height:38px; width:auto;"></a>
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
       <label class="muted" style="font-size:0.85rem; display:flex; align-items:center; gap:6px; margin:0;">{{ s.langlabel }}
         <select onchange="if(this.value){location.href=this.value}" style="width:auto; padding:6px 8px;">

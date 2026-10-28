@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block theme %}dark{% endblock %}
+{% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
 {% block title %}{{ page.title }}{% endblock %}
 {% block head_extra %}
@@ -66,8 +66,8 @@
     <h1>{{ page.h1|safe }}</h1>
     <p class="m-hero-sub">{{ page.intro }}</p>
     <div class="m-hero-ctas">
-      <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
-      <a href="/#book" class="btn secondary">Book a call</a>
+      <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">Start a project</a>
+      <a href="/#book" class="btn secondary">Talk to us</a>
     </div>
     <p class="m-hero-note">Your first minutes are free after a one-time $1 card check, credited to your account. Then pay only for what you process.</p>
     {% if page.tour %}
@@ -151,8 +151,8 @@
       <h2 class="m-h2">{{ page.cta_heading }}</h2>
       <p class="m-lede">{{ page.cta_body }}</p>
       <div class="m-hero-ctas" style="justify-content:center;">
-        <a href="/login?mode=signup" class="btn cta-olive">Start free - first {{ free_minutes|int }} minutes on us</a>
-        <a href="/#book" class="btn secondary">Book a call</a>
+        <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">Start a project</a>
+        <a href="/#book" class="btn secondary">Talk to us</a>
       </div>
     </div>
   </section>

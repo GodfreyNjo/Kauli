@@ -1,13 +1,14 @@
-{# Shared marketing nav - used by the homepage and every /solutions/* page.
+{# Shared marketing nav - used by the homepage and every public page.
    home ("" on the homepage itself, "/" on any other page) controls whether
-   the section links are bare fragments (#how, safe same-document scroll,
-   no page load) or prefixed back to the homepage (/#how) - a solutions
-   page has no #how section of its own to scroll to. #}
-<nav class="m-nav" id="m-nav">
-  <a href="/" class="m-nav-brand-link">
+   the section links are bare fragments (#pricing, safe same-document scroll,
+   no page load) or prefixed back to the homepage (/#pricing).
+   Structure follows the 2026-10 redesign plan: Services | Solutions |
+   Pricing | Resources | Sign in | Start a project - ONE primary action. #}
+<nav class="m-nav" id="m-nav" aria-label="Main">
+  <a href="/" class="m-nav-brand-link" aria-label="Kauli by Forge Media Services - home">
     <picture>
-      <source srcset="/static/kauli-logo-nav.webp" type="image/webp">
-      <img src="/static/kauli-logo-nav.png" alt="Kauli by Forge Media Services" class="m-nav-logo" width="301" height="81">
+      <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
+      <img src="/static/kauli-logo-nav-sm.png" alt="Kauli" class="m-nav-logo" width="148" height="40">
     </picture>
   </a>
   <button type="button" class="m-nav-burger" id="m-nav-burger" aria-expanded="false" aria-controls="m-nav-links" aria-label="Open menu">
@@ -18,13 +19,17 @@
   <div class="m-nav-links" id="m-nav-links">
     <div class="m-nav-dropdown">
       <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
-        Product
+        Services
         <svg class="m-nav-chevron" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
       </button>
       <div class="m-nav-dropdown-menu">
-        <a href="{{ home }}#how">How it works</a>
-        <a href="{{ home }}#demo">See a demo</a>
-        <a href="{{ home }}#book">Book a call</a>
+        <a href="/solutions/audio-to-text">Transcription</a>
+        <a href="/solutions/captioning">Subtitles &amp; captions</a>
+        <a href="/solutions/video-translation">Translation</a>
+        <a href="/solutions/video-dubbing">Video dubbing</a>
+        <a href="/solutions/voice-over">Voice over</a>
+        <a href="/solutions/video-localization">Full localization</a>
+        <a href="/languages">All languages</a>
       </div>
     </div>
 
@@ -36,27 +41,22 @@
       <div class="m-nav-dropdown-menu m-nav-dropdown-menu-wide">
         <div class="m-nav-dropdown-col">
           <span class="m-nav-dropdown-heading">By audience</span>
-          <a href="/solutions/ngos">For NGOs</a>
-          <a href="/solutions/youtubers">For YouTubers</a>
-          <a href="/solutions/media-broadcast">For media &amp; broadcast</a>
-          <a href="/solutions/e-learning">For e-learning</a>
+          <a href="/solutions/ngos">NGOs</a>
+          <a href="/solutions/youtubers">YouTubers</a>
+          <a href="/solutions/media-broadcast">Media &amp; broadcast</a>
+          <a href="/solutions/e-learning">E-learning</a>
         </div>
         <div class="m-nav-dropdown-col">
-          <span class="m-nav-dropdown-heading">By service</span>
-          <a href="/solutions/video-translation">Video translation</a>
-          <a href="/solutions/video-dubbing">Video dubbing</a>
-          <a href="/solutions/captioning">Captioning</a>
-          <a href="/languages">All languages</a>
-          <a href="/solutions/audio-to-text">Audio to text</a>
+          <span class="m-nav-dropdown-heading">By use</span>
           <a href="/solutions/youtube-video-to-text">YouTube to text</a>
           <a href="/solutions/podcast-transcription">Podcast transcription</a>
           <a href="/solutions/interview-transcription">Interview transcription</a>
           <a href="/solutions/video-transcription">Swahili &amp; Kikuyu transcription</a>
-          <a href="/solutions/voice-over">Voice over</a>
-          <a href="/solutions/video-localization">Full localization</a>
         </div>
       </div>
     </div>
+
+    <a href="{{ home }}#pricing">Pricing</a>
 
     <div class="m-nav-dropdown">
       <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
@@ -66,18 +66,20 @@
       <div class="m-nav-dropdown-menu">
         <a href="/blog">Blog</a>
         <a href="{{ home }}#faq">FAQ</a>
+        <a href="{{ home }}#demo">Sample</a>
         <a href="/formatting-standards">How we format your content</a>
+        <a href="{{ home }}#book">Talk to us</a>
       </div>
     </div>
 
-    <a href="{{ home }}#pricing">Pricing</a>
-    <a href="/login" class="btn secondary">Sign in</a>
-    <a href="/login?mode=signup" class="btn cta-olive">Get started free</a>
+    <a href="/login" class="m-nav-signin">Sign in</a>
+    <a href="/login?mode=signup" class="btn cta-olive" data-cta="nav">Start a project</a>
   </div>
 </nav>
 <script>
   (function () {
     var dropdowns = document.querySelectorAll(".m-nav-dropdown");
+    var burger = document.getElementById("m-nav-burger");
     function closeAll(except) {
       dropdowns.forEach(function (d) {
         if (d === except) return;
@@ -99,16 +101,26 @@
     });
     document.addEventListener("click", function () { closeAll(); });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") { closeAll(); if (burger) burger.focus(); }
+      if (e.key !== "Escape") return;
+      // Escape closes an open menu and hands focus back to what opened it.
+      var open = document.querySelector(".m-nav-dropdown.open .m-nav-dropdown-trigger");
+      closeAll();
+      if (open) { open.focus(); return; }
+      var links = document.getElementById("m-nav-links");
+      if (links && links.classList.contains("open") && burger) {
+        links.classList.remove("open");
+        burger.setAttribute("aria-expanded", "false");
+        burger.focus();
+      }
     });
 
-    var burger = document.getElementById("m-nav-burger");
     var links = document.getElementById("m-nav-links");
     if (burger && links) {
       burger.addEventListener("click", function (e) {
         e.stopPropagation();
         var isOpen = links.classList.toggle("open");
         burger.setAttribute("aria-expanded", String(isOpen));
+        burger.setAttribute("aria-label", isOpen ? "Close menu" : "Open menu");
       });
     }
   })();

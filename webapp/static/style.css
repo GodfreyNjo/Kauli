@@ -8,174 +8,106 @@
    a light/dark-mode toggle. */
 
 :root {
-  /* light (default) */
-  --bg: #f6f5f2;
-  --sidebar-bg: #fbfaf8;
+  /* light (default) - the 2026-10 redesign palette (Kauli_UI_UX_Audit_and_
+     Redesign_Plan.docx): navy for trust surfaces, action blue for every
+     primary action, light blue-gray page backgrounds, white cards. Every
+     text/background pair below was checked with real WCAG relative-luminance
+     math against each surface it is actually used on (all >= 4.5:1).
+     The previous brand accent was olive (#556b2f): to go back, change
+     --accent / --accent-hover / --accent-soft / --accent3* / --navy* here -
+     nothing else needs touching. */
+  --bg: #f4f7fb;
+  --sidebar-bg: #eaf0f8;       /* alternating section bands on public pages */
   --panel: #ffffff;
   --surface: #ffffff;
-  --hover: #f0eee9;
-  --active-bg: #eae6df;
-  --border-subtle: #e7e3dc;
-  --border: #dad5cc;
-  --ink: #21201d;
-  --heading-ink: #171613;
-  --muted: #6b6862;
-  /* #8c877e measured as low as 2.87:1 against --active-bg (#eae6df) - a
-     real WCAG AA failure for normal-size text (needs 4.5:1), found by
-     checking against every real component background --faint is actually
-     used on, not just the page's own base --bg (which it does clear, at
-     3.27:1 - still short of 4.5, just less obviously so). #6a655e clears
-     4.5:1+ against all of them (worst case 4.64:1 vs --active-bg); real
-     relative-luminance math, not eyeballed. Ends up close to --muted -
-     a truly accessible "extra quiet" gray on top of an already-quiet one
-     turns out not to leave much room between them. */
-  --faint: #6a655e;
+  --hover: #edf2f9;
+  --active-bg: #e1eaf6;
+  --border-subtle: #dce4f0;
+  --border: #c9d5e6;
+  --ink: #1b2b45;
+  --heading-ink: #0f2342;
+  --muted: #4b5b73;
+  --faint: #56667e;
 
-  /* The system accent, system-wide - was rust, then olive (a deliberate
-     brand choice, not a placeholder) - briefly changed to indigo chasing
-     a reference mockup's look, reverted back to olive on request: that
-     mockup was a real, useful LAYOUT reference (the dashboard/orders-
-     table/stepper/etc. structure it inspired all stays), but the actual
-     brand color wasn't meant to go with it. Replaces this token
-     everywhere it's used (buttons, links, focus states, badges, tier/
-     step highlights, the sidebar's active-row marker), not just the
-     marketing site. */
-  --accent: #556b2f;
-  --accent-hover: #445423;
-  --accent-soft: #eeeee8;
+  --accent: #1e5abe;
+  --accent-hover: #174a9c;
+  --accent-soft: #e4edfb;
   --accent-ink: #ffffff;
-  /* --accent used AS TEXT COLOR specifically (see the plain `a{}` link
-     rule and every `color: var(--accent-text)` declaration this token
-     replaced) - same color as --accent here, since #556b2f already
-     clears 4.5:1 as text against every real light-theme background
-     (4.78:1 worst case, vs --active-bg). Only the dark theme below needs
-     a genuinely different, lighter value - this token exists so that
-     override is possible without touching --accent itself, which still
-     needs to stay the true brand olive for buttons/borders/icons (a 3:1
-     bar, not 4.5:1, and already fine there in both themes). */
   --accent-text: var(--accent);
 
-  /* Second CTA color, marketing-site buttons/borders only - keeps the
-     public site from reading as one flat color end to end (buttons,
-     borders, form focus - see body.m-public rules near the end of this
-     file). --accent3 now duplicates --accent (both olive) - kept as its
-     own token rather than removed, since marketing.html's cta-olive class
-     still references it directly. */
-  --accent2: #4b21d9;
-  --accent2-hover: #3c19ae;
-  --accent3: #556b2f;
-  --accent3-hover: #64802e;
+  /* Secondary marketing colour (borders, secondary buttons) = navy;
+     --accent3 is kept as its own token because marketing.html's
+     cta-olive class (now simply "the primary button") references it. */
+  --accent2: #16315a;
+  --accent2-hover: #0f2342;
+  --accent3: #1e5abe;
+  --accent3-hover: #174a9c;
 
-  /* Fixed dark-navy "chrome" for the app sidebar/topbar - deliberately
-     NOT swapped by the light/dark theme toggle (same idea login.html's
-     data-theme-locked already uses: some surfaces are one committed look
-     regardless of the page's own theme). Gives the persistent "studio"
-     frame around a light or dark canvas, matching the reference design,
-     without touching the actual content-area theme system at all. */
-  --chrome-bg: #0f1420;
-  --chrome-active-bg: #1b2340;
-  --chrome-border: #1f2536;
-  --chrome-text: #9aa3bd;
+  /* Navy "trust" surfaces: public hero, footer, login showcase. */
+  --navy: #0f2342;
+  --navy-2: #16315a;
+  --on-navy: #ffffff;
+  --on-navy-muted: #c3d0e6;
+  --on-navy-accent: #7fb0ff;
+
+  /* App sidebar/topbar chrome - fixed navy regardless of page theme. */
+  --chrome-bg: #0f2342;
+  --chrome-active-bg: #1a3866;
+  --chrome-border: #1b3358;
+  --chrome-text: #a9bad6;
   --chrome-text-active: #ffffff;
-  --chrome-icon-border: #2b3350;
+  --chrome-icon-border: #2a4a7c;
 
-  --ok: #3f7a52;
-  --ok-soft: #e7f1ea;
-  --warn: #96692e;
-  --warn-soft: #f5ece0;
+  --ok: #2f7048;
+  --ok-soft: #e4f1e9;
+  --warn: #8a5f25;
+  --warn-soft: #f6ecdc;
   --err: #a8453e;
-  --err-soft: #f6e6e4;
-  /* Same reasoning as --accent-text - already clears 4.5:1 as text on
-     every real light-theme background (5.05:1 worst case), so just
-     mirrors --err here; the dark theme below is where it actually needs
-     to differ. */
+  --err-soft: #f7e7e5;
   --err-text: var(--err);
-  --info: #4c6c7f;
-  --info-soft: #e8eef1;
+  --info: #3d6a8f;
+  --info-soft: #e5eef6;
 
   --radius-sm: 6px;
-  --radius: 8px;
+  --radius: 10px;
   --radius-pill: 999px;
 
   --font-ui: "Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "IBM Plex Mono", Consolas, monospace;
-  /* Marketing headlines only (see .m-hero h1 / h2.m-h2 below) - matches
-     3Play Media's own real heading face (confirmed live: their h1 computes
-     to ClashGrotesk-Semibold), free for commercial use under Fontshare's
-     ITF FFL license. Rev.com's own heading face (Degular Display) is a
-     paid commercial license, not something to embed without Rev's own
-     license, so that one was skipped. --font-ui (Inter) stays untouched
-     for the app's UI/sidebar/nav text at every size, and for body copy
-     everywhere - both Rev and 3Play already use Inter for their own body
-     text, so that was already the same font before this change. */
+  /* Marketing headlines only (Clash Grotesk, Fontshare ITF FFL licence). */
   --font-display: "Clash Grotesk", var(--font-ui);
 }
 
 html[data-theme="dark"] {
-  /* Deep indigo-black surfaces, matched to Rev's actual dark background
-     (rgb(18,15,32), confirmed live off rev.com) rather than neutral zinc -
-     same lightness steps as before (bg -> sidebar -> panel -> surface ->
-     hover -> active), just recolored, so every existing contrast ratio
-     (ink/muted text) holds exactly as it did - verified with real WCAG
-     contrast math, not eyeballed. The olive accent's own contrast as TEXT
-     did NOT hold across every real surface it gets used on, despite this
-     comment's earlier claim - see --accent-text below for the real fix,
-     found via a live accessibility audit of the actual rendered site
-     (2026-09-16), not by re-checking this file in isolation. */
-  --bg: #141023;
-  --sidebar-bg: #171428;
-  --panel: #211d34;
-  --surface: #28233a;
-  --hover: #2d293f;
-  --active-bg: #363247;
-  --border-subtle: #29243b;
-  --border: #3d394c;
-  --ink: #e4e4e7;
+  /* Staff "production workstation" theme, recoloured to the navy family. */
+  --bg: #0b1730;
+  --sidebar-bg: #0e1d3a;
+  --panel: #14264a;
+  --surface: #1a2f57;
+  --hover: #1e3560;
+  --active-bg: #26427a;
+  --border-subtle: #1d3157;
+  --border: #2c4575;
+  --ink: #e6ecf7;
   --heading-ink: #ffffff;
-  --muted: #a1a1aa;
-  /* #7d7d87 (this token's previous value) only ever got checked against
-     --bg (4.57:1, clears it) - a real live audit of the actual rendered
-     site found it failing against every one of the actual component
-     backgrounds it's really used on: --panel 4.00, --surface 3.70,
-     --hover 3.44, --active-bg 3.03 (all below the 4.5:1 normal-text bar).
-     #9d9da4 clears 4.5:1+ against all of them (worst case 4.57:1 vs
-     --active-bg) - real relative-luminance math against every real
-     background, not just the one this was tested against before. */
-  --faint: #9d9da4;
+  --muted: #aebbd2;
+  --faint: #a3b2cc;
 
-  --accent: #556b2f;
-  --accent-hover: #64802e;
-  --accent-soft: #25291f;
+  --accent: #1e5abe;
+  --accent-hover: #3b78d8;
+  --accent-soft: #162c55;
   --accent-ink: #ffffff;
-  /* Unlike the light theme, --accent as TEXT genuinely fails here - as
-     low as 2.35:1 against --hover, 2.49:1 against the accent-soft-tinted
-     card background .m-step-tag.human/.demo-lang-tag.accent/.m-payg-badge
-     actually render on, and 3.13:1 even against the page's own --bg
-     (real live-audit numbers, all below the 4.5:1 bar - this is the base
-     `a{}` link color site-wide, so it was failing on ordinary body-text
-     links throughout the dark-themed marketing site and the staff editor,
-     not just a couple of small badges). #7a9943 clears 4.5:1+ against
-     all of them (worst case 4.57:1 vs the accent-soft-tinted card). Same
-     hue as --accent, just lightened - not a different brand color. */
-  --accent-text: #7a9943;
+  --accent-text: #86b4ff;
 
-  --ok: #6f9b78;
-  --ok-soft: #24312a;
-  --warn: #b58a52;
-  --warn-soft: #332c22;
-  --err: #b85d57;
-  --err-soft: #352524;
-  /* .text-red/.m-compare-bad (the comparison table's "what you get
-     elsewhere" column) render this on --panel, not --err-soft - 3.68:1
-     there, below the 4.5:1 bar (live-audit finding). #c1726d clears
-     4.57:1 against that real background; same hue, lightened. Every
-     other --err usage in this file already pairs it with --err-soft as
-     its own coordinated background (badges, status pills) and measures
-     fine there, so --err itself is untouched - only this one real
-     mismatched pairing needed a fix. */
-  --err-text: #c1726d;
-  --info: #7fa3b5;
-  --info-soft: #29343a;
+  --ok: #86cca2;
+  --ok-soft: #173326;
+  --warn: #e3b874;
+  --warn-soft: #382d1a;
+  --err: #d0645d;
+  --err-soft: #3a1d22;
+  --err-text: #f4b1ac;
+  --info: #9cc6e6;
+  --info-soft: #17304a;
 }
 
 * { box-sizing: border-box; }
@@ -2306,42 +2238,6 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 .m-lang-pill.m-lang-more { color: var(--accent-text); border-color: var(--accent-soft); background: var(--accent-soft); }
 .m-hero-langs-note { margin-top: 8px; font-size: 0.74rem; color: var(--faint); max-width: 480px; margin-inline: auto; }
 
-/* ------------------------------------------------- mobile: hero + flow -- */
-@media (max-width: 768px) {
-  /* Hero: cut everything below the CTAs so the product visual (the demo,
-     reordered right below) is reachable fast, not the 3rd/4th screen down. */
-  .m-hero .kicker, .m-hero .m-hero-trust, .m-hero .m-hero-langs, .m-hero .m-hero-langs-note {
-    display: none;
-  }
-  .m-hero-ctas { flex-direction: column; align-items: stretch; }
-  .m-hero-ctas .btn { width: 100%; text-align: center; }
-
-  /* Reorder sections so the demo (proof the product is real) lands right
-     after the hero, ahead of the text-heavy "How it works" steps - pure
-     flex order, DOM/desktop layout and reading order are untouched. Every
-     direct child needs an explicit order or the unordered ones (default 0)
-     would all collapse to the front together instead of keeping their
-     relative places. */
-  .marketing-page { display: flex; flex-direction: column; }
-  .marketing-page > .m-nav { order: 1; }
-  .marketing-page > .m-hero { order: 2; }
-  .marketing-page > #demo { order: 3; }
-  .marketing-page > #how { order: 4; }
-  .marketing-page > #who { order: 5; }
-  .marketing-page > #why { order: 6; }
-  .marketing-page > #pricing { order: 7; }
-  .marketing-page > #book { order: 8; }
-  .marketing-page > #faq { order: 9; }
-  .marketing-page > footer.m-footer { order: 10; }
-
-  /* Full-bleed demo player - the visual proof point gets the full screen
-     width instead of sitting inside the section's normal side padding. */
-  #demo .m-inner { padding: 0; }
-  .demo-player { margin: 8px -24px 0; border-radius: 0; border-left: none; border-right: none; }
-  .demo-player-chrome { padding-left: 24px; padding-right: 24px; }
-  .demo-waveform, .demo-line, .demo-result { margin-left: 24px; margin-right: 24px; }
-}
-
 /* entrance animation, staggered top to bottom */
 .m-hero .kicker, .m-hero h1, .m-hero .m-hero-sub, .m-hero .m-hero-ctas, .m-hero .m-hero-note {
   opacity: 0;
@@ -3386,3 +3282,307 @@ body.m-public form .btn:not(.secondary):hover {
 @media (prefers-reduced-motion: reduce) {
   .tour-overlay::before { transition: none; }
 }
+
+
+/* ======================================================================
+   2026-10 redesign - public site (Kauli_UI_UX_Audit_and_Redesign_Plan)
+   One promise, one primary action, show the product, calm hierarchy.
+   Everything below is token-driven (see :root) so the palette stays a
+   one-place change.
+   ====================================================================== */
+
+/* primary button = action blue everywhere; on navy it is lifted to a
+   brighter blue that still keeps white text at >= 4.5:1 (checked) */
+.btn.cta-olive, .btn.cta-primary { background: var(--accent3); color: var(--accent-ink); }
+.btn.cta-olive:hover, .btn.cta-primary:hover { background: var(--accent3-hover); color: var(--accent-ink); }
+
+/* focus must always be visible (WCAG 2.4.7) - one consistent ring */
+:focus-visible { outline: 3px solid #7fb0ff; outline-offset: 2px; }
+.m-hero :focus-visible, .cta-band :focus-visible, .m-footer :focus-visible { outline-color: #ffffff; }
+body:not(.m-public) :focus-visible { outline-color: var(--accent); }
+
+/* ------------------------------------------------------------- nav ---- */
+.m-nav { background: #ffffff; box-shadow: 0 1px 0 rgba(15, 35, 66, 0.04); }
+.m-nav-logo { height: 40px; width: auto; }
+.m-nav-links a { color: var(--ink); }
+.m-nav-links a:hover { color: var(--accent); }
+.m-nav-dropdown-trigger { color: var(--ink); }
+.m-nav-dropdown-trigger:hover, .m-nav-dropdown.open .m-nav-dropdown-trigger { color: var(--accent); }
+.m-nav-links a.btn { color: var(--accent-ink); padding: 9px 18px; border-radius: var(--radius); }
+.m-nav-links a.btn:hover { color: var(--accent-ink); }
+.m-nav-links a.m-nav-signin { padding: 8px 4px; }
+.m-nav-dropdown-menu { box-shadow: 0 16px 36px -10px rgba(15, 35, 66, 0.22); }
+.m-nav-dropdown-menu a { color: var(--ink); }
+.m-nav-dropdown-menu a:hover { background: var(--hover); color: var(--accent); }
+
+/* ------------------------------------------------------------ hero ---- */
+.m-hero {
+  background: var(--navy); color: var(--on-navy);
+  padding: 72px 24px 80px;
+}
+.m-hero::before { content: none; }               /* the old blurred colour wash */
+.m-hero h1 { color: #ffffff; }
+.m-hero .kicker { color: #dbe7ff; background: rgba(255, 255, 255, 0.12); }
+.m-hero .m-hero-sub { color: var(--on-navy-muted); }
+.m-hero .m-hero-note, .m-hero-trust { color: var(--on-navy-muted); }
+.m-hero a:not(.btn) { color: var(--on-navy-accent); }
+.m-hero .btn:not(.secondary) { background: #3070e4; color: #ffffff; box-shadow: none; }
+.m-hero .btn:not(.secondary):hover { background: #2b6ce0; box-shadow: none; }
+.m-hero .btn.secondary { background: transparent; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.5); }
+.m-hero .btn.secondary:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+.m-hero .m-lang-pill { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: var(--on-navy-muted); }
+
+/* the homepage hero: copy left, product preview right */
+.m-hero-v2 { text-align: left; }
+.m-hero-v2 .hero-grid {
+  max-width: 1160px; margin: 0 auto; display: grid; align-items: center; gap: 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+}
+.m-hero-v2 h1 {
+  margin: 0 0 18px; max-width: none; text-align: left;
+  font-size: clamp(2.1rem, 1.3rem + 2.8vw, 3.7rem);
+}
+.m-hero-v2 .m-hero-sub { margin: 0 0 28px; max-width: 560px; }
+.m-hero-v2 .m-hero-ctas { justify-content: flex-start; }
+.m-hero-v2 .m-hero-note { margin-top: 16px; max-width: 520px; line-height: 1.5; }
+.m-hero-v2 .m-hero-trust { justify-content: flex-start; margin-top: 22px; }
+.m-hero-trust span { display: inline-flex; gap: 6px; align-items: center; }
+
+/* ------------------------------------------- product preview (sample) --- */
+.pv {
+  background: #ffffff; color: var(--ink); border-radius: 16px; overflow: hidden; text-align: left;
+  box-shadow: 0 34px 70px -26px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.pv-chrome {
+  display: flex; align-items: center; gap: 7px; padding: 10px 14px; font-size: 0.74rem;
+  background: #eef2f9; border-bottom: 1px solid var(--border-subtle); color: var(--muted);
+}
+.pv-dot { width: 9px; height: 9px; border-radius: 50%; background: #c5d0e2; }
+.pv-title { margin-left: 6px; font-weight: 650; color: var(--heading-ink); }
+.pv-badge {
+  margin-left: auto; font-weight: 650; font-size: 0.68rem; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--accent-soft); color: var(--accent); padding: 3px 9px; border-radius: 999px;
+}
+.pv-body { display: grid; grid-template-columns: 1.05fr 1fr; }
+.pv-video {
+  position: relative; min-height: 250px; display: flex; align-items: flex-end;
+  background:
+    radial-gradient(ellipse 70% 60% at 25% 20%, rgba(127, 176, 255, 0.35), transparent 70%),
+    linear-gradient(150deg, #1e4478 0%, #0f2342 62%, #1a3a68 100%);
+}
+.pv-play {
+  position: absolute; inset: 0; margin: auto; width: 54px; height: 54px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94); display: grid; place-items: center; color: var(--navy);
+}
+.pv-play svg { width: 22px; height: 22px; margin-left: 3px; }
+.pv-caption {
+  position: relative; margin: 0 14px 40px; background: rgba(0, 0, 0, 0.72); color: #ffffff;
+  padding: 6px 11px; border-radius: 6px; font-size: 0.82rem; line-height: 1.35; max-width: 92%;
+}
+.pv-bar { position: absolute; left: 14px; right: 14px; bottom: 16px; display: flex; align-items: center; gap: 10px;
+  font-size: 0.7rem; color: rgba(255, 255, 255, 0.85); font-variant-numeric: tabular-nums; }
+.pv-track { flex: 1; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.28); }
+.pv-track i { display: block; height: 100%; width: 34%; border-radius: 2px; background: #7fb0ff; }
+.pv-side { display: flex; flex-direction: column; min-width: 0; border-left: 1px solid var(--border-subtle); }
+.pv-tabs { display: flex; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--border-subtle); overflow: hidden; }
+.pv-tab { padding: 10px 8px; font-size: 0.72rem; font-weight: 650; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.pv-tab.on { color: var(--accent); border-bottom-color: var(--accent); }
+.pv-lines { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.pv-line { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px; font-size: 0.8rem; line-height: 1.4; }
+.pv-line time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 0.72rem; padding-top: 2px; }
+.pv-line.on { background: var(--accent-soft); border-radius: 8px; padding: 7px 9px; margin: -7px -9px; }
+.pv-src { color: var(--muted); display: block; }
+.pv-out { color: var(--heading-ink); font-weight: 650; display: block; margin-top: 1px; }
+.pv-foot {
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 10px 14px;
+  border-top: 1px solid var(--border-subtle); background: #f7f9fd; font-size: 0.72rem; color: var(--muted);
+}
+.pv-chip { border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-weight: 700; color: var(--heading-ink); background: #fff; }
+.pv-note { margin: 10px 0 0; text-align: center; font-size: 0.74rem; color: var(--on-navy-muted); }
+
+/* --------------------------------------------------------- sections ---- */
+.m-section { padding: 76px 24px; }
+.m-section h2.m-h2 { color: var(--heading-ink); }
+.m-section p.m-lede { margin-bottom: 40px; }
+.m-section-eyebrow {
+  display: block; text-align: center; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 10px;
+}
+
+/* services */
+.svc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; }
+.svc-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 28px 26px;
+  background: #ffffff; border: 1px solid var(--border-subtle); border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(15, 35, 66, 0.04);
+}
+.svc-icon {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); margin-bottom: 4px;
+}
+.svc-icon svg { width: 24px; height: 24px; }
+.svc-card h3 { margin: 0; font-size: 1.18rem; color: var(--heading-ink); }
+.svc-card p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 0.95rem; }
+.svc-price { font-weight: 700; color: var(--heading-ink); font-size: 0.95rem; }
+.svc-price small { font-weight: 500; color: var(--muted); }
+.svc-link { margin-top: auto; padding-top: 6px; font-weight: 650; text-decoration: none; }
+.svc-link:hover { text-decoration: underline; }
+
+/* why */
+.why-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 22px; }
+.why-item { padding: 4px 0 4px 18px; border-left: 3px solid var(--accent); }
+.why-item h3 { margin: 0 0 6px; font-size: 1.02rem; color: var(--heading-ink); }
+.why-item p { margin: 0; color: var(--muted); font-size: 0.93rem; line-height: 1.55; }
+
+/* pricing hierarchy: pay-as-you-go first, extras and plans clearly separate */
+.price-group { margin-top: 40px; }
+.price-group-title { font-size: 1.08rem; margin: 0 0 4px; color: var(--heading-ink); }
+.price-group-sub { margin: 0 0 18px; color: var(--muted); font-size: 0.92rem; }
+.price-market { text-align: center; font-size: 0.88rem; color: var(--muted); margin: -26px 0 26px; }
+.m-rates-card, .m-calc, .m-plan { background: #ffffff; box-shadow: 0 1px 2px rgba(15, 35, 66, 0.04); }
+.price-extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.price-extra {
+  background: #ffffff; border: 1px solid var(--border-subtle); border-radius: 12px; padding: 18px 20px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+}
+.price-extra strong { color: var(--heading-ink); font-size: 0.95rem; }
+.price-extra span.small { display: block; color: var(--muted); font-size: 0.84rem; margin-top: 2px; font-weight: 400; }
+.price-extra .amt { font-weight: 700; color: var(--heading-ink); white-space: nowrap; }
+
+/* how it works - four plain steps, no scroll animation */
+.how-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.how-step { background: #ffffff; border: 1px solid var(--border-subtle); border-radius: 14px; padding: 22px 20px; }
+.how-num {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #ffffff;
+  display: grid; place-items: center; font-weight: 700; margin-bottom: 12px;
+}
+.how-step h3 { margin: 0 0 6px; font-size: 1.02rem; color: var(--heading-ink); }
+.how-step p { margin: 0; color: var(--muted); font-size: 0.92rem; line-height: 1.55; }
+
+/* languages strip */
+.lang-strip { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.lang-strip .m-lang-pill { background: #ffffff; text-decoration: none; }
+.lang-strip a.m-lang-pill:hover { border-color: var(--accent); color: var(--accent); }
+
+/* final conversion band + footer */
+.cta-band { background: var(--navy); color: #ffffff; text-align: center; padding: 68px 24px; }
+.cta-band h2 { font-family: var(--font-display); color: #ffffff; margin: 0 0 10px; font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem); }
+.cta-band p { color: var(--on-navy-muted); margin: 0 auto 26px; max-width: 560px; line-height: 1.55; }
+.cta-band .btn:not(.secondary) { background: #3070e4; color: #fff; padding: 13px 28px; font-size: 1rem; }
+.cta-band .btn:not(.secondary):hover { background: #2b6ce0; }
+.cta-band .btn.secondary { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); padding: 13px 24px; }
+.cta-band .btn.secondary:hover { background: rgba(255, 255, 255, 0.1); }
+.cta-band .m-hero-ctas { justify-content: center; }
+
+.m-footer { background: var(--navy); border-top: none; color: var(--on-navy-muted); }
+.m-footer-col-title { color: #ffffff; }
+.m-footer-col a { color: var(--on-navy-muted); }
+.m-footer-col a:hover { color: #ffffff; text-decoration: underline; }
+.m-footer-desc, .m-footer-copy { color: var(--on-navy-muted); }
+.m-footer-logo { opacity: 1; height: 38px; }
+.m-footer .btn.secondary { background: transparent; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.4); }
+.m-footer .btn.secondary:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* FAQ: short answers */
+.m-faq-item { background: #ffffff; }
+.m-faq-item p a { font-weight: 600; }
+
+/* ------------------------------------------------------- responsive ---- */
+@media (max-width: 960px) {
+  .m-hero-v2 { text-align: center; }
+  .m-hero-v2 .hero-grid { grid-template-columns: 1fr; gap: 36px; }
+  .m-hero-v2 h1, .m-hero-v2 .m-hero-sub, .m-hero-v2 .m-hero-note { text-align: center; margin-inline: auto; }
+  .m-hero-v2 .m-hero-ctas, .m-hero-v2 .m-hero-trust { justify-content: center; }
+  .svc-grid { grid-template-columns: 1fr; }
+  .why-grid, .how-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .m-section { padding: 56px 20px; }
+  .m-hero { padding: 52px 20px 56px; }
+  .m-hero-ctas { flex-direction: column; align-items: stretch; }
+  .m-hero-ctas .btn { width: 100%; text-align: center; }
+  .pv-body { grid-template-columns: 1fr; }
+  .pv-video { min-height: 190px; }
+  .pv-side { border-left: none; border-top: 1px solid var(--border-subtle); }
+  .why-grid, .how-grid { grid-template-columns: 1fr; }
+  .price-market { margin-top: -20px; }
+}
+
+
+/* ---------------------------------------- login / sign-up (2026-10) ---- */
+.auth-shell {
+  --auth-bg: #ffffff;
+  --auth-border: #ccd7e8;
+  --auth-ink: #0f2342;
+  --auth-muted: #4b5b73;
+  --auth-placeholder: #667489;      /* 4.9:1 on white */
+  --auth-accent: var(--accent3);
+  --auth-accent-hover: var(--accent3-hover);
+}
+.auth-form-panel { align-items: center; padding: 40px; }
+.auth-shell .auth-brand { margin: 0 0 30px; }
+.auth-shell .auth-brand-logo { height: 42px; width: auto; }
+
+/* Sign in | Create account as a segmented control */
+.auth-tabs {
+  display: flex; gap: 4px; padding: 4px; margin: 0 0 28px; border-bottom: none;
+  background: #eef2f9; border-radius: 12px;
+}
+.auth-tab {
+  flex: 1; justify-content: center; text-align: center; margin: 0; padding: 10px 12px;
+  border: none; border-radius: 9px; font-size: 0.95rem; font-weight: 650; color: var(--auth-muted);
+}
+.auth-tab.active { background: #ffffff; color: var(--auth-ink); box-shadow: 0 1px 3px rgba(15, 35, 66, 0.18); border-bottom: none; }
+.auth-tab:focus-visible { outline: 3px solid #7fb0ff; outline-offset: 1px; }
+
+.auth-shell h1 { font-size: 1.75rem; margin: 0 0 8px; line-height: 1.2; font-family: var(--font-display); }
+.auth-shell .auth-sub { margin: 0 0 22px; font-size: 0.95rem; line-height: 1.5; color: var(--auth-muted); }
+.auth-shell .error, .auth-shell .ok { margin: 0 0 16px; }
+.auth-switch { text-align: center; margin: 18px 0 0; font-size: 0.93rem; color: var(--auth-muted); }
+.auth-link-btn {
+  background: none; border: none; padding: 0; margin: 0; font: inherit; font-weight: 650;
+  color: var(--auth-accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
+}
+.auth-link-btn:hover { color: var(--auth-accent-hover); }
+.auth-link-btn:focus-visible { outline: 3px solid #7fb0ff; outline-offset: 2px; border-radius: 3px; }
+.auth-field-label { font-weight: 650; }
+
+/* navy product showcase */
+.auth-brand-panel {
+  align-items: center; background: var(--navy); border-left: none; color: #ffffff; padding: 56px 48px;
+  flex: 0 0 46%; max-width: 640px; min-width: 360px;
+}
+.auth-showcase { width: 100%; max-width: 470px; }
+.auth-showcase h2 {
+  font-family: var(--font-display); font-weight: 600; font-size: clamp(1.7rem, 1rem + 1.6vw, 2.2rem);
+  line-height: 1.15; color: #ffffff; margin: 0 0 12px;
+}
+.auth-showcase > p { color: var(--on-navy-muted); line-height: 1.55; margin: 0 0 26px; font-size: 0.98rem; }
+.auth-showcase-note { font-size: 0.74rem; color: var(--on-navy-muted); text-align: center; margin: 12px 0 0; }
+.auth-pv-status { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px 4px; }
+.auth-pv-pill { background: var(--ok-soft); color: var(--ok); font-weight: 650; font-size: 0.72rem; padding: 3px 10px; border-radius: 999px; }
+.auth-pv-meta { font-size: 0.76rem; color: var(--muted); }
+.auth-pv-wave { display: flex; align-items: center; gap: 3px; height: 56px; padding: 6px 14px 10px; }
+.auth-pv-wave i { flex: 1; min-width: 2px; background: var(--accent); border-radius: 2px; opacity: 0.8; }
+
+@media (max-width: 900px) {
+  .auth-brand-panel { display: none; }
+  .auth-form-panel { padding: 28px 20px; align-items: flex-start; }
+}
+
+
+/* ------------------------------------------ order wizard (2026-10) ---- */
+.wizard-step[aria-disabled="true"] { cursor: default; }
+.wizard-step-final { opacity: 0.65; }
+.wizard-step:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+.wizard-pane-title { font-size: 1.15rem; margin: 0 0 16px; color: var(--heading-ink); }
+.wizard-subtitle { font-size: 1rem; margin: 24px 0 10px; color: var(--heading-ink); }
+.review-card {
+  background: var(--accent-soft); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 4px;
+}
+.review-list { margin: 0; display: grid; gap: 9px; }
+.review-list > div { display: flex; justify-content: space-between; gap: 18px; font-size: 0.93rem; }
+.review-list dt { color: var(--muted); }
+.review-list dd { margin: 0; font-weight: 650; color: var(--heading-ink); text-align: right; overflow-wrap: anywhere; }
+.review-list > div:last-child { border-top: 1px solid var(--border); padding-top: 9px; font-size: 1rem; }

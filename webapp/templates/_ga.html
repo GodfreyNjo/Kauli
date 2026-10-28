@@ -31,4 +31,17 @@
     gtag('config', window.__kauliGaId);
   };
 </script>
+<script>
+  // Primary-action clicks (nav / hero / final CTA / pricing plans ...), sent
+  // ONLY when analytics has been loaded after real cookie consent (gtag is
+  // undefined until then), so this never tracks anyone who said no.
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest && e.target.closest('[data-cta]');
+    if (!el || typeof window.gtag !== 'function') return;
+    window.gtag('event', 'cta_click', {
+      cta_location: el.getAttribute('data-cta'),
+      cta_text: (el.textContent || '').trim().slice(0, 40)
+    });
+  });
+</script>
 <!-- End Google Analytics -->

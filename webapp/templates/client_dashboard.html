@@ -2,7 +2,7 @@
 {% block title %}My orders{% endblock %}
 {% block content %}
 <div class="card wizard-card">
-  <h1>Submit a new order</h1>
+  <h1>Start a project</h1>
   {% if error %}
     <p class="error">{{ error }}</p>
     {% if exception_context %}
@@ -25,15 +25,19 @@
 
   <div class="wizard-steps" id="wizard-steps">
     <div class="wizard-step active" data-step="1">
-      <span class="wizard-step-num">1</span><span class="wizard-step-label">Upload &amp; language</span>
+      <span class="wizard-step-num">1</span><span class="wizard-step-label">File &amp; languages</span>
     </div>
     <div class="wizard-step-line"></div>
     <div class="wizard-step" data-step="2">
-      <span class="wizard-step-num">2</span><span class="wizard-step-label">Service &amp; pricing</span>
+      <span class="wizard-step-num">2</span><span class="wizard-step-label">Service &amp; price</span>
     </div>
     <div class="wizard-step-line"></div>
     <div class="wizard-step" data-step="3">
-      <span class="wizard-step-num">3</span><span class="wizard-step-label">Details &amp; instructions</span>
+      <span class="wizard-step-num">3</span><span class="wizard-step-label">Review &amp; submit</span>
+    </div>
+    <div class="wizard-step-line"></div>
+    <div class="wizard-step wizard-step-final" aria-hidden="true">
+      <span class="wizard-step-num">4</span><span class="wizard-step-label">Track &amp; download</span>
     </div>
   </div>
 
@@ -50,6 +54,7 @@
     <input type="hidden" name="idempotency_key" id="idempotency-key-field">
 
     <div class="wizard-pane" data-pane="1">
+      <h2 class="wizard-pane-title">Add your file and choose languages</h2>
       <div class="step-switch" id="source-switch" style="margin-bottom:14px;">
         <button type="button" class="{{ 'active' if not form_values.get('youtube_url') else '' }}" data-source="file">Upload a file</button>
         <button type="button" class="{{ 'active' if form_values.get('youtube_url') else '' }}" data-source="youtube">From YouTube</button>
@@ -67,7 +72,7 @@
             <path d="M24 22v14m0-14 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <p class="dropzone-text" id="dropzone-text">Click to upload, or drag and drop your file here</p>
-          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">Audio or video, any common format</p>
+          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">MP3, WAV, M4A, FLAC, OGG, Opus, AAC, WMA, MP4, MOV, MKV, WebM or AVI - up to 2 GB per file</p>
         </div>
       </div>
 
@@ -77,7 +82,7 @@
                  value="{{ form_values.get('youtube_url', '') }}">
         </label>
         <p class="muted" style="margin-top:-8px;">Only submit videos you have the rights to use for dubbing.
-           Large videos can take several minutes to fetch before processing even starts.</p>
+           Large videos can take several minutes to fetch before processing even starts. If a link can't be fetched, upload the file instead.</p>
       </div>
 
       <div class="row" style="margin-top:16px;">
@@ -120,6 +125,7 @@
     </div>
 
     <div class="wizard-pane" data-pane="2" hidden>
+      <h2 class="wizard-pane-title">Choose a service and how it is delivered</h2>
       <div class="wizard-grid">
         <div>
           {% set chosen_tier = form_values.get('review_tier') or default_review_tier %}
@@ -218,6 +224,18 @@
     </div>
 
     <div class="wizard-pane" data-pane="3" hidden>
+      <h2 class="wizard-pane-title">Review and submit</h2>
+      <div class="review-card" id="review-card" aria-live="polite">
+        <dl class="review-list">
+          <div><dt>File</dt><dd id="rv-file">-</dd></div>
+          <div><dt>Languages</dt><dd id="rv-langs">-</dd></div>
+          <div><dt>Service</dt><dd id="rv-service">-</dd></div>
+          <div><dt>Estimated total</dt><dd id="rv-total">-</dd></div>
+        </dl>
+        <p class="muted" style="margin:10px 0 0; font-size:0.86rem;">Use Back to change anything. If your free minutes or prepaid
+           credits don't cover this order, you'll pay securely on the next page before processing starts.</p>
+      </div>
+      <h3 class="wizard-subtitle">Optional details</h3>
       <label>Project / folder (optional)
         <input type="text" name="folder_name" list="folder-list" placeholder="e.g. Q3 campaign, NGO field reports"
                value="{{ form_values.get('folder_name', '') }}">

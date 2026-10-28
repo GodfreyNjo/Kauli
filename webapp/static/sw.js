@@ -4,10 +4,10 @@
 // of that changes between visits, and serving a stale cached copy while
 // offline would be actively misleading (a "processing" order that's
 // actually long since delivered). Only truly static assets (CSS, the
-// PWA icons, this file's own manifest) are cached, cache-first; every
+// PWA icons, this file's own manifest) are cached, network-first; every
 // page navigation goes to the network first, falling back to a plain
 // "you're offline" response only when the network genuinely fails.
-const CACHE_NAME = "kauli-shell-v1";
+const CACHE_NAME = "kauli-shell-v2";
 const SHELL_ASSETS = [
   "/static/style.css",
   "/static/manifest.json",
@@ -39,8 +39,20 @@ self.addEventListener("fetch", (event) => {
   const isShellAsset = SHELL_ASSETS.some((path) => url.pathname === path);
 
   if (isShellAsset) {
+    // Network-first: style.css is loaded as /static/style.css?v=<hash>, and a
+    // pathname match ignores that query - cache-first would pin returning
+    // visitors to an old stylesheet forever after any redesign. The cache is
+    // only the offline fallback.
     event.respondWith(
-      caches.match(req).then((cached) => cached || fetch(req))
+      fetch(req)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(url.pathname, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(url.pathname).then((cached) => cached || Response.error()))
     );
     return;
   }
