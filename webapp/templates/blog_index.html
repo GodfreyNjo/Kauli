@@ -27,10 +27,10 @@
     <!-- Real client-side filter, not a server round-trip - this is a
          handful of posts, not thousands, so there's nothing a query
          string/page reload would buy over just toggling visibility. -->
-    <div class="m-blog-filters" role="tablist" aria-label="Filter posts by category">
-      <button type="button" class="m-blog-filter active" data-filter="">All</button>
+    <div class="m-blog-filters" role="group" aria-label="Filter posts by category">
+      <button type="button" class="m-blog-filter active" data-filter="" aria-pressed="true">All</button>
       {% for c in blog_categories %}
-      <button type="button" class="m-blog-filter" data-filter="{{ c }}">{{ c }}</button>
+      <button type="button" class="m-blog-filter" data-filter="{{ c }}" aria-pressed="false">{{ c }}</button>
       {% endfor %}
     </div>
     {% endif %}
@@ -68,7 +68,7 @@
     if (!filters.length || !cards.length) return;
     filters.forEach(function (btn) {
       btn.addEventListener('click', function () {
-        filters.forEach(function (b) { b.classList.toggle('active', b === btn); });
+        filters.forEach(function (b) { b.classList.toggle('active', b === btn); b.setAttribute('aria-pressed', String(b === btn)); });
         var wanted = btn.dataset.filter;
         var visibleCount = 0;
         cards.forEach(function (card) {

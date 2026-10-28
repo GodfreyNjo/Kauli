@@ -41,8 +41,9 @@
 
   <section class="m-section">
     <div class="m-inner">
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Languages and what is available for each">
       <table>
-        <thead><tr><th>Language</th><th>Native name</th><th>Mainly spoken in</th><th>Available</th></tr></thead>
+        <thead><tr><th scope="col">Language</th><th>Native name</th><th>Mainly spoken in</th><th>Available</th></tr></thead>
         <tbody>
           {% for row in rows %}
           <tr>
@@ -54,6 +55,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
       <p class="muted" style="margin-top:14px; font-size:0.85rem;">Instant AI transcription is machine-generated and not reviewed by a
         person. Accuracy depends on audio quality, accents and background noise.</p>
     </div>

@@ -163,7 +163,7 @@
   <table>
     <thead><tr>
       <th>Plan</th><th>Price/mo</th><th>Usage discount</th><th>Translation</th>
-      <th>Video deliverables</th><th>Support</th><th></th>
+      <th>Video deliverables</th><th>Support</th><th><span class="sr-only">Action</span></th>
     </tr></thead>
     <tbody>
       {% for key, p in plans.items() %}
@@ -238,7 +238,7 @@
 <div class="card">
   <h2>Payment history</h2>
   <table>
-    <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Method</th><th>Status</th><th><span class="sr-only">Receipt</span></th></tr></thead>
     <tbody>
       {% for pay in payments %}
       <tr>

@@ -142,8 +142,9 @@ PLANS = {
     "free": {
         "name": "Free", "price_usd": 0, "discount": 0.0,
         "mt": "local", "video_deliverables": False, "support": "-",
-        "blurb": f"Pay as you go - {FREE_MINUTES_PER_MONTH:.0f} free minutes/month, then pay per minute "
-                 "beyond that. Nothing downloads until an order's cost is covered, free or paid.",
+        "blurb": f"Pay as you go. Your first {FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are "
+                 "free after a one-time $1 card check (credited to your account). Nothing downloads until an "
+                 "order is paid for.",
     },
     "pro": {
         "name": "Pro", "price_usd": 19, "discount": 0.10,

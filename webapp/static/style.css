@@ -577,6 +577,7 @@ main:has(.editor-shell) { max-width: none; margin: 16px auto 0; padding: 0 20px 
 main:has(.centered-auth) { max-width: none; margin: 0; padding: 0; }
 main:has(.auth-shell) { max-width: none; margin: 0; padding: 0; }
 main:has(.marketing-page) { max-width: none; margin: 0; padding: 0; }
+main:has(> .m-footer) { max-width: none; margin: 0; padding: 0; }
 
 /* -------------------------------------------------------------- cards --- */
 .card {
@@ -3573,7 +3574,8 @@ body:not(.m-public) :focus-visible { outline-color: var(--accent); }
 
 /* ------------------------------------------ order wizard (2026-10) ---- */
 .wizard-step[aria-disabled="true"] { cursor: default; }
-.wizard-step-final { opacity: 0.65; }
+.wizard-step-final { color: var(--muted); }
+.wizard-step-final .wizard-step-num { border-style: dashed; }
 .wizard-step:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
 .wizard-pane-title { font-size: 1.15rem; margin: 0 0 16px; color: var(--heading-ink); }
 .wizard-subtitle { font-size: 1rem; margin: 24px 0 10px; color: var(--heading-ink); }
@@ -3586,3 +3588,49 @@ body:not(.m-public) :focus-visible { outline-color: var(--accent); }
 .review-list dt { color: var(--muted); }
 .review-list dd { margin: 0; font-weight: 650; color: var(--heading-ink); text-align: right; overflow-wrap: anywhere; }
 .review-list > div:last-child { border-top: 1px solid var(--border); padding-top: 9px; font-size: 1rem; }
+
+
+/* ------------------------------------------- in-text links (a11y) ------ */
+/* Links inside running text must not rely on colour alone (WCAG 1.4.1). Real
+   buttons, nav, footer columns and pills are separate controls and keep
+   their own styling. */
+body.m-public p a:not(.btn):not(.m-lang-pill):not(.svc-link),
+body.m-public li a:not(.btn):not(.m-lang-pill),
+body.m-public dd a, body.m-public td a:not(.btn),
+.legal a, .m-faq-item p a, .auth-consent a, .auth-shell p a {
+  text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
+}
+body.m-public .m-footer-col a { text-decoration: none; }
+body.m-public .m-footer-col a:hover { text-decoration: underline; }
+
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
+.table-scroll:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.table-scroll table { min-width: 560px; }
+
+
+/* --------------------------------------------- polish pass (2026-10) ---- */
+/* the preview's four tabs must all fit in the narrow transcript column */
+.pv-tabs { padding: 0 6px; gap: 0; justify-content: space-between; }
+.pv-tab { padding: 10px 6px; font-size: 0.7rem; }
+
+/* the global button padding was squashing the eye icon to 4px wide */
+.auth-password-toggle { padding: 0; min-width: 0; }
+
+/* no lone words on a last line in headings */
+.m-hero h1, .m-h2, .cta-band h2, .auth-showcase h2, .auth-shell h1,
+.svc-card h3, .why-item h3, .how-step h3 { text-wrap: balance; }
+.m-lede, .m-hero-sub, .cta-band p { text-wrap: pretty; }
+
+/* footer: six columns in a real grid so Contact doesn't wrap onto its own row */
+.m-footer-inner {
+  display: grid; justify-content: stretch; align-items: start; gap: 36px 32px;
+  grid-template-columns: minmax(210px, 1.5fr) repeat(5, minmax(120px, 1fr));
+}
+.m-footer-col { min-width: 0; }
+@media (max-width: 1080px) {
+  .m-footer-inner { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .m-footer-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 560px) {
+  .m-footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
