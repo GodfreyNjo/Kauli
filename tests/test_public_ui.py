@@ -106,7 +106,8 @@ def client():
 def test_homepage_structure_follows_the_plan(client):
     html = client.get("/").text
     assert len(re.findall(r"<h1[ >]", html)) == 1
-    assert "Make your content speak to more people." in html
+    assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+ Languages</h1>", html)
+    assert "Nairobi" not in html
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
     assert ids[:4] == ["services", "demo", "why", "pricing"], ids       # services before pricing, as specified
     for needed in ("how", "faq", "book", "start"):
@@ -119,7 +120,7 @@ def test_homepage_structure_follows_the_plan(client):
 
 def test_one_consistent_primary_action(client):
     html = client.get("/").text
-    assert html.count(">Start a project<") >= 3          # nav, hero, final band
+    assert html.count(">Start a project<") >= 2          # nav and final band; the hero says "Try Free Transcription"
     assert "Get started free" not in html
     assert 'data-cta="hero"' in html and 'data-cta="nav"' in html and 'data-cta="final"' in html
     for path in ("/solutions/audio-to-text", "/languages"):

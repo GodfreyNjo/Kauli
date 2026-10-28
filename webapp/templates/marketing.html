@@ -67,59 +67,70 @@
 {% endblock %}{% block content %}
 <div class="marketing-page">
 
+  <div class="tk-announce"><span class="tk-announce-tag">New</span>
+    <span><strong>Instant AI in {{ language_total }} languages.</strong> Your first {{ free_minutes|int }} minutes of transcription are free.</span>
+    <a href="/login?mode=signup" data-cta="announce">Try it now &rarr;</a></div>
+
   {% include "_nav.html" %}
 
-  <section class="m-hero m-hero-v2">
-    <div class="hero-grid">
-      <div class="hero-copy">
-        <span class="kicker">Transcription · Subtitles · Translation · Dubbing</span>
-        <h1>Make your content speak to more people.</h1>
-        <p class="m-hero-sub">
-          Transcripts, subtitles, translation and dubbing - instantly with AI, or human-reviewed
-          for Swahili, Kikuyu and English.
-        </p>
-        <div class="m-hero-ctas">
-          <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Start a project</a>
-          <a href="#demo" class="btn secondary" data-cta="hero-sample">View sample</a>
-        </div>
-        <p class="m-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are
-           free after a one-time $1 card check that is credited to your account.</p>
-        <div class="m-hero-trust">
-          <span>✓ From ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per minute</span>
-          <span>✓ {{ ai_only_languages|length + source_languages|length }} languages</span>
-          <span>✓ Human review available</span>
-        </div>
+  <section class="tk-hero">
+    <div class="tk-hero-inner">
+      <h1>Transcribe Audio to Text in {{ ai_only_languages|length + source_languages|length }} Languages</h1>
+      <p class="tk-hero-sub">Turn audio and video into accurate, time-stamped text in minutes, then translate it, add subtitles
+         or dub it. Instantly with AI, or human-reviewed for Swahili, Kikuyu and English.</p>
+      <div class="tk-hero-ctas">
+        <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
+        <a href="#book" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
+      <p class="tk-hero-note">Pay as you go. A one-time $1 card check (credited to your account) unlocks your free minutes.</p>
 
-      <div class="hero-preview">
-        <div class="pv" role="img" aria-label="Sample project preview: a video player beside a timestamped Swahili transcript with its English translation, and download formats Word, text, SRT and VTT.">
-          <div class="pv-chrome" aria-hidden="true">
-            <span class="pv-dot"></span><span class="pv-dot"></span><span class="pv-dot"></span>
-            <span class="pv-title">Nairobi Farmers Story</span>
-            <span class="pv-badge">Sample</span>
-          </div>
-          <div class="pv-body" aria-hidden="true">
-            <div class="pv-video">
-              <span class="pv-play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>
-              <span class="pv-caption">We plant when the rains begin.</span>
-              <span class="pv-bar"><span>00:14</span><span class="pv-track"><i></i></span><span>00:42</span></span>
-            </div>
-            <div class="pv-side">
-              <div class="pv-tabs"><span class="pv-tab on">Transcript</span><span class="pv-tab">Subtitles</span><span class="pv-tab">Translation</span><span class="pv-tab">Dubbing</span></div>
-              <div class="pv-lines">
-                <div class="pv-line"><time>00:04</time><span><span class="pv-src">Karibu kwenye shamba letu.</span><span class="pv-out">Welcome to our farm.</span></span></div>
-                <div class="pv-line on"><time>00:09</time><span><span class="pv-src">Tunapanda mbegu mvua inapoanza.</span><span class="pv-out">We plant when the rains begin.</span></span></div>
-                <div class="pv-line"><time>00:15</time><span><span class="pv-src">Mavuno yetu yameongezeka mwaka huu.</span><span class="pv-out">Our harvest has grown this year.</span></span></div>
-              </div>
-            </div>
-          </div>
-          <div class="pv-foot" aria-hidden="true">
-            <span>Download:</span><span class="pv-chip">Word</span><span class="pv-chip">TXT</span><span class="pv-chip">SRT</span><span class="pv-chip">VTT</span>
-          </div>
-        </div>
-        <p class="pv-note">Illustrative sample. Your own files appear in your project workspace.</p>
+      <div class="tk-langs">
+        <span>Transcribe audio to text in {{ language_total }} languages</span>
+        <ul class="tk-lang-pills" aria-label="Some of the supported languages">
+          <li>English</li><li>Kiswahili</li><li>Kikuyu</li><li>Fran&ccedil;ais</li><li>Espa&ntilde;ol</li><li>&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;</li><li>Portugu&ecirc;s</li><li>Deutsch</li><li>+ more</li>
+        </ul>
       </div>
     </div>
+
+    <div class="tk-cards">
+      <a class="tk-card" href="/login?mode=signup" data-cta="hero-upload">
+        <div class="tk-card-head">
+          <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
+          <h2>Upload to convert audio or video to text</h2>
+        </div>
+        <div class="tk-drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+          <span>Click to upload and transcribe for free</span>
+        </div>
+        <ul class="tk-chips" aria-label="Accepted formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
+      </a>
+      <a class="tk-card" href="/login?mode=signup" data-cta="hero-link">
+        <div class="tk-card-head">
+          <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
+          <h2>Paste a YouTube link and transcribe it</h2>
+        </div>
+        <div class="tk-drop">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>
+          <span>No file needed - paste a link in your project</span>
+        </div>
+        <ul class="tk-chips" aria-label="What you can order"><li>Transcript</li><li>Subtitles</li><li>Translation</li><li>Dubbing</li></ul>
+      </a>
+    </div>
+  </section>
+
+  <section class="tk-band">
+    <div class="tk-band-inner">
+      <h2>Audio to text in minutes. Checked by a person when it matters.</h2>
+      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. For Swahili, Kikuyu and English, choose Human-reviewed and a real editor checks it before it is marked ready.</p>
+      <a href="/login?mode=signup" class="btn tk-band-btn" data-cta="band">Try It Now</a>
+    </div>
+  </section>
+
+  <section class="tk-stats" aria-label="Kauli at a glance">
+    <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length }}</b><span>transcription languages</span></div>
+    <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length - 1 }}</b><span>translation languages</span></div>
+    <div class="tk-stat"><b>3</b><span>human-reviewed languages</span></div>
+    <div class="tk-stat"><b>${{ '%.2f'|format(price_card['transcribe']['ai']) }}</b><span>per minute, from</span></div>
   </section>
 
   <section class="m-section" id="services">
@@ -356,7 +367,7 @@
   </script>
 
 
-  <section class="m-section" id="why" style="background:var(--sidebar-bg);">
+  <section class="m-section tk-dark" id="why">
     <div class="m-inner">
       <span class="m-section-eyebrow">Why Kauli</span>
       <h2 class="m-h2">Built for work you put your name on</h2>
