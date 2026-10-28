@@ -180,6 +180,7 @@ def test_order_page_never_sends_the_hidden_text_before_a_plan_is_chosen(env, wav
     assert "The harvest started early" in page and "transcript-teaser" in page
     assert "Quetzal" not in page and "Zebra herds" not in page and "abundant" not in page   # not in the HTML at all
     assert "is hidden" in page and "Choose the Free plan" in page
+    assert "one-time $1 card confirmation" in page and "credited straight back" in page
 
 
 def test_the_ai_tools_wait_for_a_plan_too(env, wav_bytes):

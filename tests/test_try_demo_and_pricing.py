@@ -139,3 +139,9 @@ def test_signin_consent_is_short_and_password_rules_start_folded(client):
 def test_pay_as_you_go_replaces_the_free_plan_label_and_enterprise_is_not_a_public_tier():
     billing_html = (ROOT / "webapp/templates/billing.html").read_text(encoding="utf-8")
     assert "Pay as you go' if key == 'free'" in billing_html and "key != 'enterprise' or key == current_plan" in billing_html
+
+
+def test_the_terms_say_plainly_what_the_one_dollar_check_is(client):
+    terms = client.get("/terms").text
+    assert "$1.00 card confirmation" in terms and "not a\n       fee" in terms and "credited to your account as usage credit" in terms
+    assert "the last part of a transcript made with" in terms and "is hidden" in terms
