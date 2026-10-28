@@ -7,14 +7,14 @@
 <meta name="description" content="Sign in to Kauli to manage your transcription, subtitle, translation and dubbing projects and download your files, or create an account.">
 {% endblock %}
 {% block content %}
-<div class="auth-shell">
+<div class="auth-shell auth-shell--welcome">
   <div class="auth-form-panel">
     <div class="auth-form-inner">
       <div class="auth-brand">
         <a href="/" aria-label="Kauli - back to home">
           <picture>
-            <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
-            <img src="/static/kauli-logo-nav-sm.png" alt="Kauli" class="auth-brand-logo" width="155" height="42">
+            <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
+            <img src="/static/kauli-logo-nav-light.png" alt="Kauli" class="auth-brand-logo" width="155" height="42">
           </picture>
         </a>
       </div>
@@ -103,31 +103,26 @@
     </div>
   </div>
 
-  <aside class="auth-brand-panel" aria-hidden="true">
+  <section class="auth-brand-panel auth-welcome" aria-label="About Kauli">
+    <a href="/" class="auth-welcome-logo" aria-label="Kauli - back to home">
+      <picture>
+        <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
+        <img src="/static/kauli-logo-nav-light.png" alt="Kauli" width="163" height="44">
+      </picture>
+    </a>
     <div class="auth-showcase">
-      <h2>Human expertise. Global reach.</h2>
-      <p>Transcription, translation, captions and dubbing for your media in {{ language_total }} languages, with human review when it matters.</p>
-
-      <div class="pv auth-pv">
-        <div class="pv-chrome">
-          <span class="pv-title">Your project</span>
-          <span class="pv-badge">Sample project</span>
-        </div>
-        <div class="auth-pv-status">
-          <span class="auth-pv-pill">Ready for delivery</span>
-          <span class="auth-pv-meta">SW → EN · 00:42</span>
-        </div>
-        <div class="auth-pv-wave">{% for h in [30,52,40,70,45,82,58,36,66,48,76,34,60,44,72,38,56,28,64,42] %}<i style="height:{{ h }}%"></i>{% endfor %}</div>
-        <div class="pv-tabs"><span class="pv-tab on">Transcript</span><span class="pv-tab">Subtitles</span><span class="pv-tab">Translation</span><span class="pv-tab">Dubbing</span></div>
-        <div class="pv-lines">
-          <div class="pv-line"><time>00:09</time><span><span class="pv-src">Karibu kwenye mkutano wetu.</span><span class="pv-out">Welcome to our meeting.</span></span></div>
-          <div class="pv-line"><time>00:15</time><span><span class="pv-src">Tutaanza sasa.</span><span class="pv-out">Let us begin.</span></span></div>
-        </div>
-        <div class="pv-foot"><span>Files:</span><span class="pv-chip">Word</span><span class="pv-chip">TXT</span><span class="pv-chip">SRT</span><span class="pv-chip">VTT</span></div>
-      </div>
-      <p class="auth-showcase-note">Illustrative preview.</p>
+      <h2>Welcome to Kauli</h2>
+      <p class="auth-welcome-tag">Human expertise. Global reach.</p>
+      <p class="auth-welcome-lede">Transcription, translation, subtitles and dubbing for your audio and video, with human review when it matters.</p>
+      <p class="auth-welcome-kicker">What you get</p>
+      <ul class="auth-facts">
+        <li><strong>{{ language_total }}</strong><span>languages transcribed, and translated between</span></li>
+        <li><strong>3</strong><span>languages with human review: Swahili, Kikuyu and English</span></li>
+        <li><strong>{{ free_minutes|int }} min</strong><span>of Instant AI transcription free each month</span></li>
+        <li><strong>API</strong><span>MCP server, Slack, Teams, Notion and webhooks</span></li>
+      </ul>
     </div>
-  </aside>
+  </section>
 </div>
 <script>
   // Show/hide toggle on every password field on this page (sign-in and

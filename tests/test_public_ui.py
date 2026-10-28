@@ -184,7 +184,7 @@ def test_integrations_section_is_honest_about_what_exists(client):
     html = client.get("/").text
     block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     # what is really built is marked Available and linked to its docs...
-    for name in ("API", "MCP server", "Webhooks", "Slack", "Notion"):
+    for name in ("API", "MCP server", "Webhooks", "Slack", "Microsoft Teams", "Notion"):
         assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
     # ...and nothing unbuilt is ever presented as available
     for name in ("Zoom", "Google Drive", "HubSpot", "Salesforce"):

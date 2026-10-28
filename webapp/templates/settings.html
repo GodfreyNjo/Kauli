@@ -220,6 +220,38 @@
       </form>
       {% endif %}
 
+      <h3 id="teams" style="margin:22px 0 8px; font-size:0.92rem;">Microsoft Teams</h3>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Get a message in a Teams channel the moment an order
+         is ready. In Teams, open the channel, choose the ... menu, then Workflows, and add the
+         <strong>Post to a channel when a webhook request is received</strong> workflow. Copy the URL it gives you
+         and paste it here.</p>
+      {% if teams_error %}<p class="error">{{ teams_error }}</p>{% endif %}
+      {% if teams_notice %}<p class="ok">{{ teams_notice }}</p>{% endif %}
+      {% if teams_row %}
+      <p class="muted" style="font-size:0.82rem; margin:0 0 8px;">Connected: workflow URL ending
+         <code>&hellip;{{ teams_row['webhook_url'][-4:] }}</code></p>
+      {% endif %}
+      <form method="post" action="/settings/teams">
+        <label>{{ 'Replace the Teams webhook URL' if teams_row else 'Teams webhook URL' }}
+          <input type="url" name="url" autocomplete="off" placeholder="https://prod-00.westus.logic.azure.com/workflows/...">
+        </label>
+        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+          <input type="checkbox" name="include_links" value="1" style="width:auto; margin-top:3px;"
+                 {% if teams_row and teams_row['include_links'] %}checked{% endif %}>
+          <span style="font-size:0.84rem;">Include download buttons. Anyone in the channel can use them for 7 days;
+            leave this off to share only a link that needs your Kauli login.</span>
+        </label>
+        <button type="submit" class="secondary" style="margin-top:8px;">{{ 'Save' if teams_row else 'Connect Teams' }}</button>
+      </form>
+      {% if teams_row %}
+      <form method="post" action="/settings/teams/test" style="display:inline;">
+        <button type="submit" class="secondary">Send a test message</button>
+      </form>
+      <form method="post" action="/settings/teams/delete" style="display:inline; margin-left:8px;">
+        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Teams?');">Disconnect</button>
+      </form>
+      {% endif %}
+
       <h3 id="notion" style="margin:22px 0 8px; font-size:0.92rem;">Notion</h3>
       <p class="muted" style="font-size:0.82rem; margin-top:0;">Send each finished transcript to Notion as a page.
          In Notion, create an

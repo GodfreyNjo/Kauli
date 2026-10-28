@@ -3910,3 +3910,75 @@ body.m-public, .marketing-page { font-size: 16px; }
 /* the older public-form button rule must not recolour the demo button */
 body.m-public .demo-form button.demo-submit { background: #2262ec; color: #ffffff; font-family: var(--font-ui); font-weight: 600; border-radius: 12px; }
 body.m-public .demo-form button.demo-submit:hover { background: #1a52cc; }
+
+/* ===================================================================== */
+/* Sign-in redesign (2026-10): dark full-page layout with a welcome side  */
+/* and a bordered sign-in card. Kauli's own words, brand colours and     */
+/* only the sign-in methods that really exist (Google, email).           */
+/* ===================================================================== */
+body.auth-page { background: #07132c; }
+.auth-shell {
+  --auth-bg: #07132c; --auth-border: rgba(255, 255, 255, 0.24); --auth-ink: #f1f5ff; --auth-muted: #b9c6df;
+  --auth-placeholder: #9aabc9; --auth-accent: #2262ec; --auth-accent-hover: #1a52cc; --auth-link: #9cc2ff;
+  flex-direction: row-reverse; align-items: stretch;
+  background: radial-gradient(1200px 700px at 85% 10%, rgba(34, 98, 236, 0.28), transparent 60%),
+              linear-gradient(135deg, #07132c 0%, #0a1f4a 55%, #0d3277 100%);
+  color: var(--auth-ink);
+}
+.auth-form-panel { flex: 1 1 50%; align-items: center; justify-content: center; padding: 40px 32px; background: transparent; }
+.auth-form-inner {
+  max-width: 480px; padding: 40px 40px 32px; border: 1px solid var(--auth-border); border-radius: 20px;
+  background: rgba(7, 16, 40, 0.72); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.7);
+}
+.auth-shell h1, .auth-shell .auth-field-label { color: var(--auth-ink); }
+.auth-shell .auth-sub, .auth-shell .auth-switch, .auth-shell .auth-consent, .auth-shell .auth-checkbox-row { color: var(--auth-muted); }
+.auth-shell .auth-consent a, .auth-shell p a, .auth-forgot a, .auth-link-btn { color: var(--auth-link); }
+.auth-link-btn:hover, .auth-forgot a:hover, .auth-shell p a:hover { color: #ffffff; }
+.auth-tabs { background: rgba(255, 255, 255, 0.08); }
+.auth-tab { color: var(--auth-muted); background: transparent; }
+.auth-tab.active { background: rgba(255, 255, 255, 0.18); color: #ffffff; box-shadow: none; }
+.auth-shell input[type="email"], .auth-shell input[type="password"], .auth-shell input[type="text"] {
+  background: rgba(255, 255, 255, 0.06); color: var(--auth-ink); border-color: var(--auth-border);
+}
+.auth-shell input:focus { outline: 2px solid #7fb0ff; outline-offset: 1px; border-color: #7fb0ff; }
+.auth-google-btn { background: transparent; color: var(--auth-ink); border-color: var(--auth-border); }
+.auth-google-btn:hover { background: rgba(255, 255, 255, 0.09); color: #ffffff; }
+.auth-divider { color: var(--auth-muted); }
+.auth-divider::before, .auth-divider::after, .auth-divider span::before, .auth-divider span::after { border-color: var(--auth-border); background-color: var(--auth-border); }
+.auth-shell button[type="submit"] { background: #2262ec; color: #ffffff; border-radius: 12px; }
+.auth-shell button[type="submit"]:hover { background: var(--auth-accent-hover); }
+.auth-password-toggle { color: var(--auth-muted); }
+.auth-shell .password-checklist li { color: var(--auth-muted); }
+.auth-shell .password-checklist li.met { color: #86cca2; }
+.auth-shell .error { background: #3a1d22; color: #f4b1ac; }
+.auth-shell .ok { background: #173326; color: #86cca2; }
+
+/* welcome side */
+.auth-brand-panel.auth-welcome {
+  flex: 1 1 50%; max-width: none; min-width: 0; background: transparent; color: #ffffff; border: none;
+  display: flex; flex-direction: column; justify-content: center; padding: 40px 48px 40px 64px; position: relative;
+}
+.auth-welcome-logo { position: absolute; top: 32px; left: 64px; }
+.auth-welcome-logo img { height: 44px; width: auto; display: block; }
+.auth-showcase h2 { font-family: var(--font-ui); font-weight: 700; font-size: clamp(2.2rem, 1.2rem + 2.6vw, 3.4rem); line-height: 1.1; letter-spacing: -0.02em; color: #ffffff; margin: 0 0 12px; }
+.auth-welcome-tag { font-size: 1.2rem; font-weight: 600; color: #9ab255; margin: 0 0 14px; }
+.auth-welcome-lede { font-size: 1.08rem; line-height: 1.6; color: #c9d5ec; max-width: 520px; margin: 0 0 30px; }
+.auth-welcome-kicker { font-size: 0.85rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #b9c6df; margin: 0 0 14px; }
+.auth-facts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; max-width: 560px; }
+.auth-facts li { display: flex; flex-direction: column; gap: 4px; padding-left: 14px; border-left: 3px solid #2262ec; }
+.auth-facts strong { font-size: 1.5rem; font-weight: 700; color: #ffffff; line-height: 1.1; }
+.auth-facts span { font-size: 0.93rem; line-height: 1.45; color: #c9d5ec; }
+
+/* the welcome side carries the logo, so the card's own logo only shows when that side is hidden */
+@media (min-width: 901px) { .auth-shell--welcome .auth-brand { display: none; } }
+@media (max-width: 900px) {
+  .auth-shell { flex-direction: column; }
+  .auth-form-panel { padding: 24px 16px 40px; align-items: flex-start; }
+  .auth-form-inner { padding: 28px 22px 24px; }
+  .auth-brand-panel.auth-welcome { display: none; }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .auth-brand-panel.auth-welcome { padding: 40px 24px 40px 40px; }
+  .auth-welcome-logo { left: 40px; }
+  .auth-facts { grid-template-columns: 1fr; }
+}

@@ -3696,6 +3696,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
                    saved: bool = False, error: str | None = None, webhook_error: str | None = None,
                    slack_error: str | None = None, slack_notice: str | None = None,
                    notion_error: str | None = None, notion_notice: str | None = None,
+                   teams_error: str | None = None, teams_notice: str | None = None,
                    mfa_step: str | None = None, mfa_error: str | None = None, mfa_notice: str | None = None):
     user = current_user(request)
     if not user:
@@ -3748,6 +3749,8 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "slack_error": slack_error, "slack_notice": slack_notice,
         "notion_row": db.get_client_notion(user["id"]) if is_team_owner else None,
         "notion_error": notion_error, "notion_notice": notion_notice,
+        "teams_row": db.get_client_teams(user["id"]) if is_team_owner else None,
+        "teams_error": teams_error, "teams_notice": teams_notice,
         "mfa_step": mfa_step, "mfa_error": mfa_error, "mfa_notice": mfa_notice, "mfa_pending": mfa_pending,
         "new_backup_codes": new_backup_codes,
         "backup_codes_remaining": db.count_unused_backup_codes(user["id"]) if user["mfa_enabled_at"] else 0,
@@ -3933,6 +3936,132 @@ def client_send_to_notion(request: Request, order_id: str):
         msg = "Sent to Notion." if detail else "This order is already being sent to Notion."
         return RedirectResponse(f"/client/orders/{order_id}?notice={quote_plus(msg)}", status_code=303)
     return RedirectResponse(f"/client/orders/{order_id}?error={quote_plus(detail)}", status_code=303)
+
+
+_TEAMS_HOST_SUFFIXES = (".logic.azure.com", ".webhook.office.com", ".powerplatform.com")
+
+
+def _is_teams_webhook_url(url: str) -> bool:
+    """Only a Microsoft workflow/connector webhook: https, no credentials in the
+    URL, the default port, and a host that is a real subdomain of one of
+    Microsoft's webhook domains. A free-form URL would let a customer point
+    Kauli at our own network; this list cannot."""
+    try:
+        parsed = urlparse((url or "").strip())
+        host = (parsed.hostname or "").lower()
+        if parsed.scheme != "https" or parsed.username or parsed.password or parsed.fragment:
+            return False
+        if parsed.port not in (None, 443) or len(parsed.path) < 2:
+            return False
+        if host == "outlook.office.com":                    # the older connector address
+            return parsed.path.startswith("/webhook/")
+        return any(host.endswith(suffix) and len(host) > len(suffix) for suffix in _TEAMS_HOST_SUFFIXES)
+    except ValueError:
+        return False
+
+
+def _post_to_teams(client_id: str, order_id: str, event: str, url: str, payload: dict) -> tuple[bool, str | None]:
+    """One real POST to the customer's Teams webhook, logged with their other
+    deliveries. Workflows answer 202 Accepted, the older connectors 200."""
+    try:
+        resp = httpx.post(url, json=payload, timeout=10.0, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        db.log_webhook_delivery(client_id, order_id, event, False, None, str(exc)[:300])
+        return False, str(exc)[:200]
+    ok = resp.status_code in (200, 202)
+    detail = None if ok else (resp.text or f"HTTP {resp.status_code}")[:200]
+    db.log_webhook_delivery(client_id, order_id, event, ok, resp.status_code, detail)
+    return ok, detail
+
+
+def _teams_clean(text) -> str:
+    """Teams renders a little markdown in card text: no link syntax, mentions or code from file names."""
+    return re.sub(r"[\[\]<>`]", "", str(text))
+
+
+def _teams_card(title: str, facts: list[tuple[str, str]], note: str | None, actions: list[tuple[str, str]]) -> dict:
+    body = [{"type": "TextBlock", "text": title, "weight": "Bolder", "size": "Medium", "wrap": True}]
+    if facts:
+        body.append({"type": "FactSet", "facts": [{"title": k, "value": _teams_clean(v)} for k, v in facts]})
+    if note:
+        body.append({"type": "TextBlock", "text": note, "isSubtle": True, "wrap": True})
+    card = {"type": "AdaptiveCard", "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+            "version": "1.4", "body": body}
+    if actions:
+        card["actions"] = [{"type": "Action.OpenUrl", "title": label, "url": link} for label, link in actions]
+    return {"type": "message", "attachments": [{"contentType": "application/vnd.microsoft.card.adaptive",
+                                                "contentUrl": None, "content": card}]}
+
+
+def _teams_order_ready_message(request, order, include_links: bool) -> dict:
+    base = str(request.base_url).rstrip("/")
+    src, tgt = order["source_lang"], order["target_lang"]
+    langs = LANGUAGE_NAMES.get(src, src) + (f" to {LANGUAGE_NAMES.get(tgt, tgt)}" if tgt and tgt != src else "")
+    actions = [("Open order", f"{base}/client/orders/{order['id']}")]
+    if include_links:
+        links = _order_to_api_dict(request, order)["deliverables"]
+        for kind, label in (("txt", "Transcript (TXT)"), ("docx", "Transcript (Word)"), ("srt", "Subtitles (SRT)"),
+                            ("vtt", "Subtitles (VTT)")):
+            if kind in links and len(actions) < 4:
+                actions.append((label, links[kind]))
+    return _teams_card(
+        "Your Kauli order is ready",
+        [("File", order["original_filename"] or order["id"]),
+         ("Service", _SLACK_SERVICE_LABELS.get(order["service_level"] or "transcribe", "Order")),
+         ("Languages", langs), ("Order", order["id"])],
+        None if _plan_chosen(order["client_id"]) else "Choose a plan in Kauli to unlock downloads.", actions)
+
+
+def _notify_teams_order_ready(request, order) -> None:
+    row = db.get_client_teams(order["client_id"])
+    if not row or not _is_teams_webhook_url(row["webhook_url"]):
+        return
+    _post_to_teams(order["client_id"], order["id"], "teams.order.ready", row["webhook_url"],
+                   _teams_order_ready_message(request, order, bool(row["include_links"])))
+
+
+@app.post("/settings/teams")
+def settings_teams_save(request: Request, url: str = Form(""), include_links: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    url = url.strip()
+    if not url and db.get_client_teams(user["id"]):          # only the checkbox changed
+        db.set_client_teams_include_links(user["id"], bool(include_links))
+        return RedirectResponse("/settings?tab=integrations&teams_notice=Teams+settings+saved#teams", status_code=303)
+    if not _is_teams_webhook_url(url):
+        return RedirectResponse(
+            "/settings?tab=integrations&teams_error=That+isn%27t+a+Microsoft+Teams+workflow+webhook+URL.+Create+one+with+"
+            "the+%22Post+to+a+channel+when+a+webhook+request+is+received%22+workflow#teams", status_code=303)
+    db.set_client_teams(user["id"], url, bool(include_links))
+    return RedirectResponse("/settings?tab=integrations&teams_notice=Teams+connected.+Send+a+test+message+to+check+it#teams",
+                            status_code=303)
+
+
+@app.post("/settings/teams/test")
+def settings_teams_test(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    row = db.get_client_teams(user["id"])
+    if not row:
+        return RedirectResponse("/settings?tab=integrations&teams_error=Connect+Teams+first#teams", status_code=303)
+    ok, detail = _post_to_teams(user["id"], "test", "teams.test", row["webhook_url"], _teams_card(
+        "Kauli is connected to this channel", [], "You will get a message here when an order is ready.", []))
+    if ok:
+        return RedirectResponse("/settings?tab=integrations&teams_notice=Test+message+sent#teams", status_code=303)
+    from urllib.parse import quote_plus
+    return RedirectResponse(f"/settings?tab=integrations&teams_error={quote_plus('Teams refused the message: ' + str(detail))}#teams",
+                            status_code=303)
+
+
+@app.post("/settings/teams/delete")
+def settings_teams_delete(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.delete_client_teams(user["id"])
+    return RedirectResponse("/settings?tab=integrations&teams_notice=Teams+disconnected#teams", status_code=303)
 
 
 @app.post("/settings/slack")
@@ -7810,6 +7939,11 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
     try:                                   # so is Notion
         if event == "order.ready":
             _notify_notion_order_ready(request, order)
+    except Exception:
+        pass
+    try:                                   # and Microsoft Teams
+        if event == "order.ready":
+            _notify_teams_order_ready(request, order)
     except Exception:
         pass
     hook = db.get_client_webhook(order["client_id"])

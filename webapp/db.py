@@ -588,6 +588,18 @@ CREATE TABLE IF NOT EXISTS client_slack (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 
+-- Microsoft Teams: a customer's own Workflows webhook URL (created in THEIR tenant).
+-- The URL is a credential: anyone holding it can post to that channel, so the
+-- UI only ever shows it masked.
+CREATE TABLE IF NOT EXISTS client_teams (
+    client_id TEXT PRIMARY KEY,
+    webhook_url TEXT NOT NULL,
+    include_links INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+
 -- Notion: the customer's own internal-integration token (stored ENCRYPTED, only
 -- the last 4 characters kept readable) and the page/database transcripts go to.
 CREATE TABLE IF NOT EXISTS client_notion (
@@ -2313,6 +2325,42 @@ def get_client_webhook(client_id: str):
 def delete_client_webhook(client_id: str) -> None:
     conn = get_conn()
     conn.execute("DELETE FROM client_webhooks WHERE client_id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_client_teams(client_id: str, webhook_url: str, include_links: bool) -> None:
+    conn = get_conn()
+    now = time.time()
+    conn.execute(
+        """INSERT INTO client_teams (client_id, webhook_url, include_links, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?)
+           ON CONFLICT(client_id) DO UPDATE SET
+             webhook_url = excluded.webhook_url, include_links = excluded.include_links,
+             updated_at = excluded.updated_at""",
+        (client_id, webhook_url, 1 if include_links else 0, now, now))
+    conn.commit()
+    conn.close()
+
+
+def get_client_teams(client_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM client_teams WHERE client_id = ?", (client_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def set_client_teams_include_links(client_id: str, include_links: bool) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE client_teams SET include_links = ?, updated_at = ? WHERE client_id = ?",
+                 (1 if include_links else 0, time.time(), client_id))
+    conn.commit()
+    conn.close()
+
+
+def delete_client_teams(client_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM client_teams WHERE client_id = ?", (client_id,))
     conn.commit()
     conn.close()
 
