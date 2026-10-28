@@ -1,0 +1,98 @@
+{#- The transcript toolbar: share, download, find and replace, shortcuts, and display toggles. Behaviour lives in static/transcript_tools.js. -#}
+<div class="tx-tools" id="tx-tools" data-order-id="{{ order['id'] }}" data-same="{{ '1' if same_language else '0' }}" data-source-media="{{ '1' if source_media_ready else '0' }}" data-editable="{{ '1' if can_edit_transcript else '0' }}">
+  <button type="button" class="tx-tool" data-open="tx-share-dialog"><span aria-hidden="true">&#8599;</span> Share</button>
+  <button type="button" class="tx-tool" data-open="tx-download-dialog"><span aria-hidden="true">&#8681;</span> Download</button>
+  <button type="button" class="tx-tool" data-open="tx-find-panel" id="tx-find-open"><span aria-hidden="true">&#8981;</span> Find &amp; replace</button>
+  <details class="tx-more">
+    <summary class="tx-tool" aria-label="More transcript options">More</summary>
+    <div class="tx-more-menu">
+      <label class="tx-switch"><input type="checkbox" id="tx-hide-time"> Hide timestamps</label>
+      <label class="tx-switch"><input type="checkbox" id="tx-hide-speaker"> Hide speakers</label>
+      <label class="tx-switch"><input type="checkbox" id="tx-autoscroll" checked> Auto scroll with the audio</label>
+      {% if can_edit_transcript %}
+      <button type="button" class="tx-menu-item" id="tx-undo">Undo</button>
+      <button type="button" class="tx-menu-item" id="tx-redo">Redo</button>
+      {% endif %}
+      <button type="button" class="tx-menu-item" data-open="tx-keys-dialog">Keyboard shortcuts</button>
+    </div>
+  </details>
+</div>
+
+<div class="tx-find" id="tx-find-panel" hidden>
+  <input type="search" id="tx-find-q" placeholder="Find" aria-label="Find in transcript" autocomplete="off">
+  <input type="text" id="tx-find-r" placeholder="Replace with" aria-label="Replace with" autocomplete="off"{% if not can_edit_transcript %} disabled{% endif %}>
+  <span class="muted tx-find-count" id="tx-find-count" aria-live="polite"></span>
+  <button type="button" class="secondary" id="tx-find-prev" aria-label="Previous match">&uarr;</button>
+  <button type="button" class="secondary" id="tx-find-next" aria-label="Next match">&darr;</button>
+  {% if can_edit_transcript %}
+  <button type="button" class="secondary" id="tx-replace-one">Replace</button>
+  <button type="button" class="secondary" id="tx-replace-all">Replace all</button>
+  {% endif %}
+  <button type="button" class="secondary" id="tx-find-close" aria-label="Close find">&times;</button>
+</div>
+
+<dialog class="tx-dialog" id="tx-share-dialog" aria-labelledby="tx-share-title">
+  <form method="dialog" class="tx-dialog-head"><h3 id="tx-share-title">Share this transcript</h3><button class="tx-x" aria-label="Close">&times;</button></form>
+  <p class="muted">Anyone with the link can read this transcript. They cannot edit it or see your other files.</p>
+  <div class="tx-copy"><input type="text" id="tx-share-url" readonly aria-label="Share link" value="Making your link..."><button type="button" id="tx-share-copy">Copy link</button></div>
+  <div class="tx-share-row">
+    <input type="email" id="tx-share-email" placeholder="friend@example.com" aria-label="Email address to send the link to">
+    <button type="button" class="secondary" id="tx-share-send">Send by email</button>
+  </div>
+  <div class="tx-share-row">
+    <a class="btn secondary" id="tx-share-wa" target="_blank" rel="noopener">Share on WhatsApp</a>
+    <button type="button" class="secondary" id="tx-share-stop">Stop sharing</button>
+  </div>
+  <p class="muted tx-msg" id="tx-share-msg" role="status" aria-live="polite"></p>
+</dialog>
+
+<dialog class="tx-dialog" id="tx-download-dialog" aria-labelledby="tx-dl-title">
+  <form method="dialog" class="tx-dialog-head"><h3 id="tx-dl-title">Download the transcript</h3><button class="tx-x" aria-label="Close">&times;</button></form>
+  <fieldset class="tx-fieldset"><legend>Format</legend>
+    <div class="tx-chips">
+      <label><input type="radio" name="tx-fmt" value="docx" checked> Word</label>
+      <label><input type="radio" name="tx-fmt" value="pdf"> PDF</label>
+      <label><input type="radio" name="tx-fmt" value="txt"> Text</label>
+      <label><input type="radio" name="tx-fmt" value="srt"> SRT</label>
+      <label><input type="radio" name="tx-fmt" value="csv"> CSV</label>
+      <label><input type="radio" name="tx-fmt" value="clip"> Copy to clipboard</label>
+    </div>
+  </fieldset>
+  {% if not same_language %}
+  <fieldset class="tx-fieldset"><legend>Language</legend>
+    <div class="tx-chips">
+      <label><input type="radio" name="tx-side" value="source" checked> Original ({{ order['source_lang']|upper }})</label>
+      <label><input type="radio" name="tx-side" value="target"> Translation ({{ order['target_lang']|upper }})</label>
+    </div>
+  </fieldset>
+  {% endif %}
+  <fieldset class="tx-fieldset" id="tx-split-set"><legend>Layout</legend>
+    <div class="tx-chips">
+      <label><input type="radio" name="tx-split" value="line" checked> One paragraph per line</label>
+      <label><input type="radio" name="tx-split" value="speaker"> Split by speaker</label>
+      <label><input type="radio" name="tx-split" value="single"> Don't split (one paragraph)</label>
+    </div>
+  </fieldset>
+  <div class="tx-toggles">
+    <label class="tx-switch"><input type="checkbox" id="tx-opt-time" checked> Timestamps</label>
+    <label class="tx-switch"><input type="checkbox" id="tx-opt-speaker" checked> Speaker labels</label>
+    {% if source_media_ready %}<label class="tx-switch"><input type="checkbox" id="tx-opt-media"> Also download the original {{ 'video' if source_is_video else 'audio' }}</label>{% endif %}
+  </div>
+  <p class="muted tx-msg" id="tx-dl-msg" role="status" aria-live="polite"></p>
+  <div class="tx-actions"><button type="button" id="tx-dl-go">Download</button></div>
+</dialog>
+
+<script src="/static/transcript_tools.js?v={{ static_version('transcript_tools.js') }}" defer></script>
+
+<dialog class="tx-dialog" id="tx-keys-dialog" aria-labelledby="tx-keys-title">
+  <form method="dialog" class="tx-dialog-head"><h3 id="tx-keys-title">Keyboard shortcuts</h3><button class="tx-x" aria-label="Close">&times;</button></form>
+  <dl class="tx-keys">
+    <dt><kbd>Ctrl</kbd> / <kbd>&#8984;</kbd> + <kbd>S</kbd></dt><dd>Save your changes</dd>
+    <dt><kbd>Ctrl</kbd> / <kbd>&#8984;</kbd> + <kbd>Z</kbd></dt><dd>Undo</dd>
+    <dt><kbd>Ctrl</kbd> / <kbd>&#8984;</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dt><dd>Redo</dd>
+    <dt><kbd>Ctrl</kbd> / <kbd>&#8984;</kbd> + <kbd>F</kbd></dt><dd>Find and replace</dd>
+    <dt><kbd>Alt</kbd> + <kbd>&uarr;</kbd> / <kbd>&darr;</kbd></dt><dd>Move to the previous or next line</dd>
+    <dt><kbd>Enter</kbd> in Find</dt><dd>Next match (<kbd>Shift</kbd> + <kbd>Enter</kbd> for the previous)</dd>
+    <dt><kbd>Esc</kbd></dt><dd>Close a window or stop finding</dd>
+  </dl>
+</dialog>

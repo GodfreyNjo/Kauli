@@ -391,7 +391,7 @@ async def limit_request_size(request: Request, call_next):
 # Pages a search engine has no business indexing: the signed-in app, the account utilities and machine endpoints.
 _NOINDEX_PREFIXES = ("/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password", "/reset-password",
                       "/logout", "/lang/", "/api/", "/webhooks/", "/billing/", "/receipts/", "/avatar/", "/notifications/",
-                      "/download/", "/status")
+                      "/download/", "/status", "/s/")
 
 
 def _seo_headers(request: Request, response) -> None:
@@ -2466,7 +2466,7 @@ def robots_txt(request: Request):
     ai_bots = ("GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot",
                "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "Amazonbot", "Meta-ExternalAgent")
     private = ("/client", "/staff", "/settings", "/actor", "/lang/", "/api/", "/receipts/", "/avatar/", "/status",
-              "/webhooks/", "/billing/", "/notifications/", "/download/")
+              "/webhooks/", "/billing/", "/notifications/", "/download/", "/s/")
     body = "User-agent: *\nAllow: /\n" + "".join(f"Disallow: {p}\n" for p in private)
     body += "".join(f"\nUser-agent: {bot}\nAllow: /\n" for bot in ai_bots)
     body += f"\nSitemap: {base}/sitemap.xml\n"
@@ -6199,6 +6199,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "live": _processing_state(order, _ui_lang(request, user)) if order["status"] in ("queued", "processing") else None,
         "caption_cues": _caption_cues(job),
         "can_edit_transcript": order["review_tier"] == "ai" and order["status"] in db.TERMINAL_OK_STATUSES,
+        "can_export_transcript": bool(job) and _deliverable_denied_reason(order, "txt") is None,
         "same_language": order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"],
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
@@ -8363,6 +8364,140 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
                                  resp.status_code)
     except httpx.HTTPError as exc:
         db.log_webhook_delivery(order["client_id"], order["id"], event, False, None, str(exc)[:300])
+
+
+# ------------------------------------------------------------------------------------------------ transcript tools
+# Download with options (format, which side, how it is split, timestamps, speaker names) and a read-only share link. Both only
+# ever hand over what _deliverable_denied_reason already allows for the order, so a transcript that is not paid for, not ready
+# or not part of the order is never served by either.
+EXPORT_FORMATS = {
+    "txt": ("text/plain; charset=utf-8", "txt"),
+    "docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", "docx"),
+    "pdf": ("application/pdf", "pdf"),
+    "csv": ("text/csv; charset=utf-8", "csv"),
+    "srt": ("application/x-subrip; charset=utf-8", "srt"),
+}
+
+
+def _flag(value: str | None, default: bool = True) -> bool:
+    return default if value is None else value.strip().lower() in ("1", "true", "yes", "on")
+
+
+def _export_transcript(job, order, fmt: str, side: str, split: str, timestamps: bool, speakers: bool) -> tuple[bytes, str]:
+    """(bytes, filename) for a transcript download; raises ValueError with a customer-readable reason."""
+    if fmt not in EXPORT_FORMATS:
+        raise ValueError("Choose a format: Word, PDF, text, SRT or CSV.")
+    side = side if side in ("source", "target") else "source"
+    split = split if split in ("line", "speaker", "single") else "line"
+    stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(order["original_filename"] or "transcript").stem).strip("_") or "transcript"
+    title = f"Transcript - {order['original_filename'] or order['id']}"
+    if fmt == "txt":
+        data = transcript_export.to_txt(job, title, timestamps, speakers, split, side)
+    elif fmt == "docx":
+        data = transcript_export.to_docx(job, title, timestamps, speakers, split, side)
+    elif fmt == "pdf":
+        data = transcript_export.to_pdf(job, title, timestamps, speakers, split, side)
+    elif fmt == "csv":
+        data = transcript_export.to_csv(job, timestamps, speakers, side)
+    else:
+        try:
+            text = to_srt(job, source=(side != "target"))
+        except (AttributeError, TypeError):
+            text = ""
+        if not text.strip():
+            raise ValueError("There is nothing to put in a subtitle file yet.")
+        data = text.encode("utf-8")
+    return data, f"{stem}_transcript.{EXPORT_FORMATS[fmt][1]}"
+
+
+def _own_finished_order(request: Request, order_id: str):
+    """(user, order, None) for a signed-in client's own finished transcript, else (None, None, a ready error response)."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return None, None, JSONResponse({"error": "Sign in to continue."}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return None, None, JSONResponse({"error": "Order not found."}, status_code=404)
+    denied = _deliverable_denied_reason(order, "txt")
+    if denied:
+        return None, None, JSONResponse({"error": denied}, status_code=403)
+    return user, order, None
+
+
+@app.get("/client/orders/{order_id}/export")
+def client_export_transcript(request: Request, order_id: str, format: str = "docx", side: str = "source", split: str = "line",
+                             timestamps: str | None = None, speakers: str | None = None):
+    user, order, err = _own_finished_order(request, order_id)
+    if err:
+        return err
+    job = _load_job(order)
+    if job is None:
+        return JSONResponse({"error": "Not ready yet."}, status_code=404)
+    try:
+        data, filename = _export_transcript(job, order, format.lower(), side, split, _flag(timestamps), _flag(speakers))
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return Response(content=data, media_type=EXPORT_FORMATS[format.lower()][0],
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+@app.post("/client/orders/{order_id}/share")
+async def client_share_transcript(request: Request, order_id: str):
+    """Body {"action": "create" | "revoke" | "email", "to": "..."}. create returns the link and a WhatsApp link."""
+    user, order, err = _own_finished_order(request, order_id)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    action = (body.get("action") if isinstance(body, dict) else None) or "create"
+    if action == "revoke":
+        return JSONResponse({"ok": True, "revoked": db.revoke_order_shares(order_id, user["client_scope_id"])})
+    allowed, retry_after = rate_limit.check(f"share:{user['id']}", limit=20, window_s=600)
+    if not allowed:
+        return JSONResponse({"error": f"Too many share requests. Try again in {retry_after}s."}, status_code=429)
+    token = db.create_order_share(order_id, user["client_scope_id"])
+    url = f"{_site_base(request)}/s/{token}"
+    name = order["original_filename"] or "a transcript"
+    if action == "email":
+        to = str(body.get("to") or "").strip()
+        if not re.fullmatch(r"[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+", to) or len(to) > 254:
+            return JSONResponse({"error": "Enter a valid email address."}, status_code=400)
+        if not mailer.email_configured():
+            return JSONResponse({"error": "Email sending is not set up yet. Copy the link instead."}, status_code=503)
+        sender = user["display_name"] or user["email"]
+        html = mailer.wrap_email_html(
+            mailer.text_to_html_paragraphs(f"{sender} shared the transcript of \"{name}\" with you. The link is read-only."),
+            cta_text="Open the transcript", cta_url=url, base_url=_site_base(request))
+        ok, detail = mailer.send_email(to, f"{sender} shared a transcript with you", html,
+                                       text_body=f"{sender} shared the transcript of \"{name}\" with you: {url}", tags=["share"])
+        if not ok:
+            return JSONResponse({"error": "Could not send that email. Copy the link instead."}, status_code=502)
+        return JSONResponse({"ok": True, "url": url, "emailed": to})
+    return JSONResponse({"ok": True, "url": url,
+                         "whatsapp": "https://wa.me/?text=" + quote(f"Transcript of {name}: {url}"),
+                         "mailto": "mailto:?subject=" + quote(f"Transcript: {name}") + "&body=" + quote(url)})
+
+
+@app.get("/s/{token}", response_class=HTMLResponse)
+def shared_transcript(request: Request, token: str):
+    allowed, retry_after = rate_limit.check(f"shared:{rate_limit.client_ip(request)}", limit=60, window_s=60)
+    if not allowed:
+        return HTMLResponse(f"Too many requests. Try again in {retry_after}s.", status_code=429)
+    share = db.get_order_share(token)
+    order = db.get_order(share["order_id"]) if share else None
+    job = _load_job(order) if order and _deliverable_denied_reason(order, "txt") is None else None
+    if not share or not order or job is None:
+        return templates.TemplateResponse(request, "share_transcript.html", {"missing": True, "order": None, "rows": []}, status_code=404)
+    db.count_order_share_view(token)
+    same = order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"]
+    return templates.TemplateResponse(request, "share_transcript.html", {
+        "missing": False, "order": order, "same_language": same,
+        "rows": transcript_export.rows(job, "source"),
+        "target_by_start": {} if same else {r["start"]: r["text"] for r in transcript_export.rows(job, "target")},
+        "clock": transcript_export._clock,
+    })
 
 
 @app.get("/client/orders/{order_id}/download/{kind}")

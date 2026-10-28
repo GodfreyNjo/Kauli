@@ -356,6 +356,7 @@
           <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }}</span>
         </div>
       </div>
+      {% if can_export_transcript %}{% include "_transcript_tools.html" %}{% endif %}
       {% if can_edit_transcript %}
       <div class="tx-edit-bar">
         <button type="button" class="secondary" id="tx-edit">Edit transcript</button>
@@ -374,8 +375,8 @@
             {% if seg.segment_type == 'speech' %}
             <tr data-segment-id="{{ seg.segment_id }}" data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}" data-target-text="{{ seg.final_text }}">
               <td class="muted" style="font-size:0.76rem; white-space:nowrap;">
-                {{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}
-                {% if seg.speaker_id %}<br><span class="meta-pill" style="font-size:0.66rem;">{{ seg.speaker_id }}</span>{% endif %}
+                <span class="tx-time">{{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}</span>
+                {% if seg.speaker_id %}<br class="tx-speaker"><span class="meta-pill tx-speaker" style="font-size:0.66rem;">{{ seg.speaker_id }}</span>{% endif %}
                 {% if seg.edited_text or seg.source_edited_transcript %}<br><span class="meta-pill tx-edited" style="font-size:0.66rem;">edited</span>{% endif %}
               </td>
               {% if same_language %}
@@ -509,7 +510,7 @@
       if (activeRow) activeRow.classList.remove("order-transcript-active");
       if (match) {
         match.classList.add("order-transcript-active");
-        if (scrollBox) {
+        if (scrollBox && window.txAutoScroll !== false) {
           var boxTop = scrollBox.getBoundingClientRect().top, rowTop = match.getBoundingClientRect().top;
           scrollBox.scrollTop += (rowTop - boxTop) - scrollBox.clientHeight / 2 + match.clientHeight / 2;
         }
@@ -558,6 +559,7 @@
         saveBtn.disabled = true;
       };
       editBtn.addEventListener("click", function () { setEditing(true); });
+      window.txStartEditing = function () { if (!window.txEditing) setEditing(true); };
       cells.forEach(function (c) {
         c.addEventListener("input", function () { saveBtn.disabled = !dirty(); });
         c.addEventListener("paste", function (e) {            // never paste formatting, only the words

@@ -664,6 +664,20 @@ CREATE TABLE IF NOT EXISTS wizard_step_events (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 CREATE INDEX IF NOT EXISTS idx_wizard_step_events_client ON wizard_step_events(client_id, created_at);
+
+-- A link a customer shares so someone without an account can read one transcript (/s/<token>). Read-only, can be switched
+-- off at any time, and optionally expires. The token is the only credential, so it is long and random.
+CREATE TABLE IF NOT EXISTS order_shares (
+    token TEXT PRIMARY KEY,
+    order_id TEXT NOT NULL,
+    client_id TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    expires_at REAL,
+    revoked_at REAL,
+    views INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_order_shares_order ON order_shares(order_id);
 """
 
 def get_conn() -> sqlite3.Connection:
@@ -2527,6 +2541,61 @@ def delete_client_slack(client_id: str) -> None:
     conn.execute("DELETE FROM client_slack WHERE client_id = ?", (client_id,))
     conn.commit()
     conn.close()
+
+
+def create_order_share(order_id: str, client_id: str, days: int | None = 30) -> str:
+    """A new read-only share link for an order; an earlier live link for the same order is reused so repeated clicks do not
+    pile up tokens."""
+    import secrets
+    conn = get_conn()
+    now = time.time()
+    row = conn.execute(
+        "SELECT token FROM order_shares WHERE order_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?) "
+        "ORDER BY created_at DESC LIMIT 1", (order_id, now)).fetchone()
+    if row:
+        conn.close()
+        return row["token"]
+    token = secrets.token_urlsafe(24)
+    conn.execute("INSERT INTO order_shares (token, order_id, client_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+                 (token, order_id, client_id, now, now + days * 86400 if days else None))
+    conn.commit()
+    conn.close()
+    return token
+
+
+def get_order_share(token: str):
+    """The share row if the link is live (not revoked, not expired), else None."""
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM order_shares WHERE token = ?", (token,)).fetchone()
+    conn.close()
+    if not row or row["revoked_at"] or (row["expires_at"] and row["expires_at"] < time.time()):
+        return None
+    return row
+
+
+def count_order_share_view(token: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE order_shares SET views = views + 1 WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
+
+
+def revoke_order_shares(order_id: str, client_id: str) -> int:
+    conn = get_conn()
+    cur = conn.execute("UPDATE order_shares SET revoked_at = ? WHERE order_id = ? AND client_id = ? AND revoked_at IS NULL",
+                       (time.time(), order_id, client_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount
+
+
+def active_order_share(order_id: str):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM order_shares WHERE order_id = ? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?) "
+        "ORDER BY created_at DESC LIMIT 1", (order_id, time.time())).fetchone()
+    conn.close()
+    return row
 
 
 def log_webhook_delivery(client_id: str, order_id: str, event: str, ok: bool,

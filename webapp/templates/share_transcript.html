@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}Shared transcript{% endblock %}
+{% block head_extra %}
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="A transcript shared with you through Kauli.">
+{% endblock %}
+{% block content %}
+{% include "_nav.html" %}
+<main class="share-page">
+  {% if missing %}
+  <h1>This link is no longer available</h1>
+  <p class="muted">The transcript may have been unshared, or the link has expired. Ask the person who sent it for a new one.</p>
+  <p><a class="btn" href="/">Go to Kauli</a></p>
+  {% else %}
+  <h1>{{ order['original_filename'] or 'Shared transcript' }}</h1>
+  <p class="muted">Shared read-only. {{ rows|length }} line{{ '' if rows|length == 1 else 's' }}.</p>
+  <div class="share-lines">
+    {% for r in rows %}
+    <div class="share-line">
+      <span class="share-time">{{ clock(r.start) }}</span>
+      <div>
+        {% if r.speaker %}<strong class="share-speaker">{{ r.speaker }}</strong>{% endif %}
+        <p lang="{{ order['source_lang'] }}">{{ r.text }}</p>
+        {% if target_by_start and target_by_start.get(r.start) %}<p class="share-target" lang="{{ order['target_lang'] }}">{{ target_by_start.get(r.start) }}</p>{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted share-foot">Transcribed with <a href="/">Kauli</a>: transcription, translation and dubbing.</p>
+  {% endif %}
+</main>
+{% endblock %}
