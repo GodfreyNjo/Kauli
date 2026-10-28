@@ -159,11 +159,21 @@
       Your results are ready. Choose a plan to download them - the Free plan only needs a quick card
       confirmation (a $1 charge that is credited straight back to your account).
     </div>
-    <div class="card" style="margin-top:14px; max-height:360px; overflow-y:auto; white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">
-{%- for seg in (job.segments if job else []) -%}
-{{ seg.source_final_text }}{{ "\n\n" if not loop.last }}
-{%- endfor -%}
+    {% if transcript_teaser and (transcript_teaser.visible or transcript_teaser.hidden) %}
+    <div class="card transcript-teaser">
+      {% for p in transcript_teaser.visible %}<p>{{ p }}</p>{% endfor %}
+      {% if transcript_teaser.hidden %}
+      <div class="teaser-hidden-wrap">
+        <div class="teaser-hidden" aria-hidden="true">{% for p in transcript_teaser.hidden %}<p>{{ p }}</p>{% endfor %}</div>
+        <div class="teaser-lock">
+          <p><strong>The last {{ transcript_teaser.hidden_pct }}% of your transcript is hidden.</strong><br>
+             Choose the Free plan and you can read all of it, free.</p>
+          <a class="btn" href="/client/billing?choose_plan=1">Choose the Free plan</a>
+        </div>
+      </div>
+      {% endif %}
     </div>
+    {% endif %}
     <a class="btn" href="/client/billing?choose_plan=1" style="margin-top:14px;">Choose a plan to download →</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p class="ok">Ready. Download your files below.</p>
@@ -428,7 +438,7 @@
     }
   })();
 </script>
-{% elif job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] %}
+{% elif job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] and plan_chosen(user) %}
 <details class="card">
   <summary><h2 style="display:inline;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2></summary>
   <p class="muted" style="font-size:0.82rem;">Read-only preview of what our team is working from - not an

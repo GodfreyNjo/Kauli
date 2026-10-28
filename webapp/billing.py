@@ -118,6 +118,11 @@ FREE_MINUTES_PER_MONTH = 5.0  # trial allowance - AI transcription only, preview
 # until a real paid order covers it.
 FREE_MINUTES_SERVICE_LEVEL = "transcribe"
 
+# Until an account has chosen a plan it only gets to read this share of a
+# finished transcript on screen; the rest is hidden (see app.py's
+# _transcript_teaser). Choosing the Free plan - which costs nothing - shows it all.
+TRANSCRIPT_TEASER_VISIBLE_FRACTION = 0.4
+
 # A real $1 Paystack charge, required once before a client's FIRST free
 # minute is ever spent (see app.py's create_order gate) - confirms a real
 # card, not a throwaway signup farming the free allowance every month

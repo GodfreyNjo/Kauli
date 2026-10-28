@@ -5477,7 +5477,54 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "youtube_connection": db.get_youtube_connection(user["id"]),
         "upsell": _order_upsell_prices(order),
         "paystack_configured": billing.paystack_configured(),
+        "transcript_teaser": (_transcript_teaser(job, order["id"])
+                              if job and order["status"] in db.TERMINAL_OK_STATUSES
+                              and not _plan_chosen(user["client_scope_id"]) else None),
     })
+
+
+def _scramble_like(text: str, rng) -> str:
+    """Same length and word shapes as `text`, but random letters: nothing of the
+    real words survives, so it is safe to put in a page that is then blurred."""
+    return "".join(rng.choice("abcdefghijklmnopqrstuvwxyz") if ch.isalpha() else ch for ch in text)
+
+
+def _transcript_teaser(job, order_id: str,
+                       fraction: float = billing.TRANSCRIPT_TEASER_VISIBLE_FRACTION) -> dict:
+    """What an account that has not chosen a plan may read of a finished
+    transcript: the first `fraction` of it as real text, and the remainder as
+    scrambled placeholder text of the same shape. The hidden part is replaced
+    HERE, on the server - blurring the real text with CSS would leave it in the
+    page for anyone to read."""
+    import random
+    paras = []
+    for seg in (job.segments if job else []):
+        if getattr(seg, "segment_type", "speech") != "speech":
+            continue
+        text = (getattr(seg, "source_final_text", "") or "").strip()
+        if text:
+            paras.append(text)
+    total = sum(len(p) for p in paras)
+    if not total:
+        return {"visible": [], "hidden": [], "hidden_pct": 0}
+    budget = total * fraction
+    visible, hidden_real, used = [], [], 0
+    for p in paras:
+        if hidden_real:
+            hidden_real.append(p)
+        elif used + len(p) <= budget:
+            visible.append(p)
+            used += len(p)
+        else:
+            cut = p.rfind(" ", 0, max(int(budget - used), 0) + 1)   # split on a word boundary
+            head, tail = (p[:cut].strip(), p[cut:].strip()) if cut > 0 else ("", p)
+            if head:
+                visible.append(head)
+                used += len(head)
+            hidden_real.append(tail)
+    rng = random.Random(f"{order_id}:teaser")
+    return {"visible": visible, "hidden": [_scramble_like(p, rng) for p in hidden_real],
+            "hidden_pct": round(100 * (total - used) / total)}
 
 
 def _transcript_text_for_order(job, order_level: dict) -> str:
@@ -5514,6 +5561,9 @@ def client_order_ai_summary(request: Request, order_id: str):
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
+    if not _plan_chosen(user["client_scope_id"]):
+        return JSONResponse({"ok": False, "error": "Choose a plan to use this - the Free plan is enough."},
+                             status_code=403)
     if order["ai_summary_text"]:
         return JSONResponse({"ok": True, "summary": order["ai_summary_text"]})
     # Keyed on the account, not the order - a real result is cached forever
@@ -5546,6 +5596,9 @@ async def client_order_ai_ask(request: Request, order_id: str):
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
+    if not _plan_chosen(user["client_scope_id"]):
+        return JSONResponse({"ok": False, "error": "Choose a plan to use this - the Free plan is enough."},
+                             status_code=403)
     allowed, retry_after = rate_limit.check(f"ai-ask:{user['client_scope_id']}", limit=20, window_s=600)
     if not allowed:
         return JSONResponse({"ok": False, "error": f"Too many questions - try again in {retry_after}s."},
