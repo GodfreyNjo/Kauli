@@ -36,8 +36,8 @@ def _ratio(a: str, b: str) -> float:
 
 
 def test_palette_is_the_documented_one():
-    assert LIGHT["navy"] == "#0f2342"            # primary navy
-    assert LIGHT["accent"] == "#2262ec"          # action blue: the Kauli brand blue
+    assert LIGHT["navy"] == "#082848"            # primary navy: the logo wordmark
+    assert LIGHT["accent"] == "#0878c8"          # action blue: the logo blue
     assert LIGHT["bg"] == "#f4f7fb"              # light background
     assert LIGHT["muted"] == "#4b5b73"           # muted text
     assert LIGHT["panel"] == "#ffffff"

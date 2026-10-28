@@ -33,7 +33,7 @@ import httpx
 
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
-BRAND_ACCENT = "#556b2f"   # Kauli's real olive accent (style.css's --accent)
+BRAND_ACCENT = "#0878c8"   # the logo blue (style.css's --brand-blue)
 BRAND_INK = "#21201d"
 BRAND_MUTED = "#6b6862"
 BRAND_PAGE_BG = "#f5f4f1"

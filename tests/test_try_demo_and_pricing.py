@@ -145,3 +145,19 @@ def test_the_terms_say_plainly_what_the_one_dollar_check_is(client):
     assert "one-time card verification charge, shown before you pay" in terms and "not a\n       fee" in terms and "credited to your account as usage credit" in terms
     assert "$1" not in terms                                        # the amount is shown inside the app, before payment
     assert "the last part of a transcript made with" in terms and "is hidden" in terms
+
+
+def test_the_demo_can_end_in_english_for_every_language_and_service(client):
+    data = _demo_data(client.get("/try").text)
+    assert data["dir"] == "from" and _demo_data(client.get("/try?dir=to").text)["dir"] == "to"
+    assert _demo_data(client.get("/try?dir=sideways").text)["dir"] == "from"
+    for key, scenario in data["scenarios"].items():
+        assert set(scenario["inlang"]) == {"es", "de", "zh", "sw"}, key           # a recording in each language to translate from
+        assert scenario["headline_en"]
+        for url in scenario["inlang"].values():
+            r = client.get(url)
+            assert r.status_code == 200 and r.headers["content-type"].startswith("audio") and len(r.content) > 10_000
+    html = client.get("/try").text
+    assert 'name="hd-dir"' in html and "Into English" in html
+    js = (ROOT / "webapp/static/hear_demo.js").read_text(encoding="utf-8")
+    assert 'state.dir === "to"' in js and "headline_en" in js and 'u.searchParams.set("dir"' in js

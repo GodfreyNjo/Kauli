@@ -23,13 +23,16 @@ def test_the_footer_lists_both_offices_on_every_public_page():
     assert '"addressLocality": "Nairobi"' in home and '"postalCode": "75219"' in home      # for search engines too
 
 
-def test_the_two_brand_colours_are_defined_once_and_used_through_tokens():
-    root = re.search(r"--brand-blue:\s*(#[0-9a-f]{6});", CSS).group(1), re.search(r"--brand-olive:\s*(#[0-9a-f]{6});", CSS).group(1)
-    assert root == ("#2262ec", "#556b2f")
-    body = CSS.split("* { box-sizing")[1].split("Kauli brand colours")[0]       # below the token tables at the top
-    for literal in ("#2563eb", "#2262ec", "#556b2f", "#9ab255", "#46581f", "#eaf0d8"):
-        assert literal not in body.lower(), literal            # no stray copies of the brand colours before the token block
-    assert "--accent: #2262ec;" in CSS                         # the client area uses the same blue as the public site
+def test_the_brand_colours_come_from_the_logo_and_are_used_through_tokens():
+    blue = re.search(r"--brand-blue:\s*(#[0-9a-f]{6});", CSS).group(1)
+    orange = re.search(r"--brand-orange:\s*(#[0-9a-f]{6});", CSS).group(1)
+    navy = re.search(r"--brand-navy:\s*(#[0-9a-f]{6});", CSS).group(1)
+    assert (blue, orange, navy) == ("#0878c8", "#f47a0a", "#082848")
+    assert "--accent: #0878c8;" in CSS                         # the client area uses the same blue as the public site
+    for old in ("#556b2f", "#9ab255", "#46581f", "#eaf0d8", "#2262ec"):
+        assert old not in CSS.lower(), old                     # olive and the old blue are gone everywhere
+    # orange stays an accent: it is never a background colour or a text colour on light surfaces
+    assert not re.search(r"background(?:-color)?:\s*(?:#f47a0a|var\(--brand-orange\))", CSS)
 
 
 def test_human_review_is_priced_just_under_the_mainstream_services_and_the_lower_price_card_is_unchanged():

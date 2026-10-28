@@ -72,7 +72,22 @@
 
   <div class="tk-announce"><span class="tk-announce-tag">New</span>
     <span><strong>Instant AI in {{ language_total }} languages.</strong> Your first {{ free_minutes|int }} minutes of transcription are free.</span>
-    <a href="/login?mode=signup" data-cta="announce">Try it now &rarr;</a></div>
+    <a href="/login?mode=signup" data-cta="announce">Try it now &rarr;</a>
+    <button type="button" class="tk-announce-close" aria-label="Dismiss this announcement">&times;</button></div>
+  <script>
+    (function () {
+      var bar = document.querySelector(".tk-announce"), KEY = "kauli_announce_hidden";
+      if (!bar) return;
+      try {
+        var when = Number(localStorage.getItem(KEY) || 0);
+        if (when && Date.now() - when < 30 * 86400000) bar.hidden = true;      // stays away for 30 days
+      } catch (e) { /* storage blocked: it simply shows */ }
+      bar.querySelector(".tk-announce-close").addEventListener("click", function () {
+        bar.hidden = true;
+        try { localStorage.setItem(KEY, String(Date.now())); } catch (e) { /* ignore */ }
+      });
+    })();
+  </script>
 
   {% include "_nav.html" %}
 

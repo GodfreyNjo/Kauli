@@ -20,6 +20,10 @@
             {% if code == demo.suggested %}<em class="hd-badge">Recommended</em>{% endif %}</span></label>
         {% endfor %}
       </div>
+      <div class="hd-dir" role="radiogroup" aria-label="Final language">
+        <label><input type="radio" name="hd-dir" value="from"{% if demo.dir != 'to' %} checked{% endif %}><span>Into <b id="hd-dir-lang">{{ demo.languages[demo.language].name }}</b></span></label>
+        <label><input type="radio" name="hd-dir" value="to"{% if demo.dir == 'to' %} checked{% endif %}><span>Into English</span></label>
+      </div>
     </fieldset>
   </div>
 

@@ -3295,21 +3295,22 @@ def _try_context(request: Request) -> dict:
     static_dir = Path(__file__).parent / "static" / "demo"
     scenarios = {}
     for key, s in demo_content.SCENARIOS.items():
-        dub = {}
-        if s["service"] == "dub":
-            for lang in s["tr"]:
-                name = demo_content.audio_name(key, lang)
-                if (static_dir / name).exists():
-                    dub[lang] = f"/static/demo/{name}"
+        dub, inlang = {}, {}
+        for lang in s["tr"]:
+            if s["service"] == "dub" and (static_dir / demo_content.audio_name(key, lang)).exists():
+                dub[lang] = f"/static/demo/{demo_content.audio_name(key, lang)}"
+            if (static_dir / demo_content.audio_in_name(key, lang)).exists():
+                inlang[lang] = f"/static/demo/{demo_content.audio_in_name(key, lang)}"
         scenarios[key] = {
             "label": s["label"], "service": s["service"], "service_label": s["service_label"], "speaker": s["speaker"],
             "headline": s["headline"], "en": s["en"], "tr": s["tr"], "src": f"/static/demo/{demo_content.audio_name(key, None)}",
-            "dub": dub,
+            "dub": dub, "inlang": inlang, "headline_en": s["headline_en"],
         }
     market = _display_market(request)
     card = billing.price_card_for(market)
     return {
         "scenario": scenario, "language": language, "suggested": suggested, "language_why": language_why,
+        "dir": "to" if request.query_params.get("dir") == "to" else "from",
         "scenario_suggested": scenario_suggested, "scenario_why": scenario_why, "scenarios": scenarios,
         "languages": {code: {**l, "dub_live": code in dub_live} for code, l in demo_content.LANGUAGES.items()},
         "rates": {k: {"ai": f"{card[k]['ai']:.2f}", "human": f"{card[k]['human']:.2f}"} for k in billing.SERVICE_LEVELS},

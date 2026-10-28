@@ -64,8 +64,8 @@
         var g = x / w;
         var a = (dark ? 0.10 : 0.09) + 0.22 * amp + near * 0.18;
         ctx.fillStyle = (i % 11 === 0)
-          ? (dark ? "rgba(154,178,85," + (a + 0.12) + ")" : "rgba(85,107,47," + (a + 0.1) + ")")
-          : (dark ? "rgba(127,176,255," + a + ")" : "rgba(34,98,236," + a + ")");
+          ? "rgba(244,122,10," + (a + 0.1) + ")"
+          : (dark ? "rgba(124,196,240," + a + ")" : "rgba(8,120,200," + a + ")");
         var bw = Math.max(2, step * 0.42);
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(x - bw / 2, base - bh / 2, bw, bh, bw / 2); else ctx.rect(x - bw / 2, base - bh / 2, bw, bh);
@@ -74,10 +74,10 @@
       if (big) {
         // the playhead and its timecode
         var span = 14, p = (t % span) / span, px = p * w, sec = Math.floor(t % 3600);
-        ctx.strokeStyle = dark ? "rgba(154,178,85,0.55)" : "rgba(85,107,47,0.45)";
+        ctx.strokeStyle = "rgba(244,122,10,0.6)";
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(px, base - maxH - 18); ctx.lineTo(px, base + maxH + 18); ctx.stroke();
-        ctx.fillStyle = dark ? "rgba(154,178,85,0.9)" : "rgba(70,88,31,0.85)";
+        ctx.fillStyle = dark ? "rgba(255,170,100,0.95)" : "rgba(176,76,0,0.9)";
         ctx.font = "600 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
         ctx.fillText("00:" + pad(Math.floor(sec / 60) % 60) + ":" + pad(sec % 60), Math.min(px + 8, w - 64), base - maxH - 22);
       }

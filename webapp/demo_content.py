@@ -12,6 +12,7 @@ SCENARIOS = {
         "label": "Meetings and interviews", "service": "transcribe", "voice": "EXAVITQu4vr4xnSDxMaL",
         "service_label": "Transcription", "speaker": "Speaker 1",
         "headline": "Every word captured, with speakers and timestamps",
+        "headline_en": "Every word captured, and an English translation beside it",
         "en": "Thanks everyone for joining. Our launch moves to the fifteenth of March, so marketing needs the final assets by next Friday. Priya will share the updated budget this afternoon.",
         "tr": {
             "es": "Gracias a todos por unirse. Nuestro lanzamiento se mueve al quince de marzo, así que marketing necesita los materiales finales para el próximo viernes. Priya compartirá el presupuesto actualizado esta tarde.",
@@ -24,6 +25,7 @@ SCENARIOS = {
         "label": "Courses and training", "service": "translate", "voice": "Xb7hH8MSUJpSbSDYk0k2",
         "service_label": "Transcription + translation", "speaker": "Instructor",
         "headline": "Subtitles your learners can read in their own language",
+        "headline_en": "English subtitles on a lesson in another language",
         "en": "Welcome to lesson one. Today you will learn how to read a balance sheet, step by step, even if you have never worked with numbers before.",
         "tr": {
             "es": "Bienvenidos a la primera lección. Hoy aprenderás a leer un balance general paso a paso, incluso si nunca has trabajado con números.",
@@ -36,6 +38,7 @@ SCENARIOS = {
         "label": "Marketing and creator videos", "service": "dub", "voice": "TX3LPaxmHKxFdv7VOQHJ",
         "service_label": "Full dubbing", "speaker": "Narrator",
         "headline": "The same video, spoken in a new language",
+        "headline_en": "The same video, now spoken in English",
         "en": "Meet the new Aurora backpack. Waterproof, lightweight, and built to last for every journey. Order today and get free delivery.",
         "tr": {
             "es": "Conoce la nueva mochila Aurora. Impermeable, ligera y hecha para durar en cada viaje. Pídela hoy y recibe envío gratis.",
@@ -78,14 +81,19 @@ def audio_name(scenario: str, lang: str | None) -> str:
     return f"src-{scenario}.mp3" if lang is None else f"dub-{scenario}-{lang}.mp3"
 
 
+def audio_in_name(scenario: str, lang: str) -> str:
+    """The clip spoken in the visitor's own language, for the "into English" direction. For the dubbing scenario that is the
+    dubbed clip itself; the other two scenarios have their own recordings."""
+    return audio_name(scenario, lang) if SCENARIOS[scenario]["service"] == "dub" else f"in-{scenario}-{lang}.mp3"
+
+
 def all_clips() -> list[tuple[str, str, str | None, str]]:
     """(file name, voice id, language or None, text) for every clip the demo plays."""
     clips = []
     for key, s in SCENARIOS.items():
         clips.append((audio_name(key, None), s["voice"], None, s["en"]))
-        if s["service"] == "dub":
-            for lang, text in s["tr"].items():
-                clips.append((audio_name(key, lang), s["voice"], lang, text))
+        for lang, text in s["tr"].items():
+            clips.append((audio_in_name(key, lang) if s["service"] != "dub" else audio_name(key, lang), s["voice"], lang, text))
     return clips
 
 
