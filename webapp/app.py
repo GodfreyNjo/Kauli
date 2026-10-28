@@ -21,6 +21,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import math
 import threading
 import time
 import traceback
@@ -1293,6 +1294,31 @@ AI_ONLY_LANGUAGES = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES
 # Every code a stored order can carry, for display names.
 LANGUAGE_NAMES = {**AI_ONLY_LANGUAGES, **SOURCE_LANGUAGES}
 templates.env.globals["language_total"] = len(LANGUAGE_NAMES)
+# Bank transfer is kept only for accounts that already existed when it was switched off for new clients
+# (override the date with BANK_TRANSFER_LEGACY_BEFORE, a Unix time). M-Pesa is offered only to people in Kenya
+# (Cloudflare's country header) and to the older Kenyan accounts; everyone else pays by card.
+BANK_TRANSFER_LEGACY_BEFORE = float(os.environ.get("BANK_TRANSFER_LEGACY_BEFORE") or 1793201400)   # 2026-10-28 15:30 UTC
+
+
+def _bank_transfer_ok(user) -> bool:
+    try:
+        created = user["created_at"]
+    except (KeyError, IndexError, TypeError):
+        created = None
+    return created is None or created < BANK_TRANSFER_LEGACY_BEFORE
+
+
+def _mobile_money_ok(request: Request, user) -> bool:
+    if (request.headers.get("cf-ipcountry") or "").strip().upper() == "KE":
+        return True
+    try:
+        return bool(user) and db.get_billing_market(user["client_scope_id"]) == "legacy"
+    except (KeyError, IndexError, TypeError):
+        return False
+
+
+templates.env.globals["bank_ok"] = _bank_transfer_ok
+templates.env.globals["mpesa_ok"] = _mobile_money_ok
 templates.env.globals["pending_count"] = lambda u: db.pending_orders_count(u["client_scope_id"]) if (u and u["role"] == "client") else 0
 templates.env.globals["plan_chosen"] = lambda u: bool(u) and (u["role"] != "client" or _plan_chosen(u["client_scope_id"]))
 
@@ -6044,6 +6070,54 @@ _STEP_FOR_STATUS = {
 }
 
 
+_PROC_STAGES = [
+    ("prepare", "Preparing your file"), ("clean", "Cleaning up the audio"), ("transcribe", "Turning speech into text"),
+    ("translate", "Translating the text"), ("voice", "Creating the dubbed voice"), ("mix", "Mixing the final audio"),
+    ("finalize", "Getting your files ready"),
+]
+
+
+def _processing_state(order) -> dict:
+    """What a running order is doing right now, for the live panel: the steps THIS order goes through (a transcript
+    has fewer than a dub), which one is current, and a percentage that only ever moves forward. The percentage is
+    the step reached plus a slow creep inside the step, capped so it never claims to be finished before it is."""
+    level = order["service_level"] or "transcribe"
+    wanted = {"prepare", "transcribe", "finalize"}
+    if level in ("translate", "dub"):
+        wanted.add("translate")
+    if level == "dub":
+        wanted |= {"voice", "mix"}
+    if db.order_has_addon(order, "audio_cleanup"):
+        wanted.add("clean")
+    steps = [(k, label) for k, label in _PROC_STAGES if k in wanted]
+    order_keys = [k for k, _ in _PROC_STAGES]
+    stage = (order["processing_stage"] if "processing_stage" in order.keys() else None) or "prepare"
+    reached = order_keys.index(stage) if stage in order_keys else 0
+    idx = next((i for i, (k, _) in enumerate(steps) if order_keys.index(k) >= reached), len(steps) - 1)
+    started = (order["processing_stage_at"] if "processing_stage_at" in order.keys() else None) or order["created_at"] or time.time()
+    elapsed = max(0.0, time.time() - started)
+    queued = order["status"] == "queued"
+    done = order["status"] not in ("queued", "processing")
+    creep = 1 - math.exp(-elapsed / 45.0)
+    pct = 2 if queued else int(min(97, max(3, (idx + 0.85 * creep) / len(steps) * 100)))
+    out = [{"key": k, "label": label, "state": "done" if (done or i < idx) else ("current" if i == idx and not queued else "pending")}
+           for i, (k, label) in enumerate(steps)]
+    return {"done": done, "status": order["status"], "queued": queued, "pct": 100 if done else pct, "steps": out,
+            "what": {"transcribe": "transcript", "translate": "translation", "dub": "dub"}.get(level, "transcript"),
+            "elapsed_s": int(max(0, time.time() - (order["created_at"] or time.time())))}
+
+
+@app.get("/client/orders/{order_id}/progress")
+def client_order_progress(request: Request, order_id: str):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "sign in"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    return JSONResponse(_processing_state(order), headers={"Cache-Control": "no-store"})
+
+
 def _order_progress_steps(status: str, review_tier: str = "human") -> list[dict]:
     """Real step states for order_detail.html's progress tracker - never
     a fixed animation, always derived from the actual order.status. Two
@@ -6119,6 +6193,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
         "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
+        "live": _processing_state(order) if order["status"] in ("queued", "processing") else None,
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
         "upsell": _order_upsell_prices(order),
@@ -6820,6 +6895,12 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
     # request's docstring).
     ga_client_id = ga_events.client_id_from_request(request)
 
+    # Hiding a method in the page is not enough - refuse it here as well.
+    if provider == "bank" and not _bank_transfer_ok(user):
+        return RedirectResponse(f"{back_url}?error=Bank+transfer+is+not+available+on+this+account.+Please+pay+by+card.", status_code=303)
+    if provider == "mpesa" and not _mobile_money_ok(request, user):
+        return RedirectResponse(f"{back_url}?error=M-Pesa+is+only+available+in+Kenya.+Please+pay+by+card.", status_code=303)
+
     if provider == "paystack":
         if not billing.paystack_configured():
             return RedirectResponse(f"{back_url}?error=Paystack+isn%27t+configured+yet.", status_code=303)
@@ -7007,8 +7088,6 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
         "mpesa_configured": billing.mpesa_configured(),
         "mpesa_live": billing.mpesa_live(),
         "has_video_addon": db.order_has_addon(order, "video_deliverables"),
-        # M-Pesa and Airtel Money are only mentioned to clients whose account is in East Africa
-        "show_mobile_money": db.get_billing_market(order["client_id"]) in ("ea", "legacy"),
     })
 
 

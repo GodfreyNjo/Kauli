@@ -930,6 +930,10 @@ def init_db() -> None:
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_detail TEXT")
     if "premium_asr_refunded_at" not in existing_order_cols:
         conn.execute("ALTER TABLE orders ADD COLUMN premium_asr_refunded_at REAL")
+    if "processing_stage" not in existing_order_cols:
+        # which step of the pipeline a running order is on, so the client can watch it (see worker._run_job)
+        conn.execute("ALTER TABLE orders ADD COLUMN processing_stage TEXT")
+        conn.execute("ALTER TABLE orders ADD COLUMN processing_stage_at REAL")
     if "audio_cleanup_refunded_at" not in existing_order_cols:
         conn.execute("ALTER TABLE orders ADD COLUMN audio_cleanup_refunded_at REAL")
     if "premium_voice_refunded_at" not in existing_order_cols:
@@ -3014,6 +3018,13 @@ def next_order_needing_review(exclude_id: str):
 
 
 # Orders that are not finished yet: waiting for payment, being worked on, with our staff, or waiting on the client.
+def set_processing_stage(order_id: str, stage: str | None) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE orders SET processing_stage = ?, processing_stage_at = ? WHERE id = ?", (stage, time.time() if stage else None, order_id))
+    conn.commit()
+    conn.close()
+
+
 PENDING_STATUSES = ("pending_payment", "queued", "processing", "awaiting_review", "editor_returned", "returned_to_client")
 
 

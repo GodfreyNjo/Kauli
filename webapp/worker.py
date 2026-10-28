@@ -143,6 +143,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
         log.warning("job started for missing order", extra={"job_id": order_id})
         return
     db.update_order_status(order_id, "processing")
+    db.set_processing_stage(order_id, "prepare")
     log.info("job started", extra={"job_id": order_id, "user_id": order["client_id"], "is_retry": is_retry})
     try:
         kauli_run(
@@ -172,6 +173,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
             # to reuse whatever real work is already in that manifest,
             # per segment - see that function's own docstring.
             resume=is_retry,
+            on_stage=lambda key: db.set_processing_stage(order_id, key),
         )
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))

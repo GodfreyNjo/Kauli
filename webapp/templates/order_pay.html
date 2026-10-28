@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Pay for order{% endblock %}
 {% block content %}
+{% set show_mobile_money = mpesa_ok(request, user) %}
+{% set bank_allowed = bank_ok(user) %}
 {% set tier_name = 'Human-reviewed' if order['review_tier'] == 'human' else 'Instant AI' %}
 {% set service_names = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
 <div class="pay-wrap">
@@ -77,10 +79,10 @@
           <span class="pay-option-body"><strong>M-Pesa direct</strong><small>{% if mpesa_live %}No card needed{% else %}Coming soon{% endif %}</small></span>
         </label>
         {% endif %}
-        <label class="pay-option">
+        {% if bank_allowed %}<label class="pay-option">
           <input type="radio" name="provider" value="bank" {% if not paystack_configured %}checked{% endif %}>
           <span class="pay-option-body"><strong>Bank transfer</strong><small>We confirm it by hand, usually within one business day</small></span>
-        </label>
+        </label>{% endif %}
       </div>
       <p class="pay-note" id="paystack-note" hidden>Takes you to Paystack's own checkout page, where you choose how to pay{% if show_mobile_money %}: card, M-Pesa, M-Pesa Till or Airtel Money{% endif %}.</p>
       {% if show_mobile_money %}

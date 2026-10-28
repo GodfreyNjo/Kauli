@@ -88,14 +88,14 @@
           <input type="hidden" name="package" value="{{ key }}">
           <label style="font-size:0.78rem;">Pay with
             <select name="provider">
-              <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
-              <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
-              <option value="bank">Bank transfer</option>
+              <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
+              {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
+              {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
             </select>
           </label>
-          <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+          {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
             <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-          </label>
+          </label>{% endif %}
           <button type="submit" class="secondary">Buy ${{ "%.2f"|format(pkg['price_usd']) }}</button>
         </form>
       </details>
@@ -115,14 +115,14 @@
         </p>
         <label style="font-size:0.78rem;">Pay with
           <select name="provider">
-            <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
-            <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
-            <option value="bank">Bank transfer</option>
+            <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
+            {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
+            {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
           </select>
         </label>
-        <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+        {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
           <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-        </label>
+        </label>{% endif %}
         <button type="submit" class="secondary" id="wallet-custom-submit">Buy</button>
       </form>
     </div>
@@ -207,14 +207,14 @@
                 <input type="hidden" name="plan" value="{{ key }}">
                 <label style="font-size:0.78rem;">Pay with
                   <select name="provider">
-                    <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>Card, M-Pesa or Airtel Money (via Paystack)</option>
-                    <option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>
-                    <option value="bank">Bank transfer</option>
+                    <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
+                    {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
+                    {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
                   </select>
                 </label>
-                <label style="font-size:0.78rem;">M-Pesa phone (if applicable)
+                {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
                   <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-                </label>
+                </label>{% endif %}
                 <button type="submit">Subscribe ${{ p['price_usd'] }}/mo</button>
               </form>
             </details>

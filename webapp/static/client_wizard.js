@@ -127,9 +127,9 @@
   function updateReview() {
     const set = (id, text) => { const el = $("#" + id); if (el) el.textContent = text; };
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
-    const file = $("#file-input").files[0];
+    const file = fileQueue[0];
     set("rv-file", usingYoutube ? ($("#youtube-url-input").value.trim() || "-")
-                                : (file ? file.name : (resumedUploadKey ? "Your uploaded file" : "-")));
+                                : (fileQueue.length > 1 ? fileQueue.length + " files" : file ? file.name : (resumedUploadKey ? "Your uploaded file" : "-")));
     const src = $("#source-lang-select");
     const tgtField = $("#target-lang-field");
     const tgt = tgtField ? tgtField.querySelector("select") : null;
@@ -153,7 +153,7 @@
       if (!url) { alert("Paste a YouTube link first."); return false; }
       return true;
     }
-    const file = $("#file-input").files[0];
+    const file = fileQueue[0];
     if (!file && !resumedUploadKey) { alert("Choose a file first."); return false; }
     return true;
   }
@@ -222,6 +222,7 @@
 
   // -------------------------------------------------------- drag & drop ----
   let fileDurationMinutes = null;
+  let fileQueue = [];
 
   function probeDuration(file) {
     return new Promise((resolve) => {
@@ -237,20 +238,75 @@
     });
   }
 
-  function handleFile(file) {
+  // Several files at once: each one becomes its own order with the same settings (see submitBatch).
+  const MAX_FILES = 10;
+  const fileState = new Map();                      // file -> { text, tone } while a batch is being sent
+  let durationToken = 0;
+
+  function sizeLabel(bytes) {
+    return bytes >= 1048576 ? (bytes / 1048576).toFixed(bytes >= 10485760 ? 0 : 1) + " MB" : Math.max(1, Math.round(bytes / 1024)) + " KB";
+  }
+
+  function renderQueue() {
+    const list = $("#file-queue");
+    if (!list) return;
+    list.textContent = "";
+    fileQueue.forEach((f) => {
+      const li = document.createElement("li");
+      const st = fileState.get(f);
+      if (st && st.tone) li.className = "is-" + st.tone;
+      const name = document.createElement("span"); name.className = "fq-name"; name.textContent = f.name; name.title = f.name;
+      const meta = document.createElement("span"); meta.className = "fq-meta"; meta.textContent = st ? st.text : sizeLabel(f.size);
+      li.appendChild(name); li.appendChild(meta);
+      if (!st || st.tone === "bad") {
+        const x = document.createElement("button");
+        x.type = "button"; x.className = "fq-remove"; x.setAttribute("aria-label", "Remove " + f.name); x.textContent = "\u00d7";
+        x.addEventListener("click", () => { fileState.delete(f); fileQueue = fileQueue.filter((q) => q !== f); syncQueue(); });
+        li.appendChild(x);
+      }
+      list.appendChild(li);
+    });
+  }
+
+  function syncQueue() {
     const dz = $("#dropzone");
     const text = $("#dropzone-text");
-    if (!file) return;
+    renderQueue();
+    fileDurationMinutes = null;
+    if (!fileQueue.length) {
+      dz.classList.remove("has-file");
+      text.textContent = "Drag & drop files or click to upload";
+      updatePricing();
+      return;
+    }
+    dz.classList.add("has-file");
+    text.textContent = fileQueue.length === 1 ? fileQueue[0].name : fileQueue.length + " files selected - click to add more";
+    updatePricing();
+    // the price estimate covers every file in the list
+    const token = ++durationToken;
+    Promise.all(fileQueue.map(probeDuration)).then((mins) => {
+      if (token !== durationToken) return;
+      const known = mins.filter((m) => m != null);
+      fileDurationMinutes = known.length === mins.length ? known.reduce((x, y) => x + y, 0) : null;
+      updatePricing();
+    });
+  }
+
+  function addFiles(list) {
+    const incoming = Array.from(list || []);
+    if (!incoming.length) return;
     const ytField = $("#youtube-url-input");
     if (ytField) ytField.value = "";
     $('#source-switch [data-source="file"]').click();
-    dz.classList.add("has-file");
-    text.textContent = file.name;
-    fileDurationMinutes = null;
-    probeDuration(file).then((mins) => {
-      fileDurationMinutes = mins;
-      updatePricing();
+    let skipped = 0;
+    incoming.forEach((f) => {
+      if (fileQueue.some((q) => q.name === f.name && q.size === f.size && q.lastModified === f.lastModified)) return;
+      if (fileQueue.length >= MAX_FILES) { skipped++; return; }
+      fileQueue.push(f);
     });
+    const note = $("#file-queue-note");
+    if (note) note.textContent = skipped ? "You can send up to " + MAX_FILES + " files at once. The rest were left out." : "";
+    syncQueue();
   }
 
   function bindDropzone() {
@@ -261,7 +317,7 @@
     dz.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); }
     });
-    input.addEventListener("change", () => handleFile(input.files[0]));
+    input.addEventListener("change", () => { addFiles(input.files); input.value = ""; });   // clearing lets the same file be picked again
 
     ["dragenter", "dragover"].forEach((evt) => {
       dz.addEventListener(evt, (e) => { e.preventDefault(); dz.classList.add("dragover"); });
@@ -269,13 +325,7 @@
     ["dragleave", "drop"].forEach((evt) => {
       dz.addEventListener(evt, (e) => { e.preventDefault(); dz.classList.remove("dragover"); });
     });
-    dz.addEventListener("drop", (e) => {
-      const file = e.dataTransfer.files[0];
-      if (file) {
-        input.files = e.dataTransfer.files;
-        handleFile(file);
-      }
-    });
+    dz.addEventListener("drop", (e) => addFiles(e.dataTransfer.files));
   }
 
   // ------------------------------------------------------ live pricing ----
@@ -611,7 +661,43 @@
     const submitBtn = $("#wizard-submit");
     if (!form || !progressWrap || !window.XMLHttpRequest) return;
 
-    function finalizeOrder(formData) {
+    // After the bytes are up, the server still has real work to do before the order page can open. Show it as steps so
+    // nobody thinks the page has frozen. For a file the steps move on a timer; for a YouTube link the first step (the
+    // download) can take minutes, so it stays on that step until the server answers.
+    let stepTimer = null;
+    function startFinalizeSteps(first, auto) {
+      let list = $("#wizard-finalize-steps");
+      if (!list) {
+        list = document.createElement("ol");
+        list.id = "wizard-finalize-steps"; list.className = "wizard-steps";
+        progressWrap.appendChild(list);
+      }
+      const labels = [first, "Checking your audio", "Working out your price", "Starting your order"];
+      let i = auto ? 1 : 0;
+      function paint() {
+        list.textContent = "";
+        labels.forEach((t, k) => {
+          const li = document.createElement("li");
+          li.className = k < i ? "is-done" : (k === i ? "is-current" : "");
+          li.textContent = t;
+          list.appendChild(li);
+        });
+      }
+      paint();
+      progressFill.classList.add("indeterminate");
+      progressLabel.textContent = "Setting up your order";
+      clearInterval(stepTimer);
+      if (auto) stepTimer = setInterval(() => { if (i < labels.length - 1) { i += 1; paint(); } }, 2200);
+    }
+    function stopFinalizeSteps() {
+      clearInterval(stepTimer); stepTimer = null;
+      const list = $("#wizard-finalize-steps");
+      if (list) list.remove();
+      progressFill.classList.remove("indeterminate");
+    }
+
+    function finalizeOrder(formData, first, auto) {
+      startFinalizeSteps(first || "Upload complete", auto !== false);
       const xhr = new XMLHttpRequest();
       xhr.open("POST", form.action, true);
       xhr.onload = function () {
@@ -643,6 +729,7 @@
         document.close();
       };
       xhr.onerror = function () {
+        stopFinalizeSteps();
         progressLabel.textContent = "Something went wrong submitting - please try again.";
         if (submitBtn) submitBtn.disabled = false;
       };
@@ -686,13 +773,12 @@
             return;
           }
           progressFill.style.width = "100%";
-          progressLabel.textContent = "Upload complete - processing your order…";
           // Safely on R2 now - a refresh from here on only needs to skip
           // straight to "Continue with this file", never re-upload it.
           saveResumableUpload(data.upload_key, file.name);
           formData.delete("audio");
           formData.set("upload_key", data.upload_key);
-          finalizeOrder(formData);
+          finalizeOrder(formData, "Upload complete", true);
         };
         putXhr.onerror = function () {
           uploadTransferActive = false;
@@ -719,10 +805,85 @@
       e.returnValue = "";
     });
 
+    function send(method, url, body, onProgress, headers) {
+      return new Promise((resolve, reject) => {
+        const x = new XMLHttpRequest();
+        x.open(method, url, true);
+        Object.keys(headers || {}).forEach((h) => x.setRequestHeader(h, headers[h]));
+        if (onProgress && x.upload) x.upload.addEventListener("progress", (ev) => { if (ev.lengthComputable) onProgress(Math.round((ev.loaded / ev.total) * 100)); });
+        x.onload = () => resolve(x);
+        x.onerror = () => reject(new Error("Network problem. Check your connection and try again."));
+        x.send(body);
+      });
+    }
+
+    function errorFrom(html) {
+      const m = /class="error"[^>]*>([\s\S]*?)<\/p>/.exec(html || "");
+      if (!m) return "This file could not be submitted.";
+      const t = document.createElement("textarea");
+      t.innerHTML = m[1].replace(/<[^>]+>/g, "");
+      return t.value.trim() || "This file could not be submitted.";
+    }
+
+    async function submitBatch() {
+      const files = fileQueue.slice();
+      const bar = (done, cur) => { progressFill.style.width = Math.round(((done + cur / 100) / files.length) * 100) + "%"; };
+      progressFill.classList.remove("indeterminate");
+      let okCount = 0, lastUrl = "";
+      const failed = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const setRow = (text, tone) => { fileState.set(f, { text: text, tone: tone || "" }); renderQueue(); };
+        progressLabel.textContent = "Sending file " + (i + 1) + " of " + files.length;
+        setRow("Uploading 0%", "busy");
+        try {
+          const pre = new FormData();
+          pre.append("filename", f.name);
+          pre.append("content_type", f.type || "application/octet-stream");
+          const px = await send("POST", "/client/orders/presign-upload", pre);
+          let data = null;
+          try { data = JSON.parse(px.responseText); } catch (err) { data = null; }
+          if (px.status !== 200 || !data || !data.put_url) throw new Error((data && data.error) || "Could not prepare the upload.");
+          uploadTransferActive = true;
+          const put = await send("PUT", data.put_url, f, (pct) => { setRow("Uploading " + pct + "%", "busy"); bar(i, pct); },
+                                 { "Content-Type": f.type || "application/octet-stream" });
+          uploadTransferActive = false;
+          if (put.status < 200 || put.status >= 300) throw new Error("The upload did not finish.");
+          setRow("Starting your order", "busy");
+          const fd = new FormData(form);
+          fd.delete("audio");
+          fd.set("upload_key", data.upload_key);
+          fd.set("idempotency_key", window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + i);
+          const res = await send("POST", form.action, fd);
+          const landed = res.responseURL || "";
+          if (landed && landed !== form.action && /\/client\/orders\/[^/?#]+/.test(landed)) {
+            okCount += 1; lastUrl = landed; setRow("Submitted", "ok");
+          } else {
+            throw new Error(errorFrom(res.responseText));
+          }
+        } catch (err) {
+          uploadTransferActive = false;
+          setRow(err.message, "bad");
+          failed.push(f);
+        }
+        bar(i + 1, 0);
+      }
+      if (!failed.length) {
+        progressLabel.textContent = okCount + " orders started";
+        window.location.href = okCount === 1 ? lastUrl : "/client/pending";
+        return;
+      }
+      progressLabel.textContent = okCount + " started, " + failed.length + " did not go through. Fix or remove those and press Submit again.";
+      fileQueue = failed;
+      failed.forEach((f) => { const st = fileState.get(f); if (st) st.tone = "bad"; });
+      renderQueue();
+      if (submitBtn) submitBtn.disabled = false;
+    }
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      const fileInput = $("#file-input");
-      const usingFile = fileInput && fileInput.files && fileInput.files.length > 0;
+      const youtubeActive = $('#source-switch [data-source="youtube"]').classList.contains("active");
+      const usingFile = fileQueue.length > 0 && !youtubeActive;
       const formData = new FormData(form);
 
       progressWrap.hidden = false;
@@ -730,20 +891,20 @@
       progressFill.style.width = "0%";
       if (submitBtn) submitBtn.disabled = true;
 
-      if (usingFile) {
-        uploadFileDirectToR2(fileInput.files[0], formData);
+      if (usingFile && fileQueue.length > 1) {
+        submitBatch();
+      } else if (usingFile) {
+        uploadFileDirectToR2(fileQueue[0], formData);
       } else if (resumedUploadKey) {
         // Already safely on R2 from before a refresh - skip straight to
         // finalize, no re-upload.
         progressFill.style.width = "100%";
-        progressLabel.textContent = "Submitting your already-uploaded file…";
         formData.delete("audio");
         formData.set("upload_key", resumedUploadKey);
-        finalizeOrder(formData);
+        finalizeOrder(formData, "Upload complete", true);
       } else {
-        progressFill.classList.add("indeterminate");
-        progressLabel.textContent = "Fetching from YouTube… this can take a few minutes for longer videos, it hasn't hung.";
-        finalizeOrder(formData);
+        finalizeOrder(formData, "Fetching your video from YouTube", false);
+        progressLabel.textContent = "Fetching from YouTube. Longer videos take a few minutes, and it has not hung.";
       }
     });
 

@@ -472,6 +472,7 @@ def run(
     resume: bool = False,
     clean_audio: bool = False,
     label_speakers: bool = False,
+    on_stage=None,
 ) -> Job:
     out = Path(outdir)
     (out / "segments").mkdir(parents=True, exist_ok=True)
@@ -479,6 +480,14 @@ def run(
     def log(msg):
         if verbose:
             print(msg, flush=True)
+
+    def stage(key):
+        # tells the web app which step this order is on (prepare, clean, transcribe, translate, voice, mix, finalize)
+        if on_stage:
+            try:
+                on_stage(key)
+            except Exception:  # noqa: BLE001 - progress reporting must never break an order
+                pass
 
     # Real cost bug this fixes: webapp/worker.py's own retry-on-failure used
     # to always call this fresh from ASR, no matter which stage actually
@@ -509,6 +518,7 @@ def run(
         target_language=target_lang,
         providers={"asr": asr, "mt": mt, "tts": tts},
     )
+    stage("prepare")
     job.source_duration_ms = probe_duration_ms(audio_path)
 
     # ---------- 1. ASR ----------
@@ -526,6 +536,7 @@ def run(
         from .providers import elevenlabs_audio
         asr_input = audio_path
         if clean_audio:
+            stage("clean")
             try:
                 cleaned = out / "cleaned.wav"
                 if not cleaned.exists():
@@ -536,6 +547,7 @@ def run(
             except Exception as exc:  # noqa: BLE001
                 job.warnings.append(f"Audio clean-up skipped, original audio used ({exc})")
                 log(f"      audio clean-up skipped: {exc}")
+        stage("transcribe")
         job.segments = asr_provider.transcribe(asr_input, language=source_lang)
         # TranskriptorASR (and any future provider with a real fallback) sets
         # these on itself rather than raising - the manifest's own
@@ -575,6 +587,7 @@ def run(
     job.save(out / "manifest.json")
 
     # ---------- 2. Translate + fit ----------
+    stage("translate")
     log(f"[2/5] Translating with {mt} ...")
     job.status = "translating"
     mt_provider = get_mt(mt)
@@ -633,6 +646,7 @@ def run(
     if skip_tts:
         log("[3/5] TTS skipped (--skip-tts)")
     else:
+        stage("voice")
         log(f"[3/5] Synthesising with {tts} ...")
         job.status = "synthesizing"
         tts_provider = get_tts(tts, target_lang=target_lang)
@@ -731,6 +745,7 @@ def run(
             log(f"      {tts_provider.fallback_reason or 'TTS fell back to ' + tts_provider.fallback_name}")
 
         # ---------- 4. Mix ----------
+        stage("mix")
         log("[4/5] Mixing timeline ...")
         job.status = "mixing"
         # Real bug this fixes: this used to construct a THROWAWAY second TTS
@@ -750,6 +765,7 @@ def run(
         write_wav_mono(str(out / f"dub_{target_lang}.wav"), track, sr)
 
     # ---------- 5. Deliverables ----------
+    stage("finalize")
     log("[5/5] Writing subtitles and manifest ...")
     (out / f"subs_{target_lang}.srt").write_text(to_srt(job), encoding="utf-8")
     (out / f"subs_{target_lang}.vtt").write_text(to_vtt(job), encoding="utf-8")
