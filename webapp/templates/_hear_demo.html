@@ -1,0 +1,74 @@
+<div class="hd" role="region" aria-label="Interactive demo">
+  <p class="hd-picked" id="hd-picked" aria-live="polite"></p>
+  <div class="hd-controls">
+    <fieldset class="hd-fieldset">
+      <legend><span class="hd-step">1</span> What are you making?</legend>
+      <div class="hd-options">
+        {% for key, s in demo.scenarios.items() %}
+        <label class="hd-option"><input type="radio" name="hd-scenario" value="{{ key }}"{% if key == demo.scenario %} checked{% endif %}>
+          <span><strong>{{ s.label }}</strong><small>{{ s.service_label }}</small></span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <fieldset class="hd-fieldset">
+      <legend><span class="hd-step">2</span> Translate into</legend>
+      <div class="hd-options hd-langs">
+        {% for code, l in demo.languages.items() %}
+        <label class="hd-option hd-lang"><input type="radio" name="hd-lang" value="{{ code }}"{% if code == demo.language %} checked{% endif %}>
+          <span>{% if l.flag %}<i class="lang-flag {{ l.flag }}" aria-hidden="true"></i>{% else %}<i class="lang-dot tone-3" aria-hidden="true">{{ code|upper }}</i>{% endif %}
+            <strong>{{ l.native }}</strong><small>{{ l.name }}</small>
+            {% if code == demo.suggested %}<em class="hd-badge">Recommended</em>{% endif %}</span></label>
+        {% endfor %}
+      </div>
+    </fieldset>
+  </div>
+
+  <div class="hd-stage">
+    <article class="hd-card hd-in" aria-labelledby="hd-in-title">
+      <header><span class="hd-chip">Your file</span><h2 id="hd-in-title">English, as recorded</h2></header>
+      <div class="hd-player">
+        <button type="button" class="hd-play" id="hd-play-in" aria-label="Play the original English audio"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg></button>
+        <div class="hd-wave" id="hd-wave-in" aria-hidden="true"></div>
+        <span class="hd-time" id="hd-time-in">0:00</span>
+      </div>
+      <p class="hd-text" id="hd-text-in"></p>
+    </article>
+
+    <div class="hd-arrow" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg>
+      <span>Kauli</span>
+    </div>
+
+    <article class="hd-card hd-out" aria-labelledby="hd-out-title" aria-live="polite">
+      <header><span class="hd-chip hd-chip-olive" id="hd-service">Service</span><h2 id="hd-out-title">What you get</h2><span class="hd-avail" id="hd-avail"></span></header>
+      <p class="hd-headline" id="hd-headline"></p>
+      <div class="hd-player">
+        <button type="button" class="hd-play hd-play-out" id="hd-play-out" aria-label="Play the Kauli result"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg></button>
+        <div class="hd-wave" id="hd-wave-out" aria-hidden="true"></div>
+        <span class="hd-time" id="hd-time-out">0:00</span>
+      </div>
+      <div class="hd-transcript" id="hd-transcript" hidden>
+        <p class="hd-line"><span class="hd-ts">00:00</span> <strong id="hd-speaker">Speaker 1</strong></p>
+        <p class="hd-text" id="hd-text-src"></p>
+        <p class="hd-sub">Translated into <span id="hd-lang-name"></span> <small>(Instant AI translation)</small></p>
+      </div>
+      <p class="hd-text hd-text-out" id="hd-text-out"></p>
+      <ul class="hd-files" aria-label="Files you can download"><li>Word</li><li>Text</li><li>SRT subtitles</li></ul>
+    </article>
+  </div>
+
+  <audio id="hd-audio" preload="none"></audio>
+
+  <div class="hd-convert">
+    <div>
+      <p class="hd-rate" id="hd-rate"></p>
+      <p class="hd-fine">Sample audio is made with AI voices (ElevenLabs). Instant AI results are machine-generated and not reviewed by a person; your results depend on your audio.</p>
+    </div>
+    <div class="hd-ctas">
+      <a href="/login?mode=signup" class="btn cta-olive" data-cta="try-signup">Try it on your own file - first {{ free_minutes|int }} minutes free</a>
+      <a href="/demo" class="btn secondary" data-cta="try-book">Book a live demo</a>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="hd-data">{{ demo|tojson }}</script>
+<script src="/static/hear_demo.js?v=2" defer></script>

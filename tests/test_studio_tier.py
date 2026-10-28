@@ -250,13 +250,13 @@ def test_the_blue_band_names_only_the_languages_that_are_really_human_reviewed(e
     band = extras.client.get("/").text.split('class="tk-band"')[1].split("</section>")[0]
     assert "Audio to text in minutes. Checked by an expert when it matters." in band
     assert "a real expert checks it before it is marked ready" in band and "editor" not in band
-    assert "For Swahili, Kikuyu, English, Chinese, German and Spanish, choose Human-reviewed" in band
+    assert "In selected languages, choose Human-reviewed" in band and 'href="/human-review"' in band
 
 
 def test_the_blue_band_before_the_extra_languages_are_switched_on(studio, monkeypatch):
     monkeypatch.setattr(studio.app, "current_user", lambda request: None)
     band = studio.client.get("/").text.split('class="tk-band"')[1].split("</section>")[0]
-    assert "For Swahili, Kikuyu and English, choose Human-reviewed" in band and "Chinese" not in band
+    assert "In selected languages, choose Human-reviewed" in band and "Swahili" not in band and "Chinese" not in band
 
 
 # ------------------------------------------------------------------- the services section
@@ -265,7 +265,7 @@ def test_services_show_transcription_starting_from_zero_without_hiding_the_real_
     html = studio.client.get("/").text
     section = html.split('id="services"')[1].split("</section>")[0]
     assert "m-eyebrow-lined" in section and "Everything your video or audio needs to travel" in section
-    assert "and Swahili, Kikuyu and English can add human review." in section
+    assert "and selected languages can add human review." in section and 'href="/human-review"' in section
     prices = [p.strip() for p in __import__("re").findall(r'<span class="svc-price">(.*?)</span>', section, __import__("re").S)]
     assert prices[0].startswith("From $0") and "first 5 minutes free" in prices[0] and "/min" in prices[0]   # honest: free minutes, then a rate
     assert prices[1].startswith("From $") and prices[1].startswith("From $0 ") is False                      # translation and dubbing still show their rates

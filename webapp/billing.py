@@ -67,10 +67,14 @@ MARKETS = {
     "legacy": "Existing account pricing",
 }
 PRICE_CARD = {
+    # Human-reviewed rows re-set 2026-10-28 to sit just under the mainstream human services (Rev $1.99 and Happy
+    # Scribe $2.00 per minute for human transcription; Rev's human translated subtitles start at $6.49) while staying
+    # well above the budget end (GoTranscript ~$1.00, TranscribeMe ~$0.79). Instant AI rows are unchanged. The lower
+    # price market below is unchanged too. Orders already placed keep the rate they were priced at.
     "intl": {
-        "transcribe": {"ai": 0.12, "human": 1.20},
-        "translate": {"ai": 0.30, "human": 1.40},
-        "dub": {"ai": 0.80, "human": 2.00},
+        "transcribe": {"ai": 0.12, "human": 1.79},
+        "translate": {"ai": 0.30, "human": 2.99},
+        "dub": {"ai": 0.80, "human": 3.99},
     },
     "ea": {
         "transcribe": {"ai": 0.06, "human": 0.60},
@@ -83,10 +87,21 @@ DEFAULT_MARKET = "intl"
 # CF-IPCountry header. A VPN can fake it - the account market is fixed at
 # signup and only staff can change it, so it's a nudge, not a lock.
 EAST_AFRICA_COUNTRIES = {"KE", "UG", "TZ", "RW", "BI", "ET", "SS", "SO", "DJ", "ER"}
+# The lower price card ("ea" is just its internal name) is for visitors in lower-income economies, roughly the World Bank's
+# low and lower-middle income groups: Africa, South and South-East Asia and a few others. Edit this list freely.
+LOWER_PRICE_COUNTRIES = EAST_AFRICA_COUNTRIES | {
+    # rest of Africa
+    "DZ", "AO", "BJ", "BW", "BF", "CV", "CM", "CF", "TD", "KM", "CG", "CD", "CI", "EG", "SZ", "GA", "GM", "GH", "GN", "GW", "LS", "LR",
+    "MG", "MW", "ML", "MR", "MA", "MZ", "NA", "NE", "NG", "SN", "SL", "TG", "TN", "ZM", "ZW", "SD", "ST",
+    # South and South-East Asia, Central Asia
+    "IN", "PK", "BD", "LK", "NP", "BT", "AF", "PH", "ID", "VN", "KH", "LA", "MM", "TL", "UZ", "KG", "TJ",
+    # a few others
+    "BO", "HN", "NI", "HT", "SV", "PS", "YE", "SY", "PG",
+}
 
 
 def market_for_country(country_code: str | None) -> str:
-    return "ea" if (country_code or "").strip().upper() in EAST_AFRICA_COUNTRIES else DEFAULT_MARKET
+    return "ea" if (country_code or "").strip().upper() in LOWER_PRICE_COUNTRIES else DEFAULT_MARKET
 
 
 def rate_for(service_level: str, market: str | None, review_tier: str = "human") -> float:
@@ -617,13 +632,16 @@ def paystack_currency() -> str:
     return "USD" if os.environ.get("PAYSTACK_CURRENCY", "").strip().upper() == "USD" else "KES"
 
 
-def paystack_currency_for_market(market: str | None) -> str:
+def paystack_currency_for_market(market: str | None, country: str | None = None) -> str:
     """The currency to actually charge THIS customer in. With USD switched on,
     US/international customers pay in dollars (what their card statement
     should show); Kenya & East Africa and legacy accounts stay on KES, since
     M-Pesa/mobile money only works in KES and those clients expect it."""
-    if paystack_currency() == "USD" and market == "intl":
-        return "USD"
+    if paystack_currency() == "USD":
+        if country is None:
+            return "USD" if market == "intl" else "KES"
+        # Only a client in Kenya is charged in shillings; everyone else is charged in dollars.
+        return "KES" if (country.strip().upper() == "KE" and market in ("ea", "legacy")) else "USD"
     return "KES"
 
 

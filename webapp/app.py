@@ -51,7 +51,7 @@ from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_f
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
@@ -1454,9 +1454,8 @@ MARKETING_FAQ = [
           "time when you order."},
     {"q": "Which languages do you support?",
      "a": f"Instant AI transcribes {len(AI_ONLY_LANGUAGES) + len(SOURCE_LANGUAGES)} languages and translates "
-          "between them (except Kikuyu). Dubbing and human review are available now for Swahili, Kikuyu and English, "
-          "and more languages are coming soon.",
-     "link": ("/languages", "See every language")},
+          "between them (except Kikuyu). Dubbing and human review are available in selected languages, and more are coming soon.",
+     "link": ("/human-review", "See the human review languages")},
     {"q": "What is the difference between verbatim and clean read?",
      "a": "Clean read tidies filler words and false starts for easy reading. Verbatim keeps everything exactly "
           "as spoken, which legal and research work often needs. On Human-reviewed orders you choose per order.",
@@ -2838,7 +2837,7 @@ def index(request: Request):
             "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
     return templates.TemplateResponse(request, "marketing.html",
         {**_marketing_context(sent=request.query_params.get("sent") == "1", market=_display_market(request)),
-         "hreflang_alts": _hreflang_alternates(_site_base(request)),
+         "demo": _try_context(request), "hreflang_alts": _hreflang_alternates(_site_base(request)),
          "hreflang_default": f"{_site_base(request)}/"})
 
 
@@ -2954,7 +2953,9 @@ def sitemap(request: Request):
         (f"{base}/developers", "0.5"),
         (f"{base}/demo", "0.6"),
         (f"{base}/try", "0.7"),
+        (f"{base}/human-review", "0.8"),
     ]
+    static_urls += [(f"{base}/human-review/{slug}", "0.7") for slug in human_review_content.ORDER]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
     static_urls += [(f"{base}/languages", "0.8")]
     static_urls += [(f"{base}/transcribe/{slug}", "0.6") for slug in AI_LANGUAGE_SLUGS]
@@ -3312,6 +3313,106 @@ def _try_context(request: Request) -> dict:
     }
 
 
+_COUNTRY_NAMES = {
+    "US": "United States", "GB": "United Kingdom", "CA": "Canada", "AU": "Australia", "KE": "Kenya", "NG": "Nigeria", "IN": "India",
+    "TZ": "Tanzania", "UG": "Uganda", "RW": "Rwanda", "CD": "Democratic Republic of the Congo", "CN": "China", "TW": "Taiwan",
+    "HK": "Hong Kong", "SG": "Singapore", "DE": "Germany", "AT": "Austria", "CH": "Switzerland", "ES": "Spain", "MX": "Mexico",
+    "AR": "Argentina", "CO": "Colombia", "FR": "France", "BE": "Belgium", "SN": "Senegal", "CI": "C\u00f4te d'Ivoire",
+}
+
+_HR_FAQ = [
+    ("What is human review?", "A real editor checks the transcript, translation or subtitles against your audio before the order is marked ready. "
+     "Instant AI orders are machine-generated and say so; human-reviewed orders have a person's sign-off."),
+    ("Which languages have human review?", "Each language on this page shows whether it is available now or coming soon. Instant AI transcription and "
+     "translation work in many more languages today."),
+    ("How much does human review cost?", "It is priced per audio-minute and the exact price is shown before you confirm any order."),
+    ("How long does it take?", "Longer than Instant AI, because a person checks the work. You see an estimated delivery time when you order."),
+    ("Can I see the result before I download it?", "Yes. A finished order plays in the browser with live captions and a transcript that follows along, "
+     "and you can ask for a revision on anything you want changed."),
+]
+
+
+def _human_review_live() -> set[str]:
+    """Language codes human review can really be ordered in right now (the same rule the order form uses)."""
+    return {"en", "sw", "ke"} | _review_extra_languages()
+
+
+def _hr_blogs(keywords: list[str], limit: int = 3) -> list[dict]:
+    posts = db.list_blog_posts(published_only=True)
+
+    def score(p):
+        text = f"{p['title']} {p['slug']} {p['description'] or ''}".lower()
+        return sum(1 for k in keywords if k in text)
+
+    ranked = sorted(posts, key=lambda p: (-score(p), -(p["published_at"] or 0)))
+    return [{"slug": p["slug"], "title": p["title"], "description": p["description"]} for p in ranked[:limit]]
+
+
+def _hr_languages() -> list[dict]:
+    live = _human_review_live()
+    out = []
+    for slug in human_review_content.ORDER:
+        lang = human_review_content.LANGUAGES[slug]
+        out.append({**lang, "slug": slug, "live": lang["code"] in live})
+    return out
+
+
+def _hr_context(request: Request) -> dict:
+    ctx = _marketing_context(home="/", market=_display_market(request))
+    card = billing.price_card_for(_display_market(request))
+    ctx.update({"langs": _hr_languages(), "benefits": human_review_content.BENEFITS, "tips": human_review_content.TIPS,
+                "human_rate": f"{card['transcribe']['human']:.2f}", "faq": _HR_FAQ})
+    return ctx
+
+
+def _faq_jsonld(pairs) -> dict:
+    return {"@context": "https://schema.org", "@type": "FAQPage",
+            "mainEntity": [{"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in pairs]}
+
+
+def _breadcrumb_jsonld(base: str, trail: list[tuple[str, str]]) -> dict:
+    return {"@context": "https://schema.org", "@type": "BreadcrumbList",
+            "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": name, "item": f"{base}{path}"} for i, (name, path) in enumerate(trail)]}
+
+
+@app.get("/human-review", response_class=HTMLResponse)
+def human_review_hub(request: Request):
+    ctx = _hr_context(request)
+    base = _site_base(request)
+    ctx["blogs"] = _hr_blogs(human_review_content.GENERAL_KEYWORDS)
+    ctx["jsonld"] = [
+        {"@context": "https://schema.org", "@type": "WebPage", "name": "Human review in selected languages", "url": f"{base}/human-review",
+         "description": "Real editors check transcripts, subtitles and dubs against your audio.", "isPartOf": {"@type": "WebSite", "name": "Kauli", "url": f"{base}/"}},
+        {"@context": "https://schema.org", "@type": "ItemList", "name": "Languages with human review",
+         "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": f"{l['name']} human review", "url": f"{base}/human-review/{l['slug']}"} for i, l in enumerate(ctx["langs"])]},
+        _faq_jsonld(_HR_FAQ),
+        _breadcrumb_jsonld(base, [("Kauli", "/"), ("Human review", "/human-review")]),
+    ]
+    return templates.TemplateResponse(request, "human_review_hub.html", ctx)
+
+
+@app.get("/human-review/{slug}", response_class=HTMLResponse)
+def human_review_language(request: Request, slug: str):
+    lang = human_review_content.LANGUAGES.get(slug)
+    if not lang:
+        return HTMLResponse("Not found.", status_code=404)
+    ctx = _hr_context(request)
+    base = _site_base(request)
+    live = lang["code"] in _human_review_live()
+    ctx.update({"lang": {**lang, "slug": slug}, "live": live, "dub_live": live,
+                "blogs": _hr_blogs(lang["keywords"])})
+    countries = [{"@type": "Country", "name": _COUNTRY_NAMES.get(c, c)} for c in lang["countries"]]
+    ctx["jsonld"] = [
+        {"@context": "https://schema.org", "@type": "Service", "name": f"{lang['name']} human review: transcription, translation, subtitles and dubbing",
+         "serviceType": "Transcription, translation, subtitling and dubbing", "description": lang["description"], "url": f"{base}/human-review/{slug}",
+         "provider": {"@type": "Organization", "name": "Kauli", "url": f"{base}/"}, "areaServed": countries,
+         "availableLanguage": {"@type": "Language", "name": lang["name"]}},
+        _faq_jsonld(lang["faq"]),
+        _breadcrumb_jsonld(base, [("Kauli", "/"), ("Human review", "/human-review"), (lang["name"], f"/human-review/{slug}")]),
+    ]
+    return templates.TemplateResponse(request, "human_review_language.html", ctx)
+
+
 @app.get("/try", response_class=HTMLResponse)
 def try_page(request: Request):
     ctx = _marketing_context(home="/", market=_display_market(request))
@@ -3380,7 +3481,7 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
     allowed, retry_after = rate_limit.check(f"callback:{rate_limit.client_ip(request)}", limit=5, window_s=600)
     if not allowed:
         return templates.TemplateResponse(request, "marketing.html",
-            _marketing_context(lead_error=f"Too many requests - try again in {retry_after // 60 + 1} minute(s)."),
+            {**_marketing_context(lead_error=f"Too many requests - try again in {retry_after // 60 + 1} minute(s)."), "demo": _try_context(request)},
             status_code=429)
     # Form(""), not Form(...) - a blank-valued field is dropped entirely by
     # Starlette's form parser (indistinguishable from a missing one), so
@@ -3390,11 +3491,11 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
     email = email.strip().lower()
     if not name or "@" not in email:
         return templates.TemplateResponse(request, "marketing.html",
-            _marketing_context(lead_error="Please enter your name and a valid email address."),
+            {**_marketing_context(lead_error="Please enter your name and a valid email address."), "demo": _try_context(request)},
             status_code=400)
     if not volume_estimate.strip() or not org_type.strip():
         return templates.TemplateResponse(request, "marketing.html",
-            _marketing_context(lead_error="Please select your estimated volume and organization type."),
+            {**_marketing_context(lead_error="Please select your estimated volume and organization type."), "demo": _try_context(request)},
             status_code=400)
     lead_id = db.create_lead(name, email, phone.strip() or None, company.strip() or None,
                               message.strip() or None, preferred_time.strip() or None,
@@ -6936,7 +7037,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # A plan purchase (no order) on a plan that has a Paystack plan code
         # configured becomes a RECURRING subscription; anything else (orders,
         # top-ups, plans without a code) stays a one-off charge.
-        charge_currency = billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]))
+        charge_currency = billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]), request.headers.get("cf-ipcountry"))
         plan_code = billing.paystack_plan_code(plan, charge_currency) if (order_id is None and payment_kind == "order") else None
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url,
                                               plan_code=plan_code, currency=charge_currency)

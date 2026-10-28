@@ -17,8 +17,8 @@ def test_approved_price_card():
     assert billing.rate_for("transcribe", "intl", "ai") == 0.12
     assert billing.rate_for("translate", "intl", "ai") == 0.30
     assert billing.rate_for("dub", "intl", "ai") == 0.80
-    assert billing.rate_for("transcribe", "intl", "human") == 1.20
-    assert billing.rate_for("dub", "intl", "human") == 2.00
+    assert billing.rate_for("transcribe", "intl", "human") == 1.79
+    assert billing.rate_for("dub", "intl", "human") == 3.99
     assert billing.rate_for("transcribe", "ea", "ai") == 0.06
     assert billing.rate_for("dub", "ea", "human") == 1.20
 
@@ -31,7 +31,7 @@ def test_legacy_accounts_keep_old_human_rates_and_get_ea_ai_rates():
 
 
 def test_unknown_review_tier_is_treated_as_human():
-    assert billing.rate_for("transcribe", "intl", "nonsense") == 1.20
+    assert billing.rate_for("transcribe", "intl", "nonsense") == 1.79
 
 
 def test_market_for_country():
@@ -53,7 +53,7 @@ def test_order_cost_uses_market_and_tier_and_records_them():
     assert c["rate_per_min"] == 0.12 and c["total_usd"] == 1.20
     assert c["market"] == "intl" and c["review_tier"] == "ai"
     h = billing.order_cost_usd(10, "dub", "pro", 0.0, market="intl", review_tier="human")
-    assert h["gross_usd"] == 20.0 and h["total_usd"] == 18.0  # Pro: 10% off
+    assert h["gross_usd"] == 39.9 and h["total_usd"] == 35.91  # Pro: 10% off
 
 
 def test_default_call_is_unchanged_legacy_behaviour():

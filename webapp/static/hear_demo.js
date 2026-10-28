@@ -94,6 +94,7 @@
     var r = D.rates[s.service];
     $("hd-rate").innerHTML = "<strong>" + s.service_label + "</strong> from <b>$" + r.ai + "</b> per audio-minute with Instant AI, or <b>$" + r.human + "</b> human-reviewed.";
     $("hd-picked").textContent = pickedLine();
+    if (window.location.pathname !== "/try") return;     // the home page keeps its own address
     try {
       var u = new URL(window.location.href);
       u.searchParams.set("use", state.scenario);
@@ -102,14 +103,7 @@
     } catch (e) { /* the page works without it */ }
   }
 
-  function pickedLine() {
-    var L = D.languages[D.suggested], s = D.scenarios[D.scenario_suggested];
-    var bits = [];
-    if (D.language_why === "location") bits.push(L.name + " picked for your location");
-    else if (D.language_why === "browser") bits.push(L.name + " picked from your browser language");
-    if (D.scenario_why === "page") bits.push("showing " + s.label.toLowerCase() + " because of the page you came from");
-    return bits.length ? bits.join(", ") + ". Change either below." : "";
-  }
+  function pickedLine() { return ""; }          // the suggestion is shown as a "Recommended" badge, not as a sentence about the visitor
 
   function play(which) {
     if (state.playing === which) { stop(); return; }

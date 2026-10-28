@@ -65,7 +65,7 @@
         var a = (dark ? 0.10 : 0.09) + 0.22 * amp + near * 0.18;
         ctx.fillStyle = (i % 11 === 0)
           ? (dark ? "rgba(154,178,85," + (a + 0.12) + ")" : "rgba(85,107,47," + (a + 0.1) + ")")
-          : (dark ? "rgba(127,176,255," + a + ")" : "rgba(37,99,235," + a + ")");
+          : (dark ? "rgba(127,176,255," + a + ")" : "rgba(34,98,236," + a + ")");
         var bw = Math.max(2, step * 0.42);
         ctx.beginPath();
         if (ctx.roundRect) ctx.roundRect(x - bw / 2, base - bh / 2, bw, bh, bw / 2); else ctx.rect(x - bw / 2, base - bh / 2, bw, bh);

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block theme %}light{% endblock %}
+{% block body_class %}m-public{% endblock %}
+{% block title %}{{ lang.title }} | Kauli{% endblock %}
+{% block head_extra %}
+<meta name="description" content="{{ lang.description }}">
+<link rel="canonical" href="{{ request.base_url }}human-review/{{ lang.slug }}">
+<meta property="og:title" content="{{ lang.title }} - Kauli">
+<meta property="og:description" content="{{ lang.description }}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ request.base_url }}human-review/{{ lang.slug }}">
+{% for block in jsonld %}<script type="application/ld+json">{{ block|tojson }}</script>
+{% endfor %}
+{% include "_ga.html" %}
+{% endblock %}{% block content %}
+{% include "_nav.html" %}
+
+<section class="hd-hero hr-hero">
+  <a href="/human-review" class="m-breadcrumb-back">&larr; All languages</a>
+  <span class="m-section-eyebrow m-eyebrow-lined">{{ lang.name }} human review</span>
+  <h1>{{ lang.headline }}</h1>
+  <p class="hd-lede">{{ lang.intro }}</p>
+  <p class="hr-status"><span class="tk-tag {{ 'now' if live else 'soon' }}">{{ 'Available now' if live else 'Coming soon' }}</span>
+    {% if live %}Human review is open for {{ lang.name }}.{% else %}Human review for {{ lang.name }} is on its way. Instant AI transcription and translation work today.{% endif %}</p>
+  <div class="hd-ctas" style="justify-content:center; margin-top:18px;">
+    <a href="/login?mode=signup" class="btn cta-olive" data-cta="hr-lang-start">{{ 'Start a ' ~ lang.name ~ ' project' if live else 'Try Instant AI in ' ~ lang.name }}</a>
+    {% if not live %}<a href="/demo" class="btn secondary" data-cta="hr-lang-ask">Ask for {{ lang.name }} review</a>{% endif %}
+  </div>
+</section>
+
+<section class="m-section">
+  <div class="m-inner narrow">
+    <h2 class="m-h2" style="text-align:left;">{{ lang.name }} for {{ lang.regions }}</h2>
+    <p class="hr-prose">{{ lang.context }}</p>
+    <h3 class="hr-sub">What our editors check</h3>
+    <ul class="pz-list hr-checks">{% for c in lang.checks %}<li>{{ c }}</li>{% endfor %}</ul>
+  </div>
+</section>
+
+<section class="m-section" style="background:var(--sidebar-bg);">
+  <div class="m-inner">
+    <h2 class="m-h2">What you can order in {{ lang.name }}</h2>
+    <div class="hr-services">
+      <div><h3>Transcripts</h3><p>Instant AI in minutes, or checked by an editor. Word, text and SRT files.</p></div>
+      <div><h3>Translation</h3><p>Into and out of {{ lang.name }}, with the review following your audience.</p></div>
+      <div><h3>Subtitles</h3><p>SRT and VTT files, or captions published straight to your YouTube channel.</p></div>
+      <div><h3>Dubbing</h3><p>{% if dub_live %}A synthetic voice in your target language, with the translation checked first.{% else %}Coming with human review for {{ lang.name }}.{% endif %}</p></div>
+    </div>
+  </div>
+</section>
+
+{% if lang.legacy %}
+<section class="m-section">
+  <div class="m-inner narrow">
+    <h2 class="m-h2" style="text-align:left;">{{ lang.name }} guides and services</h2>
+    <ul class="hr-links">
+      {% for href, label in lang.legacy %}<li><a href="{{ href }}">{{ label }}</a></li>{% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+{% if blogs %}
+<section class="m-section" style="background:var(--sidebar-bg);">
+  <div class="m-inner">
+    <h2 class="m-h2">Read more about {{ lang.name }}</h2>
+    <ul class="hr-blogs">
+      {% for b in blogs %}<li><a href="/blog/{{ b.slug }}"><strong>{{ b.title }}</strong>{% if b.description %}<span>{{ b.description }}</span>{% endif %}<em>Read the article</em></a></li>{% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}
+
+<section class="m-section" id="faq">
+  <div class="m-inner narrow">
+    <h2 class="m-h2">{{ lang.name }} questions</h2>
+    <div class="m-faq-list">
+      {% for q, a in lang.faq %}<details class="m-faq-item"><summary>{{ q }}</summary><p>{{ a }}</p></details>{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="m-section">
+  <div class="m-inner">
+    <h2 class="m-h2">Other languages</h2>
+    <ul class="hr-others">
+      {% for l in langs if l.slug != lang.slug %}
+      <li><a href="/human-review/{{ l.slug }}">{{ l.name }} <span class="tk-tag {{ 'now' if l.live else 'soon' }}">{{ 'Available now' if l.live else 'Coming soon' }}</span></a></li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
+<section class="cta-band">
+  <h2>Try it on your own {{ lang.name }} audio</h2>
+  <p>Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
+  <div class="m-hero-ctas"><a href="/login?mode=signup" class="btn cta-olive" data-cta="hr-lang-band">Start a project</a><a href="/human-review" class="btn secondary">All languages</a></div>
+</section>
+
+{% include "_footer.html" %}
+{% endblock %}

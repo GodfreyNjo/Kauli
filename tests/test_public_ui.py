@@ -37,7 +37,7 @@ def _ratio(a: str, b: str) -> float:
 
 def test_palette_is_the_documented_one():
     assert LIGHT["navy"] == "#0f2342"            # primary navy
-    assert LIGHT["accent"] == "#1e5abe"          # action blue
+    assert LIGHT["accent"] == "#2262ec"          # action blue: the Kauli brand blue
     assert LIGHT["bg"] == "#f4f7fb"              # light background
     assert LIGHT["muted"] == "#4b5b73"           # muted text
     assert LIGHT["panel"] == "#ffffff"
@@ -51,7 +51,7 @@ def test_palette_is_the_documented_one():
 ])
 def test_text_meets_wcag_aa_on_every_surface(theme, tokens, text_tokens, surface_tokens):
     merged = dict(tokens)
-    merged["accent-text-resolved"] = tokens["accent"]  # light --accent-text is var(--accent)
+    merged["accent-text-resolved"] = tokens.get("accent-text", tokens["accent"])  # the light theme sets a deeper brand blue for text
     for t in text_tokens:
         for s in surface_tokens:
             r = _ratio(merged[t], merged[s])
@@ -107,9 +107,9 @@ def test_homepage_structure_follows_the_plan(client):
     html = client.get("/").text
     assert len(re.findall(r"<h1[ >]", html)) == 1
     assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+\+ Languages</h1>", html)
-    assert "Nairobi" not in html
+    assert "Nairobi sample" not in html                       # the old sample is gone (the Nairobi office is in the footer)
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
-    assert ids[:6] == ["services", "demo", "hear", "why", "integrations", "pricing"], ids   # services before pricing, as specified
+    assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
     assert 'id="book"' not in html and 'href="/demo"' in html          # booking lives on /demo now
     for needed in ("how", "faq", "start"):
         assert needed in ids
@@ -246,7 +246,7 @@ def test_hero_subtitle_is_short_with_a_learn_more_that_holds_the_rest(client):
     assert sub == "Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it."
     more = re.search(r'<details class="tk-more">.*?</details>', html, re.S).group(0)
     assert "<summary" in more and "Learn more" in more and "<details class=\"tk-more\" open" not in html   # closed by default
-    assert "Instantly with AI, or human-reviewed for Swahili, Kikuyu and English." in more
+    assert "Instantly with AI, or human-reviewed in selected languages." in more and 'href="/human-review"' in more
     for topic in ("Instant AI", "Human-reviewed", "Transcripts, subtitles and dubbing", "Simple pricing"):
         assert topic in more
     assert "from $0.12 per audio-minute" in more and "not reviewed by a person" in more

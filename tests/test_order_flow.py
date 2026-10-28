@@ -104,7 +104,7 @@ def test_free_instant_ai_transcription_is_a_preview_with_frozen_us_price(env, wa
 def test_human_reviewed_order_is_priced_from_the_us_card_and_waits_for_payment(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
     assert order["review_tier"] == "human" and order["status"] == "pending_payment"
-    assert abs(order["cost_usd"] - 1.20) < 0.01               # 1.0 minute x $1.20
+    assert abs(order["cost_usd"] - 1.79) < 0.01               # 1.0 minute x $1.79
     assert env.submitted == []                                # nothing runs before payment
 
 
@@ -208,7 +208,7 @@ def test_upgrade_to_human_review_charges_the_difference_and_queues_review(env, w
     order = env.order_from(env.place(wav_bytes, source_lang="sw", service_level="translate"))
     env.db.update_order_status(order["id"], "ready_for_delivery")
     prices = env.app._order_upsell_prices(env.db.get_order(order["id"]))
-    assert prices["unlock"] is None and abs(prices["upgrade"] - (1.40 - 0.30)) < 0.01
+    assert prices["unlock"] is None and abs(prices["upgrade"] - (2.99 - 0.30)) < 0.01
     env.monkeypatch.setattr(env.app.worker, "notify_staff_needs_review", lambda o: None)
     assert env.app._activate_payment(_payment(env, order, "review_upgrade", prices["upgrade"]), "ref-up")
     upgraded = env.db.get_order(order["id"])

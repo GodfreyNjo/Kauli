@@ -292,7 +292,7 @@ def test_languages_flow_across_the_home_page_in_a_loop(visitor):
     assert re.search(r"in \d+\+ languages", section) and "More languages are coming soon" in section
     tracks = re.findall(r'<ul class="tk-marquee-track"([^>]*)>', section)
     assert len(tracks) == 2 and 'aria-hidden="true"' in tracks[1] and 'aria-hidden' not in tracks[0]
-    second = section.split('<ul class="tk-marquee-track" aria-hidden="true">')[1]
+    second = section.split('<ul class="tk-marquee-track" aria-hidden="true">')[1].split("</ul>")[0]      # just the copied track
     assert 'tabindex="-1"' in second and second.count("<a ") == second.count('tabindex="-1"')   # the copy is not tabbable
     pills = re.findall(r'class="tk-pill[^"]*"', section.split('<ul class="tk-marquee-track" aria-hidden="true">')[0])
     assert len(pills) >= 12

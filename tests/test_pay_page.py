@@ -17,11 +17,11 @@ def _pay_page(env, wav, **overrides):
 def test_payment_page_shows_the_order_the_price_and_why_it_is_safe(env, wav_bytes):
     order, page = _pay_page(env, wav_bytes)
     assert 'class="pay-file"' in page and "clip.wav" in page
-    assert "Order summary" in page and "Total due" in page and "$1.20" in page and "Human-reviewed" in page
+    assert "Order summary" in page and "Total due" in page and "$1.79" in page and "Human-reviewed" in page
     assert "Processing starts the moment this is confirmed." in page
     for promise in ("Card details go straight to Paystack", "No hidden fees", "Your files stay private"):
         assert promise in page
-    assert re.search(r'<button type="submit" id="pay-submit" class="pay-btn">.*Pay \$1\.20</button>', page, re.S)
+    assert re.search(r'<button type="submit" id="pay-submit" class="pay-btn">.*Pay \$1\.79</button>', page, re.S)
     if os.environ.get("PAY_DUMP_PATH"):
         Path(os.environ["PAY_DUMP_PATH"]).write_text(page, encoding="utf-8")
 

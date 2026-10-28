@@ -77,7 +77,10 @@ def test_every_demo_clip_exists_and_dubbing_is_labelled_honestly(client):
 
 def test_demo_is_linked_from_home_and_the_sitemap(client):
     home = client.get("/").text
-    assert re.search(r'id="hear".*?href="/try"', home, re.S)
+    section = re.search(r'<section class="m-section" id="demo">.*?</section>', home, re.S).group(0)
+    assert 'id="hd-data"' in section and 'name="hd-scenario"' in section and 'href="/try"' in section
+    assert "See a sample" not in home and "demo-player" not in home            # the old Swahili sample is gone
+    assert home.count('id="hd-data"') == 1
     assert "/try</loc>" in client.get("/sitemap.xml").text
 
 

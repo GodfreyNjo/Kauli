@@ -89,7 +89,7 @@ def test_an_order_that_needs_payment_comes_back_402_with_a_payment_link(api, wav
     body = r.json()
     assert body["payment_required"] is True and body["status"] == "pending_payment"
     assert body["payment_url"].endswith(f"/client/orders/{body['id']}/pay")
-    assert abs(body["cost_usd"] - 1.20) < 0.01              # same price card as the dashboard
+    assert abs(body["cost_usd"] - 1.79) < 0.01              # same price card as the dashboard
     assert api.submitted == []                              # nothing runs before payment
     assert body["deliverables"] == {}
 
