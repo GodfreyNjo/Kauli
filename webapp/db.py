@@ -588,6 +588,33 @@ CREATE TABLE IF NOT EXISTS client_slack (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 
+-- Notion: the customer's own internal-integration token (stored ENCRYPTED, only
+-- the last 4 characters kept readable) and the page/database transcripts go to.
+CREATE TABLE IF NOT EXISTS client_notion (
+    client_id TEXT PRIMARY KEY,
+    token_enc TEXT NOT NULL,
+    token_hint TEXT NOT NULL,
+    parent_id TEXT NOT NULL,
+    parent_kind TEXT NOT NULL,          -- 'page' | 'database'
+    title_prop TEXT NOT NULL DEFAULT 'title',
+    bot_name TEXT,
+    auto_send INTEGER NOT NULL DEFAULT 1,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+
+-- One row per order sent to Notion: stops a retry or a double trigger from
+-- creating the page twice, and remembers where it went. page_url is NULL while
+-- a send is in flight.
+CREATE TABLE IF NOT EXISTS notion_exports (
+    order_id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    page_id TEXT,
+    page_url TEXT,
+    created_at REAL NOT NULL
+);
+
 -- Real, in-house friction signal: which step of the order wizard a client
 -- actually reached, and whether they went on to submit - see
 -- static/client_wizard.js's showStep()/finalizeOrder() for what fires
@@ -2286,6 +2313,78 @@ def get_client_webhook(client_id: str):
 def delete_client_webhook(client_id: str) -> None:
     conn = get_conn()
     conn.execute("DELETE FROM client_webhooks WHERE client_id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def set_client_notion(client_id: str, token_enc: str, token_hint: str, parent_id: str, parent_kind: str,
+                      title_prop: str, bot_name: str | None, auto_send: bool) -> None:
+    conn = get_conn()
+    now = time.time()
+    conn.execute(
+        """INSERT INTO client_notion (client_id, token_enc, token_hint, parent_id, parent_kind, title_prop,
+                                      bot_name, auto_send, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(client_id) DO UPDATE SET
+             token_enc = excluded.token_enc, token_hint = excluded.token_hint, parent_id = excluded.parent_id,
+             parent_kind = excluded.parent_kind, title_prop = excluded.title_prop, bot_name = excluded.bot_name,
+             auto_send = excluded.auto_send, updated_at = excluded.updated_at""",
+        (client_id, token_enc, token_hint, parent_id, parent_kind, title_prop, bot_name,
+         1 if auto_send else 0, now, now))
+    conn.commit()
+    conn.close()
+
+
+def get_client_notion(client_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM client_notion WHERE client_id = ?", (client_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def delete_client_notion(client_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM client_notion WHERE client_id = ?", (client_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_notion_export(order_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM notion_exports WHERE order_id = ?", (order_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def claim_notion_export(order_id: str, client_id: str, stale_after_s: int = 300) -> bool:
+    """True if THIS caller may send the order to Notion now. A finished export,
+    or one started in the last few minutes, is never claimed again; an old
+    unfinished claim (a crash mid-send) can be retried."""
+    conn = get_conn()
+    now = time.time()
+    cur = conn.execute("INSERT OR IGNORE INTO notion_exports (order_id, client_id, created_at) VALUES (?, ?, ?)",
+                       (order_id, client_id, now))
+    claimed = cur.rowcount == 1
+    if not claimed:
+        cur = conn.execute("UPDATE notion_exports SET created_at = ? WHERE order_id = ? AND page_url IS NULL "
+                           "AND created_at < ?", (now, order_id, now - stale_after_s))
+        claimed = cur.rowcount == 1
+    conn.commit()
+    conn.close()
+    return claimed
+
+
+def finish_notion_export(order_id: str, page_id: str, page_url: str | None) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE notion_exports SET page_id = ?, page_url = ? WHERE order_id = ?",
+                 (page_id, page_url or "", order_id))
+    conn.commit()
+    conn.close()
+
+
+def release_notion_export(order_id: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM notion_exports WHERE order_id = ? AND page_url IS NULL", (order_id,))
     conn.commit()
     conn.close()
 

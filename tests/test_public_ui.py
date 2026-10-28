@@ -106,7 +106,7 @@ def client():
 def test_homepage_structure_follows_the_plan(client):
     html = client.get("/").text
     assert len(re.findall(r"<h1[ >]", html)) == 1
-    assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+ Languages</h1>", html)
+    assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+\+ Languages</h1>", html)
     assert "Nairobi" not in html
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
     assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
@@ -138,7 +138,7 @@ def test_pricing_has_a_clear_hierarchy(client):
 
 def test_primary_nav_matches_the_plan(client):
     nav = re.search(r'<nav class="m-nav".*?</nav>', client.get("/").text, re.S).group(0)
-    positions = [nav.index(label) for label in ("Services", "Solutions", "Integrations", "Pricing", "Resources", "Sign in", "Start free")]
+    positions = [nav.index(label) for label in ("Services", "Use Case", "Integrations", "Pricing", "Resources", "Sign in", "Start free")]
     assert positions == sorted(positions)
 
 
@@ -181,10 +181,10 @@ def test_integrations_section_is_honest_about_what_exists(client):
     html = client.get("/").text
     block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     # what is really built is marked Available and linked to its docs...
-    for name in ("API", "MCP server", "Webhooks", "Slack"):
+    for name in ("API", "MCP server", "Webhooks", "Slack", "Notion"):
         assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
     # ...and nothing unbuilt is ever presented as available
-    for name in ("Zoom", "Notion", "Google Drive", "HubSpot", "Salesforce"):
+    for name in ("Zoom", "Google Drive", "HubSpot", "Salesforce"):
         m = re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge (\w+)">', block)
         assert m and m.group(1) == "soon", name
 
@@ -221,3 +221,17 @@ def test_the_blog_seed_no_longer_promises_a_card_check():
     from webapp import blog_seed
     text = Path(blog_seed.__file__).read_text(encoding="utf-8")
     assert not _DOLLAR_CHECK.search(text)
+
+
+def test_use_case_menu_replaces_solutions_and_links_real_pages(client):
+    html = client.get("/").text
+    nav = re.search(r'<nav class="m-nav".*?</nav>', html, re.S).group(0)
+    assert "Use Case" in nav and "Solutions" not in nav
+    for heading in ("Creators &amp; publishers", "Research &amp; media", "Teaching &amp; communities"):
+        assert heading in nav
+    menu = re.search(r'm-nav-dropdown-menu-3.*?</div>\s*</div>\s*</div>', nav, re.S).group(0)
+    links = re.findall(r'href="(/solutions/[a-z-]+)"', menu)
+    assert len(links) == 9 and len(set(links)) == 9                 # nine distinct use-case pages
+    for link in links:
+        assert client.get(link).status_code == 200, link          # none of them is a dead link
+    assert "Use cases" in html and ">Solutions<" not in html          # the footer column follows the same name

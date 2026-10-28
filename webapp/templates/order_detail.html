@@ -203,6 +203,17 @@
       {% endif %}
       {% endif %}
     </div>
+    {% if notion_row %}
+    <div class="notion-send" style="margin-top:12px;">
+      {% if notion_export and notion_export['page_url'] %}
+      <a class="btn secondary" href="{{ notion_export['page_url'] }}" target="_blank" rel="noopener">Open in Notion &nearr;</a>
+      {% else %}
+      <form method="post" action="/client/orders/{{ order['id'] }}/send-to-notion" style="display:inline;">
+        <button type="submit" class="secondary">Send to Notion</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
     {% if has_dub and has_video_deliverables and has_video_source and not burned_ready and not dubbed_ready %}
     <p class="muted" style="margin-top:8px;">Your captioned/dubbed video file is being generated - this
        happens automatically once an order's approved, no need to ask. Longer videos take a few minutes;

@@ -220,6 +220,40 @@
       </form>
       {% endif %}
 
+      <h3 id="notion" style="margin:22px 0 8px; font-size:0.92rem;">Notion</h3>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Send each finished transcript to Notion as a page.
+         In Notion, create an
+         <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener">internal integration</a> and
+         copy its secret. Then open the page or database where transcripts should go, choose the ... menu, then
+         Connections, and add your integration. Paste the secret and that page's link here. Transcripts are only
+         sent once downloads are unlocked (after you choose a plan).</p>
+      {% if notion_error %}<p class="error">{{ notion_error }}</p>{% endif %}
+      {% if notion_notice %}<p class="ok">{{ notion_notice }}</p>{% endif %}
+      {% if notion_row %}
+      <p class="muted" style="font-size:0.82rem; margin:0 0 8px;">Connected as <strong>{{ notion_row['bot_name'] }}</strong>,
+         sending to a {{ notion_row['parent_kind'] }}. Secret ends <code>&hellip;{{ notion_row['token_hint'] }}</code></p>
+      {% endif %}
+      <form method="post" action="/settings/notion">
+        <label>{{ 'Replace the integration secret (optional)' if notion_row else 'Integration secret' }}
+          <input type="password" name="token" autocomplete="off" placeholder="ntn_... or secret_...">
+        </label>
+        <label>{{ 'Replace the page or database link (optional)' if notion_row else 'Page or database link' }}
+          <input type="url" name="url" autocomplete="off" placeholder="https://www.notion.so/...">
+        </label>
+        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+          <input type="checkbox" name="auto_send" value="1" style="width:auto; margin-top:3px;"
+                 {% if not notion_row or notion_row['auto_send'] %}checked{% endif %}>
+          <span style="font-size:0.84rem;">Send automatically when an order is ready. Leave it off to send orders one at a
+            time with the Send to Notion button.</span>
+        </label>
+        <button type="submit" class="secondary" style="margin-top:8px;">{{ 'Save' if notion_row else 'Connect Notion' }}</button>
+      </form>
+      {% if notion_row %}
+      <form method="post" action="/settings/notion/delete" style="display:inline;">
+        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Notion?');">Disconnect</button>
+      </form>
+      {% endif %}
+
       <h3 style="margin:22px 0 8px; font-size:0.92rem;">Webhook</h3>
       <p class="muted" style="font-size:0.82rem; margin-top:0;">We'll POST here the moment an order reaches
          "ready for delivery" - signed the same way Stripe/GitHub sign theirs, so you can verify it really

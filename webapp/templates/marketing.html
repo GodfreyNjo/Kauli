@@ -75,7 +75,7 @@
 
   <section class="tk-hero">
     <div class="tk-hero-inner">
-      <h1>Transcribe Audio to Text in {{ ai_only_languages|length + source_languages|length }} Languages</h1>
+      <h1>Transcribe Audio to Text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ Languages</h1>
       <p class="tk-hero-sub">Turn audio and video into accurate, time-stamped text in minutes, then translate it, add subtitles
          or dub it. Instantly with AI, or human-reviewed for Swahili, Kikuyu and English.</p>
       <div class="tk-hero-ctas">
@@ -393,7 +393,7 @@
         ("Publishing", "M4 6h16v10H4zM9 20h6M12 16v4", [("YouTube captions", "live", None)]),
         ("Video conferencing", "M3 7h11v10H3zM14 11l7-4v10l-7-4", [("Zoom", "soon", None), ("Microsoft Teams", "soon", None), ("Google Meet", "soon", None)]),
         ("Storage", "M3 7l3-3h12l3 3v12H3zM3 7h18", [("Google Drive", "soon", None), ("Dropbox", "soon", None), ("OneDrive", "soon", None)]),
-        ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", [("Notion", "soon", None), ("Google Docs", "soon", None)]),
+        ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", [("Notion", "live", "/developers#notion"), ("Google Docs", "soon", None)]),
         ("Collaboration", "M4 5h16v11H9l-5 4z", [("Slack", "live", "/developers#slack"), ("Discord", "soon", None)]),
         ("CRM", "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 3.5-6 8-6s8 2 8 6", [("HubSpot", "soon", None), ("Salesforce", "soon", None)]),
         ("Project management", "M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z", [("Asana", "soon", None), ("Trello", "soon", None)]),

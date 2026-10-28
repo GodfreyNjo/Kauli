@@ -42,7 +42,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server, notion_export  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -3628,6 +3628,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
                    password_error: str | None = None, password_saved: bool = False,
                    saved: bool = False, error: str | None = None, webhook_error: str | None = None,
                    slack_error: str | None = None, slack_notice: str | None = None,
+                   notion_error: str | None = None, notion_notice: str | None = None,
                    mfa_step: str | None = None, mfa_error: str | None = None, mfa_notice: str | None = None):
     user = current_user(request)
     if not user:
@@ -3678,6 +3679,8 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "webhook_error": webhook_error,
         "slack_row": db.get_client_slack(user["id"]) if is_team_owner else None,
         "slack_error": slack_error, "slack_notice": slack_notice,
+        "notion_row": db.get_client_notion(user["id"]) if is_team_owner else None,
+        "notion_error": notion_error, "notion_notice": notion_notice,
         "mfa_step": mfa_step, "mfa_error": mfa_error, "mfa_notice": mfa_notice, "mfa_pending": mfa_pending,
         "new_backup_codes": new_backup_codes,
         "backup_codes_remaining": db.count_unused_backup_codes(user["id"]) if user["mfa_enabled_at"] else 0,
@@ -3711,6 +3714,158 @@ def settings_api_key_revoke(request: Request):
     db.log_security_event("api_key_revoked", user_id=user["id"], email=user["email"],
                            ip_address=rate_limit.client_ip(request))
     return RedirectResponse("/settings?tab=integrations", status_code=303)
+
+
+def _notion_fernet():
+    import base64
+    from cryptography.fernet import Fernet
+    key = base64.urlsafe_b64encode(hashlib.sha256(f"{_session_secret}:notion-token".encode()).digest())
+    return Fernet(key)
+
+
+def _notion_encrypt(token: str) -> str:
+    return _notion_fernet().encrypt(token.encode()).decode()
+
+
+def _notion_decrypt(token_enc: str) -> str | None:
+    """None if the stored token can't be read (e.g. the session secret changed) -
+    the customer is then asked to reconnect, never shown an error page."""
+    try:
+        return _notion_fernet().decrypt(token_enc.encode()).decode()
+    except Exception:
+        return None
+
+
+def _notion_http(*args, **kwargs):
+    return httpx.request(*args, **kwargs)        # looked up per call so tests can replace httpx.request
+
+
+_NOTION_TOKEN_RE = re.compile(r"^[A-Za-z0-9_\-]{20,200}$")
+_NOTION_RUN_IN_BACKGROUND = True
+
+
+@app.post("/settings/notion")
+def settings_notion_save(request: Request, token: str = Form(""), url: str = Form(""), auto_send: str = Form("")):
+    from urllib.parse import quote_plus
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+
+    def back(kind: str, message: str):
+        return RedirectResponse(f"/settings?tab=integrations&notion_{kind}={quote_plus(message)}#notion", status_code=303)
+
+    existing = db.get_client_notion(user["id"])
+    token, url = token.strip(), url.strip()
+    if token:
+        if not _NOTION_TOKEN_RE.match(token):
+            return back("error", "That doesn't look like a Notion integration secret. Copy it from notion.so/my-integrations.")
+        plain = token
+    elif existing:
+        plain = _notion_decrypt(existing["token_enc"])
+        if not plain:
+            return back("error", "The saved Notion token can't be read any more. Paste the integration secret again.")
+    else:
+        return back("error", "Paste your Notion integration secret.")
+    if url:
+        parent_id = notion_export.parse_notion_id(url)
+        if not parent_id:
+            return back("error", "That doesn't look like a Notion page or database link.")
+    elif existing:
+        parent_id = existing["parent_id"]
+    else:
+        return back("error", "Paste the link to the Notion page or database where transcripts should go.")
+    try:
+        info = notion_export.validate_connection(plain, parent_id, http=_notion_http)
+    except notion_export.NotionError as exc:
+        return back("error", str(exc))
+    db.set_client_notion(user["id"], _notion_encrypt(plain), plain[-4:], parent_id, info["kind"],
+                         info["title_prop"], info["bot_name"], bool(auto_send))
+    return back("notice", f"Notion connected as {info['bot_name']}. Finished transcripts will appear as pages "
+                          f"in your {info['kind']}.")
+
+
+@app.post("/settings/notion/delete")
+def settings_notion_delete(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.delete_client_notion(user["id"])
+    return RedirectResponse("/settings?tab=integrations&notion_notice=Notion+disconnected#notion", status_code=303)
+
+
+_NOTION_SERVICE_LABELS = {"transcribe": "Transcription", "translate": "Transcription + translation", "dub": "Full dub"}
+
+
+def _notion_push_order(order, base_url: str) -> tuple[bool, str]:
+    """Creates the transcript page in the customer's Notion. Returns (ok, page url or the reason).
+    Needs the same things a download needs: a finished order and a chosen plan."""
+    row = db.get_client_notion(order["client_id"])
+    if not row:
+        return False, "Notion isn't connected."
+    if order["status"] not in db.TERMINAL_OK_STATUSES:
+        return False, "This order isn't ready yet."
+    if not _plan_chosen(order["client_id"]):
+        return False, "Choose a plan to send results to Notion."
+    token = _notion_decrypt(row["token_enc"])
+    if not token:
+        return False, "Reconnect Notion in Settings: the saved token can't be read."
+    if not db.claim_notion_export(order["id"], order["client_id"]):
+        sent = db.get_notion_export(order["id"])
+        return True, (sent["page_url"] if sent and sent["page_url"] else "")
+    try:
+        job = _load_job(order)
+        lines = transcript_export._lines(job, True) if job else []
+        if not lines:
+            raise notion_export.NotionError("The transcript isn't ready yet.")
+        src, tgt = order["source_lang"], order["target_lang"]
+        langs = LANGUAGE_NAMES.get(src, src) + (f" to {LANGUAGE_NAMES.get(tgt, tgt)}" if tgt and tgt != src else "")
+        meta = " | ".join(x for x in (
+            order["original_filename"] or order["id"],
+            _NOTION_SERVICE_LABELS.get(order["service_level"] or "transcribe", "Order"), langs,
+            f"{order['duration_minutes']:.1f} min" if order["duration_minutes"] else "") if x)
+        blocks = notion_export.build_blocks(meta, f"{base_url.rstrip('/')}/client/orders/{order['id']}", lines,
+                                            ai_note=order["review_tier"] == "ai")
+        title = f"Transcript - {order['original_filename'] or order['id']}"
+        page = notion_export.create_page(token, row["parent_id"], row["parent_kind"], row["title_prop"], title,
+                                         blocks, http=_notion_http)
+        db.finish_notion_export(order["id"], page["id"], page["url"])
+        db.log_webhook_delivery(order["client_id"], order["id"], "notion.order.ready", True, 200)
+        return True, page["url"] or ""
+    except notion_export.NotionError as exc:
+        db.release_notion_export(order["id"])
+        db.log_webhook_delivery(order["client_id"], order["id"], "notion.order.ready", False, None, str(exc)[:300])
+        return False, str(exc)
+    except Exception as exc:
+        db.release_notion_export(order["id"])
+        db.log_webhook_delivery(order["client_id"], order["id"], "notion.order.ready", False, None, str(exc)[:300])
+        return False, "Something went wrong sending to Notion. Try again in a moment."
+
+
+def _notify_notion_order_ready(request, order) -> None:
+    row = db.get_client_notion(order["client_id"])
+    if not row or not row["auto_send"]:
+        return
+    base = str(request.base_url)
+    if _NOTION_RUN_IN_BACKGROUND:          # Notion calls take seconds: never hold up an approval
+        threading.Thread(target=_notion_push_order, args=(order, base), daemon=True).start()
+    else:
+        _notion_push_order(order, base)
+
+
+@app.post("/client/orders/{order_id}/send-to-notion")
+def client_send_to_notion(request: Request, order_id: str):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+    from urllib.parse import quote_plus
+    ok, detail = _notion_push_order(order, str(request.base_url))
+    if ok:
+        msg = "Sent to Notion." if detail else "This order is already being sent to Notion."
+        return RedirectResponse(f"/client/orders/{order_id}?notice={quote_plus(msg)}", status_code=303)
+    return RedirectResponse(f"/client/orders/{order_id}?error={quote_plus(detail)}", status_code=303)
 
 
 @app.post("/settings/slack")
@@ -5480,6 +5635,8 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "transcript_teaser": (_transcript_teaser(job, order["id"])
                               if job and order["status"] in db.TERMINAL_OK_STATUSES
                               and not _plan_chosen(user["client_scope_id"]) else None),
+        "notion_row": db.get_client_notion(user["client_scope_id"]),
+        "notion_export": db.get_notion_export(order["id"]),
     })
 
 
@@ -7582,6 +7739,11 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
     try:                                   # Slack is independent of the signed webhook below
         if event == "order.ready":
             _notify_slack_order_ready(request, order)
+    except Exception:
+        pass
+    try:                                   # so is Notion
+        if event == "order.ready":
+            _notify_notion_order_ready(request, order)
     except Exception:
         pass
     hook = db.get_client_webhook(order["client_id"])

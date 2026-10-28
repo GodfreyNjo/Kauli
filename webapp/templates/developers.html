@@ -92,6 +92,17 @@
        order. Download buttons are optional and off by default, because anyone in the channel could use them.
        Kauli only accepts <code>hooks.slack.com</code> webhook URLs, and the URL is never shown in full again.</p>
 
+    <h2 id="notion">Notion</h2>
+    <p>Send each finished transcript to Notion as a page. In Notion, create an
+       <a href="https://www.notion.so/my-integrations" rel="noopener">internal integration</a> and copy its secret. Open the
+       page or database where transcripts should go, choose the ... menu, then <strong>Connections</strong>, and add your
+       integration. Then paste the secret and that page's link in
+       <a href="/settings?tab=integrations#notion">Settings</a> under <strong>Notion</strong>. Kauli checks the connection
+       straight away, so a wrong secret or an unshared page is caught when you save.</p>
+    <p>Pages are created when an order is ready (or one at a time with <strong>Send to Notion</strong> on the order page) and
+       only once downloads are unlocked. Each order is sent once and never duplicated. Your secret is stored encrypted and
+       never shown again, and Kauli only talks to <code>api.notion.com</code> with it.</p>
+
     <h2 id="webhooks">Webhooks</h2>
     <p>Add a webhook URL in <a href="/settings">Settings</a> and Kauli sends a <code>POST</code> with
        <code>{"event": "order.ready", "order": {...}}</code> when an order is delivered. The body is signed so you can verify it came from

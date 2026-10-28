@@ -3847,3 +3847,8 @@ body.m-public, .marketing-page { font-size: 16px; }
   text-align: center; gap: 10px; padding: 16px; background: linear-gradient(180deg, transparent 0%, var(--panel) 78%); }
 .teaser-lock p { margin: 0; color: var(--heading-ink); }
 .teaser-lock .btn { margin: 0; }
+
+/* "Use Case" dropdown: three groups side by side */
+.m-nav-dropdown-menu-3 { flex-direction: row; gap: 6px 18px; min-width: 700px; }
+.m-nav-dropdown-menu-3 .m-nav-dropdown-col { flex: 1 1 0; }
+@media (max-width: 900px) { .m-nav-dropdown-menu-3 { min-width: 0; flex-direction: column; } }
