@@ -131,10 +131,12 @@ def test_unknown_or_foreign_orders_are_not_found(api):
     assert r.json()["error"]["code"] == -32602
 
 
-def test_transcript_is_refused_for_previews_and_unpaid_orders(api, fake_youtube):
+def test_transcript_is_refused_until_a_plan_is_chosen_and_for_unpaid_orders(api, fake_youtube):
     free = payload(call(api, "kauli_create_order", url="https://youtu.be/abc123XYZ00", source_lang="en"))
+    assert "isn't ready" in call(api, "kauli_get_transcript", order_id=free["id"])["content"][0]["text"]
+    api.db.update_order_status(free["id"], "ready_for_delivery")
     res = call(api, "kauli_get_transcript", order_id=free["id"])
-    assert res["isError"] is True                                  # free minutes buy a preview, never a download
+    assert res["isError"] is True and "Choose a plan" in res["content"][0]["text"]
     held = payload(call(api, "kauli_create_order", url="https://youtu.be/abc123XYZ00", source_lang="en",
                         review_tier="human"))
     assert "waiting for payment" in call(api, "kauli_get_transcript", order_id=held["id"])["content"][0]["text"]
@@ -143,6 +145,7 @@ def test_transcript_is_refused_for_previews_and_unpaid_orders(api, fake_youtube)
 def test_a_paid_finished_order_returns_its_subtitle_text(api, fake_youtube):
     order = payload(call(api, "kauli_create_order", url="https://youtu.be/abc123XYZ00", source_lang="en"))
     row = api.db.get_order(order["id"])
+    api.db.set_plan_chosen("u1")
     api.db.set_order_free_preview(order["id"], False)
     api.db.update_order_status(order["id"], "ready_for_delivery")
     outdir = Path(row["outdir"])

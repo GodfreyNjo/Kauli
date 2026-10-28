@@ -154,24 +154,17 @@
       ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} charge applies before it unlocks.
     </div>
     <a class="btn" href="/client/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px;">Review &amp; pay charge →</a>
-  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order['is_free_preview'] %}
+  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and not plan_chosen(user) %}
     <div class="modal-warning">
-      This ran on your free trial minutes - a transcription preview, not a downloadable file. Submit a
-      paid order (any service level, any time) to get the real, downloadable deliverables.
+      Your results are ready. Choose a plan to download them - the Free plan only needs a quick card
+      confirmation (a $1 charge that is credited straight back to your account).
     </div>
     <div class="card" style="margin-top:14px; max-height:360px; overflow-y:auto; white-space:pre-wrap; font-size:0.9rem; line-height:1.6;">
 {%- for seg in (job.segments if job else []) -%}
 {{ seg.source_final_text }}{{ "\n\n" if not loop.last }}
 {%- endfor -%}
     </div>
-    {% if upsell['unlock'] and paystack_configured %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/unlock" style="margin-top:14px;">
-      <input type="hidden" name="provider" value="paystack">
-      <button type="submit">Unlock this transcript for ${{ "%.2f"|format(upsell['unlock']) }} →</button>
-      <span class="muted" style="font-size:0.85rem;"> - download as Word, text and SRT. No need to upload it again.</span>
-    </form>
-    {% endif %}
-    <a class="btn secondary" href="/client" style="margin-top:14px;">Or submit a new paid order →</a>
+    <a class="btn" href="/client/billing?choose_plan=1" style="margin-top:14px;">Choose a plan to download →</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p class="ok">Ready. Download your files below.</p>
     {% if upsell['upgrade'] and paystack_configured %}
@@ -242,7 +235,7 @@
   {% endif %}
 </div>
 
-{% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and not order['is_free_preview'] %}
+{% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and plan_chosen(user) %}
 <div class="card">
   <div class="order-workspace-grid">
     <div class="order-workspace-media">
@@ -435,7 +428,7 @@
     }
   })();
 </script>
-{% elif job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] and not order['is_free_preview'] %}
+{% elif job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] %}
 <details class="card">
   <summary><h2 style="display:inline;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2></summary>
   <p class="muted" style="font-size:0.82rem;">Read-only preview of what our team is working from - not an

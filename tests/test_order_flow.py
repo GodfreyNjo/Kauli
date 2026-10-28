@@ -58,6 +58,7 @@ def env(tmp_path, monkeypatch):
 
     db.get_or_create_user("u1", "client@example.com", "client")
     db.set_trial_verified("u1")
+    db.set_plan_chosen("u1")
     db.set_billing_market("u1", "intl")
     monkeypatch.setattr(app_mod, "current_user",
                         lambda request: {**dict(db.get_user("u1")), "client_scope_id": "u1"})
@@ -195,13 +196,11 @@ def _payment(env, order, kind, amount):
     return env.db.get_payment(pid)
 
 
-def test_unlock_a_free_preview_costs_what_the_ai_work_would_have(env, wav_bytes):
+def test_free_minute_results_have_nothing_to_unlock_or_upgrade(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes))
     env.db.update_order_status(order["id"], "ready_for_delivery")
     prices = env.app._order_upsell_prices(env.db.get_order(order["id"]))
-    assert prices["upgrade"] is None and abs(prices["unlock"] - 0.12) < 0.005
-    assert env.app._activate_payment(_payment(env, order, "preview_unlock", prices["unlock"]), "ref-unlock")
-    assert env.db.get_order(order["id"])["is_free_preview"] == 0
+    assert prices == {"unlock": None, "upgrade": None}        # downloadable once a plan is chosen
 
 
 def test_upgrade_to_human_review_charges_the_difference_and_queues_review(env, wav_bytes):
@@ -257,11 +256,11 @@ def test_client_pages_render_with_both_tiers_and_the_upsell_buttons(env, wav_byt
     assert "Add human review" in page.text and "Transcript (.docx)" in page.text
     assert "human-verified" not in page.text.lower()
 
-    # a free-trial preview -> "Unlock this transcript"
+    # a free-minutes order downloads like any other once the plan is chosen (no more "unlock")
     free = env.order_from(env.place(wav_bytes))
     env.db.update_order_status(free["id"], "ready_for_delivery")
     page = env.client.get(f"/client/orders/{free['id']}")
-    assert page.status_code == 200 and "Unlock this transcript for $0.12" in page.text
+    assert page.status_code == 200 and "Transcript (.docx)" in page.text and "Unlock this transcript" not in page.text
 
     # a human-reviewed order never shows the Instant AI banner or upsells
     human = env.order_from(env.place(wav_bytes, review_tier="human"))

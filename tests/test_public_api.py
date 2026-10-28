@@ -77,7 +77,8 @@ def test_creating_a_free_instant_ai_order_over_the_api(api, wav_bytes):
     body = r.json()
     assert body["status"] != "pending_payment" and body["review_tier"] == "ai"
     assert body["service_level"] == "transcribe" and body["source_lang"] == "en"
-    assert body["deliverables"] == {}                       # a free-minutes order is a preview, never a download
+    assert body["deliverables"] == {}                       # nothing downloads until the account has chosen a plan
+    assert body["plan_required"] is True and body["choose_plan_url"].endswith("/client/billing?choose_plan=1")
     assert api.submitted == [body["id"]]
     assert api.db.get_order(body["id"])["is_free_preview"] == 1
 
@@ -117,13 +118,25 @@ def test_idempotency_key_returns_the_same_order(api, wav_bytes):
     assert len(api.db.list_orders_for_client("u1")) == 1
 
 
-def test_free_minutes_need_the_one_time_card_check(api, wav_bytes):
+def test_free_minutes_work_straight_away_but_downloads_wait_for_a_plan(api, wav_bytes):
     conn = api.db.get_conn()
     conn.execute("UPDATE users SET trial_verified_at = NULL WHERE id = 'u1'")
     conn.commit()
     r = api.post(wav_bytes)
-    assert r.status_code == 402 and r.json()["error"] == "verification_required"
-    assert api.db.list_orders_for_client("u1") == []
+    assert r.status_code == 201 and r.json()["plan_required"] is True      # no card check before ordering
+    order_id = r.json()["id"]
+    assert api.submitted == [order_id]
+
+
+def test_links_appear_once_the_plan_is_chosen(api, wav_bytes):
+    order_id = api.post(wav_bytes).json()["id"]
+    api.db.update_order_status(order_id, "ready_for_delivery")
+    headers = {"Authorization": f"Bearer {KEY}"}
+    before = api.client.get(f"/api/v1/orders/{order_id}", headers=headers).json()
+    assert before["ready"] and before["deliverables"] == {} and before["plan_required"] is True
+    api.db.set_plan_chosen("u1")
+    after = api.client.get(f"/api/v1/orders/{order_id}", headers=headers).json()
+    assert "txt" in after["deliverables"] and "plan_required" not in after       # free-minute results are downloadable
 
 
 def test_staff_keys_cannot_create_client_orders(api, wav_bytes):

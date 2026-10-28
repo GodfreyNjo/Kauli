@@ -53,8 +53,7 @@
     <ul>
       <li><code>201</code>: the order was created and is processing.</li>
       <li><code>402</code> with <code>payment_required: true</code> and a <code>payment_url</code>: the order is held until it is paid.
-          Nothing runs and nothing downloads before payment. <code>402</code> with <code>error: "verification_required"</code>
-          means the one-time $1 card check (credited to your account) is needed before free minutes apply.</li>
+          Nothing runs and nothing downloads before payment.</li>
       <li><code>400</code> with <code>{"error": "..."}</code>: the request broke a rule, for example a language that is
           only available as Instant AI.</li>
       <li><code>401</code> missing or wrong key. <code>429</code> rate limited.</li>
@@ -77,7 +76,9 @@
     <p>When an order is paid and ready, <code>deliverables</code> holds signed download links that need no login and expire
        after 7 days: <code>txt</code> and <code>docx</code> (transcript), <code>transcript</code> (timed SRT in the source
        language) and, depending on what the order bought, <code>srt</code>, <code>vtt</code>, <code>audio</code>,
-       <code>burned</code> and <code>dubbed</code>. Orders that only used free minutes are previews and have no downloads.</p>
+       <code>burned</code> and <code>dubbed</code>. Downloads need the account to have chosen a plan (the Free plan is enough, and covers
+       orders made with the free monthly minutes): until then <code>deliverables</code> is empty and the order has
+       <code>plan_required: true</code> with a <code>choose_plan_url</code> for the account owner to open.</p>
 
     <h2>Languages</h2>
     <p><code>GET /api/v1/languages</code> needs no key and lists every code with what it supports:

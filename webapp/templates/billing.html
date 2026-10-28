@@ -4,6 +4,12 @@
 <h1>Billing</h1>
 {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% if not plan_is_chosen %}
+  <div class="modal-warning" role="status">
+    <strong>Choose a plan to download your files.</strong> Your orders still process meanwhile. The Free plan
+    needs a quick card confirmation: a $1 charge that is credited straight back to your account.
+  </div>
+{% endif %}
 {% if is_test_account %}
   <p class="ok">Full access enabled on this account for testing - every tier's benefits apply regardless
      of what's below.</p>
@@ -175,7 +181,11 @@
         <td>{{ '✓' if p['video_deliverables'] else '-' }}</td>
         <td>{{ p['support'] }}</td>
         <td>
-          {% if key == current_plan %}
+          {% if key == 'free' and not plan_is_chosen %}
+            <form method="post" action="/client/billing/choose-free">
+              <button type="submit">Choose Free plan</button>
+            </form>
+          {% elif key == current_plan %}
             <span class="plan-active-pill">✓ Active</span>
             {% if recurring and key != 'free' %}
             <form method="post" action="/client/billing/cancel-subscription" style="margin-top:6px;"

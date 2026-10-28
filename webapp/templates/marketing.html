@@ -82,7 +82,7 @@
         <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
         <a href="#book" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
-      <p class="tk-hero-note">Pay as you go. A one-time $1 card check (credited to your account) unlocks your free minutes.</p>
+      <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
 
       <div class="tk-langs">
         <span>Transcribe audio to text in {{ language_total }} languages</span>
@@ -695,7 +695,7 @@
     <div class="exit-popup-body">
       <h2 id="exit-popup-title">Still deciding?</h2>
       <p class="exit-popup-lede">Try Kauli with your first {{ free_minutes|int }} minutes of Instant AI transcription free -
-         after a one-time $1 card check that's credited to your account.</p>
+        .</p>
       <p class="exit-popup-sub">See real results before you commit to anything.</p>
       <a href="/login?mode=signup" class="btn cta-olive exit-popup-cta">Start free now</a>
     </div>

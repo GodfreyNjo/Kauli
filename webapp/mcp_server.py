@@ -41,7 +41,8 @@ TOOLS: list[dict[str, Any]] = [
         "description": "Creates a Kauli order from a YouTube link. Runs the same checks and prices as the website: "
                        "free minutes apply to Instant AI transcription only, human review is Swahili, Kikuyu and "
                        "English only, and an order that needs payment is held (status pending_payment) until the "
-                       "customer opens payment_url. Nothing downloads before it is paid. Spends the customer's "
+                       "customer opens payment_url. Nothing downloads before it is paid for or covered by free minutes, and "
+                       "the account has chosen a plan. Spends the customer's "
                        "money or free minutes, so confirm with the customer before calling.",
         "inputSchema": {
             "type": "object",
@@ -80,7 +81,7 @@ TOOLS: list[dict[str, Any]] = [
         "name": "kauli_get_transcript",
         "title": "Read a finished transcript",
         "description": "The text of a finished, paid order: txt (readable, time-stamped), srt or vtt (subtitles). "
-                       "Only works once the order is ready; free-minute previews are not downloadable.",
+                       "Only works once the order is ready and the account has chosen a plan (the Free plan is enough).",
         "inputSchema": {"type": "object", "properties": {
             "order_id": _ORDER_ID,
             "format": {"type": "string", "enum": ["txt", "srt", "vtt"], "default": "txt"}},

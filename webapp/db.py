@@ -715,6 +715,23 @@ def init_db() -> None:
         # ships would be a real regression, not a fraud fix.
         conn.execute("ALTER TABLE users ADD COLUMN trial_verified_at REAL")
         conn.execute("UPDATE users SET trial_verified_at = ? WHERE trial_verified_at IS NULL", (time.time(),))
+    if "plan_chosen_at" not in existing_user_cols:
+        # Downloads unlock once an account has CHOSEN a plan (Free, which needs
+        # the card confirmation, or a paid plan) or has made any real payment.
+        # Every account that exists when this migration runs is grandfathered
+        # in - they already have their files, and locking real customers out
+        # of work they already paid for would be a regression, not a policy.
+        conn.execute("ALTER TABLE users ADD COLUMN plan_chosen_at REAL")
+        conn.execute("UPDATE users SET plan_chosen_at = ? WHERE plan_chosen_at IS NULL", (time.time(),))
+    # One-off copy fix, safe to repeat: posts seeded earlier promised "a one-time
+    # $1 card check". That is now explained only inside the app, so the phrase is
+    # removed from any post (draft or published) that still carries it.
+    import re as _re
+    _phrase = _re.compile(r" after a one-time \$1 card check,?(?: that is| that's)? credited to your account")
+    for _row in conn.execute("SELECT id, body_html, description FROM blog_posts "
+                             "WHERE body_html LIKE '%card check%' OR description LIKE '%card check%'").fetchall():
+        conn.execute("UPDATE blog_posts SET body_html = ?, description = ? WHERE id = ?",
+                     (_phrase.sub("", _row["body_html"] or ""), _phrase.sub("", _row["description"] or ""), _row["id"]))
     if "signup_ip" not in existing_user_cols:
         # Real, honest fraud-triage signal - see ip_intel.py's own module
         # docstring for exactly what this does and doesn't prove.
@@ -1542,6 +1559,15 @@ def set_tour_seen(user_id: str) -> None:
         "UPDATE users SET onboarding_tour_seen_at = ? WHERE id = ? AND onboarding_tour_seen_at IS NULL",
         (time.time(), user_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def set_plan_chosen(user_id: str) -> None:
+    """Set once, never cleared. Idempotent: a repeated payment webhook is fine."""
+    conn = get_conn()
+    conn.execute("UPDATE users SET plan_chosen_at = ? WHERE id = ? AND plan_chosen_at IS NULL",
+                 (time.time(), user_id))
     conn.commit()
     conn.close()
 

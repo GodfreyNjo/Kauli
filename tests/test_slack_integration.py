@@ -101,7 +101,14 @@ def test_order_ready_posts_a_message_without_download_links_by_default(slack):
     buttons = msg["blocks"][-1]["elements"]
     assert [b["text"]["text"] for b in buttons] == ["Open order"]
     assert buttons[0]["url"] == f"https://kauli.test/client/orders/{order['id']}"
-    assert any(b["type"] == "context" for b in msg["blocks"])                       # free-minutes note
+    assert not any(b["type"] == "context" for b in msg["blocks"])                   # plan already chosen: no note
+    slack.db.get_conn().close()
+    conn = slack.db.get_conn()
+    conn.execute("UPDATE users SET plan_chosen_at = NULL WHERE id = 'u1'")
+    conn.commit()
+    _fire(slack, slack.db.get_order(order["id"]))
+    notes = [b for b in slack.sent[-1]["json"]["blocks"] if b["type"] == "context"]
+    assert notes and "Choose a plan" in notes[0]["elements"][0]["text"]
 
 
 def test_download_buttons_only_for_a_paid_ready_order_and_only_if_opted_in(slack):

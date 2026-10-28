@@ -183,6 +183,13 @@
     {% endif %}
     <div class="app-main">
       <main id="main-content" tabindex="-1">
+        {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user)
+              and request.url.path not in ['/client/billing', '/client/verify-trial'] %}
+        <div class="plan-banner" role="status">
+          <span><strong>Choose a plan to download your files.</strong> Your orders still process meanwhile.</span>
+          <a class="btn" href="/client/billing?choose_plan=1">Choose a plan</a>
+        </div>
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
     </div>

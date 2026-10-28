@@ -197,3 +197,27 @@ def test_integrations_nav_dropdown_and_section_wording(client):
     section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     assert "Send work in and pull results out with our API, MCP server and webhooks today." in section
     assert "are on the way" not in section and "One-click" not in section
+
+
+_DOLLAR_CHECK = re.compile(r"\$1 card|one-time \$1|\$1 charge|\$1\.00|card check", re.I)
+
+
+def test_no_public_page_mentions_the_one_dollar_card_check(client):
+    """The credited $1 is explained only inside the app (billing and the Free-plan step)."""
+    paths = {"/", "/login", "/blog", "/languages", "/terms", "/privacy", "/developers", "/llms.txt",
+             "/formatting-standards"}
+    sitemap = client.get("/sitemap.xml").text
+    paths |= {re.sub(r"^https?://[^/]+", "", u) for u in re.findall(r"<loc>([^<]+)</loc>", sitemap)}
+    assert len(paths) > 40                                          # solution + language + translated pages
+    offenders = []
+    for path in sorted(paths):
+        r = client.get(path)
+        if r.status_code == 200 and _DOLLAR_CHECK.search(r.text):
+            offenders.append((path, _DOLLAR_CHECK.search(r.text).group(0)))
+    assert not offenders, offenders
+
+
+def test_the_blog_seed_no_longer_promises_a_card_check():
+    from webapp import blog_seed
+    text = Path(blog_seed.__file__).read_text(encoding="utf-8")
+    assert not _DOLLAR_CHECK.search(text)

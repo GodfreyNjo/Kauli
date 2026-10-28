@@ -59,7 +59,7 @@
 
       <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
         <h1>Create your account</h1>
-        <p class="auth-sub">Start a project in minutes. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free after a one-time $1 card check, credited to your account.</p>
+        <p class="auth-sub">Start a project in minutes. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
         {% if mode == 'signup' and error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
         <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
           {% include "_google_g_icon.svg" %}

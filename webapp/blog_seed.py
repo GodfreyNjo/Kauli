@@ -73,7 +73,7 @@ POSTS = [
 <li><strong>Keep timestamps if you'll make subtitles.</strong> An SRT file carries them automatically.</li>
 </ul>
 
-<p>Want to try it on your own video? Your first 5 minutes of Instant AI transcription are free after a one-time $1 card check that is credited to your account - start with our <a href="/solutions/youtube-video-to-text">YouTube to text</a> page.</p>""",
+<p>Want to try it on your own video? Your first 5 minutes of Instant AI transcription are free - start with our <a href="/solutions/youtube-video-to-text">YouTube to text</a> page.</p>""",
     },
     {
         "slug": "ai-vs-human-transcription-which-do-you-need",
@@ -333,7 +333,7 @@ POSTS = [
 <li><strong>Edit before publishing.</strong> Instant AI is not reviewed by a person, so give it a quick read.</li>
 </ul>
 
-<p>Start with our <a href="/solutions/podcast-transcription">podcast transcription</a> page, and your first 5 minutes are free after a one-time $1 card check that is credited to your account.</p>""",
+<p>Start with our <a href="/solutions/podcast-transcription">podcast transcription</a> page, and your first 5 minutes are free.</p>""",
     },
     {
         "slug": "interview-transcription-checklist-research-journalism",
@@ -429,7 +429,7 @@ POSTS = [
 <p>Dubbing and human review are available for Swahili, Kikuyu and English, not for Chinese, Spanish or the other languages.</p>
 <p>For those you get transcription and Instant AI translation, with SRT, Word and text downloads.</p>
 
-<p>Ready to try it? Start from the <a href="/solutions/audio-to-text">audio to text</a> page - your first 5 minutes are free after a one-time $1 card check credited to your account.</p>""",
+<p>Ready to try it? Start from the <a href="/solutions/audio-to-text">audio to text</a> page - your first 5 minutes are free.</p>""",
     },
     {
         "slug": "how-to-transcribe-a-zoom-recording",
@@ -522,7 +522,7 @@ POSTS = [
 
 <h2>What it costs</h2>
 <p>Instant AI transcription is $0.12 per audio-minute in the US, so a 30-minute MP3 comes to about $3.60.</p>
-<p>Your first 5 minutes are free after a one-time $1 card check that is credited to your account.</p>""",
+<p>Your first 5 minutes are free.</p>""",
     },
     {
         "slug": "transcribe-whatsapp-voice-notes",
@@ -764,7 +764,7 @@ Today we're looking at subtitles.</code></pre>
 <p>Machine translation is a second model applied to the transcript, so any transcription error carries straight into the translation.</p>
 <p>That's why we always suggest getting the transcript right first - our guide to <a href="/blog/ai-vs-human-transcription-which-do-you-need">AI vs human transcription</a> covers when to add a person.</p>
 
-<p>You can see all of this in practice by trying <a href="/solutions/audio-to-text">audio to text</a> on a short clip - the first 5 minutes are free after a one-time $1 card check, credited to your account.</p>""",
+<p>You can see all of this in practice by trying <a href="/solutions/audio-to-text">audio to text</a> on a short clip - the first 5 minutes are free.</p>""",
     },
     {
         "slug": "translate-youtube-titles-descriptions-and-captions",
