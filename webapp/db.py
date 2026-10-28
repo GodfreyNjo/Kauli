@@ -3013,6 +3013,28 @@ def next_order_needing_review(exclude_id: str):
     return row
 
 
+def usual_languages(client_id: str, recent: int = 10):
+    """The language pair a client usually orders: the most common (spoken, target) pair among their last `recent`
+    orders, the most recent one winning a tie. None for a client with no orders. Read straight from their own order
+    history, so there is nothing to keep in sync and it follows them as their work changes."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT source_lang, target_lang FROM orders WHERE client_id = ? AND source_lang IS NOT NULL AND source_lang != '' "
+        "ORDER BY created_at DESC LIMIT ?", (client_id, recent)).fetchall()
+    conn.close()
+    if not rows:
+        return None
+    counts: dict[tuple, int] = {}
+    for r in rows:
+        key = (r["source_lang"], r["target_lang"] or "")
+        counts[key] = counts.get(key, 0) + 1
+    best = max(counts.values())
+    for r in rows:                                   # newest first, so the newest of the tied pairs wins
+        key = (r["source_lang"], r["target_lang"] or "")
+        if counts[key] == best:
+            return key
+
+
 def list_orders_for_client(client_id: str):
     conn = get_conn()
     rows = conn.execute(

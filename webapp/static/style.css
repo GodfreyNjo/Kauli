@@ -4570,3 +4570,5 @@ body.m-public .m-nav-links a.btn, body.m-public .m-nav-links a.btn.cta-olive { b
 #cookie-notice-accept, #cookie-prefs-decline, .btn.secondary { border-radius: 12px; font-weight: 600; }
 #cookie-notice-accept { background: #2563eb; color: #ffffff; }
 #cookie-notice-accept:hover { background: #1d4ed8; }
+
+.lang-learned { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding: 8px 12px; border-radius: 10px; background: #eaf0d8; color: #46581f; font-size: 0.88rem; font-weight: 600; width: fit-content; max-width: 100%; }

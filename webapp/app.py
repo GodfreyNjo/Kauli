@@ -5215,6 +5215,16 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         reorder_form_values["source_lang"] = user["default_source_lang"]
     if user["default_target_lang"]:
         reorder_form_values["target_lang"] = user["default_target_lang"]
+    # Nothing chosen in Settings: learn it from the languages this client keeps ordering, so a repeat client
+    # lands on their usual pair instead of the site default. Only ever a starting point they can change.
+    languages_learned = False
+    if not user["default_source_lang"] and not user["default_target_lang"]:
+        usual = db.usual_languages(user["client_scope_id"])
+        if usual and usual[0] in LANGUAGE_NAMES:
+            reorder_form_values["source_lang"] = usual[0]
+            if usual[1]:
+                reorder_form_values["target_lang"] = usual[1]
+            languages_learned = True
     if user["default_service_level"]:
         reorder_form_values["service_level"] = user["default_service_level"]
     if user["default_rush"]:
@@ -5237,7 +5247,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "folders": db.list_folders_for_client(user["client_scope_id"]),
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
         "manual_transcription_languages": MANUAL_TRANSCRIPTION_LANGUAGES,
-        "form_values": reorder_form_values,
+        "form_values": reorder_form_values, "languages_learned": languages_learned and not reorder_youtube_url,
         "youtube_polling_configured": youtube_poll.youtube_polling_configured(),
         "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
@@ -5816,7 +5826,8 @@ def create_order(
         # fallback lives INSIDE the provider itself, not here, so this one
         # value is the whole policy. Falls straight to faster-whisper with
         # no attempt at all if no key is configured yet.
-        asr = ("transkriptor" if os.environ.get("TRANSKRIPTOR_API_KEY") or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
+        asr = ("transkriptor" if (os.environ.get("TRANSKRIPTOR_API_KEY") or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP")
+                                  or os.environ.get("TRANSKRIPTOR_API_KEY_BACKUP_2"))
                else "faster-whisper")
     if studio and level["asr"]:
         asr = "elevenlabs-scribe"                   # fell back to faster-whisper in the pipeline if ElevenLabs fails
