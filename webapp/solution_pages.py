@@ -23,7 +23,7 @@ DEMO_FOR = {
     "ngos": "field", "youtubers": "video", "media-broadcast": "news", "e-learning": "course", "voice-over": "video",
     "captioning": "news", "video-translation": "video", "video-transcription": "meeting", "video-dubbing": "video",
     "video-localization": "video", "audio-to-text": "meeting", "youtube-video-to-text": "video",
-    "podcast-transcription": "podcast", "interview-transcription": "interview",
+    "podcast-transcription": "podcast", "interview-transcription": "interview", "call-centers": "call",
 }
 
 
@@ -494,6 +494,62 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             ],
             "fit_guide": plans("A pilot with a few recordings.", "Monthly programme reporting.", "Videos with burned captions or dubbed files for screenings.",
                                "A multi-country programme needing invoicing."),
+        },
+        # ------------------------------------------------------------------ call centers
+        "call-centers": {
+            "title": "Call Center Transcription and Call Quality Review",
+            "meta_description": "Turn recorded calls into searchable transcripts with agent and customer separated. Review more calls, translate them, and send results to your tools through API and webhooks. Up to 99% accuracy with human review.",
+            "kicker": "For call centers and support teams",
+            "h1": "Every call transcribed, searchable and ready to review",
+            "intro": "Recorded calls hold what your customers actually say, and almost nobody has time to listen. Kauli turns recordings into transcripts "
+                     "with the agent and the customer separated, so quality, compliance and coaching teams can read, search and count calls "
+                     "instead of listening to them.",
+            "why_heading": "Built for quality, coaching and compliance work",
+            "points": [
+                {"title": "Agent and customer, separated",
+                 "body": "Speaker labels and timestamps on every line, so a reviewer can jump straight to the moment a call turned."},
+                {"title": "Searchable across every call",
+                 "body": "Find every call that mentions a product, a refund or a competitor. Download transcripts as CSV to sort and count them in a spreadsheet."},
+                {"title": "Notes in seconds",
+                 "body": "Make an overview, key points and action items from any call with AI notes, then check and edit them."},
+                {"title": "Up to 99% accurate where it matters",
+                 "body": f"Use Instant AI for coaching and trends, and add a real editor for complaints, disputes and evidence. Human review is available in {hr_names}."},
+                {"title": "Calls in other languages",
+                 "body": "Transcribe and translate calls so a supervisor who does not speak the language can still review them."},
+                {"title": "Connects to the tools you use",
+                 "body": "Send recordings in through the API and get finished transcripts out by signed webhook, or use Zapier, Make or n8n to reach your helpdesk, CRM or spreadsheet."},
+            ],
+            "choose": [
+                {"name": "Quality assurance and coaching", "best": "Reviewing more calls with the same team.",
+                 "get": f"Instant AI transcripts with speakers and timestamps in minutes, and {pro['included_ai_minutes']:,.0f} to {prem['included_ai_minutes']:,.0f} minutes a month included on Pro and Premium."},
+                {"name": "Multilingual support lines", "best": "Teams that take calls in several languages.",
+                 "get": "Transcription in 70+ languages with translation, so reviewers can read every call in one language."},
+                {**human, "name": "Human-reviewed evidence", "best": "Complaints, disputes, compliance checks and anything you may need to show."},
+                {"name": "Integrated pipeline", "best": "Teams that want it automatic.",
+                 "get": "Send each recording through the API as it is made and receive the finished transcript by webhook, with an account manager on Enterprise."},
+            ],
+            "demo": "call",
+            "guides": ["call-center-transcription-quality-assurance-and-integrations", "record-meetings-and-interviews-with-ai-post-processing", "ai-vs-human-transcription-which-do-you-need"],
+            "cta_heading": "Try it on one of your own calls",
+            "cta_body": "Upload a recording, or ask us for a pilot on a batch of calls. Your first minutes are free.",
+            "related": ["video-transcription", "interview-transcription", "audio-to-text"],
+            "tour": {"mode": "upload", "filename": "support_call.mp3"},
+            "faq": [
+                {"q": "Does it separate the agent from the customer?",
+                 "a": "Yes. Transcripts label who is speaking and when, so you can read the agent and the customer separately. Speaker labels are most reliable on clear recordings with distinct voices."},
+                {"q": "Can it connect to our phone system?",
+                 "a": "Any phone system that can export its recordings can send them to Kauli, by upload or through our API. Finished transcripts come back by signed webhook. We do not yet have one-click connectors to specific telephony platforms, and an integration can be built on the API; talk to us about yours."},
+                {"q": "Can it transcribe live calls as they happen?",
+                 "a": "Not yet for phone calls. Kauli transcribes recordings once a call ends, and the meeting recorder can join online Zoom, Google Meet and Microsoft Teams calls."},
+                {"q": "How accurate is it?",
+                 "a": "Instant AI is machine-generated and very good on clear audio, and it is labelled as not reviewed by a person. Human review has an editor check the text against the audio and can reach up to 99% accuracy."},
+                {"q": "What about confidentiality?",
+                 "a": "We do not share your data with anyone else. Files are kept until you delete them, and you can ask us to delete files or account data at any time. Tell callers that calls are recorded, as the rules where you operate require."},
+                {"q": "How is it priced?",
+                 "a": f"Per audio-minute, shown before you order. Pro is ${pro['price_usd']}/month with {pro['included_ai_minutes']:,.0f} Instant AI minutes, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}, and Enterprise has negotiated volume rates and invoicing."},
+            ],
+            "fit_guide": plans("Trying a handful of calls.", "A small team reviewing calls every month.", "A larger team that also needs translation and video files.",
+                               "A call center that needs a negotiated rate, invoicing and an integration."),
         },
     }
     for slug, demo in DEMO_FOR.items():

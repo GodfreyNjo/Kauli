@@ -220,6 +220,61 @@ def valid(secret, timestamp, body, header):
 <p>Your first minutes are free, so run one lesson through and compare.</p>""",
     },
     {
+        "slug": "call-center-transcription-quality-assurance-and-integrations",
+        "title": "Call Center Transcription: Quality Assurance, Speaker Labels and How to Connect Your Recordings",
+        "category": "Transcription Guides",
+        "description": "How a call center can turn recorded calls into searchable text with agent and customer separated, review more calls with less effort, and send transcripts to the tools it already uses.",
+        "body_html": """<p>Most call centers record every call and listen to almost none of them.</p>
+<p>Text changes that, because a transcript can be searched, skimmed and counted in a way audio cannot.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>A transcript with the agent and the customer separated lets a reviewer read a call in a minute instead of listening for ten.</li>
+<li>Upload recordings, send them through the API as they are made, or have finished transcripts pushed to your tools with webhooks.</li>
+<li>Use human review for the calls that matter most, such as complaints, disputes and compliance checks, which reaches up to 99% accuracy.</li>
+</ul></div>
+
+<h2>What a call transcript gives your team</h2>
+<p>Each line of the transcript is tied to a time in the recording and to a speaker, so you can jump to the moment that matters.</p>
+<p>Searching across transcripts finds every call that mentions a product, a competitor or a phrase you are watching for.</p>
+<p>The AI notes feature turns a call into an overview, key points and action items that an agent or a supervisor can check in seconds.</p>
+
+<h2>Review more calls without more reviewers</h2>
+<p>Quality teams usually score a small sample because listening is slow.</p>
+<p>Reading is faster, so the same people can look at more calls, and they can start from the calls with the most complaints or the longest handling time.</p>
+<p>Download a set of transcripts as CSV to sort and count them in a spreadsheet.</p>
+
+<h2>Instant AI or human review</h2>
+<p>Instant AI is ready in minutes and is machine-generated, so treat it as a strong first draft.</p>
+<p>Human review has a real editor check the text against the audio, and it can reach up to 99% accuracy.</p>
+<p>Many teams use Instant AI for coaching and trend work and human review for evidence they may need to show a customer or a regulator.</p>
+
+<h2>Getting recordings in</h2>
+<ol>
+<li>Upload audio or video files from your account, or paste a link.</li>
+<li>Send recordings from your own systems with the <a href="/developers">API</a>, so every call is transcribed as it is made.</li>
+<li>Join online calls with the meeting recorder for Zoom, Google Meet and Microsoft Teams.</li>
+</ol>
+<p>Any phone system that can export its recordings can use the first two routes.</p>
+
+<h2>Getting transcripts out</h2>
+<p>When an order finishes, a signed webhook tells your system, with links to the transcript in text, Word, SRT and VTT.</p>
+<p>Tools such as Zapier, Make and n8n can pass it on to a helpdesk, a CRM or a spreadsheet without code.</p>
+<p>The <a href="/blog/podcast-transcripts-to-your-website-with-webhooks">webhook guide</a> shows the same steps in detail.</p>
+
+<h2>Customers in other languages</h2>
+<p>A call in one language can be transcribed and translated, so a supervisor who does not speak it can still review the call.</p>
+<p>Machine translation is labelled as such, and human review is available in selected languages.</p>
+
+<h2>Privacy and consent</h2>
+<p>Tell callers that calls are recorded, as the rules where you operate require.</p>
+<p>Your recordings are not shared with anyone else, and you can ask us at any time to delete files or account data.</p>
+<p>If you have specific compliance needs, <a href="/demo">talk to us</a> before you start.</p>
+
+<h2>Next step</h2>
+<p>Hear a sample on the <a href="/try?use=call">call center demo</a>, and read the <a href="/solutions/call-centers">call centers page</a> for options and plans.</p>
+<p>Your first minutes are free, so you can test it on your own recordings.</p>""",
+    },
+    {
         "slug": "ngos-and-civil-society-transcription-and-translation",
         "title": "Transcription and Translation for NGOs and Civil Society Groups: A Practical Guide",
         "category": "Process & Quality",

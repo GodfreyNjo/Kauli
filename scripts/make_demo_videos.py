@@ -50,6 +50,8 @@ MUSIC_VOLUME = 0.2
 LOOKS = {
     ("meeting", 0): dict(skin=(226, 178, 146), hair=(38, 28, 32), style="long", shirt=(14, 116, 144)),
     ("meeting", 1): dict(skin=(205, 156, 124), hair=(58, 40, 30), style="short", beard=True, shirt=(40, 62, 120)),
+    ("call", 0): dict(skin=(196, 146, 114), hair=(34, 26, 28), style="bob", headphones=True, shirt=(20, 128, 120)),
+    ("call", 1): dict(skin=(152, 106, 80), hair=(24, 20, 20), style="short", shirt=(168, 72, 52)),
     ("interview", 0): dict(skin=(232, 190, 160), hair=(120, 108, 100), style="short", glasses=True, shirt=(92, 104, 120)),
     ("interview", 1): dict(skin=(168, 118, 90), hair=(30, 24, 24), style="bob", shirt=(150, 44, 76)),
     ("podcast", 0): dict(skin=(240, 200, 170), hair=(70, 46, 32), style="short", headphones=True, shirt=(48, 132, 96)),

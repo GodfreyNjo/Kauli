@@ -212,3 +212,20 @@ def test_the_manifest_records_which_provider_really_ran():
     from kauli import pipeline
     src = Path(pipeline.__file__).read_text(encoding="utf-8")
     assert 'getattr(asr_provider, "used_name", None)' in src and 'job.providers["asr"] = ran' in src
+
+
+def test_a_paid_plans_quality_minutes_come_first_and_the_rest_of_the_allowance_goes_to_the_low_cost_providers(env, wav_bytes):
+    env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
+    env.monkeypatch.setenv("GROQ_API_KEY", "g")
+    env.db.set_subscription_plan("u1", "pro", 30)
+    env.order_from(env.place(wav_bytes, source_lang="en"))                                        # first-order showcase
+    early = env.order_from(env.place(wav_bytes, source_lang="en"))
+    assert early["asr"].startswith("chain:transkriptor,")                                         # inside the plan's quality minutes
+    conn = env.db.get_conn()
+    conn.execute("UPDATE subscriptions SET minutes_used_this_period = ? WHERE user_id = 'u1'", (env.app.billing.PLANS["pro"]["quality_minutes"] + 1,))
+    conn.commit()
+    conn.close()
+    bulk = env.order_from(env.place(wav_bytes, source_lang="en"))
+    assert bulk["asr"] == "chain:groq-whisper,transkriptor,faster-whisper"                        # past them: low-cost first, still inside the allowance
+    swahili = env.order_from(env.place(wav_bytes, source_lang="sw"))
+    assert swahili["asr"].startswith("chain:transkriptor,")                                       # the languages we are known for keep the quality provider

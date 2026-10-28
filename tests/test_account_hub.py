@@ -338,3 +338,12 @@ def test_the_assistant_uses_claude_when_a_key_is_set_and_falls_back_when_it_fail
 
     monkeypatch.setattr(account_hub.order_ai_assist, "_client", lambda: Boom())
     assert "$19" in account_hub.assistant_reply("what does the pro plan cost", [])[0]
+
+
+def test_the_transcript_can_be_opened_as_an_editable_note(env, wav_bytes):
+    order = _finished(env, wav_bytes)
+    assert 'action="/client/orders/%s/notes?as=transcript"' % order["id"] in env.client.get(f"/client/orders/{order['id']}").text
+    r = env.client.post(f"/client/orders/{order['id']}/notes?as=transcript")
+    assert r.status_code == 303
+    page = env.client.get(r.headers["location"]).text
+    assert "Transcript: clip.wav" in page and "<p>Hello there</p>" in page and "<p>Second line</p>" in page

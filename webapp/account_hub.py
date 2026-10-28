@@ -306,8 +306,9 @@ def notes_download(request: Request, note_id: str, format: str = "docx"):
 
 
 @router.post("/client/orders/{order_id}/notes")
-def notes_from_order(request: Request, order_id: str):
-    """Make notes from one of the customer's finished transcripts (AI-written when available, extractive otherwise)."""
+def notes_from_order(request: Request, order_id: str, kind: str = Query("ai", alias="as")):
+    """Make a note from one of the customer's finished transcripts: AI-written (extractive when no AI key is set), or with
+    ?as=transcript the transcript itself, to edit freely as a note."""
     user = _client(request)
     if not user:
         return _to_login(request)
@@ -320,12 +321,17 @@ def notes_from_order(request: Request, order_id: str):
     if not allowed:
         return HTMLResponse(f"Too many requests. Try again in {retry_after}s.", status_code=429)
     text = _transcript_text(order)
-    body = ai_notes(text)
+    if kind == "transcript":
+        body = "".join(f"<p>{html.escape(line)}</p>" for line in text.splitlines() if line.strip()) or "<p></p>"
+        title = f"Transcript: {order['original_filename'] or order_id}"[:200]
+    else:
+        body = ai_notes(text)
+        title = f"Notes: {order['original_filename'] or order_id}"[:200]
     note_id = uuid.uuid4().hex[:12]
     now = time.time()
     conn = db.get_conn()
     conn.execute("INSERT INTO notes (id, client_id, author_id, order_id, title, body_html, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                 (note_id, user["client_scope_id"], user["id"], order_id, f"Notes: {order['original_filename'] or order_id}"[:200], body, now, now))
+                 (note_id, user["client_scope_id"], user["id"], order_id, title, body, now, now))
     conn.commit()
     conn.close()
     return RedirectResponse(f"/client/notes?id={note_id}", status_code=303)
@@ -386,7 +392,7 @@ def _line_chart(points: list[tuple[str, float]], width: int = 640, height: int =
     path = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
     grid = "".join(
         f'<line x1="{pad_l}" x2="{width - pad_r}" y1="{pad_t + h * (1 - f):.1f}" y2="{pad_t + h * (1 - f):.1f}" class="an-grid"/>'
-        f'<text x="{pad_l - 6}" y="{pad_t + h * (1 - f) + 4:.1f}" text-anchor="end" class="an-axis">{top * f:.0f}</text>' for f in (0, 0.5, 1))
+        f'<text x="{pad_l - 6}" y="{pad_t + h * (1 - f) + 4:.1f}" text-anchor="end" class="an-axis">{f"{top * f:.1f}".rstrip("0").rstrip(".")}</text>' for f in (0, 0.5, 1))
     dots = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="4" class="an-dot"><title>{html.escape(l)}: {v:.0f} min</title></circle>'
                    for x, y, (l, v) in zip(xs, ys, points))
     labels = "".join(f'<text x="{xs[i]:.1f}" y="{height - 8}" text-anchor="middle" class="an-axis">{html.escape(points[i][0])}</text>'

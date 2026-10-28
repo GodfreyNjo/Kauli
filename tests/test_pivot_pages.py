@@ -51,7 +51,7 @@ def test_the_course_page_has_a_demo_and_the_podcast_page_explains_webhooks(env):
 
 
 def test_the_guides_follow_the_house_style_and_link_only_to_real_pages(env):
-    assert len(blog_guides.GUIDES) == 5 and len({g["slug"] for g in blog_guides.GUIDES}) == 5
+    assert len(blog_guides.GUIDES) == 6 and len({g["slug"] for g in blog_guides.GUIDES}) == 6
     known_posts = {p["slug"] for p in blog_seed.POSTS} | {g["slug"] for g in blog_guides.GUIDES}
     for g in blog_guides.GUIDES:
         body = g["body_html"]
@@ -82,7 +82,7 @@ def test_the_webhook_guide_matches_what_the_product_really_sends(env):
 def test_guides_are_seeded_once_published_and_never_put_back_after_a_delete(env):
     env.db.get_or_create_user("s1", "staff@example.com", "staff")
     first = dict(blog_guides.seed_guides("s1"))
-    assert set(first.values()) == {"published"} and len(first) == 5
+    assert set(first.values()) == {"published"} and len(first) == 6
     assert all(p["status"] == "published" for p in env.db.list_blog_posts(published_only=False) if p["slug"] in first)
     assert set(dict(blog_guides.seed_guides("s1")).values()) == {"already seeded"}
     post = env.db.get_blog_post_by_slug("ngos-and-civil-society-transcription-and-translation", published_only=True)

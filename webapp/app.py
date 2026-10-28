@@ -403,6 +403,8 @@ def _seo_headers(request: Request, response) -> None:
     elif response.headers.get("content-type", "").startswith("text/html") and "content-language" not in response.headers:
         code = path.strip("/")
         response.headers["Content-Language"] = site_locales.LOCALES[code][1] if code in site_locales.LOCALES else "en"
+        # Allow large image previews and full snippets in search results and AI answers for every public page.
+        response.headers.setdefault("X-Robots-Tag", "max-image-preview:large, max-snippet:-1, max-video-preview:-1")
 
 
 @app.middleware("http")
@@ -1825,7 +1827,7 @@ solution_pages.refresh(SOLUTION_PAGES, _HR_NAMES)
 SOLUTION_PAGES = {k: SOLUTION_PAGES[k] for k in (
     "ngos", "youtubers", "media-broadcast", "e-learning", "voice-over", "captioning", "video-translation", "audio-to-text",
     "youtube-video-to-text", "podcast-transcription", "interview-transcription", "video-transcription", "video-dubbing",
-    "video-localization")}
+    "video-localization", "call-centers")}
 
 
 @app.get("/solutions/{slug}", response_class=HTMLResponse)
@@ -2369,6 +2371,25 @@ def _is_personal_email_domain(email: str) -> bool:
 def _slugify(text: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", text.strip().lower()).strip("-")
     return slug or uuid.uuid4().hex[:8]
+
+
+@app.get("/blog/rss.xml")
+def blog_rss(request: Request):
+    """The blog as an RSS 2.0 feed (newest 30 published posts): readers, aggregators and search engines use it to
+    find new posts quickly."""
+    from email.utils import formatdate
+    from xml.sax.saxutils import escape
+    base = _site_base(request)
+    items = []
+    for p in list(db.list_blog_posts(published_only=True))[:30]:
+        when = p["published_at"] or p["updated_at"] or p["created_at"]
+        link = f"{base}/blog/{p['slug']}"
+        items.append(f"<item><title>{escape(p['title'])}</title><link>{link}</link><guid isPermaLink=\"true\">{link}</guid>"
+                     f"<pubDate>{formatdate(when, usegmt=True)}</pubDate><description>{escape(p['description'] or '')}</description></item>")
+    xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0"><channel><title>Kauli blog</title>'
+           f"<link>{base}/blog</link><description>Guides on transcription, translation, subtitles and dubbing.</description>"
+           "<language>en</language>" + "".join(items) + "</channel></rss>")
+    return Response(content=xml, media_type="application/rss+xml")
 
 
 @app.get("/blog", response_class=HTMLResponse)

@@ -137,3 +137,33 @@ def test_localized_pages_declare_their_language_to_crawlers(env):
     assert r.headers.get("content-language") == "de"
     assert '<html lang="de"' in r.text and 'hreflang="x-default"' in r.text
     assert env.client.get("/").headers.get("content-language") == "en"
+
+
+def test_the_blog_has_an_rss_feed_and_public_pages_allow_rich_previews(env):
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
+    env.db.create_blog_post(slug="a-test-post", title="A test post & more", description="About <testing>", body_html="<p>x</p>",
+                            author_id="u1", status="published", category="Transcription Guides")
+    feed = env.client.get("/blog/rss.xml")
+    assert feed.status_code == 200 and feed.headers["content-type"].startswith("application/rss+xml")
+    assert feed.text.startswith("<?xml") and "<rss version=\"2.0\">" in feed.text and "Kauli blog" in feed.text
+    assert "<item><title>A test post &amp; more</title>" in feed.text and f"{BASE}/blog/a-test-post" in feed.text
+    assert "About &lt;testing&gt;" in feed.text
+    home = env.client.get("/")
+    assert 'type="application/rss+xml"' in home.text and "/blog/rss.xml" in home.text
+    assert "max-image-preview:large" in home.headers["x-robots-tag"] and "noindex" not in home.headers["x-robots-tag"]
+    assert env.client.get("/solutions/call-centers").status_code == 200
+    assert "/solutions/call-centers" in env.client.get("/sitemap.xml").text
+    private = env.client.get("/client/home")
+    assert "noindex" in private.headers.get("x-robots-tag", "")
+
+
+def test_the_call_center_offering_is_on_the_site_with_a_demo_and_a_guide(env):
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
+    page = env.client.get("/solutions/call-centers").text
+    assert "Call Center Transcription" in page and "/try?use=call" in page and "Try it on one of your own calls" in page
+    home = env.client.get("/").text
+    assert "/solutions/call-centers" in home and "/try?use=call" in home
+    demo = env.client.get("/try?use=call")
+    assert demo.status_code == 200 and "Call centers" in demo.text
+    for lang in ("en", "es", "de", "zh", "sw"):
+        assert (Path(__file__).parent.parent / "webapp" / "static" / "demo" / f"vid-call-{lang}.mp4").exists()

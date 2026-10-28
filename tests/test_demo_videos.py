@@ -80,7 +80,7 @@ def test_a_mans_voice_is_a_man_on_screen_and_a_womans_a_woman():
 
 def test_there_is_a_demo_for_every_use_case_and_every_page_points_at_a_real_one(env=None):
     from webapp import app as app_mod
-    assert set(demo_content.SCENARIOS) == {"meeting", "interview", "podcast", "course", "news", "field", "video"}
+    assert set(demo_content.SCENARIOS) == {"meeting", "call", "interview", "podcast", "course", "news", "field", "video"}
     for slug, page in app_mod.SOLUTION_PAGES.items():
         assert page["demo"] in demo_content.SCENARIOS, slug
     used = {p["demo"] for p in app_mod.SOLUTION_PAGES.values()}

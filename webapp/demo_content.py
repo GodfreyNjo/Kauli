@@ -28,6 +28,23 @@ SCENARIOS = {
             "sw": "Speaker 1: Asanteni nyote kwa kujiunga. Uzinduzi wetu umehamishwa hadi tarehe kumi na tano Machi.\nSpeaker 2: Nimeelewa. Idara ya masoko inahitaji nyenzo za mwisho kufikia Ijumaa ijayo, na nitashiriki bajeti alasiri hii.",
         },
     },
+    "call": {
+        "label": "Call centers", "service": "transcribe", "service_label": "Call transcripts with speaker IDs",
+        "cast": [
+            {"name": "Speaker 1", "voice": "XrExE9yKIg1WjnnlVkGX", "gender": "f"},     # Matilda: the agent
+            {"name": "Speaker 2", "voice": "cjVigY5qzO86Huf0OWal", "gender": "m"},     # Eric: the customer
+        ],
+        "speaker": "Speaker 1",
+        "headline": "Every call searchable, with agent and customer separated",
+        "headline_en": "The call in English, agent and customer side by side",
+        "en": "Speaker 1: Thank you for calling Northside Support, this is Amina. How can I help you today?\nSpeaker 2: Hi, I was charged twice for my order, and I would like a refund.\nSpeaker 1: I am sorry about that. I can see the duplicate payment, and I will refund it today. You will get a confirmation by email.",
+        "tr": {
+            "es": "Speaker 1: Gracias por llamar a Soporte Norte, habla Amina. ¿En qué puedo ayudarle hoy?\nSpeaker 2: Hola, me cobraron dos veces mi pedido y quisiera un reembolso.\nSpeaker 1: Lamento eso. Veo el pago duplicado y lo reembolsaré hoy. Recibirá una confirmación por correo electrónico.",
+            "de": "Speaker 1: Danke für Ihren Anruf beim Nord-Support, hier ist Amina. Wie kann ich Ihnen heute helfen?\nSpeaker 2: Hallo, meine Bestellung wurde zweimal abgebucht, und ich möchte eine Erstattung.\nSpeaker 1: Das tut mir leid. Ich sehe die doppelte Zahlung und erstatte sie heute. Sie erhalten eine Bestätigung per E-Mail.",
+            "zh": "Speaker 1: 感谢致电北区客服，我是阿米娜。请问今天有什么可以帮您？\nSpeaker 2: 你好，我的订单被扣了两次款，我想申请退款。\nSpeaker 1: 很抱歉。我看到了重复付款，今天就会为您退款。您会收到一封确认邮件。",
+            "sw": "Speaker 1: Asante kwa kupiga simu Msaada wa Kaskazini, mimi ni Amina. Naweza kukusaidia vipi leo?\nSpeaker 2: Habari, nilitozwa mara mbili kwa agizo langu, na ningependa kurejeshewa pesa.\nSpeaker 1: Pole kwa hilo. Naona malipo yaliyorudiwa, na nitayarejesha leo. Utapokea uthibitisho kwa barua pepe.",
+        },
+    },
     "interview": {
         "label": "Interviews", "service": "transcribe", "service_label": "Transcription with speaker IDs",
         "cast": [
@@ -141,6 +158,7 @@ BROWSER_LANGUAGE = {"es": "es", "de": "de", "zh": "zh", "sw": "sw"}
 
 # Where the visitor came from -> what they are probably making.
 REFERRER_SCENARIO = (
+    (("call-center", "contact-center", "call-centre"), "call"),
     (("podcast",), "podcast"),
     (("interview",), "interview"),
     (("news", "broadcast", "media"), "news"),

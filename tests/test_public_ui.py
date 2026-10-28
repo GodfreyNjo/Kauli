@@ -234,7 +234,7 @@ def test_use_case_menu_replaces_solutions_and_links_real_pages(client):
         assert heading in nav
     menu = re.search(r'm-nav-dropdown-menu-3.*?</div>\s*</div>\s*</div>', nav, re.S).group(0)
     links = re.findall(r'href="(/solutions/[a-z-]+)"', menu)
-    assert len(links) == 9 and len(set(links)) == 9                 # nine distinct use-case pages
+    assert len(links) == 10 and len(set(links)) == 10               # ten distinct use-case pages
     for link in links:
         assert client.get(link).status_code == 200, link          # none of them is a dead link
     assert "Use cases" in html and ">Solutions<" not in html          # the footer column follows the same name
