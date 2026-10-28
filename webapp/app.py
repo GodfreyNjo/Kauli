@@ -2346,6 +2346,30 @@ def _display_market(request: Request) -> str:
     return billing.market_for_country(request.headers.get("cf-ipcountry"))
 
 
+_MARQUEE_LANGUAGES = [
+    ("en", "English", "flag-en"), ("sw", "Kiswahili", "flag-ke"), ("ki", "Kikuyu", "flag-ke"),
+    ("fr", "Français", "flag-fr"), ("es", "Español", "flag-es"), ("ar", "العربية", "flag-sa"),
+    ("pt", "Português", "flag-pt"), ("de", "Deutsch", "flag-de"), ("it", "Italiano", ""), ("zh", "中文", ""),
+    ("hi", "हिन्दी", ""), ("ja", "日本語", ""), ("ko", "한국어", ""), ("tr", "Türkçe", ""), ("ru", "Русский", ""),
+    ("nl", "Nederlands", ""), ("pl", "Polski", ""), ("id", "Bahasa Indonesia", ""), ("vi", "Tiếng Việt", ""),
+    ("uk", "Українська", ""),
+]
+
+
+def _language_marquee() -> list[dict]:
+    """The languages shown flowing across the home page: only codes we really support, each linked to the
+    page that exists for it."""
+    slug_by_code = {code: slug for slug, code in AI_LANGUAGE_SLUGS.items()}
+    items = []
+    for i, (code, name, flag) in enumerate(_MARQUEE_LANGUAGES):
+        if code not in LANGUAGE_NAMES:
+            continue
+        href = ("/solutions/audio-to-text" if code == "en" else "/solutions/video-transcription" if code in ("sw", "ki")
+                else f"/transcribe/{slug_by_code[code]}" if code in slug_by_code else "/languages")
+        items.append({"code": code, "name": name, "flag": flag, "tone": i % 5, "href": href})
+    return items
+
+
 def _marketing_context(sent: bool = False, lead_error: str | None = None, home: str = "",
                         market: str = billing.DEFAULT_MARKET) -> dict:
     """Shared by both marketing.html render points below - keeps them from
@@ -2361,6 +2385,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "addons": billing.ADDONS,
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
         "email": CONTACT_EMAIL,
+        "language_marquee": _language_marquee(),
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
@@ -3037,6 +3062,82 @@ def status_page(request: Request):
         "uptime_seconds": time.time() - _PROCESS_STARTED_AT,
         "checked_at": datetime.now(),
     })
+
+
+def _elevenlabs_configured() -> bool:
+    """Premium voice is offered only while there is a key AND the add-on price still clears the
+    margin floor at the current ElevenLabs cost - it is never sold at a loss."""
+    return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.premium_voice_margin_ok()
+
+
+_ELEVEN_BALANCE_CACHE: dict = {"at": 0.0, "remaining": None}
+
+
+def _elevenlabs_remaining_chars() -> int | None:
+    """Characters left on the ElevenLabs plan this period (None if it cannot be read), cached a minute."""
+    if time.time() - _ELEVEN_BALANCE_CACHE["at"] < 60:
+        return _ELEVEN_BALANCE_CACHE["remaining"]
+    remaining = None
+    try:
+        resp = httpx.get("https://api.elevenlabs.io/v1/user/subscription",
+                         headers={"xi-api-key": os.environ.get("ELEVENLABS_API_KEY", "")}, timeout=10.0,
+                         follow_redirects=False)
+        resp.raise_for_status()
+        data = resp.json()
+        remaining = max(int(data["character_limit"]) - int(data["character_count"]), 0)
+    except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        remaining = None
+    _ELEVEN_BALANCE_CACHE.update({"at": time.time(), "remaining": remaining})
+    return remaining
+
+
+def _premium_capacity_ok(minutes: float) -> bool:
+    """Spend ceiling: an order is only taken if the ElevenLabs plan has the characters left for it, so the
+    voice bill can never run past the subscription into pay-per-use overage. Set ELEVENLABS_ALLOW_OVERAGE=1
+    to accept orders beyond the plan (and enable overage on the ElevenLabs side)."""
+    if os.environ.get("ELEVENLABS_ALLOW_OVERAGE") == "1":
+        return True
+    remaining = _elevenlabs_remaining_chars()
+    return remaining is not None and remaining >= billing.premium_voice_chars_needed(minutes)
+
+
+_PREMIUM_VOICES_CACHE: dict = {"at": 0.0, "voices": []}
+
+
+def _premium_voices(force: bool = False) -> list[dict]:
+    """ElevenLabs' PREMADE voices, cached for an hour. Only premade ones: the account's own cloned
+    or custom voices belong to someone and are never offered to customers."""
+    if not _elevenlabs_configured():
+        return []
+    if not force and time.time() - _PREMIUM_VOICES_CACHE["at"] < 3600 and _PREMIUM_VOICES_CACHE["voices"]:
+        return _PREMIUM_VOICES_CACHE["voices"]
+    try:
+        resp = httpx.get("https://api.elevenlabs.io/v1/voices", headers={"xi-api-key": os.environ["ELEVENLABS_API_KEY"]},
+                         timeout=15.0, follow_redirects=False)
+        resp.raise_for_status()
+        raw = resp.json().get("voices", [])
+    except (httpx.HTTPError, ValueError):
+        return _PREMIUM_VOICES_CACHE["voices"]            # a stale list beats none
+    voices = []
+    for v in raw:
+        vid = str(v.get("voice_id") or "")
+        if v.get("category") != "premade" or not re.fullmatch(r"[A-Za-z0-9]{10,40}", vid):
+            continue
+        labels = v.get("labels") or {}
+        voices.append({"id": vid, "name": str(v.get("name") or "Voice")[:60],
+                       "description": " - ".join(str(labels[k]) for k in ("gender", "accent", "age") if labels.get(k))[:80]})
+    voices.sort(key=lambda x: x["name"].lower())
+    _PREMIUM_VOICES_CACHE.update({"at": time.time(), "voices": voices})
+    return voices
+
+
+@app.get("/client/premium-voices")
+def client_premium_voices(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    voices = _premium_voices()
+    return JSONResponse({"available": _elevenlabs_configured() and bool(voices), "voices": voices})
 
 
 DEMO_INTERESTS = {
@@ -5046,6 +5147,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
         "show_tour": not user["onboarding_tour_seen_at"],
+        "premium_voice_available": _elevenlabs_configured(),
     })
 
 
@@ -5101,6 +5203,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "youtube_watches": db.list_youtube_watches(client_id=user["client_scope_id"]),
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
         "show_tour": not user["onboarding_tour_seen_at"],
+        "premium_voice_available": _elevenlabs_configured(),
     })
 
 
@@ -5316,6 +5419,8 @@ def create_order(
     service_level: str = Form("transcribe"),
     addon_video_deliverables: str = Form(""),
     addon_human_voice_over: str = Form(""),
+    addon_premium_voice: str = Form(""),
+    premium_voice_id: str = Form(""),
     instr_speaker_ids: str = Form(""),
     instr_verbatim_level: str = Form("clean_read"),
     instr_transcribe_lyrics: str = Form(""),
@@ -5347,6 +5452,7 @@ def create_order(
         "youtube_url": youtube_url, "source_lang": source_lang, "target_lang": target_lang,
         "service_level": service_level, "addon_video_deliverables": addon_video_deliverables,
         "addon_human_voice_over": addon_human_voice_over,
+        "addon_premium_voice": addon_premium_voice, "premium_voice_id": premium_voice_id,
         "instr_speaker_ids": instr_speaker_ids, "instr_verbatim_level": instr_verbatim_level,
         "instr_transcribe_lyrics": instr_transcribe_lyrics, "instr_use_italics": instr_use_italics,
         "instr_existing_subs": instr_existing_subs, "instr_no_audio": instr_no_audio,
@@ -5433,6 +5539,18 @@ def create_order(
     wants_human_voice_over = bool(addon_human_voice_over) and service_level == "dub" and review_tier == "human"
     if wants_human_voice_over:
         addons.append("human_voice_over")
+    # Premium AI voice (ElevenLabs): a full dub into English or Swahili only - no ElevenLabs model
+    # speaks Kikuyu - using one of its premade voices. Enforced here, not just in the wizard.
+    wants_premium_voice = bool(addon_premium_voice)
+    if wants_premium_voice:
+        if service_level != "dub" or target_lang not in ("en", "sw"):
+            return _client_dashboard_error(
+                request, user, "Premium voice is available on a full dub into English or Swahili.", form_values=form_values)
+        if not _elevenlabs_configured():
+            return _client_dashboard_error(request, user, "Premium voices aren't available right now.", form_values=form_values)
+        if premium_voice_id not in {v["id"] for v in _premium_voices()}:
+            return _client_dashboard_error(request, user, "Choose one of the listed premium voices.", form_values=form_values)
+        addons.append("premium_voice")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Not a checkbox the client toggles - this is a real cost every
         # service level incurs for this language (every SERVICE_LEVELS tier
@@ -5514,6 +5632,11 @@ def create_order(
             "Couldn't read that file's duration - it may not be a valid audio/video file.",
             form_values=form_values)
 
+    if wants_premium_voice and not _premium_capacity_ok(minutes):
+        return _client_dashboard_error(
+            request, user, "Premium voices are at capacity right now. Choose the standard voice, or try again later.",
+            form_values=form_values)
+
     # Validated before db.create_order() below, on purpose - a rejection
     # here needs to bail out cleanly with nothing written to the orders
     # table, not leave a half-created order behind because an optional
@@ -5575,6 +5698,8 @@ def create_order(
     # delivering garbled audio a client already paid for.
     if not level["tts"]:
         tts = "stub"
+    elif wants_premium_voice:
+        tts = "elevenlabs"
     elif target_lang == "sw":
         if not os.environ.get("AZURE_SPEECH_KEY"):
             return _client_dashboard_error(request, user,
@@ -5647,6 +5772,8 @@ def create_order(
         folder_name=folder_name.strip() or None,
         wants_human_voice_over=wants_human_voice_over,
     )
+    if wants_premium_voice:
+        db.set_dub_voice(order_id, f"elevenlabs:{premium_voice_id}", job_status=None)
     if youtube_video_id:
         # Closes the loop on the auto-import flow, if this happens to be
         # one of those videos - a real order now exists for it, so it's no
@@ -7710,7 +7837,8 @@ def api_create_order(
         resp = create_order(
             request, audio=audio, upload_key="", youtube_url=url, source_lang=source_lang.strip(),
             target_lang=target, service_level=service_level, addon_video_deliverables="",
-            addon_human_voice_over="", instr_speaker_ids="", instr_verbatim_level="clean_read",
+            addon_human_voice_over="", addon_premium_voice="", premium_voice_id="",
+            instr_speaker_ids="", instr_verbatim_level="clean_read",
             instr_transcribe_lyrics="", instr_use_italics="", instr_existing_subs="ignore",
             instr_no_audio="tag", instr_wrong_language="tag", instr_instrumental_only="tag",
             instr_notes=notes, style_guide=None, idempotency_key=idem, folder_name=folder_name,

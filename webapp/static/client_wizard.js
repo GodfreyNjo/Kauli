@@ -290,6 +290,7 @@
     const addonRate = Number(data.dataset.addonRate) || 0;
     const manualRate = Number(data.dataset.manualTranscriptionRate) || 0;
     const humanVoiceRate = Number(data.dataset.humanVoiceRate) || 0;
+    const premiumVoiceRate = Number(data.dataset.premiumVoiceRate) || 0;
     const rushPct = Number(data.dataset.rushPct) || 0;
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
@@ -382,6 +383,18 @@
     const humanVoiceChecked = isDub && humanVoiceBox && humanVoiceBox.checked;
     $("#price-human-voice-row").hidden = !humanVoiceChecked;
 
+    // Premium AI voice (ElevenLabs): a dub into English or Swahili only - no model speaks Kikuyu.
+    const premiumField = $("#premium-voice-field");
+    const targetSel = document.querySelector('select[name="target_lang"]');
+    const premiumOk = !!(selected && selected.value === "dub") && !!targetSel && (targetSel.value === "en" || targetSel.value === "sw");
+    if (premiumField) premiumField.hidden = !premiumOk;
+    const premiumBox = $("#premium-voice-checkbox");
+    const premiumVoiceChecked = premiumOk && premiumBox && premiumBox.checked;
+    const premiumPicker = $("#premium-voice-picker");
+    if (premiumPicker) premiumPicker.hidden = !premiumVoiceChecked;
+    if (premiumVoiceChecked) loadPremiumVoices();
+    $("#price-premium-voice-row").hidden = !premiumVoiceChecked;
+
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
     const durationEl = $("#price-duration");
     if (usingYoutube) {
@@ -416,12 +429,13 @@
       // per-minute cost the moment any of those is active.
       $("#price-free").textContent = "-";
       let perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0)
-        + (humanVoiceChecked ? humanVoiceRate : 0);
+        + (humanVoiceChecked ? humanVoiceRate : 0) + (premiumVoiceChecked ? premiumVoiceRate : 0);
       if (rushChecked) perMinExtras += rate * rushPct;
       $("#price-total").textContent = formatMoney(rate + perMinExtras) + "/min";
       if (addonChecked) $("#price-addon").textContent = formatMoney(addonRate) + "/min";
       if (isManual) $("#price-manual").textContent = formatMoney(manualRate) + "/min";
       if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceRate) + "/min";
+      if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceRate) + "/min";
       if (rushChecked) $("#price-rush").textContent = formatMoney(rate * rushPct) + "/min";
       return;
     }
@@ -443,8 +457,9 @@
     // comment on why add-ons aren't reduced by free minutes/credits.
     const manualCost = isManual ? manualRate * fileDurationMinutes : 0;
     const humanVoiceCost = humanVoiceChecked ? humanVoiceRate * fileDurationMinutes : 0;
+    const premiumVoiceCost = premiumVoiceChecked ? premiumVoiceRate * fileDurationMinutes : 0;
     const rushSurcharge = rushChecked ? (fileDurationMinutes * rate) * rushPct : 0;
-    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + rushSurcharge;
+    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
       : (freeMinutesEligible ? "none applied" : "not eligible (transcription-only)");
@@ -455,8 +470,37 @@
     if (addonChecked) $("#price-addon").textContent = formatMoney(addonCost);
     if (isManual) $("#price-manual").textContent = formatMoney(manualCost);
     if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceCost);
+    if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceCost);
     if (rushChecked) $("#price-rush").textContent = formatMoney(rushSurcharge);
     $("#price-total").textContent = formatMoney(Math.max(0, total));
+  }
+
+  // The premium voice list comes from the server (ElevenLabs' ready-made voices); fetched once, on first use.
+  let premiumVoicesLoaded = false;
+  function loadPremiumVoices() {
+    const select = $("#premium-voice-select");
+    if (!select || premiumVoicesLoaded) return;
+    premiumVoicesLoaded = true;
+    fetch("/client/premium-voices", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((data) => {
+        const keep = select.dataset.selected || "";
+        select.innerHTML = "";
+        if (!data.voices || !data.voices.length) {
+          const o = document.createElement("option");
+          o.value = ""; o.textContent = "Premium voices are not available right now";
+          select.appendChild(o);
+          return;
+        }
+        data.voices.forEach((v, i) => {
+          const o = document.createElement("option");
+          o.value = v.id;
+          o.textContent = v.name + (v.description ? " - " + v.description : "");
+          if (v.id === keep || (!keep && i === 0)) o.selected = true;
+          select.appendChild(o);
+        });
+      })
+      .catch(() => { premiumVoicesLoaded = false; });
   }
 
   function bindPricing() {
@@ -466,6 +510,10 @@
     if (addonBox) addonBox.addEventListener("change", updatePricing);
     const humanVoiceBoxEl = $("#human-voice-checkbox");
     if (humanVoiceBoxEl) humanVoiceBoxEl.addEventListener("change", updatePricing);
+    const premiumBoxEl = $("#premium-voice-checkbox");
+    if (premiumBoxEl) premiumBoxEl.addEventListener("change", updatePricing);
+    const targetSelEl = document.querySelector('select[name="target_lang"]');
+    if (targetSelEl) targetSelEl.addEventListener("change", updatePricing);
     const rushBox = $("#rush-checkbox");
     if (rushBox) rushBox.addEventListener("change", updatePricing);
     const langSelect = $("#source-lang-select");

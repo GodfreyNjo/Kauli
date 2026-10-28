@@ -928,6 +928,10 @@ def init_db() -> None:
         # during testing before this shipped).
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_flagged INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_detail TEXT")
+    if "premium_voice_refunded_at" not in existing_order_cols:
+        # Set once, when a premium-voice order was NOT delivered in the premium voice (ElevenLabs failed and
+        # the standard voice was used) and the add-on charge was credited back - never refunded twice.
+        conn.execute("ALTER TABLE orders ADD COLUMN premium_voice_refunded_at REAL")
     if "voice_clone_consent_given_at" not in existing_order_cols:
         # An explicit, client-initiated, logged action - see
         # set_voice_clone_consent() and app.py's staff_set_dub_voice, which
@@ -2686,6 +2690,17 @@ def approve_difficulty_surcharge(order_id: str) -> None:
         )
         conn.commit()
     conn.close()
+
+
+def mark_premium_voice_refunded(order_id: str) -> bool:
+    """True only for the call that sets it, so a retried job cannot refund twice."""
+    conn = get_conn()
+    cur = conn.execute("UPDATE orders SET premium_voice_refunded_at = ? WHERE id = ? AND premium_voice_refunded_at IS NULL",
+                       (time.time(), order_id))
+    conn.commit()
+    changed = cur.rowcount == 1
+    conn.close()
+    return changed
 
 
 def set_dub_voice(order_id: str, voice: str | None, job_status: str | None = None) -> None:

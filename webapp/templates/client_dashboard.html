@@ -48,6 +48,7 @@
        data-addon-rate="{{ addons['video_deliverables']['rate_per_min'] if 'video_deliverables' in addons else 0 }}"
        data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"
        data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
+       data-premium-voice-rate="{{ addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0 }}"
        data-rush-pct="{{ rush_surcharge_pct }}"></div>
 
   <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
@@ -208,6 +209,23 @@
             ready, which takes longer than the automated dub.</span>
           </label>
 
+          {% if premium_voice_available %}
+          <div class="tier-option premium-voice-box" id="premium-voice-field" hidden style="margin-bottom:14px;">
+            <label class="checkbox" style="align-items:center; margin-bottom:6px;">
+              <input type="checkbox" name="addon_premium_voice" value="1" id="premium-voice-checkbox"
+                     {% if form_values.get('addon_premium_voice') %}checked{% endif %}>
+              <span><strong>Premium AI voice</strong> (+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/audio-minute).
+              Natural, expressive voices for your English or Swahili dub. Your translated script (not your audio)
+              is sent to our voice partner ElevenLabs to create the speech.</span>
+            </label>
+            <label id="premium-voice-picker" hidden style="margin:0;">Voice
+              <select name="premium_voice_id" id="premium-voice-select" data-selected="{{ form_values.get('premium_voice_id', '') }}">
+                <option value="">Loading voices...</option>
+              </select>
+            </label>
+          </div>
+          {% endif %}
+
           <label class="checkbox tier-option" id="voice-clone-consent-field" hidden style="margin-bottom:14px; align-items:center;">
             <input type="checkbox" name="voice_clone_consent" value="1" id="voice-clone-consent-checkbox"
                    {% if form_values.get('voice_clone_consent') %}checked{% endif %}>
@@ -235,6 +253,7 @@
           <div class="pricing-row" id="price-addon-row" hidden><span>Video deliverables</span><span id="price-addon">—</span></div>
           <div class="pricing-row" id="price-manual-row" hidden><span>Manual transcription</span><span id="price-manual">—</span></div>
           <div class="pricing-row" id="price-human-voice-row" hidden><span>Human voice actor</span><span id="price-human-voice">—</span></div>
+          <div class="pricing-row" id="price-premium-voice-row" hidden><span>Premium AI voice</span><span id="price-premium-voice">—</span></div>
           <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
           <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
           <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>

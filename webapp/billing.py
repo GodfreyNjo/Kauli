@@ -221,7 +221,52 @@ ADDONS = {
         "rate_per_min": 2.50,
         "included_in": (),
     },
+    # Premium AI voices from ElevenLabs on a full dub into English or Swahili (no model supports
+    # Kikuyu), with or without human review. Priced from the unit-economics model just below, not
+    # guessed: see premium_voice_unit_cost_usd() and premium_voice_min_rate(). The add-on is always
+    # charged in full (plan discounts, free minutes and wallet credits never reduce an add-on).
+    "premium_voice": {
+        "name": "Premium AI voice (ElevenLabs)",
+        "rate_per_min": 0.50,
+        "included_in": (),
+    },
 }
+
+# ---- Premium voice unit economics --------------------------------------------------------
+# ElevenLabs bills per character: its API list price for the models we use (v3, v4, Multilingual
+# v2) is $0.08 per 1,000 characters (elevenlabs.io/pricing/api, checked 2026-10-28; set
+# ELEVENLABS_USD_PER_1K_CHARS if your plan differs). The numbers below are deliberately cautious.
+PREMIUM_VOICE_USD_PER_1K_CHARS = 0.08
+PREMIUM_VOICE_CHARS_PER_AUDIO_MINUTE = 1100   # speech runs about 900-1,000 characters a minute; Swahili runs longer
+PREMIUM_VOICE_REWORK_FACTOR = 1.5             # retries, corrections and re-renders synthesise some lines again
+PAYMENT_FEE_RATE = 0.039                      # Paystack's international card rate, taken from the whole payment
+MIN_PREMIUM_MARGIN = 0.50                     # the add-on must keep at least this share after cost and fees
+
+
+def premium_voice_unit_cost_usd() -> float:
+    """Worst-case ElevenLabs cost of one audio-minute of premium voice."""
+    try:
+        per_1k = float(os.environ.get("ELEVENLABS_USD_PER_1K_CHARS") or PREMIUM_VOICE_USD_PER_1K_CHARS)
+    except ValueError:
+        per_1k = PREMIUM_VOICE_USD_PER_1K_CHARS
+    return per_1k * PREMIUM_VOICE_CHARS_PER_AUDIO_MINUTE / 1000.0 * PREMIUM_VOICE_REWORK_FACTOR
+
+
+def premium_voice_min_rate() -> float:
+    """The lowest per-minute add-on price that still clears MIN_PREMIUM_MARGIN after the voice cost
+    and the payment fee."""
+    return premium_voice_unit_cost_usd() / (1.0 - PAYMENT_FEE_RATE - MIN_PREMIUM_MARGIN)
+
+
+def premium_voice_margin_ok() -> bool:
+    """False if the add-on price has fallen below the floor (e.g. ElevenLabs raised its prices):
+    the app then stops offering premium voice instead of selling it at a loss."""
+    return ADDONS["premium_voice"]["rate_per_min"] >= premium_voice_min_rate()
+
+
+def premium_voice_chars_needed(minutes: float) -> int:
+    return int(minutes * PREMIUM_VOICE_CHARS_PER_AUDIO_MINUTE * PREMIUM_VOICE_REWORK_FACTOR) + 1
+
 
 # Rush processing: a client-chosen surcharge on a single order in exchange
 # for real, manual priority in the review queue - Godfrey picking it up and

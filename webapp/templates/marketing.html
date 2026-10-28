@@ -105,12 +105,34 @@
       </div>
       <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
 
-      <div class="tk-langs">
-        <span>Transcribe audio to text in {{ language_total }} languages</span>
-        <ul class="tk-lang-pills" aria-label="Some of the supported languages">
-          <li>English</li><li>Kiswahili</li><li>Kikuyu</li><li>Fran&ccedil;ais</li><li>Espa&ntilde;ol</li><li>&#1575;&#1604;&#1593;&#1585;&#1576;&#1610;&#1577;</li><li>Portugu&ecirc;s</li><li>Deutsch</li><li>+ more</li>
-        </ul>
-      </div>
+      <section class="tk-langs" aria-labelledby="langs-title">
+        <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
+        <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
+        <p class="tk-langs-sub">From global languages to Swahili and Kikuyu, we've got you covered.</p>
+        <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
+          {% for copy in (1, 2) %}
+          <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
+            {% for l in language_marquee %}
+            <li><a href="{{ l.href }}" class="tk-pill{{ ' is-first' if loop.first else '' }}"{% if copy == 2 %} tabindex="-1"{% endif %}>
+              {% if l.flag %}<span class="lang-flag {{ l.flag }}" aria-hidden="true"></span>{% else %}<span class="lang-dot tone-{{ l.tone }}" aria-hidden="true">{{ l.code|upper }}</span>{% endif %}{{ l.name }}</a></li>
+            {% endfor %}
+            <li><a href="/languages" class="tk-pill tk-pill-more"{% if copy == 2 %} tabindex="-1"{% endif %}><span aria-hidden="true">+</span> more</a></li>
+          </ul>
+          {% endfor %}
+        </div>
+        <button type="button" class="tk-marquee-toggle" id="lang-marquee-toggle" aria-controls="lang-marquee" aria-pressed="false">Pause</button>
+        <script>
+          (function () {
+            var m = document.getElementById("lang-marquee"), b = document.getElementById("lang-marquee-toggle");
+            if (!m || !b) return;
+            b.addEventListener("click", function () {
+              var paused = m.classList.toggle("is-paused");
+              b.setAttribute("aria-pressed", paused ? "true" : "false");
+              b.textContent = paused ? "Play" : "Pause";
+            });
+          })();
+        </script>
+      </section>
     </div>
 
     <div class="tk-cards">

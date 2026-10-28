@@ -148,6 +148,86 @@ class AzureTTS(TTSProvider):
             return int(w.getnframes() / w.getframerate() * 1000)
 
 
+class ElevenLabsTTS(TTSProvider):
+    """Premium AI voices from ElevenLabs, over their REST API (no SDK).
+
+    PREMADE voices only: Kauli never clones a real person's voice through this
+    provider (cloning has its own consent-gated path, see XTTSCloneTTS).
+    Set ELEVENLABS_API_KEY. The model is chosen by target language because only
+    ElevenLabs' newer v3/v4 models speak Swahili; the older multilingual v2 does
+    not, and no model supports Kikuyu - so this is only ever used for English
+    and Swahili dubs (enforced where the order is created).
+
+    Asks for raw 24 kHz 16-bit PCM and wraps it in a WAV, so it drops into the
+    same pipeline as AzureTTS (also 24 kHz)."""
+    name = "elevenlabs"
+    sample_rate = 24000
+    API = "https://api.elevenlabs.io"
+    # characters one request may carry, per ElevenLabs' model documentation
+    CHAR_LIMITS = {"eleven_v3": 5000, "eleven_v4": 10000, "eleven_multilingual_v2": 10000, "eleven_flash_v2_5": 40000}
+
+    def __init__(self, default_voice: str | None = None, language: str = "en"):
+        self.default_voice = default_voice
+        self.language = language or "en"
+        self.model = (os.getenv("ELEVENLABS_MODEL_SW", "eleven_v3") if self.language == "sw"
+                      else os.getenv("ELEVENLABS_MODEL_EN", "eleven_multilingual_v2"))
+
+    @staticmethod
+    def _split(text: str, limit: int) -> list[str]:
+        """Pieces under the per-request limit, cut on sentence ends where possible."""
+        text = text.strip()
+        pieces = []
+        while len(text) > limit:
+            cut = max(text.rfind(". ", 0, limit), text.rfind("? ", 0, limit), text.rfind("! ", 0, limit))
+            cut = cut + 1 if cut > limit // 2 else (text.rfind(" ", 0, limit) if text.rfind(" ", 0, limit) > 0 else limit)
+            pieces.append(text[:cut].strip())
+            text = text[cut:].strip()
+        if text:
+            pieces.append(text)
+        return pieces
+
+    @staticmethod
+    def _explain(resp) -> str:
+        try:
+            detail = resp.json().get("detail")
+            detail = detail.get("message") if isinstance(detail, dict) else detail
+        except Exception:
+            detail = None
+        meaning = {401: "the API key was rejected or the plan has no credits left",
+                   402: "the plan does not include this voice or request",
+                   429: "too many requests or concurrent generations - slow down"}.get(resp.status_code, "request refused")
+        return f"ElevenLabs {resp.status_code}: {meaning}" + (f" ({str(detail)[:160]})" if detail else "")
+
+    def synthesize(self, text: str, out_path: str, voice_id=None, rate: float = 1.0) -> int:
+        import re
+        import httpx
+        key = os.environ.get("ELEVENLABS_API_KEY")
+        if not key:
+            raise RuntimeError("ELEVENLABS_API_KEY is not set")
+        voice = voice_id or self.default_voice or os.getenv("ELEVENLABS_DEFAULT_VOICE")
+        if not voice or not re.fullmatch(r"[A-Za-z0-9]{10,40}", str(voice)):
+            raise RuntimeError("No valid ElevenLabs voice chosen for this order")
+        settings = {"stability": 0.5, "similarity_boost": 0.75, "speed": min(1.2, max(0.7, rate))}
+        pcm = b""
+        for piece in self._split(text, self.CHAR_LIMITS.get(self.model, 5000) - 200):
+            body = {"text": piece, "model_id": self.model, "voice_settings": settings}
+            if "multilingual_v2" not in self.model:             # that model does not accept language_code
+                body["language_code"] = self.language
+            resp = httpx.post(f"{self.API}/v1/text-to-speech/{voice}", params={"output_format": "pcm_24000"},
+                              headers={"xi-api-key": key, "Content-Type": "application/json"}, json=body, timeout=90.0)
+            if resp.status_code != 200:
+                raise RuntimeError(self._explain(resp))
+            pcm += resp.content
+        if not pcm:
+            raise RuntimeError("ElevenLabs returned no audio")
+        with wave.open(out_path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(self.sample_rate)
+            w.writeframes(pcm)
+        return int(len(pcm) / 2 / self.sample_rate * 1000)
+
+
 class XTTSCloneTTS(TTSProvider):
     """Voice cloning via Coqui XTTS-v2 - clones the ACTUAL source speaker
     instead of using a fixed pretrained voice like Piper/Azure.
@@ -278,6 +358,7 @@ class MMSTTS(TTSProvider):
 
 _REGISTRY = {
     "stub": StubTTS, "piper": PiperTTS, "azure": AzureTTS, "xtts": XTTSCloneTTS, "mms": MMSTTS,
+    "elevenlabs": ElevenLabsTTS,
 }
 
 # A small, realistic picker for jobs where actual voice cloning (see
@@ -358,11 +439,17 @@ def _tts_fallback_configured(name: str) -> bool:
 def get_tts(name: str, target_lang: str | None = None, **kwargs) -> TTSProvider:
     if name not in _REGISTRY:
         raise ValueError(f"Unknown TTS provider '{name}'. Options: {list(_REGISTRY)}")
-    primary = _REGISTRY[name](**kwargs)
     fallback_name = TTS_FALLBACK_CHAIN.get(name)
-    # target_lang == "en" is a hard requirement, not a preference - see
-    # ResilientTTS's own docstring on why any other target makes this
-    # fallback actively wrong rather than just less ideal.
-    if fallback_name and target_lang == "en" and _tts_fallback_configured(fallback_name):
+    if name == "elevenlabs":
+        kwargs.setdefault("language", target_lang or "en")
+        # A paid premium voice that fails must still produce a dub: English falls back to Piper and
+        # Swahili to Azure (each speaks that language). The fallback is recorded in the job's
+        # warnings so staff can see the premium voice was not delivered.
+        fallback_name = "azure" if target_lang == "sw" and os.environ.get("AZURE_SPEECH_KEY") else (
+            "piper" if target_lang == "en" else None)
+    primary = _REGISTRY[name](**kwargs)
+    # Piper's fallback needs target_lang == "en" - a hard requirement, not a preference - see
+    # ResilientTTS's own docstring on why any other target makes it actively wrong. Azure speaks Swahili.
+    if fallback_name and (target_lang == "en" or fallback_name == "azure") and _tts_fallback_configured(fallback_name):
         return ResilientTTS(primary, _REGISTRY[fallback_name](), fallback_name)
     return primary
