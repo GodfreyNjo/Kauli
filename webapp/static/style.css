@@ -40,8 +40,19 @@
      cta-olive class (now simply "the primary button") references it. */
   --accent2: #16315a;
   --accent2-hover: #0f2342;
-  --accent3: #1e5abe;
-  --accent3-hover: #174a9c;
+  --accent3: #556b2f;
+  --accent3-hover: #445423;
+
+  /* Two-colour brand: BLUE (+ navy) is structure and trust - links, focus,
+     active states, progress, the hero/footer surfaces. OLIVE is the call to
+     action - every primary button. On navy surfaces the olive lifts to a
+     brighter tint with navy text so it still stands out (>= 5:1). */
+  --cta: #556b2f;
+  --cta-hover: #445423;
+  --cta-ink: #ffffff;
+  --cta-on-navy: #9ab255;
+  --cta-on-navy-hover: #a9c064;
+  --cta-on-navy-ink: #0f2342;
 
   /* Navy "trust" surfaces: public hero, footer, login showcase. */
   --navy: #0f2342;
@@ -98,6 +109,9 @@ html[data-theme="dark"] {
   --accent-soft: #162c55;
   --accent-ink: #ffffff;
   --accent-text: #86b4ff;
+  --cta: #9ab255;
+  --cta-hover: #a9c064;
+  --cta-ink: #0f2342;
 
   --ok: #86cca2;
   --ok-soft: #173326;
@@ -911,8 +925,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent-soft
 
 button, .btn {
   display: inline-block;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--cta);
+  color: var(--cta-ink);
   border: none;
   border-radius: var(--radius-sm);
   padding: 8px 14px;
@@ -922,18 +936,18 @@ button, .btn {
   text-decoration: none;
   margin-top: 6px;
 }
-button:hover, .btn:hover { background: var(--accent-hover); }
+button:hover, .btn:hover { background: var(--cta-hover); }
 button.secondary, .btn.secondary {
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--border);
 }
 button.secondary:hover, .btn.secondary:hover { background: var(--hover); }
-.btn.cta-alt { background: var(--accent2); }
+.btn.cta-alt { background: var(--accent2); color: #ffffff; }
 .btn.cta-alt:hover { background: var(--accent2-hover); }
 .btn.cta-olive { background: var(--accent3); }
 .btn.cta-olive:hover { background: var(--accent3-hover); }
-button.approve { background: var(--ok); }
+button.approve { background: var(--ok); color: var(--accent-ink); }
 button.approve:hover { filter: brightness(0.92); }
 
 .muted { color: var(--muted); font-size: 0.88rem; }
@@ -2625,7 +2639,7 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
 /* Real uploaded cover (see staff_blog_edit.html) instead of the generated
    waveform placeholder above, when a post actually has one. */
 .m-blog-card-photo { background-size: cover; background-position: center; }
-.m-blog-card-visual[data-category="Localization"] { background: color-mix(in srgb, var(--accent3) 18%, var(--bg)); color: var(--accent3); }
+.m-blog-card-visual[data-category="Localization"] { background: color-mix(in srgb, var(--accent3) 18%, var(--bg)); color: var(--accent3-hover); }
 .m-blog-card-visual[data-category="Accessibility & Compliance"] { background: color-mix(in srgb, var(--accent2) 18%, var(--bg)); color: var(--accent2); }
 .m-blog-card-visual[data-category="Process & Quality"] { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); color: var(--accent-text); }
 .m-blog-card-visual[data-category="Trust & Safety"] { background: color-mix(in srgb, var(--info) 22%, var(--bg)); color: var(--info); }
@@ -2634,7 +2648,7 @@ button.wf-tab:hover:not(.done) { background: var(--hover); color: var(--ink); }
   letter-spacing: 0.03em; padding: 4px 10px; border-radius: var(--radius-pill);
   background: var(--accent-soft); color: var(--accent-text);
 }
-.m-category-pill[data-category="Localization"] { background: color-mix(in srgb, var(--accent3) 20%, transparent); color: var(--accent3); }
+.m-category-pill[data-category="Localization"] { background: color-mix(in srgb, var(--accent3) 20%, transparent); color: var(--accent3-hover); }
 .m-category-pill[data-category="Accessibility & Compliance"] { background: color-mix(in srgb, var(--accent2) 20%, transparent); color: var(--accent2); }
 .m-category-pill[data-category="Process & Quality"] { background: var(--accent-soft); color: var(--accent-text); }
 .m-category-pill[data-category="Trust & Safety"] { background: var(--info-soft); color: var(--info); }
@@ -3276,10 +3290,10 @@ body.m-public form .btn:not(.secondary):hover {
   cursor: pointer; padding: 4px 6px;
 }
 .tour-next {
-  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 999px;
+  background: var(--cta); color: var(--cta-ink); border: none; border-radius: 999px;
   padding: 6px 14px; font-size: 0.82rem; font-weight: 600; cursor: pointer;
 }
-.tour-next:hover { background: var(--accent-hover); }
+.tour-next:hover { background: var(--cta-hover); }
 @media (prefers-reduced-motion: reduce) {
   .tour-overlay::before { transition: none; }
 }
@@ -3294,8 +3308,8 @@ body.m-public form .btn:not(.secondary):hover {
 
 /* primary button = action blue everywhere; on navy it is lifted to a
    brighter blue that still keeps white text at >= 4.5:1 (checked) */
-.btn.cta-olive, .btn.cta-primary { background: var(--accent3); color: var(--accent-ink); }
-.btn.cta-olive:hover, .btn.cta-primary:hover { background: var(--accent3-hover); color: var(--accent-ink); }
+.btn.cta-olive, .btn.cta-primary { background: var(--cta); color: var(--cta-ink); }
+.btn.cta-olive:hover, .btn.cta-primary:hover { background: var(--cta-hover); color: var(--cta-ink); }
 
 /* focus must always be visible (WCAG 2.4.7) - one consistent ring */
 :focus-visible { outline: 3px solid #7fb0ff; outline-offset: 2px; }
@@ -3327,8 +3341,8 @@ body:not(.m-public) :focus-visible { outline-color: var(--accent); }
 .m-hero .m-hero-sub { color: var(--on-navy-muted); }
 .m-hero .m-hero-note, .m-hero-trust { color: var(--on-navy-muted); }
 .m-hero a:not(.btn) { color: var(--on-navy-accent); }
-.m-hero .btn:not(.secondary) { background: #3070e4; color: #ffffff; box-shadow: none; }
-.m-hero .btn:not(.secondary):hover { background: #2b6ce0; box-shadow: none; }
+.m-hero .btn:not(.secondary) { background: var(--cta-on-navy); color: var(--cta-on-navy-ink); box-shadow: none; }
+.m-hero .btn:not(.secondary):hover { background: var(--cta-on-navy-hover); color: var(--cta-on-navy-ink); box-shadow: none; }
 .m-hero .btn.secondary { background: transparent; color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.5); }
 .m-hero .btn.secondary:hover { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
 .m-hero .m-lang-pill { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: var(--on-navy-muted); }
@@ -3469,8 +3483,8 @@ body:not(.m-public) :focus-visible { outline-color: var(--accent); }
 .cta-band { background: var(--navy); color: #ffffff; text-align: center; padding: 68px 24px; }
 .cta-band h2 { font-family: var(--font-display); color: #ffffff; margin: 0 0 10px; font-size: clamp(1.6rem, 1rem + 2vw, 2.4rem); }
 .cta-band p { color: var(--on-navy-muted); margin: 0 auto 26px; max-width: 560px; line-height: 1.55; }
-.cta-band .btn:not(.secondary) { background: #3070e4; color: #fff; padding: 13px 28px; font-size: 1rem; }
-.cta-band .btn:not(.secondary):hover { background: #2b6ce0; }
+.cta-band .btn:not(.secondary) { background: var(--cta-on-navy); color: var(--cta-on-navy-ink); padding: 13px 28px; font-size: 1rem; }
+.cta-band .btn:not(.secondary):hover { background: var(--cta-on-navy-hover); }
 .cta-band .btn.secondary { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.5); padding: 13px 24px; }
 .cta-band .btn.secondary:hover { background: rgba(255, 255, 255, 0.1); }
 .cta-band .m-hero-ctas { justify-content: center; }
@@ -3634,3 +3648,7 @@ body.m-public .m-footer-col a:hover { text-decoration: underline; }
 @media (max-width: 560px) {
   .m-footer-inner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ------------------------------------------- olive call-to-action (2026-10) */
+/* approve buttons use the (light) success green on the dark staff theme */
+html[data-theme="dark"] button.approve { color: #0b1730; }
