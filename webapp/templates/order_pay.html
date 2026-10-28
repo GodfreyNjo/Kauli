@@ -1,21 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Pay for order{% endblock %}
 {% block content %}
-<div class="card" style="max-width:520px;">
+{% set tier_name = 'Human-reviewed' if order['review_tier'] == 'human' else 'Instant AI' %}
+{% set service_names = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
+<div class="pay-wrap">
   <a href="/client" class="breadcrumb">&larr; back to my orders</a>
-  <h1>{{ order['original_filename'] }}</h1>
 
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
   {% if pending_retry_after_s is not none %}
-  {% if resume_url %}
-  <p class="muted">Still have that Paystack tab open? Finish there. Otherwise:
-     <a href="{{ resume_url }}">Resume payment</a> - takes you back to the same checkout page, no new charge started.</p>
-  {% endif %}
-  <p class="muted" id="pending-payment-countdown" data-seconds="{{ pending_retry_after_s }}">
-    {% if pending_retry_after_s > 0 %}{% if not resume_url %}You can try again in <strong><span id="pending-countdown-value"></span></strong>.{% endif %}
-    {% else %}You can try again now - <a href="javascript:location.reload()">refresh this page</a>.{% endif %}
-  </p>
+  <div class="pay-pending">
+    {% if resume_url %}
+    <p>Still have that Paystack tab open? Finish there. Otherwise:
+       <a href="{{ resume_url }}">Resume payment</a> - takes you back to the same checkout page, no new charge started.</p>
+    {% endif %}
+    <p id="pending-payment-countdown" data-seconds="{{ pending_retry_after_s }}">
+      {% if pending_retry_after_s > 0 %}{% if not resume_url %}You can try again in <strong><span id="pending-countdown-value"></span></strong>.{% endif %}
+      {% else %}You can try again now - <a href="javascript:location.reload()">refresh this page</a>.{% endif %}
+    </p>
+  </div>
   <script>
     (function () {
       var el = document.getElementById('pending-payment-countdown');
@@ -42,71 +45,92 @@
   {% endif %}
 
   {% if order['status'] != 'pending_payment' %}
-    <p class="ok">This order's already paid for - <a href="/client/orders/{{ order['id'] }}">view it here</a>.</p>
+    <div class="pay-card"><p class="ok" style="margin:0;">This order's already paid for - <a href="/client/orders/{{ order['id'] }}">view it here</a>.</p></div>
   {% else %}
-    <p class="muted">{{ "%.1f"|format(order['duration_minutes'] or 0) }} minutes
-       &middot; {{ order['service_level'] }}{% if has_video_addon %} + video deliverables add-on{% endif %}</p>
-    <p style="font-size:1.6rem; font-weight:700; margin:10px 0;">${{ "%.2f"|format(order['cost_usd']) }}</p>
-    {% if has_video_addon %}
-    <p class="muted" style="margin-top:-6px;">Includes the video deliverables add-on (burned captions + dubbed video) for this order.</p>
-    {% endif %}
-    <p class="muted" style="margin-top:-6px;">Processing starts the moment this is confirmed.</p>
+  <div class="pay-grid">
+    <section class="pay-card pay-summary" aria-labelledby="pay-file">
+      <span class="pay-chip">Order summary</span>
+      <h1 class="pay-file" id="pay-file" title="{{ order['original_filename'] }}">{{ order['original_filename'] }}</h1>
+      <dl class="pay-facts">
+        <div><dt>Length</dt><dd>{{ "%.1f"|format(order['duration_minutes'] or 0) }} minutes</dd></div>
+        <div><dt>Service</dt><dd>{{ service_names.get(order['service_level'], order['service_level']) }}</dd></div>
+        <div><dt>Delivery</dt><dd>{{ tier_name }}</dd></div>
+        {% if has_video_addon %}<div><dt>Add-on</dt><dd>Video deliverables (burned captions + dubbed video)</dd></div>{% endif %}
+      </dl>
+      <div class="pay-total"><span>Total due</span><b>${{ "%.2f"|format(order['cost_usd']) }}</b></div>
+      <p class="pay-sub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>Processing starts the moment this is confirmed.</p>
+    </section>
 
-    <form method="post" action="/client/orders/{{ order['id'] }}/pay" style="margin-top:18px;" id="pay-form">
-      <label>Pay with
-        <select name="provider" id="provider-select">
-          <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>
-            Card, M-Pesa or Airtel Money (via Paystack){% if not paystack_configured %} - unavailable{% endif %}
-          </option>
-          <option value="mpesa" {% if not mpesa_live %}disabled{% endif %}>
-            M-Pesa direct (no card needed){% if not mpesa_live %} (coming){% endif %}
-          </option>
-          <option value="bank">Bank transfer</option>
-        </select>
-      </label>
-      <p class="muted" id="paystack-note" hidden style="margin-top:-6px;">Takes you to Paystack's own checkout
-         page, where you can choose card, M-Pesa, M-Pesa Till, or Airtel Money.</p>
-      <label id="phone-field" hidden>M-Pesa phone number
+    <form method="post" action="/client/orders/{{ order['id'] }}/pay" id="pay-form" class="pay-card pay-method">
+      <h2>Pay with</h2>
+      <div class="pay-options" role="radiogroup" aria-label="Payment method" id="provider-select">
+        <label class="pay-option{% if not paystack_configured %} is-off{% endif %}">
+          <input type="radio" name="provider" value="paystack" {% if not paystack_configured %}disabled{% else %}checked{% endif %}>
+          <span class="pay-option-body">
+            <strong>{% if show_mobile_money %}Card, M-Pesa or Airtel Money{% else %}Card{% endif %}</strong>
+            <small>{% if paystack_configured %}Secure checkout by Paystack{% else %}Unavailable right now{% endif %}</small>
+          </span>
+        </label>
+        {% if show_mobile_money %}
+        <label class="pay-option{% if not mpesa_live %} is-off{% endif %}">
+          <input type="radio" name="provider" value="mpesa" {% if not mpesa_live %}disabled{% endif %}>
+          <span class="pay-option-body"><strong>M-Pesa direct</strong><small>{% if mpesa_live %}No card needed{% else %}Coming soon{% endif %}</small></span>
+        </label>
+        {% endif %}
+        <label class="pay-option">
+          <input type="radio" name="provider" value="bank" {% if not paystack_configured %}checked{% endif %}>
+          <span class="pay-option-body"><strong>Bank transfer</strong><small>We confirm it by hand, usually within one business day</small></span>
+        </label>
+      </div>
+      <p class="pay-note" id="paystack-note" hidden>Takes you to Paystack's own checkout page, where you choose how to pay{% if show_mobile_money %}: card, M-Pesa, M-Pesa Till or Airtel Money{% endif %}.</p>
+      {% if show_mobile_money %}
+      <label id="phone-field" class="pay-phone" hidden>M-Pesa phone number
         <input type="tel" name="phone" placeholder="2547XXXXXXXX">
       </label>
-      <p class="muted" id="bank-note" hidden>We'll email transfer instructions and confirm manually once
+      {% endif %}
+      <p class="pay-note" id="bank-note" hidden>We'll email transfer instructions and confirm manually once
          it lands - usually within one business day.</p>
-      <button type="submit" id="pay-submit">Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
+      <button type="submit" id="pay-submit" class="pay-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Pay ${{ "%.2f"|format(order['cost_usd']) }}</button>
+      <ul class="pay-trust" aria-label="Why it is safe to pay">
+        <li>Card details go straight to Paystack. We never see them.</li>
+        <li>The price above is final. No hidden fees.</li>
+        <li>Your files stay private in your account.</li>
+      </ul>
     </form>
+  </div>
   {% endif %}
 </div>
 
 <script>
   (function () {
-    var sel = document.getElementById('provider-select');
+    var form = document.getElementById('pay-form');
+    if (!form) return;
     var phoneField = document.getElementById('phone-field');
     var bankNote = document.getElementById('bank-note');
     var paystackNote = document.getElementById('paystack-note');
+    function chosen() { var r = form.querySelector('input[name="provider"]:checked'); return r ? r.value : ''; }
     function update() {
-      phoneField.hidden = sel.value !== 'mpesa';
-      bankNote.hidden = sel.value !== 'bank';
-      paystackNote.hidden = sel.value !== 'paystack';
+      var v = chosen();
+      if (phoneField) phoneField.hidden = v !== 'mpesa';
+      bankNote.hidden = v !== 'bank';
+      paystackNote.hidden = v !== 'paystack';
+      [].forEach.call(form.querySelectorAll('.pay-option'), function (o) { o.classList.toggle('is-picked', o.querySelector('input').checked); });
     }
-    sel.addEventListener('change', update);
+    [].forEach.call(form.querySelectorAll('input[name="provider"]'), function (r) { r.addEventListener('change', update); });
     update();
-  })();
 
-  // Real problem this fixes: paystack_initialize (webapp/billing.py) makes
-  // a real network call to Paystack's API before the redirect response
-  // comes back - a genuine few seconds, during which the button gave no
-  // feedback at all. That silence read as "nothing happened", so a client
-  // would click Pay again - and the SECOND click hit the server's
-  // already-in-progress guard (db.get_active_pending_payment_for_order),
-  // locking them out of a real retry for up to 15 minutes even though
-  // the first click was actually working correctly the whole time.
-  (function () {
-    var form = document.getElementById('pay-form');
+    // Real problem this fixes: paystack_initialize (webapp/billing.py) makes
+    // a real network call to Paystack's API before the redirect response
+    // comes back - a genuine few seconds, during which the button gave no
+    // feedback at all. That silence read as "nothing happened", so a client
+    // would click Pay again - and the SECOND click hit the server's
+    // already-in-progress guard (db.get_active_pending_payment_for_order),
+    // locking them out of a real retry for up to 15 minutes even though
+    // the first click was actually working correctly the whole time.
     var btn = document.getElementById('pay-submit');
-    if (!form || !btn) return;
     form.addEventListener('submit', function () {
-      var sel = document.getElementById('provider-select');
       btn.disabled = true;
-      btn.textContent = sel && sel.value === 'paystack' ? 'Taking you to Paystack…' : 'Processing…';
+      btn.textContent = chosen() === 'paystack' ? 'Taking you to Paystack…' : 'Processing…';
     });
   })();
 </script>

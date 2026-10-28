@@ -6994,6 +6994,8 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
         "mpesa_configured": billing.mpesa_configured(),
         "mpesa_live": billing.mpesa_live(),
         "has_video_addon": db.order_has_addon(order, "video_deliverables"),
+        # M-Pesa and Airtel Money are only mentioned to clients whose account is in East Africa
+        "show_mobile_money": db.get_billing_market(order["client_id"]) in ("ea", "legacy"),
     })
 
 
