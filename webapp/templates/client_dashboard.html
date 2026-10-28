@@ -55,34 +55,63 @@
 
     <div class="wizard-pane" data-pane="1">
       <h2 class="wizard-pane-title">Add your file and choose languages</h2>
-      <div class="step-switch" id="source-switch" style="margin-bottom:14px;">
+      {# The two buttons stay (the wizard script reads them to know the chosen source) but the cards below are the
+         real controls: picking a file or typing a link makes that card the source. #}
+      <div class="step-switch" id="source-switch" hidden>
         <button type="button" class="{{ 'active' if not form_values.get('youtube_url') else '' }}" data-source="file">Upload a file</button>
         <button type="button" class="{{ 'active' if form_values.get('youtube_url') else '' }}" data-source="youtube">From YouTube</button>
       </div>
 
-      <div id="source-file" {% if form_values.get('youtube_url') %}hidden{% endif %}>
-        {% if error and not form_values.get('youtube_url') %}
-        <p class="muted" style="font-size:0.82rem; margin-top:0;">Everything else below was kept as you had it -
-           just re-choose your file, browsers don't let a page do that part for you.</p>
-        {% endif %}
-        <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a file to upload">
-          <input type="file" name="audio" id="file-input" accept="audio/*,video/*" style="display:none;">
-          <svg class="dropzone-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M14 34a8 8 0 0 1-1-15.94A10 10 0 0 1 32.4 14.2 7.5 7.5 0 0 1 34 29H31" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M24 22v14m0-14 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <p class="dropzone-text" id="dropzone-text">Click to upload, or drag and drop your file here</p>
-          <p class="muted" style="font-size:0.78rem; margin:2px 0 0;">MP3, WAV, M4A, FLAC, OGG, Opus, AAC, WMA, MP4, MOV, MKV, WebM or AVI - up to 2 GB per file</p>
-        </div>
-      </div>
+      <div class="src-cards">
+        <section class="src-card {{ '' if form_values.get('youtube_url') else 'is-active' }}" id="card-file" aria-labelledby="src-file-title">
+          <div class="src-card-head">
+            <span class="src-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
+            <div>
+              <h3 id="src-file-title">Upload audio or video</h3>
+              <p>Drag and drop your file or click to browse.</p>
+            </div>
+          </div>
+          <div id="source-file">
+            {% if error and not form_values.get('youtube_url') %}
+            <p class="muted src-note" style="margin:0 0 10px;">Everything else below was kept as you had it -
+               just re-choose your file, browsers don't let a page do that part for you.</p>
+            {% endif %}
+            <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose a file to upload">
+              <input type="file" name="audio" id="file-input" accept="audio/*,video/*" style="display:none;">
+              <svg class="dropzone-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M14 34a8 8 0 0 1-1-15.94A10 10 0 0 1 32.4 14.2 7.5 7.5 0 0 1 34 29H31" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M24 22v14m0-14 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <p class="dropzone-text" id="dropzone-text">Drag &amp; drop or click to upload</p>
+              <p class="src-formats">Also OGG, Opus, AAC, WMA, WebM and AVI. Up to 2 GB per file.</p>
+            </div>
+          </div>
+          <ul class="src-chips" aria-label="Common formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
+        </section>
 
-      <div id="source-youtube" {% if not form_values.get('youtube_url') %}hidden{% endif %}>
-        <label>YouTube link
-          <input type="url" name="youtube_url" id="youtube-url-input" placeholder="https://www.youtube.com/watch?v=..."
-                 value="{{ form_values.get('youtube_url', '') }}">
-        </label>
-        <p class="muted" style="margin-top:-8px;">Only submit videos you have the rights to use for dubbing.
-           Large videos can take several minutes to fetch before processing even starts. If a link can't be fetched, upload the file instead.</p>
+        <section class="src-card {{ 'is-active' if form_values.get('youtube_url') else '' }}" id="card-youtube" aria-labelledby="src-yt-title">
+          <div class="src-card-head">
+            <span class="src-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
+            <div>
+              <h3 id="src-yt-title">Paste a YouTube link</h3>
+              <p>We'll fetch the audio and transcribe it.</p>
+            </div>
+          </div>
+          <div id="source-youtube">
+            <label class="src-link" for="youtube-url-input">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+              <span class="sr-only">YouTube link</span>
+              <input type="url" name="youtube_url" id="youtube-url-input" placeholder="https://www.youtube.com/watch?v=..."
+                     value="{{ form_values.get('youtube_url', '') }}">
+              <button type="button" class="src-go" id="youtube-go" aria-label="Use this link and continue">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              </button>
+            </label>
+            <p class="muted src-note">Only submit videos you have the rights to use for dubbing. Large videos can take
+               several minutes to fetch before processing even starts. If a link can't be fetched, upload the file instead.</p>
+          </div>
+          <ul class="src-chips" aria-label="What you can order"><li>Transcript</li><li>Subtitles</li><li>Translation</li><li>Dubbing</li></ul>
+        </section>
       </div>
 
       <div class="row" style="margin-top:16px;">

@@ -187,17 +187,36 @@
   function bindSourceSwitch() {
     const fileBtn = $('#source-switch [data-source="file"]');
     const ytBtn = $('#source-switch [data-source="youtube"]');
-    const filePane = $("#source-file");
-    const ytPane = $("#source-youtube");
-    fileBtn.addEventListener("click", () => {
-      fileBtn.classList.add("active"); ytBtn.classList.remove("active");
-      filePane.hidden = false; ytPane.hidden = true;
-    });
-    ytBtn.addEventListener("click", () => {
-      ytBtn.classList.add("active"); fileBtn.classList.remove("active");
-      ytPane.hidden = false; filePane.hidden = true;
-      fileDurationMinutes = null;
-      updatePricing();
+    const fileCard = $("#card-file");
+    const ytCard = $("#card-youtube");
+    const ytInput = $("#youtube-url-input");
+    // The two cards are always visible; the hidden buttons still carry the chosen source
+    // (the rest of this file reads it from them), and the cards just show which one is live.
+    function setSource(which) {
+      const yt = which === "youtube";
+      ytBtn.classList.toggle("active", yt);
+      fileBtn.classList.toggle("active", !yt);
+      if (fileCard) fileCard.classList.toggle("is-active", !yt);
+      if (ytCard) ytCard.classList.toggle("is-active", yt);
+      if (yt) {
+        fileDurationMinutes = null;
+        updatePricing();
+      }
+    }
+    fileBtn.addEventListener("click", () => setSource("file"));
+    ytBtn.addEventListener("click", () => setSource("youtube"));
+    setSource(ytBtn.classList.contains("active") ? "youtube" : "file");
+    if (ytInput) {
+      // typing or pasting a link makes YouTube the source
+      ytInput.addEventListener("input", () => { if (ytInput.value.trim()) ytBtn.click(); });
+      ytInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); const go = $("#youtube-go"); if (go) go.click(); }
+      });
+    }
+    const go = $("#youtube-go");
+    if (go) go.addEventListener("click", () => {
+      ytBtn.click();
+      $("#wizard-next").click();                       // same checks as pressing Next
     });
   }
 
@@ -222,6 +241,9 @@
     const dz = $("#dropzone");
     const text = $("#dropzone-text");
     if (!file) return;
+    const ytField = $("#youtube-url-input");
+    if (ytField) ytField.value = "";
+    $('#source-switch [data-source="file"]').click();
     dz.classList.add("has-file");
     text.textContent = file.name;
     fileDurationMinutes = null;
