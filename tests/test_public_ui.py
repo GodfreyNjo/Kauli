@@ -120,7 +120,8 @@ def test_homepage_structure_follows_the_plan(client):
 
 def test_one_consistent_primary_action(client):
     html = client.get("/").text
-    assert html.count(">Start a project<") >= 2          # nav and final band; the hero says "Try Free Transcription"
+    assert html.count(">Start a project<") >= 1          # the final band; the nav says "Start free", the hero "Try Free Transcription"
+    assert ">Start free<" in html
     assert "Get started free" not in html
     assert 'data-cta="hero"' in html and 'data-cta="nav"' in html and 'data-cta="final"' in html
     for path in ("/solutions/audio-to-text", "/languages"):
@@ -137,7 +138,7 @@ def test_pricing_has_a_clear_hierarchy(client):
 
 def test_primary_nav_matches_the_plan(client):
     nav = re.search(r'<nav class="m-nav".*?</nav>', client.get("/").text, re.S).group(0)
-    positions = [nav.index(label) for label in ("Services", "Solutions", "Pricing", "Resources", "Sign in", "Start a project")]
+    positions = [nav.index(label) for label in ("Services", "Solutions", "Integrations", "Pricing", "Resources", "Sign in", "Start free")]
     assert positions == sorted(positions)
 
 

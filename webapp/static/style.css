@@ -3773,3 +3773,48 @@ a.int-chip:hover { border-color: var(--accent); background: #ffffff; text-decora
 @media (max-width: 960px) { .int-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .int-grid { grid-template-columns: 1fr; } }
 .int-card a.int-chip, .int-card a.int-chip:hover, .int-card a.int-chip * { text-decoration: none; }
+
+/* ===================================================================== */
+/* Type scale and nav sized to the reference (2026-10): 16px body, 18px   */
+/* ledes, 38px section headings, 50px hero, 70px header, 44px buttons.    */
+/* ===================================================================== */
+body.m-public, .marketing-page { font-size: 16px; }
+.m-nav { padding: 0 28px; min-height: 70px; }
+.m-nav-links { gap: 26px; }
+.m-nav-links a, .m-nav-dropdown-trigger { font-size: 1rem; font-weight: 500; }
+.m-nav-dropdown-menu a { font-size: 0.97rem; }
+.m-nav-links a.btn.cta-olive {
+  display: inline-flex; align-items: center; justify-content: center; margin: 0;
+  height: 44px; padding: 0 24px; border-radius: 8px;
+  font-size: 15px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap;
+}
+.m-nav-links a.m-nav-signin { padding: 8px 4px; font-weight: 500; }
+
+.tk-hero h1 { font-size: clamp(2.1rem, 1rem + 3.1vw, 3.125rem); }
+.tk-hero-sub { font-size: 1.125rem; }
+.tk-hero-note { font-size: 0.92rem; }
+.tk-langs { font-size: 1.05rem; }
+.tk-lang-pills li { font-size: 0.95rem; }
+.tk-card h2 { font-size: 1.25rem; }
+.tk-drop { font-size: 1.02rem; }
+.tk-chips li { font-size: 0.85rem; }
+.tk-band p { font-size: 1.125rem; }
+.tk-stat span { font-size: 1.05rem; }
+
+.m-section h2.m-h2 { font-size: clamp(1.75rem, 1.1rem + 1.7vw, 2.375rem); }
+.m-section p.m-lede { font-size: 1.125rem; }
+.m-section-eyebrow { font-size: 0.85rem; }
+.svc-card h3 { font-size: 1.3rem; }
+.svc-card p, .why-item p, .how-step p, .m-faq-item p { font-size: 1rem; line-height: 1.6; }
+.why-item h3, .how-step h3 { font-size: 1.15rem; }
+.svc-price { font-size: 1.05rem; }
+.svc-link { font-size: 1rem; }
+.int-card h3 { font-size: 1.1rem; }
+.int-name { font-size: 1rem; }
+.int-badge { font-size: 0.75rem; }
+.int-note { font-size: 1.02rem; }
+.m-faq-item summary { font-size: 1.08rem; }
+.m-footer-col a { font-size: 0.97rem; }
+.m-footer-desc { font-size: 0.95rem; }
+.m-footer-col-title { font-size: 0.85rem; }
+.marketing-page .btn { font-size: 1rem; }
