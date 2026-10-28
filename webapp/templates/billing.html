@@ -167,14 +167,15 @@
 <div class="card" style="padding:0; overflow-x:auto;">
   <table>
     <thead><tr>
-      <th>Plan</th><th>Price/mo</th><th>Usage discount</th><th>Translation</th>
+      <th>Plan</th><th>Price</th><th>Instant AI minutes / month</th><th>Usage discount</th><th>Translation</th>
       <th>Video deliverables</th><th>Support</th><th>Choose</th>
     </tr></thead>
     <tbody>
       {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
       <tr>
         <td><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
-        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}{% else %}$0{% endif %}</td>
+        <td>{% if p['price_usd'] %}${{ p['price_usd'] }}/mo{% if key in ('pro', 'premium') %}<br><span class="muted" style="font-size:0.78rem;">or ${{ p['price_usd_year'] }}/yr (save {{ billing_saving(p) }}%)</span>{% endif %}{% else %}$0{% endif %}</td>
+        <td>{{ p['included_ai_minutes']|int }}</td>
         <td>{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
         <td>{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
         <td>{{ '✓' if p['video_deliverables'] else '-' }}</td>
@@ -205,6 +206,12 @@
               <summary class="btn secondary" style="cursor:pointer; display:inline-block;">Upgrade to {{ p['name'] }}</summary>
               <form method="post" action="/client/billing/checkout" style="margin-top:8px; min-width:220px;">
                 <input type="hidden" name="plan" value="{{ key }}">
+                <label style="font-size:0.78rem;">Billing
+                  <select name="interval">
+                    <option value="month">Monthly - ${{ p['price_usd'] }}</option>
+                    <option value="year">Yearly - ${{ p['price_usd_year'] }} (save {{ billing_saving(p) }}%)</option>
+                  </select>
+                </label>
                 <label style="font-size:0.78rem;">Pay with
                   <select name="provider">
                     <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
@@ -215,7 +222,7 @@
                 {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
                   <input type="tel" name="phone" placeholder="2547XXXXXXXX">
                 </label>{% endif %}
-                <button type="submit">Subscribe ${{ p['price_usd'] }}/mo</button>
+                <button type="submit">Subscribe</button>
               </form>
             </details>
           {% endif %}

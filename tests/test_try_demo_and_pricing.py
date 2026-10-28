@@ -85,14 +85,13 @@ def test_demo_is_linked_from_home_and_the_sitemap(client):
 
 
 # ------------------------------------------------------------------ pricing
-def test_pricing_is_one_clear_choice_with_exactly_two_monthly_plans(client):
+def test_pricing_is_one_clear_choice_with_two_plans_and_a_custom_one(client):
     html = client.get("/").text
     section = re.search(r'<section class="m-section" id="pricing">.*?</section>', html, re.S).group(0)
     assert "Simple pricing. Pay only for what you use." in section
-    assert section.count('class="pz-plan') == 2 or section.count('<article class="pz-plan') == 2
-    assert re.findall(r'<article class="pz-plan[^"]*"[^>]*>\s*(?:<span[^>]*>[^<]*</span>\s*)?<h4>([^<]+)</h4>', section) == ["Pro", "Premium"]
-    for gone in ("Enterprise", "Free</div>"):
-        assert gone not in section
+    assert section.count('<article class="pz-plan') == 3
+    assert re.findall(r'<article class="pz-plan[^"]*"[^>]*>\s*(?:<span[^>]*>[^<]*</span>\s*)?<h4>([^<]+)</h4>', section) == ["Pro", "Premium", "Enterprise"]
+    assert "Free</div>" not in section and 'href="/demo?interest=enterprise"' in section
     # no region is named in the public pricing, and no local currency is pushed on everyone
     for region in ("Kenya", "East Africa", "US &amp; international", "KES", "KSh"):
         assert region not in section, region
@@ -143,5 +142,6 @@ def test_pay_as_you_go_replaces_the_free_plan_label_and_enterprise_is_not_a_publ
 
 def test_the_terms_say_plainly_what_the_one_dollar_check_is(client):
     terms = client.get("/terms").text
-    assert "$1.00 card confirmation" in terms and "not a\n       fee" in terms and "credited to your account as usage credit" in terms
+    assert "one-time card verification charge, shown before you pay" in terms and "not a\n       fee" in terms and "credited to your account as usage credit" in terms
+    assert "$1" not in terms                                        # the amount is shown inside the app, before payment
     assert "the last part of a transcript made with" in terms and "is hidden" in terms

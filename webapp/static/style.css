@@ -4826,3 +4826,69 @@ body.m-public .m-nav-links a.btn, body.m-public .m-nav-links a.btn.cta-olive { b
 .m-office strong { display: block; color: #ffffff; font-size: 0.95rem; }
 /* cards on the human review pages are whole-card links: no underlines inside them */
 body.m-public .hr-lang a, body.m-public .hr-blogs a, body.m-public .hr-links a, body.m-public .hr-others a, body.m-public .hr-lang a:hover, body.m-public .hr-blogs a:hover { text-decoration: none; }
+
+/* plans: monthly / yearly toggle and the third (custom) card */
+.pz-plans { max-width: 1100px; }
+.pz-plan-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pz-interval { display: inline-flex; gap: 4px; padding: 4px; margin: 0 auto 26px; background: #e9f0fb; border-radius: 999px; }
+.pz-interval button { margin: 0; padding: 9px 18px; border: 0; border-radius: 999px; background: transparent; color: #33445f; font-weight: 650; cursor: pointer; }
+.pz-interval button em { margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--brand-olive-soft); color: var(--brand-olive-ink); font-style: normal; font-size: 0.74rem; font-weight: 800; }
+.pz-interval button.is-on { background: var(--brand-blue); color: #ffffff; }
+.pz-plans .pz-y { display: none; }
+.pz-plans.is-yearly .pz-y { display: inline; }
+.pz-plans.is-yearly .pz-m { display: none; }
+.pz-plans .pz-save.pz-y { display: none; }
+.pz-plans.is-yearly .pz-save.pz-y { display: block; }
+.pz-save { margin: -6px 0 10px; color: var(--brand-olive-ink); font-weight: 700; font-size: 0.9rem; }
+.pz-plan-price > span { display: inline-flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.pz-plan-custom { background: linear-gradient(180deg, #f8fbff, #eef3fd); }
+@media (max-width: 980px) { .pz-plan-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .pz-plan-grid-3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* meetings */
+.mt .ch-files { margin-top: 18px; }
+.mt h2 { margin: 0 0 8px; font-size: 1.25rem; color: var(--brand-navy); }
+.mt-lede { margin: 0 0 14px; color: #52627a; line-height: 1.55; max-width: 680px; }
+.mt-left { margin: 0 0 14px; color: var(--brand-olive-ink); font-weight: 600; }
+.mt-why { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: #fff1d6; color: #7a4a00; }
+.mt-form { display: grid; gap: 14px; max-width: 560px; }
+.mt-form label { display: grid; gap: 6px; font-weight: 650; color: var(--brand-navy); }
+.mt-form input[type="url"], .mt-form input[type="text"], .mt-form select, .mt-form input[type="datetime-local"] { width: 100%; padding: 11px 14px; border-radius: 12px; border: 1px solid #d3deef; background: #ffffff; font-size: 1rem; }
+.mt-when { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.mt-when legend { padding: 0; margin-bottom: 6px; font-weight: 650; color: var(--brand-navy); }
+.mt-radio { display: inline-flex !important; align-items: center; gap: 8px !important; font-weight: 500 !important; }
+.mt-fine { margin: 14px 0 0; color: #52627a; font-size: 0.88rem; }
+
+
+/* ======================================================================
+   Sign-in, simplified: a branded blue panel (with a trace of olive) beside a clean form on a soft blue page.
+   Few words, and one button that tells you what happens next.
+   ====================================================================== */
+body.auth-page { background: #dfe9ff; }
+.auth-shell { background: linear-gradient(135deg, #e9f0ff 0%, #d9e5ff 100%); }
+.auth-brand-panel.auth-welcome {
+  background-color: var(--brand-blue);
+  background-image:
+    radial-gradient(760px 520px at 12% 8%, rgba(154, 178, 85, 0.34), transparent 62%),
+    linear-gradient(160deg, #3a74f2 0%, var(--brand-blue) 46%, #1a47b5 100%);
+  color: #ffffff; border: 0;
+}
+.auth-brand-panel.auth-welcome .auth-showcase h2, .auth-brand-panel.auth-welcome h2 { color: #ffffff; font-size: clamp(2.2rem, 1.4rem + 2.6vw, 3.4rem); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 14px; }
+.auth-showcase .auth-welcome-lede { color: #e6eeff; font-size: 1.3rem; margin: 0 0 30px; font-weight: 500; }
+.auth-facts { grid-template-columns: minmax(0, 1fr); gap: 12px; max-width: 420px; }
+.auth-facts li { background: rgba(255, 255, 255, 0.13); border: 1px solid rgba(255, 255, 255, 0.24); border-left: 4px solid var(--brand-olive-bright); padding: 16px 20px; flex-direction: row; align-items: baseline; gap: 14px; }
+.auth-facts li strong { color: #ffffff; font-size: 1.15rem; }
+.auth-facts li span { color: #d6e3ff; font-size: 0.98rem; }
+.auth-facts li.is-lit { background: #ffffff; border-color: #ffffff; border-left-color: var(--brand-olive); }
+.auth-facts li.is-lit strong { color: var(--brand-navy); }
+.auth-facts li.is-lit span { color: #52627a; }
+.sw-hud { background: rgba(255, 255, 255, 0.95); }
+.auth-form-panel { background: transparent; }
+.auth-form-inner { border-radius: 24px; padding: 38px 38px 30px; box-shadow: 0 34px 80px -40px rgba(20, 60, 150, 0.55); }
+.auth-shell h1 { font-size: 1.9rem; }
+.auth-shell .auth-sub { font-size: 1.05rem; margin-bottom: 20px; }
+.auth-google-btn { padding: 14px 16px; font-weight: 650; }
+.auth-shell button[type="submit"] { padding: 16px 20px; font-size: 1.08rem; font-weight: 700; box-shadow: 0 16px 30px -16px rgba(34, 98, 236, 0.85); transition: transform 0.15s ease, background 0.2s ease; }
+.auth-shell button[type="submit"]:hover { transform: translateY(-1px); }
+.auth-consent { font-size: 0.78rem; }
+@media (max-width: 900px) { .auth-form-inner { padding: 28px 20px 24px; } }

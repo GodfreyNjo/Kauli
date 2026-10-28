@@ -26,14 +26,14 @@
 
       <div class="auth-panel" id="panel-signin" {% if mode == 'signup' %}hidden{% endif %}>
         <h1>Welcome back</h1>
-        <p class="auth-sub">Sign in to manage your projects and downloads.</p>
+        <p class="auth-sub">Sign in to continue.</p>
         {% if mode == 'signin' and error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
         {% if mode == 'signin' and notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
         <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
           {% include "_google_g_icon.svg" %}
           Continue with Google
         </a>
-        <div class="auth-divider"><span>or sign in with email</span></div>
+        <div class="auth-divider"><span>or</span></div>
         <form method="post" action="/login">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
@@ -52,20 +52,20 @@
           <p class="auth-forgot"><a href="/forgot-password">Forgot your password?</a></p>
           <button type="submit">Sign in</button>
         </form>
-        <p class="auth-switch">New to Kauli? <button type="button" class="auth-link-btn" data-show="panel-signup">Create an account</button></p>
+        <p class="auth-switch">New here? <button type="button" class="auth-link-btn" data-show="panel-signup">Create a free account</button></p>
         <p class="auth-consent">By signing in, you agree to Kauli's <a href="/terms">Terms of Service</a>,
            <a href="/privacy">Privacy Policy</a> and <a href="/privacy#cookies">Cookie Policy</a>.</p>
       </div>
 
       <div class="auth-panel" id="panel-signup" {% if mode != 'signup' %}hidden{% endif %}>
-        <h1>Create your account</h1>
-        <p class="auth-sub">Start a project in minutes. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
+        <h1>Create your free account</h1>
+        <p class="auth-sub">Your first {{ free_minutes|int }} minutes are free.</p>
         {% if mode == 'signup' and error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
         <a href="/login/google?next={{ (next or '')|urlencode }}" class="auth-google-btn">
           {% include "_google_g_icon.svg" %}
           Continue with Google
         </a>
-        <div class="auth-divider"><span>or sign up with email</span></div>
+        <div class="auth-divider"><span>or</span></div>
         <form method="post" action="/signup" id="signup-form">
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
@@ -90,9 +90,9 @@
           </ul>
           <label class="auth-checkbox-row">
             <input type="checkbox" name="marketing_consent" value="1" {% if marketing_consent %}checked{% endif %}>
-            <span>Also send me occasional Kauli tips and updates. Unsubscribe anytime.</span>
+            <span>Send me Kauli tips and updates</span>
           </label>
-          <button type="submit">Create account</button>
+          <button type="submit">Create free account</button>
         </form>
         <p class="auth-switch">Already have an account? <button type="button" class="auth-link-btn" data-show="panel-signin">Sign in</button></p>
         <p class="auth-consent">By creating an account, you agree to Kauli's <a href="/terms">Terms of
@@ -105,20 +105,17 @@
   <section class="auth-brand-panel auth-welcome" aria-label="About Kauli">
     <a href="/" class="auth-welcome-logo" aria-label="Kauli - back to home">
       <picture>
-        <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
-        <img src="/static/kauli-logo-nav-sm.png" alt="Kauli" width="163" height="44">
+        <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
+        <img src="/static/kauli-logo-nav-light.png" alt="Kauli" width="163" height="44">
       </picture>
     </a>
     <div class="auth-showcase">
-      <h2>Welcome to Kauli</h2>
-      <p class="auth-welcome-tag">Human expertise. Global reach.</p>
-      <p class="auth-welcome-lede">Transcription, translation, subtitles and dubbing for your audio and video, with human review when it matters.</p>
-      <p class="auth-welcome-kicker">What you get</p>
+      <h2>Audio to text in minutes</h2>
+      <p class="auth-welcome-lede">Your first {{ free_minutes|int }} minutes are free.</p>
       <ul class="auth-facts">
-        <li><strong>{{ language_total }}</strong><span>languages transcribed, and translated between</span></li>
-        <li><strong>Human review</strong><span>in selected languages, with more coming soon</span></li>
-        <li><strong>{{ free_minutes|int }} min</strong><span>of Instant AI transcription free each month</span></li>
-        <li><strong>API</strong><span>MCP server, Slack, Teams, Notion and webhooks</span></li>
+        <li><strong>{{ language_total }} languages</strong><span>Transcribe and translate</span></li>
+        <li><strong>Human review</strong><span>When it has to be right</span></li>
+        <li><strong>{{ free_minutes|int }} free minutes</strong><span>Every month</span></li>
       </ul>
     </div>
   </section>

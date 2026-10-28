@@ -17,7 +17,7 @@ def test_the_footer_lists_both_offices_on_every_public_page():
     client = TestClient(app_mod.app, follow_redirects=False)
     for path in ("/", "/try", "/languages", "/human-review", "/human-review/swahili", "/developers", "/demo"):
         html = client.get(path).text
-        assert "Nation Centre, Kimathi Street, 9th floor, Nairobi, Kenya" in html, path
+        assert "9th floor, Nation Centre, Kimathi Street, Nairobi, Kenya" in html, path
         assert "3710 Rawlins St, Suite 1420, Dallas, TX 75219, USA" in html, path
     home = client.get("/").text
     assert '"addressLocality": "Nairobi"' in home and '"postalCode": "75219"' in home      # for search engines too

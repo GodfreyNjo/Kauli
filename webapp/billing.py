@@ -160,30 +160,50 @@ TRIAL_VERIFICATION_FEE_USD = 1.00
 # hybrid, the same shape AWS/Twilio use) - say if you want them different.
 PLANS = {
     "free": {
-        "name": "Free", "price_usd": 0, "discount": 0.0,
+        "name": "Free", "price_usd": 0, "price_usd_year": 0, "discount": 0.0, "included_ai_minutes": FREE_MINUTES_PER_MONTH,
         "mt": "local", "video_deliverables": False, "support": "-",
         "blurb": f"Pay as you go. Your first {FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are "
                  "free each month; anything beyond that is billed per minute. Downloads unlock once you have "
                  "chosen a plan.",
     },
+    # A plan is a commitment, and the commitment is rewarded twice: Instant AI minutes included every month (worth
+    # about what the plan costs), and a percentage off everything beyond them. Instant AI costs us roughly
+    # $0.015 a minute (worst case about $0.033), so even the yearly price leaves a wide margin - see the test
+    # tests/test_plans_v2.py that fails if a change here would let a plan lose money.
     "pro": {
-        "name": "Pro", "price_usd": 19, "discount": 0.10,
+        "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.10, "included_ai_minutes": 150,
         "mt": "local", "video_deliverables": False, "support": "Email",
-        "blurb": "10% off usage rates, standard turnaround, email support.",
+        "blurb": "150 Instant AI minutes every month, 10% off everything else, email support.",
     },
     "premium": {
-        "name": "Premium", "price_usd": 49, "discount": 0.20,
+        "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": 400,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
-        "blurb": "20% off usage rates, Priority-quality translation, burned captions & "
-                 "dubbed video included, priority turnaround.",
+        "blurb": "400 Instant AI minutes every month, 20% off everything else, burned captions & dubbed video "
+                 "included, priority-quality translation and turnaround.",
     },
+    # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).
     "enterprise": {
-        "name": "Enterprise", "price_usd": 199, "discount": 0.30,
+        "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.30, "included_ai_minutes": 1000,
         "mt": "claude", "video_deliverables": True, "support": "Dedicated account manager",
         "blurb": "Negotiated volume rate, dedicated account manager, bank transfer billing.",
     },
 }
 PLAN_PERIOD_DAYS = 30
+PLAN_YEAR_DAYS = 365
+
+
+def plan_included_minutes(plan: str) -> float:
+    """Instant AI transcription minutes a plan includes every month (the free plan's is the trial allowance)."""
+    return float(PLANS.get(plan, PLANS["free"]).get("included_ai_minutes", FREE_MINUTES_PER_MONTH))
+
+
+def yearly_monthly_equivalent(plan: str) -> float:
+    return round(PLANS[plan]["price_usd_year"] / 12.0, 2)
+
+
+def yearly_saving_pct(plan: str) -> int:
+    monthly = PLANS[plan]["price_usd"] * 12
+    return int(round((1 - PLANS[plan]["price_usd_year"] / monthly) * 100)) if monthly else 0
 
 # Add-ons: a lower-tier plan can unlock a higher tier's feature for a single
 # order, at a per-minute surcharge, instead of having to subscribe to the
@@ -575,16 +595,27 @@ def effective_plan(user, subscription) -> str:
     return subscription["plan"]
 
 
+def _plan_in_force(subscription) -> str:
+    """The plan a subscription row is actually delivering right now: its own plan while it is active and inside its
+    period (plus the grace a renewing card gets), otherwise the free plan."""
+    if subscription is None or subscription["status"] != "active":
+        return "free"
+    grace = RECURRING_GRACE_DAYS * 86400 if _is_recurring(subscription) else 0
+    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time():
+        return "free"
+    return subscription["plan"] if subscription["plan"] in PLANS else "free"
+
+
 def free_minutes_remaining(subscription) -> float:
-    """The trial allowance is FREE_MINUTES_PER_MONTH for everyone, on every
-    plan, plus any bonus_minutes an account manager has granted for
-    onboarding (see db.grant_bonus_minutes) - that's what makes a 10-minute
-    sales demo possible without touching the base pricing at all."""
+    """Instant AI transcription minutes left this month: the allowance of the plan in force (5 on the free plan,
+    150 on Pro, 400 on Premium), plus any bonus_minutes an account manager has granted for onboarding (see
+    db.grant_bonus_minutes), minus what has been used. Same counter and the same monthly reset for every plan, and
+    a yearly plan gets a fresh allowance every month."""
     if subscription is None:
         return FREE_MINUTES_PER_MONTH
     used = subscription["minutes_used_this_period"] or 0.0
     bonus = subscription["bonus_minutes"] or 0.0
-    return max(0.0, FREE_MINUTES_PER_MONTH + bonus - used)
+    return max(0.0, plan_included_minutes(_plan_in_force(subscription)) + bonus - used)
 
 
 # ------------------------------------------------------------- currency ----
@@ -645,29 +676,43 @@ def paystack_currency_for_market(market: str | None, country: str | None = None)
     return "KES"
 
 
-def paystack_plan_code(plan: str, currency: str | None = None) -> str | None:
-    """Paystack plan code (PLN_...) for a subscription plan, from
-    PAYSTACK_PLAN_PRO / PAYSTACK_PLAN_PREMIUM. Created in the Paystack
-    dashboard (Products -> Plans, monthly, priced to match PLANS). Unset =
-    that plan is still sold as a one-off 30-day purchase, as before.
+def paystack_plan_code(plan: str, currency: str | None = None, yearly: bool = False) -> str | None:
+    """Paystack plan code (PLN_...) for a subscription plan. Monthly: PAYSTACK_PLAN_PRO_USD / _KES (or the older
+    unsuffixed PAYSTACK_PLAN_PRO). Yearly: PAYSTACK_PLAN_PRO_YEARLY_USD / _KES. Unset = that plan is still sold as
+    a one-off purchase for its period, as before.
 
-    A Paystack plan has one currency, so with `currency` given the plan made for that currency wins
-    (PAYSTACK_PLAN_PRO_USD / PAYSTACK_PLAN_PRO_KES, written by `python -m webapp.paystack_setup`). A plan is never
-    offered in a currency it was not made for: with only the other currency's plan set, the client is simply
-    charged once, as before. The unsuffixed PAYSTACK_PLAN_PRO keeps working for anyone who set it up by hand."""
+    A Paystack plan has one currency, so the plan made for the currency being charged wins, and a plan is never
+    offered in a currency it was not made for: with only the other currency's plan set, the client is simply charged
+    once. Write the codes with `python -m webapp.paystack_setup`."""
+    p = plan.upper()
+    if yearly:
+        if currency:
+            return os.environ.get(f"PAYSTACK_PLAN_{p}_YEARLY_{currency.upper()}", "").strip() or None
+        return os.environ.get(f"PAYSTACK_PLAN_{p}_YEARLY", "").strip() or None
     if currency:
-        specific = os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}_{currency.upper()}", "").strip()
+        specific = os.environ.get(f"PAYSTACK_PLAN_{p}_{currency.upper()}", "").strip()
         if specific:
             return specific
-        if any(os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}_{c}", "").strip() for c in ("USD", "KES")):
+        if any(os.environ.get(f"PAYSTACK_PLAN_{p}_{c}", "").strip() for c in ("USD", "KES")):
             return None
-    return (os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}", "").strip() or None)
+    return (os.environ.get(f"PAYSTACK_PLAN_{p}", "").strip() or None)
+
+
+def _plan_code_names(plan: str, yearly: bool) -> list[str]:
+    p = plan.upper()
+    if yearly:
+        return [f"PAYSTACK_PLAN_{p}_YEARLY"] + [f"PAYSTACK_PLAN_{p}_YEARLY_{c}" for c in ("USD", "KES")]
+    return [f"PAYSTACK_PLAN_{p}"] + [f"PAYSTACK_PLAN_{p}_{c}" for c in ("USD", "KES")]
 
 
 def paystack_plan_codes(plan: str) -> set[str]:
-    """Every Paystack plan code that means this plan - what a renewal webhook is matched against."""
-    names = [f"PAYSTACK_PLAN_{plan.upper()}"] + [f"PAYSTACK_PLAN_{plan.upper()}_{c}" for c in ("USD", "KES")]
+    """Every Paystack plan code that means this plan, monthly or yearly - what a renewal webhook is matched against."""
+    names = _plan_code_names(plan, False) + _plan_code_names(plan, True)
     return {v for v in (os.environ.get(n, "").strip() for n in names) if v}
+
+
+def paystack_plan_is_yearly(code: str) -> bool:
+    return any(os.environ.get(n, "").strip() == code for plan in PLANS for n in _plan_code_names(plan, True) if code)
 
 
 # How long past current_period_end a RECURRING (Paystack-subscribed) account

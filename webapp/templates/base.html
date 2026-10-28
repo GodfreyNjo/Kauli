@@ -167,6 +167,7 @@
         <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}">{{ nav_icon('checklist') }}<span class="label">My orders</span></a>
         {% set pending = pending_count(user) %}
         <a href="/client/pending" class="{{ 'active' if request.url.path == '/client/pending' else '' }}">{{ nav_icon('pulse') }}<span class="label">Pending</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
+        {% if meetings_enabled() %}<a href="/client/meetings" class="{{ 'active' if request.url.path == '/client/meetings' else '' }}">{{ nav_icon('mic') }}<span class="label">Meetings</span></a>{% endif %}
         <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">Files</span></a>
         <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}">{{ nav_icon('message') }}<span class="label">Messages</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>

@@ -61,14 +61,16 @@ def test_dry_run_creates_nothing_and_apply_creates_only_what_is_missing(monkeypa
     monkeypatch.setattr(paystack_setup.httpx, "get", fake.get)
     monkeypatch.setattr(paystack_setup.httpx, "post", fake.post)
     dry = paystack_setup.ensure_plans("sk_test_x", ["USD"], apply=False)
-    assert fake.posted == [] and {(r["plan"], r["status"]) for r in dry} == {("pro", "exists"), ("premium", "would_create")}
+    assert fake.posted == [] and {(r["plan"], r["interval"], r["status"]) for r in dry} == {
+        ("pro", "monthly", "exists"), ("pro", "annually", "would_create"), ("premium", "monthly", "would_create"), ("premium", "annually", "would_create")}
     done = paystack_setup.ensure_plans("sk_test_x", ["USD"], apply=True)
-    assert len(fake.posted) == 1
-    body = fake.posted[0]
-    assert body["name"] == "Kauli Premium (monthly)" and body["amount"] == billing.PLANS["premium"]["price_usd"] * 100
-    assert body["interval"] == "monthly" and body["currency"] == "USD"
+    assert [b["name"] for b in fake.posted] == ["Kauli Pro (yearly)", "Kauli Premium (monthly)", "Kauli Premium (yearly)"]
+    by_name = {b["name"]: b for b in fake.posted}
+    assert by_name["Kauli Premium (monthly)"]["amount"] == billing.PLANS["premium"]["price_usd"] * 100 and by_name["Kauli Premium (monthly)"]["interval"] == "monthly"
+    assert by_name["Kauli Pro (yearly)"]["amount"] == billing.PLANS["pro"]["price_usd_year"] * 100 and by_name["Kauli Pro (yearly)"]["interval"] == "annually"
     out = paystack_setup.render(done)
-    assert "PAYSTACK_PLAN_PRO_USD=PLN_have" in out and "PAYSTACK_PLAN_PREMIUM_USD=PLN_new1" in out and "sk_test_x" not in out
+    assert "PAYSTACK_PLAN_PRO_USD=PLN_have" in out and "PAYSTACK_PLAN_PREMIUM_USD=PLN_new2" in out
+    assert "PAYSTACK_PLAN_PRO_YEARLY_USD=PLN_new1" in out and "PAYSTACK_PLAN_PREMIUM_YEARLY_USD=PLN_new3" in out and "sk_test_x" not in out
 
 
 def test_a_different_price_is_reported_never_overwritten(monkeypatch):

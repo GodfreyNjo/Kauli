@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Meetings{% endblock %}
+{% block content %}
+<div class="ch mt">
+  <div class="ch-top"><h1>Meetings</h1></div>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
+
+  {% if not enabled %}
+  <section class="ch-files"><div class="ch-empty"><p>Sending Kauli to your meetings is coming soon. You will find it here.</p></div></section>
+  {% else %}
+  <section class="ch-files mt-send">
+    <h2>Send Kauli to a meeting</h2>
+    <p class="mt-lede">Kauli joins as "Kauli Notetaker", records the meeting and gives you the transcript when it ends. It works on Zoom, Google Meet and Microsoft Teams, and uses the minutes in your plan.</p>
+    {% if not can_send %}<p class="mt-why">{{ why_not }} <a href="/client/billing">See plans</a></p>{% else %}<p class="mt-left"><b>{{ minutes_left }}</b> minutes available. You need at least {{ min_minutes }} to send Kauli.</p>{% endif %}
+    <form method="post" action="/client/meetings" class="mt-form" id="mt-form"{% if not can_send %} aria-disabled="true"{% endif %}>
+      <label>Meeting link
+        <input type="url" name="meeting_url" required placeholder="https://zoom.us/j/..." {% if not can_send %}disabled{% endif %}>
+      </label>
+      <label>Name <span class="muted">(optional)</span>
+        <input type="text" name="title" maxlength="120" placeholder="Weekly planning" {% if not can_send %}disabled{% endif %}>
+      </label>
+      <label>Spoken language
+        <select name="source_lang" {% if not can_send %}disabled{% endif %}>
+          {% for code, label in languages %}<option value="{{ code }}"{% if code == 'en' %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </label>
+      <fieldset class="mt-when">
+        <legend>When</legend>
+        <label class="mt-radio"><input type="radio" name="when" value="now" checked {% if not can_send %}disabled{% endif %}> Join now</label>
+        <label class="mt-radio"><input type="radio" name="when" value="later" {% if not can_send %}disabled{% endif %}> Pick a time</label>
+        <input type="datetime-local" id="mt-at" hidden {% if not can_send %}disabled{% endif %}>
+        <input type="hidden" name="join_at" id="mt-join-at">
+      </fieldset>
+      <button type="submit" class="btn cta-olive" {% if not can_send %}disabled{% endif %}>Send Kauli</button>
+    </form>
+    <p class="mt-fine">Tell everyone in the meeting that it is being recorded. The host may need to admit Kauli from the waiting room.</p>
+  </section>
+
+  <section class="ch-files">
+    <h2>Your meetings</h2>
+    {% if not meetings %}<div class="ch-empty"><p>No meetings yet.</p></div>{% else %}
+    <ul class="ch-list">
+      {% for m in meetings %}
+      <li><div class="ch-row">
+        <span class="ch-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg></span>
+        <span class="ch-row-main"><strong>{{ m['title'] or (platform_names.get(m['platform'], 'Meeting') ~ ' meeting') }}</strong>
+          <small>{{ platform_names.get(m['platform'], '') }} &middot; {{ (m['join_at'] or m['created_at'])|timestamp_to_str }}{% if m['error'] %} &middot; {{ m['error'] }}{% endif %}</small></span>
+        <span class="ch-state ch-{{ 'ok' if m['status'] == 'done' else ('attention' if m['status'] in ('failed', 'cancelled') else 'busy') }}">{{ status_text.get(m['status'], m['status']) }}</span>
+        {% if m['order_id'] %}<a class="btn secondary ch-act" href="/client/orders/{{ m['order_id'] }}">Open transcript</a>
+        {% elif m['status'] in ('scheduled', 'joining', 'recording') %}
+        <form method="post" action="/client/meetings/{{ m['id'] }}/cancel" style="margin:0;"><button type="submit" class="btn secondary ch-act">Cancel</button></form>{% endif %}
+      </div></li>
+      {% endfor %}
+    </ul>{% endif %}
+  </section>
+  <script>
+    (function () {
+      var form = document.getElementById('mt-form'); if (!form) return;
+      var at = document.getElementById('mt-at'), hidden = document.getElementById('mt-join-at');
+      [].forEach.call(form.querySelectorAll('input[name="when"]'), function (r) {
+        r.addEventListener('change', function () { at.hidden = form.querySelector('input[name="when"]:checked').value !== 'later'; if (at.hidden) hidden.value = ''; });
+      });
+      form.addEventListener('submit', function () {
+        hidden.value = (!at.hidden && at.value) ? new Date(at.value).toISOString() : '';
+      });
+    })();
+  </script>
+  {% endif %}
+</div>
+{% endblock %}

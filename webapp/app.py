@@ -27,7 +27,7 @@ import time
 import traceback
 import types
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
@@ -51,7 +51,7 @@ from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_f
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, _wrap_caption_text, _display_end_ms  # noqa: E402
 
 WEBAPP_DIR = Path(__file__).parent
@@ -1338,6 +1338,8 @@ def _first_name(user) -> str:
 
 
 templates.env.globals["first_name"] = _first_name
+templates.env.globals["billing_saving"] = lambda plan: int(round((1 - plan["price_usd_year"] / (plan["price_usd"] * 12)) * 100)) if plan["price_usd"] else 0
+templates.env.globals["meetings_enabled"] = meeting_bot.configured
 templates.env.globals["bank_ok"] = _bank_transfer_ok
 templates.env.globals["mpesa_ok"] = _mobile_money_ok
 templates.env.globals["pending_count"] = lambda u: db.pending_orders_count(u["client_scope_id"]) if (u and u["role"] == "client") else 0
@@ -3249,6 +3251,7 @@ DEMO_INTERESTS = {
     "dubbing": "Dubbing and voice over",
     "localization": "Full localization",
     "api": "API and integrations",
+    "enterprise": "Enterprise or a custom volume plan",
     "other": "Something else",
 }
 
@@ -5317,6 +5320,191 @@ def client_messages(request: Request):
     })
 
 
+# ------------------------------------------------------------------ Kauli in your meetings
+def _meeting_gate(user) -> tuple[bool, str, float]:
+    """Whether this client may send Kauli to a meeting right now: on a paid plan, with enough minutes left (the plan's
+    included Instant AI minutes plus any prepaid credit) to cover a meeting of a useful length."""
+    cid = user["client_scope_id"]
+    sub = db.get_subscription_current(cid)
+    market = db.get_billing_market(cid)
+    ai_rate = billing.rate_for("transcribe", market, "ai") or 0.12
+    minutes = billing.free_minutes_remaining(sub) + billing.credits_to_usd(db.wallet_credits_remaining(cid)) / ai_rate
+    is_tester = (user["email"] or "").strip().lower() in billing.test_client_emails()
+    if billing._plan_in_force(sub) == "free" and not is_tester:
+        return False, "Kauli can join your meetings on the Pro and Premium plans.", minutes
+    if minutes < meeting_bot.MIN_MEETING_MINUTES and not is_tester:
+        return False, (f"You need at least {int(meeting_bot.MIN_MEETING_MINUTES)} minutes left to send Kauli to a meeting, and you have {int(minutes)}. "
+                       "Add prepaid credit, or your minutes renew next month."), minutes
+    return True, "", minutes
+
+
+def _fail_meeting(m, message: str) -> None:
+    db.update_meeting(m["id"], status="failed", error=message)
+
+
+def _finish_meeting(m, link: str, request: Request) -> None:
+    """The meeting ended and its recording is ready: turn it into an ordinary Instant AI order for that client. Charged
+    exactly like any other order (included minutes first, then credit, then a payment link for any overage)."""
+    if not db.claim_meeting(m["id"]):
+        return
+    row = db.get_user(m["client_id"])
+    if not row:
+        _fail_meeting(m, "The account for this meeting no longer exists.")
+        return
+    user = dict(row)
+    user["client_scope_id"] = m["client_id"]
+    request.state.api_user = user
+    tmp_dir = Path(tempfile.mkdtemp(prefix="kauli-meeting-"))
+    tmp = tmp_dir / "meeting.mp4"
+    try:
+        meeting_bot.download(link, str(tmp))
+        from starlette.datastructures import Headers
+        with open(tmp, "rb") as fh:
+            upload = UploadFile(file=fh, filename=f"{(m['title'] or 'Meeting').strip()[:80]}.mp4", headers=Headers({"content-type": "video/mp4"}))
+            resp = create_order(
+                request, audio=upload, upload_key="", youtube_url="", source_lang=m["source_lang"], target_lang=m["source_lang"],
+                service_level="transcribe", addon_video_deliverables="", addon_human_voice_over="", addon_premium_voice="",
+                premium_voice_id="", addon_audio_cleanup="", instr_speaker_ids="1", instr_verbatim_level="clean_read",
+                instr_transcribe_lyrics="", instr_use_italics="", instr_existing_subs="ignore", instr_no_audio="tag",
+                instr_wrong_language="tag", instr_instrumental_only="tag", instr_notes="Recorded by Kauli in an online meeting.",
+                style_guide=None, idempotency_key=f"meeting-{m['id']}", folder_name="Meetings", voice_clone_consent="",
+                rush="", review_tier="ai")
+    except ApiOrderError as exc:
+        _fail_meeting(m, f"The recording could not be turned into a transcript: {exc}")
+        return
+    except Exception:  # noqa: BLE001 - a bad recording must not take the webhook or the page down
+        logging_setup.get_logger("meetings").warning("meeting import failed", extra={"job_id": m["id"]}, exc_info=True)
+        _fail_meeting(m, "The recording could not be turned into a transcript. Please contact us and we will sort it out.")
+        return
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+    loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
+    found = re.match(r"^/client/orders/([0-9a-f]+)", loc)
+    if not found:
+        _fail_meeting(m, "The recording could not be turned into a transcript.")
+        return
+    db.update_meeting(m["id"], status="done", order_id=found.group(1))
+
+
+def _refresh_meeting(m, request: Request) -> None:
+    """Ask the meeting service where a bot has got to and move our record along; import the recording once it exists."""
+    if m["status"] not in ("scheduled", "joining", "recording", "processing") or not m["provider_bot_id"]:
+        return
+    bot = meeting_bot.get_bot(m["provider_bot_id"])
+    if "error" in bot:
+        return
+    status, problem = meeting_bot.status_from_bot(bot)
+    link = meeting_bot.recording_url(bot)
+    if status in ("processing", "done") and link:
+        _finish_meeting(m, link, request)
+        return
+    if status == "failed":
+        _fail_meeting(m, problem or "Kauli could not join or record this meeting.")
+    elif status != m["status"]:
+        db.update_meeting(m["id"], status="processing" if status == "done" else status)
+
+
+_MEETING_STATUS_TEXT = {"scheduled": "Scheduled", "joining": "Joining", "recording": "Recording", "processing": "Getting the recording",
+                        "importing": "Making the transcript", "done": "Transcript ready", "failed": "Did not work", "cancelled": "Cancelled"}
+
+
+@app.get("/client/meetings", response_class=HTMLResponse)
+def client_meetings(request: Request, error: str | None = None, notice: str | None = None):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    enabled = meeting_bot.configured()
+    meetings = db.list_meetings_for_client(user["client_scope_id"]) if enabled else []
+    for m in meetings:
+        _refresh_meeting(m, request)
+    if enabled:
+        meetings = db.list_meetings_for_client(user["client_scope_id"])
+    ok, why, minutes = _meeting_gate(user) if enabled else (False, "", 0.0)
+    return templates.TemplateResponse(request, "client_meetings.html", {
+        "user": user, "enabled": enabled, "meetings": meetings, "can_send": ok, "why_not": why, "minutes_left": int(minutes),
+        "min_minutes": int(meeting_bot.MIN_MEETING_MINUTES), "status_text": _MEETING_STATUS_TEXT, "platform_names": meeting_bot.PLATFORM_NAMES,
+        "languages": sorted(LANGUAGE_NAMES.items(), key=lambda kv: kv[1]), "error": error, "notice": notice,
+    })
+
+
+@app.post("/client/meetings")
+def client_meeting_create(request: Request, meeting_url: str = Form(""), title: str = Form(""), source_lang: str = Form("en"),
+                          join_at: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+
+    def back(kind: str, text: str):
+        return RedirectResponse(f"/client/meetings?{kind}={quote(text)}", status_code=303)
+
+    if not meeting_bot.configured():
+        return back("error", "Meetings are not switched on yet.")
+    url = (meeting_url or "").strip()
+    platform = meeting_bot.platform_for(url)
+    if not platform:
+        return back("error", "Paste a Zoom, Google Meet or Microsoft Teams meeting link that starts with https.")
+    if source_lang not in LANGUAGE_NAMES:
+        return back("error", "Pick the language that will be spoken.")
+    ok, why, minutes = _meeting_gate(user)
+    if not ok:
+        return back("error", why)
+    cid = user["client_scope_id"]
+    if db.count_active_meetings(cid) >= meeting_bot.MAX_ACTIVE_MEETINGS:
+        return back("error", f"You already have {meeting_bot.MAX_ACTIVE_MEETINGS} meetings in progress. Wait for one to finish or cancel it.")
+    allowed, _retry = rate_limit.check(f"meeting:{cid}", limit=10, window_s=600)
+    if not allowed:
+        return back("error", "Too many requests just now. Try again in a few minutes.")
+    join_ts, join_iso = None, None
+    if join_at.strip():
+        try:
+            when = datetime.fromisoformat(join_at.strip().replace("Z", "+00:00"))
+            join_ts = when.timestamp()
+        except ValueError:
+            return back("error", "That start time was not understood.")
+        if join_ts < time.time() - 300 or join_ts > time.time() + meeting_bot.MAX_SCHEDULE_DAYS * 86400:
+            return back("error", f"Choose a start time within the next {meeting_bot.MAX_SCHEDULE_DAYS} days.")
+        join_iso = datetime.fromtimestamp(join_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if join_ts > time.time() + 60 else None
+    made = meeting_bot.create_bot(url, join_iso)
+    if "error" in made:
+        return back("error", made["error"])
+    db.create_meeting(uuid.uuid4().hex, cid, url, platform, (title or "").strip()[:120], source_lang, made["id"], join_ts, minutes)
+    return back("notice", "Kauli will join your meeting. Tell everyone in it that the meeting is being recorded.")
+
+
+@app.post("/client/meetings/{meeting_id}/cancel")
+def client_meeting_cancel(request: Request, meeting_id: str):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    m = db.get_meeting(meeting_id)
+    if not m or m["client_id"] != user["client_scope_id"]:
+        return HTMLResponse("Not found.", status_code=404)
+    if m["status"] in ("scheduled", "joining", "recording"):
+        if m["provider_bot_id"]:
+            meeting_bot.leave_bot(m["provider_bot_id"])
+        db.update_meeting(m["id"], status="cancelled")
+    return RedirectResponse("/client/meetings?notice=" + quote("Meeting cancelled."), status_code=303)
+
+
+@app.post("/webhooks/recall")
+async def recall_webhook(request: Request):
+    """The meeting service telling us a bot changed state. Signature-checked; anything unsigned or for a bot we did not
+    send is ignored."""
+    body = await request.body()
+    if not meeting_bot.verify_webhook(request.headers, body):
+        return JSONResponse({"error": "bad signature"}, status_code=401)
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return JSONResponse({"error": "bad body"}, status_code=400)
+    data = payload.get("data") or {}
+    bot_id = (data.get("bot") or {}).get("id") or data.get("bot_id")
+    m = db.get_meeting_by_provider(str(bot_id)) if bot_id else None
+    if m:
+        await run_in_threadpool(_refresh_meeting, m, request)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/client/pending", response_class=HTMLResponse)
 def client_pending(request: Request):
     """Orders that are not finished yet, with the one thing each is waiting for."""
@@ -6903,8 +7091,9 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         db.set_trial_verified(payment["user_id"])
         description = "Free trial verification - credited to your account"
     else:
-        db.set_subscription_plan(payment["user_id"], payment["plan"], billing.PLAN_PERIOD_DAYS)
-        description = f"{billing.PLANS[payment['plan']]['name']} plan subscription"
+        yearly = payment_kind in ("plan_year", "subscription_renewal_year")
+        db.set_subscription_plan(payment["user_id"], payment["plan"], billing.PLAN_YEAR_DAYS if yearly else billing.PLAN_PERIOD_DAYS)
+        description = f"{billing.PLANS[payment['plan']]['name']} plan subscription" + (" (yearly)" if yearly else "")
     # A real receipt for every completed payment, whatever it was for -
     # not conditional on provider (Paystack/M-Pesa/bank all get one),
     # since this is Kauli's own receipt, not a copy of theirs.
@@ -7038,7 +7227,10 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # configured becomes a RECURRING subscription; anything else (orders,
         # top-ups, plans without a code) stays a one-off charge.
         charge_currency = billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]), request.headers.get("cf-ipcountry"))
-        plan_code = billing.paystack_plan_code(plan, charge_currency) if (order_id is None and payment_kind == "order") else None
+        if order_id is None and payment_kind in ("order", "plan_year"):
+            plan_code = billing.paystack_plan_code(plan, charge_currency, yearly=(payment_kind == "plan_year"))
+        else:
+            plan_code = None
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url,
                                               plan_code=plan_code, currency=charge_currency)
         if "error" in result:
@@ -7121,7 +7313,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
 
 @app.post("/client/billing/checkout")
 def billing_checkout(request: Request, plan: str = Form(...), provider: str = Form(...),
-                      phone: str = Form("")):
+                      phone: str = Form(""), interval: str = Form("month")):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
@@ -7134,8 +7326,9 @@ def billing_checkout(request: Request, plan: str = Form(...), provider: str = Fo
             "send us a message from any order page and we'll reach out.",
             status_code=303,
         )
-    return _checkout(request, user, provider, plan, billing.PLANS[plan]["price_usd"],
-                      None, phone, "/client/billing", "/client/billing")
+    yearly = interval == "year"
+    return _checkout(request, user, provider, plan, billing.PLANS[plan]["price_usd_year" if yearly else "price_usd"],
+                      None, phone, "/client/billing", "/client/billing", payment_kind="plan_year" if yearly else "order")
 
 
 def _order_upsell_prices(order) -> dict:
@@ -7387,9 +7580,10 @@ def _handle_subscription_renewal(data: dict, base_url: str) -> None:
     if not (plan and user and provider_ref):
         return
     payment_id = billing.new_reference()
-    amount_usd = billing.PLANS[plan]["price_usd"]
+    yearly = billing.paystack_plan_is_yearly(plan_code)
+    amount_usd = billing.PLANS[plan]["price_usd_year" if yearly else "price_usd"]
     db.create_payment(payment_id, user["id"], plan, amount_usd, None, "USD", "paystack",
-                       meta=json.dumps({"kind": "subscription_renewal"}))
+                       meta=json.dumps({"kind": "subscription_renewal_year" if yearly else "subscription_renewal"}))
     payment = db.get_payment(payment_id)
     if payment and not _activate_payment(payment, provider_ref, base_url=base_url):
         db.fail_payment(payment_id)  # a webhook retry for a renewal already recorded - don't leave a pending orphan

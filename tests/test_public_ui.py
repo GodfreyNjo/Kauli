@@ -145,12 +145,12 @@ def test_primary_nav_matches_the_plan(client):
 
 def test_login_is_task_focused_and_accessible(client):
     html = client.get("/login").text
-    assert "Welcome back" in html and "Sign in to manage your projects and downloads." in html
+    assert "Welcome back" in html and "Sign in to continue." in html
     assert 'autocomplete="current-password"' in html and 'autocomplete="new-password"' in html
     assert 'autocomplete="username"' in html and 'autocomplete="email"' in html
-    assert "Forgot your password?" in html and "Create an account" in html
+    assert "Forgot your password?" in html and "Create a free account" in html and "Create free account" in html
     assert 'href="/terms"' in html and 'href="/privacy"' in html
-    assert "Human expertise. Global reach." in html
+    assert "Audio to text in minutes" in html and "Human expertise. Global reach." not in html and "What you get" not in html
     assert "AI Drafted, Human Verified" not in html
     # every input is wrapped in a visible label
     assert html.count('class="auth-field-label"') >= 4

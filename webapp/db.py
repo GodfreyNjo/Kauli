@@ -591,6 +591,27 @@ CREATE TABLE IF NOT EXISTS client_slack (
 -- Microsoft Teams: a customer's own Workflows webhook URL (created in THEIR tenant).
 -- The URL is a credential: anyone holding it can post to that channel, so the
 -- UI only ever shows it masked.
+-- Kauli joining a client's online meeting (see webapp/meeting_bot.py): one row per bot sent.
+CREATE TABLE IF NOT EXISTS meeting_bots (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    meeting_url TEXT NOT NULL,
+    platform TEXT NOT NULL,                 -- 'zoom' | 'meet' | 'teams'
+    title TEXT,
+    source_lang TEXT NOT NULL DEFAULT 'en',
+    status TEXT NOT NULL DEFAULT 'scheduled', -- scheduled | joining | recording | processing | importing | done | failed | cancelled
+    provider_bot_id TEXT,
+    join_at REAL,
+    minutes_available REAL,                 -- what the client had left when the bot was sent
+    order_id TEXT,                          -- the Instant AI order the recording became
+    error TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_meeting_bots_client ON meeting_bots(client_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_meeting_bots_provider ON meeting_bots(provider_bot_id);
+
 CREATE TABLE IF NOT EXISTS client_teams (
     client_id TEXT PRIMARY KEY,
     webhook_url TEXT NOT NULL,
@@ -3043,6 +3064,68 @@ def pending_orders_count(client_id: str) -> int:
     n = conn.execute(f"SELECT COUNT(*) FROM orders WHERE client_id = ? AND status IN ({marks})", (client_id, *PENDING_STATUSES)).fetchone()[0]
     conn.close()
     return n
+
+
+def create_meeting(meeting_id: str, client_id: str, meeting_url: str, platform: str, title: str, source_lang: str,
+                   provider_bot_id: str, join_at: float | None, minutes_available: float) -> None:
+    now = time.time()
+    conn = get_conn()
+    conn.execute(
+        "INSERT INTO meeting_bots (id, client_id, meeting_url, platform, title, source_lang, status, provider_bot_id, join_at, "
+        "minutes_available, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'scheduled', ?, ?, ?, ?, ?)",
+        (meeting_id, client_id, meeting_url, platform, title, source_lang, provider_bot_id, join_at, minutes_available, now, now))
+    conn.commit()
+    conn.close()
+
+
+def get_meeting(meeting_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM meeting_bots WHERE id = ?", (meeting_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def get_meeting_by_provider(provider_bot_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM meeting_bots WHERE provider_bot_id = ?", (provider_bot_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def list_meetings_for_client(client_id: str, limit: int = 30):
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM meeting_bots WHERE client_id = ? ORDER BY COALESCE(join_at, created_at) DESC LIMIT ?", (client_id, limit)).fetchall()
+    conn.close()
+    return rows
+
+
+def count_active_meetings(client_id: str) -> int:
+    conn = get_conn()
+    n = conn.execute("SELECT COUNT(*) FROM meeting_bots WHERE client_id = ? AND status IN ('scheduled','joining','recording','processing','importing')", (client_id,)).fetchone()[0]
+    conn.close()
+    return n
+
+
+def update_meeting(meeting_id: str, **fields) -> None:
+    allowed = {"status", "order_id", "error", "title"}
+    sets = {k: v for k, v in fields.items() if k in allowed}
+    if not sets:
+        return
+    conn = get_conn()
+    conn.execute(f"UPDATE meeting_bots SET {', '.join(k + ' = ?' for k in sets)}, updated_at = ? WHERE id = ?", (*sets.values(), time.time(), meeting_id))
+    conn.commit()
+    conn.close()
+
+
+def claim_meeting(meeting_id: str) -> bool:
+    """Atomically take the one-time job of turning a finished meeting into an order; False if another caller already has."""
+    conn = get_conn()
+    cur = conn.execute("UPDATE meeting_bots SET status = 'importing', updated_at = ? WHERE id = ? AND order_id IS NULL "
+                       "AND status IN ('scheduled','joining','recording','processing')", (time.time(), meeting_id))
+    conn.commit()
+    ok = cur.rowcount == 1
+    conn.close()
+    return ok
 
 
 def usual_languages(client_id: str, recent: int = 10):
