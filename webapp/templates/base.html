@@ -137,7 +137,7 @@
       <div class="sidebar-top">
         <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">«</button>
       </div>
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" aria-label="App">
         {% if user['role'] == 'staff' %}
         <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}">{{ nav_icon('grid') }}<span class="label">Overview</span></a>
         <a href="/staff/jobs" class="{{ 'active' if request.url.path == '/staff/jobs' else '' }}">{{ nav_icon('checklist') }}<span class="label">All jobs</span></a>

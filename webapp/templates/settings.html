@@ -6,7 +6,7 @@
 <p class="muted" style="margin-top:0;">Manage your account, preferences and defaults.</p>
 
 <div class="settings-layout">
-  <nav class="settings-nav">
+  <nav class="settings-nav" aria-label="Settings sections">
     <a href="/settings?tab=general" class="{{ 'active' if tab == 'general' }}">General</a>
     {% if user['role'] == 'client' %}
     <a href="/settings?tab=defaults" class="{{ 'active' if tab == 'defaults' }}">Language &amp; order defaults</a>
@@ -155,7 +155,7 @@
       <p class="muted" style="font-size:0.85rem; margin-top:0;">Let your own systems talk to Kauli directly -
          an API key to check order status and pull deliverable links without logging in, and a webhook so we
          tell you the moment an order's ready instead of you polling for it.
-         <a href="/docs/api">Full docs &amp; code examples &rarr;</a></p>
+         <a href="/developers">Full docs &amp; code examples &rarr;</a></p>
 
       <h3 style="margin:18px 0 8px; font-size:0.92rem;">API key</h3>
       {% if new_api_key %}
@@ -179,7 +179,7 @@
       </form>
       {% if api_key_row %}
       <form method="post" action="/settings/api-key/revoke" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-btn" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
+        <button type="submit" class="row-action-chip" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
       </form>
       {% endif %}
       <p class="muted" style="font-size:0.78rem; margin-top:12px;">
@@ -187,6 +187,38 @@
         <code>Authorization: Bearer &lt;your key&gt;</code>. Returns status and signed, time-limited links to
         only the deliverables that order actually paid for.
       </p>
+
+      <h3 id="slack" style="margin:22px 0 8px; font-size:0.92rem;">Slack</h3>
+      <p class="muted" style="font-size:0.82rem; margin-top:0;">Get a message in a Slack channel the moment an
+         order is ready. In your workspace, create an
+         <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener">Incoming Webhook</a>,
+         choose the channel, and paste its URL here.</p>
+      {% if slack_error %}<p class="error">{{ slack_error }}</p>{% endif %}
+      {% if slack_notice %}<p class="ok">{{ slack_notice }}</p>{% endif %}
+      {% if slack_row %}
+      <p class="muted" style="font-size:0.82rem; margin:0 0 8px;">Connected:
+         <code>https://hooks.slack.com/services/&hellip;{{ slack_row['webhook_url'][-4:] }}</code></p>
+      {% endif %}
+      <form method="post" action="/settings/slack">
+        <label>{{ 'Replace the Slack webhook URL' if slack_row else 'Slack webhook URL' }}
+          <input type="url" name="url" autocomplete="off" placeholder="https://hooks.slack.com/services/T000/B000/XXXX">
+        </label>
+        <label style="display:flex; gap:8px; align-items:flex-start; margin-top:8px;">
+          <input type="checkbox" name="include_links" value="1" style="width:auto; margin-top:3px;"
+                 {% if slack_row and slack_row['include_links'] %}checked{% endif %}>
+          <span style="font-size:0.84rem;">Include download buttons. Anyone in the channel can use them for 7 days;
+            leave this off to share only a link that needs your Kauli login.</span>
+        </label>
+        <button type="submit" class="secondary" style="margin-top:8px;">{{ 'Save' if slack_row else 'Connect Slack' }}</button>
+      </form>
+      {% if slack_row %}
+      <form method="post" action="/settings/slack/test" style="display:inline;">
+        <button type="submit" class="secondary">Send a test message</button>
+      </form>
+      <form method="post" action="/settings/slack/delete" style="display:inline; margin-left:8px;">
+        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Slack?');">Disconnect</button>
+      </form>
+      {% endif %}
 
       <h3 style="margin:22px 0 8px; font-size:0.92rem;">Webhook</h3>
       <p class="muted" style="font-size:0.82rem; margin-top:0;">We'll POST here the moment an order reaches
@@ -209,7 +241,7 @@
         <button type="submit" class="secondary" onclick="return confirm('Regenerate the signing secret? Update your verification code with the new one first.');">Regenerate secret</button>
       </form>
       <form method="post" action="/settings/webhook/delete" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-btn" onclick="return confirm('Remove your webhook?');">Remove</button>
+        <button type="submit" class="row-action-chip" onclick="return confirm('Remove your webhook?');">Remove</button>
       </form>
 
       {% if webhook_deliveries %}
@@ -246,7 +278,7 @@
       <p style="font-size:0.85rem;">Connected as <strong>{{ youtube_connection['channel_title'] or 'your channel' }}</strong>
          &middot; since {{ youtube_connection['connected_at']|int|timestamp_to_str }}</p>
       <form method="post" action="/client/youtube/disconnect">
-        <button type="submit" class="row-action-btn" onclick="return confirm('Disconnect your YouTube channel? You can reconnect any time.');">Disconnect</button>
+        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect your YouTube channel? You can reconnect any time.');">Disconnect</button>
       </form>
       {% else %}
       <a class="btn secondary" href="/client/youtube/connect?next={{ '/settings?tab=integrations'|urlencode }}">Connect your YouTube channel</a>

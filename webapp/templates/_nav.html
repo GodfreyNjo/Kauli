@@ -56,7 +56,32 @@
       </div>
     </div>
 
-    <a href="{{ home }}#integrations">Integrations</a>
+    <div class="m-nav-dropdown">
+      <button type="button" class="m-nav-dropdown-trigger" aria-expanded="false" aria-haspopup="true">
+        Integrations
+        <svg class="m-nav-chevron" viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 1.5 6 6.5 11 1.5"/></svg>
+      </button>
+      <div class="m-nav-dropdown-menu m-nav-dropdown-menu-int">
+        <p class="m-nav-dropdown-note">Send work in and pull results out with our API, MCP server and webhooks today.</p>
+        <div class="m-nav-dropdown-col">
+          <span class="m-nav-dropdown-heading">Available now</span>
+          <a href="/developers">API</a>
+          <a href="/developers#mcp">MCP server</a>
+          <a href="/developers#webhooks">Webhooks</a>
+          <a href="/developers#slack">Slack</a>
+          <a href="{{ home }}#integrations">YouTube captions</a>
+        </div>
+        <div class="m-nav-dropdown-col">
+          <span class="m-nav-dropdown-heading">Coming soon</span>
+          <span class="m-nav-dropdown-soon">Zoom<em>Soon</em></span>
+          <span class="m-nav-dropdown-soon">Google Meet<em>Soon</em></span>
+          <span class="m-nav-dropdown-soon">Google Drive<em>Soon</em></span>
+          <span class="m-nav-dropdown-soon">Notion<em>Soon</em></span>
+          <span class="m-nav-dropdown-soon">HubSpot<em>Soon</em></span>
+        </div>
+        <a class="m-nav-dropdown-foot" href="{{ home }}#integrations">See all integrations &rarr;</a>
+      </div>
+    </div>
     <a href="{{ home }}#pricing">Pricing</a>
 
     <div class="m-nav-dropdown">

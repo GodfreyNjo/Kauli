@@ -181,9 +181,19 @@ def test_integrations_section_is_honest_about_what_exists(client):
     html = client.get("/").text
     block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     # what is really built is marked Available and linked to its docs...
-    for name in ("API", "MCP server", "Webhooks"):
+    for name in ("API", "MCP server", "Webhooks", "Slack"):
         assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
     # ...and nothing unbuilt is ever presented as available
-    for name in ("Zoom", "Slack", "Notion", "Google Drive", "HubSpot", "Salesforce"):
+    for name in ("Zoom", "Notion", "Google Drive", "HubSpot", "Salesforce"):
         m = re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge (\w+)">', block)
         assert m and m.group(1) == "soon", name
+
+
+def test_integrations_nav_dropdown_and_section_wording(client):
+    html = client.get("/").text
+    nav = re.search(r'<nav class="m-nav".*?</nav>', html, re.S).group(0)
+    assert "Send work in and pull results out with our API, MCP server and webhooks today." in nav
+    assert "Available now" in nav and "Coming soon" in nav and "See all integrations" in nav
+    section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
+    assert "Send work in and pull results out with our API, MCP server and webhooks today." in section
+    assert "are on the way" not in section and "One-click" not in section

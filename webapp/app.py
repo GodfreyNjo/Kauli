@@ -3618,6 +3618,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
                    team_error: str | None = None, defaults_saved: bool = False,
                    password_error: str | None = None, password_saved: bool = False,
                    saved: bool = False, error: str | None = None, webhook_error: str | None = None,
+                   slack_error: str | None = None, slack_notice: str | None = None,
                    mfa_step: str | None = None, mfa_error: str | None = None, mfa_notice: str | None = None):
     user = current_user(request)
     if not user:
@@ -3666,6 +3667,8 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
         "deletion_requested": db.has_pending_deletion_request(user["id"]) if user["role"] == "client" else False,
         "webhook_error": webhook_error,
+        "slack_row": db.get_client_slack(user["id"]) if is_team_owner else None,
+        "slack_error": slack_error, "slack_notice": slack_notice,
         "mfa_step": mfa_step, "mfa_error": mfa_error, "mfa_notice": mfa_notice, "mfa_pending": mfa_pending,
         "new_backup_codes": new_backup_codes,
         "backup_codes_remaining": db.count_unused_backup_codes(user["id"]) if user["mfa_enabled_at"] else 0,
@@ -3699,6 +3702,51 @@ def settings_api_key_revoke(request: Request):
     db.log_security_event("api_key_revoked", user_id=user["id"], email=user["email"],
                            ip_address=rate_limit.client_ip(request))
     return RedirectResponse("/settings?tab=integrations", status_code=303)
+
+
+@app.post("/settings/slack")
+def settings_slack_save(request: Request, url: str = Form(""), include_links: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    url = url.strip()
+    existing = db.get_client_slack(user["id"])
+    if not url and existing:                       # only the checkbox changed
+        db.set_client_slack_include_links(user["id"], bool(include_links))
+        return RedirectResponse("/settings?tab=integrations&slack_notice=Slack+settings+saved#slack", status_code=303)
+    if not _is_slack_webhook_url(url):
+        return RedirectResponse(
+            "/settings?tab=integrations&slack_error=That+isn%27t+a+Slack+Incoming+Webhook+URL.+It+should+look+like+"
+            "https%3A%2F%2Fhooks.slack.com%2Fservices%2FT...%2FB...%2F...#slack", status_code=303)
+    db.set_client_slack(user["id"], url, bool(include_links))
+    return RedirectResponse("/settings?tab=integrations&slack_notice=Slack+connected.+Send+a+test+message+to+check+it#slack",
+                            status_code=303)
+
+
+@app.post("/settings/slack/test")
+def settings_slack_test(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    row = db.get_client_slack(user["id"])
+    if not row:
+        return RedirectResponse("/settings?tab=integrations&slack_error=Connect+Slack+first#slack", status_code=303)
+    ok, detail = _post_to_slack(user["id"], "test", "slack.test", row["webhook_url"], {
+        "text": "Kauli is connected to this channel. You will get a message here when an order is ready."})
+    if ok:
+        return RedirectResponse("/settings?tab=integrations&slack_notice=Test+message+sent#slack", status_code=303)
+    from urllib.parse import quote_plus
+    return RedirectResponse(f"/settings?tab=integrations&slack_error={quote_plus('Slack refused the message: ' + str(detail))}#slack",
+                            status_code=303)
+
+
+@app.post("/settings/slack/delete")
+def settings_slack_delete(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
+        return RedirectResponse("/login")
+    db.delete_client_slack(user["id"])
+    return RedirectResponse("/settings?tab=integrations&slack_notice=Slack+disconnected#slack", status_code=303)
 
 
 @app.post("/settings/webhook")
@@ -7377,6 +7425,74 @@ def _is_safe_webhook_url(url: str) -> bool:
         return False
 
 
+_SLACK_WEBHOOK_RE = re.compile(r"^https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+$")
+
+
+def _is_slack_webhook_url(url: str) -> bool:
+    """Exactly Slack's Incoming Webhook shape on exactly hooks.slack.com - the
+    host is fixed, so unlike a free-form webhook URL this can never be pointed
+    at Kauli's own network."""
+    return bool(_SLACK_WEBHOOK_RE.match(url or ""))
+
+
+def _post_to_slack(client_id: str, order_id: str, event: str, url: str, payload: dict) -> tuple[bool, str | None]:
+    """One real POST to the client's Slack webhook, logged in the same delivery
+    list as their other webhook. Never follows redirects, never raises."""
+    try:
+        resp = httpx.post(url, json=payload, timeout=10.0, follow_redirects=False)
+    except httpx.HTTPError as exc:
+        db.log_webhook_delivery(client_id, order_id, event, False, None, str(exc)[:300])
+        return False, str(exc)[:200]
+    ok = resp.status_code == 200
+    detail = None if ok else (resp.text or f"HTTP {resp.status_code}")[:200]
+    db.log_webhook_delivery(client_id, order_id, event, ok, resp.status_code, detail)
+    return ok, detail
+
+
+def _slack_escape(text: str) -> str:
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_SLACK_SERVICE_LABELS = {"transcribe": "Transcription", "translate": "Transcription + translation", "dub": "Full dub"}
+
+
+def _slack_order_ready_message(request, order, include_links: bool) -> dict:
+    base = str(request.base_url).rstrip("/")
+    name = _slack_escape(order["original_filename"] or order["id"])
+    service = _SLACK_SERVICE_LABELS.get(order["service_level"] or "transcribe", "Order")
+    src, tgt = order["source_lang"], order["target_lang"]
+    langs = LANGUAGE_NAMES.get(src, src) + (f" \u2192 {LANGUAGE_NAMES.get(tgt, tgt)}" if tgt and tgt != src else "")
+    buttons = [{"type": "button", "text": {"type": "plain_text", "text": "Open order"},
+                "url": f"{base}/client/orders/{order['id']}", "style": "primary"}]
+    if include_links:
+        links = _order_to_api_dict(request, order)["deliverables"]
+        for kind, label in (("txt", "Transcript (TXT)"), ("docx", "Transcript (Word)"), ("srt", "Subtitles (SRT)"),
+                            ("vtt", "Subtitles (VTT)")):
+            if kind in links and len(buttons) < 4:
+                buttons.append({"type": "button", "text": {"type": "plain_text", "text": label}, "url": links[kind]})
+    blocks = [
+        {"type": "header", "text": {"type": "plain_text", "text": "Your Kauli order is ready"}},
+        {"type": "section", "fields": [
+            {"type": "mrkdwn", "text": f"*File*\n{name}"},
+            {"type": "mrkdwn", "text": f"*Service*\n{service}"},
+            {"type": "mrkdwn", "text": f"*Languages*\n{_slack_escape(langs)}"},
+            {"type": "mrkdwn", "text": f"*Order*\n{order['id']}"}]},
+    ]
+    if order["is_free_preview"]:
+        blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text":
+            "Made with free minutes: you can read it in Kauli, and downloads unlock with a paid order."}]})
+    blocks.append({"type": "actions", "elements": buttons})
+    return {"text": f"Your Kauli order is ready: {order['original_filename'] or order['id']}", "blocks": blocks}
+
+
+def _notify_slack_order_ready(request, order) -> None:
+    row = db.get_client_slack(order["client_id"])
+    if not row or not _is_slack_webhook_url(row["webhook_url"]):
+        return
+    _post_to_slack(order["client_id"], order["id"], "slack.order.ready", row["webhook_url"],
+                   _slack_order_ready_message(request, order, bool(row["include_links"])))
+
+
 def _fire_client_webhook(request: Request, order, event: str = "order.ready") -> None:
     """Real outbound POST, fired once, right when the client-facing 'order
     ready' email/notification already go out (see staff_approve below). No
@@ -7387,6 +7503,11 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
     lost if a webhook attempt fails. Errors are swallowed - a client's
     misconfigured or offline endpoint must never break the real approval
     flow it's hanging off of."""
+    try:                                   # Slack is independent of the signed webhook below
+        if event == "order.ready":
+            _notify_slack_order_ready(request, order)
+    except Exception:
+        pass
     hook = db.get_client_webhook(order["client_id"])
     if not hook:
         return
