@@ -6805,8 +6805,8 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # A plan purchase (no order) on a plan that has a Paystack plan code
         # configured becomes a RECURRING subscription; anything else (orders,
         # top-ups, plans without a code) stays a one-off charge.
-        plan_code = billing.paystack_plan_code(plan) if (order_id is None and payment_kind == "order") else None
         charge_currency = billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]))
+        plan_code = billing.paystack_plan_code(plan, charge_currency) if (order_id is None and payment_kind == "order") else None
         result = billing.paystack_initialize(user["email"], amount_usd, payment_id, callback_url,
                                               plan_code=plan_code, currency=charge_currency)
         if "error" in result:
@@ -7149,7 +7149,7 @@ def _handle_subscription_renewal(data: dict, base_url: str) -> None:
     plan_code = ((data.get("plan") or {}).get("plan_code") or "").strip()
     if not plan_code:
         return
-    plan = next((p for p in billing.PLANS if p != "free" and billing.paystack_plan_code(p) == plan_code), None)
+    plan = next((p for p in billing.PLANS if p != "free" and plan_code in billing.paystack_plan_codes(p)), None)
     user = db.get_user_by_email(((data.get("customer") or {}).get("email") or "").strip().lower())
     provider_ref = str(data.get("id") or data.get("reference") or "")
     if not (plan and user and provider_ref):

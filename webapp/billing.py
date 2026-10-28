@@ -627,12 +627,29 @@ def paystack_currency_for_market(market: str | None) -> str:
     return "KES"
 
 
-def paystack_plan_code(plan: str) -> str | None:
+def paystack_plan_code(plan: str, currency: str | None = None) -> str | None:
     """Paystack plan code (PLN_...) for a subscription plan, from
     PAYSTACK_PLAN_PRO / PAYSTACK_PLAN_PREMIUM. Created in the Paystack
     dashboard (Products -> Plans, monthly, priced to match PLANS). Unset =
-    that plan is still sold as a one-off 30-day purchase, as before."""
+    that plan is still sold as a one-off 30-day purchase, as before.
+
+    A Paystack plan has one currency, so with `currency` given the plan made for that currency wins
+    (PAYSTACK_PLAN_PRO_USD / PAYSTACK_PLAN_PRO_KES, written by `python -m webapp.paystack_setup`). A plan is never
+    offered in a currency it was not made for: with only the other currency's plan set, the client is simply
+    charged once, as before. The unsuffixed PAYSTACK_PLAN_PRO keeps working for anyone who set it up by hand."""
+    if currency:
+        specific = os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}_{currency.upper()}", "").strip()
+        if specific:
+            return specific
+        if any(os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}_{c}", "").strip() for c in ("USD", "KES")):
+            return None
     return (os.environ.get(f"PAYSTACK_PLAN_{plan.upper()}", "").strip() or None)
+
+
+def paystack_plan_codes(plan: str) -> set[str]:
+    """Every Paystack plan code that means this plan - what a renewal webhook is matched against."""
+    names = [f"PAYSTACK_PLAN_{plan.upper()}"] + [f"PAYSTACK_PLAN_{plan.upper()}_{c}" for c in ("USD", "KES")]
+    return {v for v in (os.environ.get(n, "").strip() for n in names) if v}
 
 
 # How long past current_period_end a RECURRING (Paystack-subscribed) account
