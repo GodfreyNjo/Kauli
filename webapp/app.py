@@ -6156,9 +6156,12 @@ def _order_progress_steps(status: str, review_tier: str = "human") -> list[dict]
         step_defs = [s for s in _PROGRESS_STEPS if s[0] != "staff_review"]
     current_idx = next((i for i, (k, _) in enumerate(step_defs) if k == current_key), 0)
     attention = status in ("returned_to_client", "failed", "dead_letter")
+    # Ready (or delivered) is the end of the road for the client: every step, Delivered included, is ticked. An
+    # Instant AI order gets there on its own the moment processing finishes - nobody has to approve it.
+    finished = status in ("ready_for_delivery", "delivered")
     steps = []
     for i, (key, label) in enumerate(step_defs):
-        if i < current_idx:
+        if finished or i < current_idx:
             state = "done"
         elif i == current_idx:
             state = "attention" if attention else "current"

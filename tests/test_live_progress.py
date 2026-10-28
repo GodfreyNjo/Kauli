@@ -66,3 +66,23 @@ def test_the_pipeline_reports_each_stage_it_enters():
         assert f'stage("{key}")' in src, key
     worker = (Path(__file__).parent.parent / "webapp" / "worker.py").read_text(encoding="utf-8")
     assert "on_stage=lambda key: db.set_processing_stage(order_id, key)" in worker
+
+
+def test_a_finished_order_ticks_every_step_including_delivered(env):
+    steps = env.app._order_progress_steps
+    ai = steps("ready_for_delivery", "ai")
+    assert [s["key"] for s in ai] == ["submitted", "processing", "delivered"] and {s["state"] for s in ai} == {"done"}
+    assert {s["state"] for s in steps("delivered", "human")} == {"done"}
+    # while it is still running nothing is ticked early, and trouble is still flagged
+    assert [s["state"] for s in steps("processing", "ai")] == ["done", "current", "pending"]
+    assert [s["state"] for s in steps("awaiting_review", "human")] == ["done", "done", "current", "pending"]
+    assert steps("failed", "ai")[1]["state"] == "attention"
+
+
+def test_instant_ai_reaches_the_ticked_state_with_no_staff_approval(env, wav_bytes):
+    from test_order_flow import _run_worker
+    ai = env.order_from(env.place(wav_bytes))
+    done = _run_worker(env, ai)
+    assert done["status"] == "ready_for_delivery"                      # nobody approved anything
+    page = env.client.get(f"/client/orders/{ai['id']}").text
+    assert page.count("order-progress-done") == 3 and "order-progress-current" not in page
