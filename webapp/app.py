@@ -33,6 +33,7 @@ from urllib.parse import quote, urlparse
 import httpx
 import yt_dlp
 from fastapi import Body, FastAPI, Request, UploadFile, Form, File
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -41,7 +42,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export  # noqa: E402
+from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server  # noqa: E402
 from kauli import timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
@@ -7246,6 +7247,113 @@ def api_create_order(
         return JSONResponse({"error": "could not create the order"}, status_code=400)
     order = db.get_order(m.group(1))
     return JSONResponse(_order_to_api_dict(request, order), status_code=402 if m.group(2) else 201)
+
+
+_MCP_TEXT_LIMIT = 200_000
+
+
+def _mcp_owned_order(client_id: str, order_id: str):
+    order = db.get_order(str(order_id or "").strip())
+    if not order or order["client_id"] != client_id:
+        return None
+    return order
+
+
+def _mcp_call_tool(request: Request, client_id: str, name: str, args: dict) -> dict:
+    """What each MCP tool does. Every one goes through the same helpers as the
+    REST API - same key check, same ownership rule, same payment gate - so the
+    assistant can never see or do more than the customer's own key could."""
+    text = mcp_server.text_result
+    if name == "kauli_list_languages":
+        return text(json.loads(api_languages().body))
+    if name == "kauli_create_order":
+        resp = api_create_order(
+            request, audio=None, url=str(args.get("url", "")), source_lang=str(args.get("source_lang", "en")),
+            target_lang=str(args.get("target_lang", "")), service_level=str(args.get("service_level", "transcribe")),
+            review_tier=str(args.get("review_tier", "ai")), idempotency_key=str(args.get("idempotency_key", "")),
+            folder_name="", notes="")
+        body = json.loads(resp.body)
+        return text(body, is_error=resp.status_code not in (200, 201, 402))
+    if name == "kauli_get_order":
+        order = _mcp_owned_order(client_id, args.get("order_id"))
+        return text(_order_to_api_dict(request, order)) if order else text("Order not found.", is_error=True)
+    if name == "kauli_list_orders":
+        try:
+            limit = max(1, min(int(args.get("limit", 10)), 100))
+        except (TypeError, ValueError):
+            limit = 10
+        return text({"orders": [_order_to_api_dict(request, o) for o in db.list_orders_for_client(client_id)[:limit]]})
+    if name == "kauli_get_transcript":
+        order = _mcp_owned_order(client_id, args.get("order_id"))
+        if not order:
+            return text("Order not found.", is_error=True)
+        fmt = str(args.get("format", "txt")).lower()
+        if fmt not in ("txt", "srt", "vtt"):
+            return text("format must be txt, srt or vtt.", is_error=True)
+        if order["status"] == "pending_payment":
+            return text("This order is waiting for payment, so there is no transcript to read yet.", is_error=True)
+        outdir = Path(order["outdir"])
+        if fmt == "txt":
+            denied = _deliverable_denied_reason(order, "txt")
+            job = None if denied else _load_job(order)
+            if denied or job is None:
+                return text(denied or "Not ready yet.", is_error=True)
+            title = f"Transcript - {order['original_filename'] or order['id']}"
+            content = transcript_export.to_txt(job, title).decode("utf-8")
+        else:
+            # Translated subtitles when the order bought translation, else the source-language SRT.
+            kind = fmt if _deliverable_denied_reason(order, fmt) is None else (
+                "transcript" if fmt == "srt" else None)
+            denied = _deliverable_denied_reason(order, kind) if kind else (
+                "VTT subtitles are only part of translation orders - ask for txt or srt instead.")
+            filename = _deliverable_filename(order, kind) if kind else None
+            if denied or not filename or not (outdir / filename).exists():
+                return text(denied or "Not ready yet.", is_error=True)
+            content = (outdir / filename).read_text(encoding="utf-8", errors="replace")
+        if len(content) > _MCP_TEXT_LIMIT:
+            content = content[:_MCP_TEXT_LIMIT] + "\n\n[Truncated - download the full file with kauli_get_order's links.]"
+        return text(content)
+    return text(f"Unknown tool: {name}", is_error=True)
+
+
+@app.post("/mcp")
+async def mcp_endpoint(request: Request):
+    """Kauli's remote MCP server (Streamable HTTP, JSON responses). Connect a
+    client with the customer's API key as a bearer token."""
+    limited = _api_rate_limited(request)
+    if limited:
+        return limited
+    try:
+        payload = await request.json()
+    except ValueError:
+        return JSONResponse({"jsonrpc": "2.0", "id": None,
+                              "error": {"code": mcp_server.PARSE_ERROR, "message": "Invalid JSON"}}, status_code=400)
+    client_id = _client_id_from_api_key(request)
+    row = db.get_user(client_id) if client_id else None
+    if row and row["account_status"] == "closed":
+        client_id = None
+    batch = payload if isinstance(payload, list) else [payload]
+    if not batch:
+        return JSONResponse({"jsonrpc": "2.0", "id": None, "error": {
+            "code": mcp_server.INVALID_REQUEST, "message": "Empty batch"}}, status_code=400)
+
+    def run(msg):
+        return mcp_server.handle_message(
+            msg, bool(client_id), lambda name, args: _mcp_call_tool(request, client_id, name, args))
+
+    responses = [r for r in [await run_in_threadpool(run, m) for m in batch] if r is not None]
+    if not responses:
+        return Response(status_code=202)                   # only notifications
+    if any(r.get("error", {}).get("code") == -32001 for r in responses):
+        return JSONResponse(responses[0] if len(responses) == 1 else responses, status_code=401,
+                             headers={"WWW-Authenticate": 'Bearer realm="kauli"'})
+    return JSONResponse(responses if isinstance(payload, list) else responses[0])
+
+
+@app.get("/mcp")
+def mcp_get():
+    # No server-initiated stream: this server only answers POSTed requests.
+    return Response(status_code=405, headers={"Allow": "POST"})
 
 
 def _is_safe_webhook_url(url: str) -> bool:

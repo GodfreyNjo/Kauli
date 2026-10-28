@@ -95,6 +95,35 @@ def valid(secret: str, timestamp: str, body: bytes, header: str) -&gt; bool:
     expected = "sha256=" + hmac.new(secret.encode(), timestamp.encode() + b"." + body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, header)</code></pre>
 
+    <h2 id="mcp">Use Kauli from an AI assistant (MCP)</h2>
+    <p>Kauli runs a remote <a href="https://modelcontextprotocol.io" rel="noopener">Model Context Protocol</a> server, so an
+       assistant can order and read transcripts for you. It uses the same API key as above, sent as a bearer token.</p>
+    <p>Endpoint: <code>{{ base }}/mcp</code> (Streamable HTTP). In Claude Code:</p>
+<pre tabindex="0"><code>claude mcp add --transport http kauli {{ base }}/mcp   --header "Authorization: Bearer $KAULI_API_KEY"</code></pre>
+    <p>Any other client that lets you set a header on a remote MCP server works the same way:</p>
+<pre tabindex="0"><code>{
+  "mcpServers": {
+    "kauli": {
+      "type": "http",
+      "url": "{{ base }}/mcp",
+      "headers": { "Authorization": "Bearer YOUR_KAULI_API_KEY" }
+    }
+  }
+}</code></pre>
+    <table class="dev-table">
+      <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td><code>kauli_create_order</code></td><td>Order a transcript, translation or dub from a YouTube link. Same prices and rules as the site; an order that needs payment is held and returns a payment link.</td></tr>
+        <tr><td><code>kauli_get_order</code></td><td>Check one order and get signed download links once it is paid and ready.</td></tr>
+        <tr><td><code>kauli_list_orders</code></td><td>Your most recent orders.</td></tr>
+        <tr><td><code>kauli_get_transcript</code></td><td>Read the text of a finished, paid order as txt, srt or vtt.</td></tr>
+        <tr><td><code>kauli_list_languages</code></td><td>The language codes Kauli accepts and what each supports.</td></tr>
+      </tbody>
+    </table>
+    <p>Ordering spends your money or free minutes, so a good assistant will ask before it orders. The server does not
+       support browser sign-in (OAuth) yet, so connectors that only offer a sign-in button cannot use it; use a client
+       that accepts a header, as above. Files are uploaded through the REST API; the MCP server takes YouTube links.</p>
+
     <h2>Need something else?</h2>
     <p>Questions, higher limits, or an integration you would like us to build: write to
        <a href="mailto:{{ email }}">{{ email }}</a> or <a href="tel:{{ phone_tel }}">{{ phone_display }}</a>.</p>
