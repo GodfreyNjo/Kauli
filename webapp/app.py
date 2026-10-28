@@ -160,6 +160,27 @@ def _youtube_extra_opts() -> dict:
     return opts
 
 
+def explain_youtube_failure(exc: Exception) -> str:
+    """What to tell a client when a YouTube link could not be fetched: the cause in plain words and what to do next, never the
+    downloader's raw error (which is a wall of text about cookies that a client cannot act on)."""
+    text = str(exc).lower()
+    upload = "You can always download the video yourself and upload the file here instead, which is never blocked."
+    if "confirm you" in text and "bot" in text or "sign in" in text and "cookies" in text:
+        return ("YouTube is blocking automatic downloads from our servers right now, so we could not fetch this link. "
+                "Please try again in a little while, or " + upload[0].lower() + upload[1:])
+    if "private video" in text or "members-only" in text or "join this channel" in text:
+        return "That video is private or for members only, so we cannot fetch it. Make it public or unlisted, or " + upload[0].lower() + upload[1:]
+    if "not available" in text or "unavailable" in text or "removed" in text or "no longer available" in text:
+        return "That video is unavailable (removed, region-locked or blocked). Check the link, or " + upload[0].lower() + upload[1:]
+    if "age" in text and ("restrict" in text or "confirm your age" in text):
+        return "That video is age-restricted, so we cannot fetch it automatically. " + upload
+    if "live event" in text or "is live" in text or "premiere" in text:
+        return "That video is a live stream or a premiere that has not finished. Try again once it has ended."
+    if "unsupported url" in text or "is not a valid url" in text:
+        return "That does not look like a YouTube video link. Paste the address of a single video."
+    return "We could not fetch that YouTube link. Please check it and try again, or " + upload[0].lower() + upload[1:]
+
+
 def _download_youtube(url: str, dest_dir: Path) -> tuple[Path, str, str | None]:
     """Downloads AUDIO ONLY - the pipeline (ASR/MT/TTS) only ever needs
     audio samples, and audio-only is a fraction of the size/time of the
@@ -5612,8 +5633,9 @@ def create_order(
         try:
             audio_path, original_filename, youtube_video_id = _download_youtube(youtube_url, order_upload_dir)
         except Exception as exc:
-            return _client_dashboard_error(request, user, f"Couldn't fetch that YouTube link: {exc}",
-                                            form_values=form_values)
+            api_log.warning("youtube_fetch_failed", extra={"trace_id": getattr(request.state, "trace_id", None),
+                                                           "url": youtube_url[:200], "error": str(exc)[:500]})
+            return _client_dashboard_error(request, user, explain_youtube_failure(exc), form_values=form_values)
     elif audio is not None and audio.filename:
         client_ip = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
