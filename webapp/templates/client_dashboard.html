@@ -49,6 +49,7 @@
        data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"
        data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
        data-premium-voice-rate="{{ addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0 }}"
+       data-audio-cleanup-rate="{{ addons['audio_cleanup']['rate_per_min'] if 'audio_cleanup' in addons else 0 }}"
        data-rush-pct="{{ rush_surcharge_pct }}"></div>
 
   <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
@@ -209,6 +210,16 @@
             ready, which takes longer than the automated dub.</span>
           </label>
 
+          {% if audio_cleanup_available %}
+          <label class="checkbox tier-option" id="audio-cleanup-field" style="margin-bottom:14px; align-items:center;">
+            <input type="checkbox" name="addon_audio_cleanup" value="1" id="audio-cleanup-checkbox"
+                   {% if form_values.get('addon_audio_cleanup') %}checked{% endif %}>
+            <span><strong>Clean up the audio first</strong> (+${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min']) }}/audio-minute).
+            Removes background noise and music before we transcribe, which helps most on field interviews and phone or
+            WhatsApp recordings. Your audio is sent to our audio partner ElevenLabs to do this.</span>
+          </label>
+          {% endif %}
+
           {% if premium_voice_available %}
           <div class="tier-option premium-voice-box" id="premium-voice-field" hidden style="margin-bottom:14px;">
             <label class="checkbox" style="align-items:center; margin-bottom:6px;">
@@ -254,6 +265,7 @@
           <div class="pricing-row" id="price-manual-row" hidden><span>Manual transcription</span><span id="price-manual">—</span></div>
           <div class="pricing-row" id="price-human-voice-row" hidden><span>Human voice actor</span><span id="price-human-voice">—</span></div>
           <div class="pricing-row" id="price-premium-voice-row" hidden><span>Premium AI voice</span><span id="price-premium-voice">—</span></div>
+          <div class="pricing-row" id="price-audio-cleanup-row" hidden><span>Audio clean-up</span><span id="price-audio-cleanup">—</span></div>
           <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
           <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
           <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>

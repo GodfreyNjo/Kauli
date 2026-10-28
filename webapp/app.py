@@ -3070,6 +3070,11 @@ def _elevenlabs_configured() -> bool:
     return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.premium_voice_margin_ok()
 
 
+def _audio_cleanup_available() -> bool:
+    """Offered only with a key and while the add-on price still clears the margin floor at today's cost."""
+    return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.audio_cleanup_margin_ok()
+
+
 _ELEVEN_BALANCE_CACHE: dict = {"at": 0.0, "remaining": None}
 
 
@@ -3089,6 +3094,14 @@ def _elevenlabs_remaining_chars() -> int | None:
         remaining = None
     _ELEVEN_BALANCE_CACHE.update({"at": time.time(), "remaining": remaining})
     return remaining
+
+
+def _audio_cleanup_capacity_ok(minutes: float) -> bool:
+    """Same spend ceiling as the premium voice: only taken while the plan has the credits left."""
+    if os.environ.get("ELEVENLABS_ALLOW_OVERAGE") == "1":
+        return True
+    remaining = _elevenlabs_remaining_chars()
+    return remaining is not None and remaining >= billing.audio_cleanup_credits_needed(minutes)
 
 
 def _premium_capacity_ok(minutes: float) -> bool:
@@ -5148,6 +5161,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
         "show_tour": not user["onboarding_tour_seen_at"],
         "premium_voice_available": _elevenlabs_configured(),
+        "audio_cleanup_available": _audio_cleanup_available(),
     })
 
 
@@ -5204,6 +5218,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "youtube_pending_imports": db.list_pending_imports(user["client_scope_id"]),
         "show_tour": not user["onboarding_tour_seen_at"],
         "premium_voice_available": _elevenlabs_configured(),
+        "audio_cleanup_available": _audio_cleanup_available(),
     })
 
 
@@ -5421,6 +5436,7 @@ def create_order(
     addon_human_voice_over: str = Form(""),
     addon_premium_voice: str = Form(""),
     premium_voice_id: str = Form(""),
+    addon_audio_cleanup: str = Form(""),
     instr_speaker_ids: str = Form(""),
     instr_verbatim_level: str = Form("clean_read"),
     instr_transcribe_lyrics: str = Form(""),
@@ -5453,6 +5469,7 @@ def create_order(
         "service_level": service_level, "addon_video_deliverables": addon_video_deliverables,
         "addon_human_voice_over": addon_human_voice_over,
         "addon_premium_voice": addon_premium_voice, "premium_voice_id": premium_voice_id,
+        "addon_audio_cleanup": addon_audio_cleanup,
         "instr_speaker_ids": instr_speaker_ids, "instr_verbatim_level": instr_verbatim_level,
         "instr_transcribe_lyrics": instr_transcribe_lyrics, "instr_use_italics": instr_use_italics,
         "instr_existing_subs": instr_existing_subs, "instr_no_audio": instr_no_audio,
@@ -5551,6 +5568,11 @@ def create_order(
         if premium_voice_id not in {v["id"] for v in _premium_voices()}:
             return _client_dashboard_error(request, user, "Choose one of the listed premium voices.", form_values=form_values)
         addons.append("premium_voice")
+    wants_audio_cleanup = bool(addon_audio_cleanup)
+    if wants_audio_cleanup:
+        if not _audio_cleanup_available():
+            return _client_dashboard_error(request, user, "Audio clean-up isn't available right now.", form_values=form_values)
+        addons.append("audio_cleanup")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Not a checkbox the client toggles - this is a real cost every
         # service level incurs for this language (every SERVICE_LEVELS tier
@@ -5632,6 +5654,10 @@ def create_order(
             "Couldn't read that file's duration - it may not be a valid audio/video file.",
             form_values=form_values)
 
+    if wants_audio_cleanup and not _audio_cleanup_capacity_ok(minutes):
+        return _client_dashboard_error(
+            request, user, "Audio clean-up is at capacity right now. Continue without it, or try again later.",
+            form_values=form_values)
     if wants_premium_voice and not _premium_capacity_ok(minutes):
         return _client_dashboard_error(
             request, user, "Premium voices are at capacity right now. Choose the standard voice, or try again later.",
@@ -7837,7 +7863,7 @@ def api_create_order(
         resp = create_order(
             request, audio=audio, upload_key="", youtube_url=url, source_lang=source_lang.strip(),
             target_lang=target, service_level=service_level, addon_video_deliverables="",
-            addon_human_voice_over="", addon_premium_voice="", premium_voice_id="",
+            addon_human_voice_over="", addon_premium_voice="", premium_voice_id="", addon_audio_cleanup="",
             instr_speaker_ids="", instr_verbatim_level="clean_read",
             instr_transcribe_lyrics="", instr_use_italics="", instr_existing_subs="ignore",
             instr_no_audio="tag", instr_wrong_language="tag", instr_instrumental_only="tag",

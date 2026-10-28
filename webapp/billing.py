@@ -230,6 +230,14 @@ ADDONS = {
         "rate_per_min": 0.50,
         "included_in": (),
     },
+    # Removes background noise and music from the recording BEFORE it is transcribed (ElevenLabs Voice
+    # Isolator, $0.12 per audio-minute), which improves accuracy on field interviews and phone or WhatsApp
+    # recordings. Priced from audio_cleanup_unit_cost_usd() below; switches itself off if that rises past the price.
+    "audio_cleanup": {
+        "name": "Audio clean-up (removes background noise first)",
+        "rate_per_min": 0.30,
+        "included_in": (),
+    },
 }
 
 # ---- Premium voice unit economics --------------------------------------------------------
@@ -266,6 +274,33 @@ def premium_voice_margin_ok() -> bool:
 
 def premium_voice_chars_needed(minutes: float) -> int:
     return int(minutes * PREMIUM_VOICE_CHARS_PER_AUDIO_MINUTE * PREMIUM_VOICE_REWORK_FACTOR) + 1
+
+
+# Audio clean-up: ElevenLabs Voice Isolator lists at $0.12 per audio-minute (the cleaned file is kept, so a
+# retry does not pay again). Speaker labels use Scribe at $0.22 per hour, about $0.0037 a minute, so they are
+# included free with the existing "Identify speakers" option; the figure is kept here so a test guards it.
+AUDIO_CLEANUP_USD_PER_MIN = 0.12
+AUDIO_CLEANUP_CREDITS_PER_MIN = 1500          # conservative plan-credit use per minute, for the spend ceiling
+SPEAKER_LABELS_USD_PER_MIN = 0.22 / 60.0 * PREMIUM_VOICE_REWORK_FACTOR
+
+
+def audio_cleanup_unit_cost_usd() -> float:
+    try:
+        return float(os.environ.get("ELEVENLABS_ISOLATOR_USD_PER_MIN") or AUDIO_CLEANUP_USD_PER_MIN)
+    except ValueError:
+        return AUDIO_CLEANUP_USD_PER_MIN
+
+
+def audio_cleanup_min_rate() -> float:
+    return audio_cleanup_unit_cost_usd() / (1.0 - PAYMENT_FEE_RATE - MIN_PREMIUM_MARGIN)
+
+
+def audio_cleanup_margin_ok() -> bool:
+    return ADDONS["audio_cleanup"]["rate_per_min"] >= audio_cleanup_min_rate()
+
+
+def audio_cleanup_credits_needed(minutes: float) -> int:
+    return int(minutes * AUDIO_CLEANUP_CREDITS_PER_MIN) + 1
 
 
 # Rush processing: a client-chosen surcharge on a single order in exchange

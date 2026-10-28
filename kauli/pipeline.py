@@ -470,6 +470,8 @@ def run(
     skip_tts: bool = False,
     verbose: bool = True,
     resume: bool = False,
+    clean_audio: bool = False,
+    label_speakers: bool = False,
 ) -> Job:
     out = Path(outdir)
     (out / "segments").mkdir(parents=True, exist_ok=True)
@@ -519,7 +521,22 @@ def run(
         log(f"[1/5] Transcribing with {asr} ...")
         job.status = "transcribing"
         asr_provider = get_asr(asr)
-        job.segments = asr_provider.transcribe(audio_path, language=source_lang)
+        # Optional ElevenLabs extras. Neither can lose an order: if one fails the order carries on without it,
+        # the manifest says so, and the web app credits back a paid add-on that was not delivered.
+        from .providers import elevenlabs_audio
+        asr_input = audio_path
+        if clean_audio:
+            try:
+                cleaned = out / "cleaned.wav"
+                if not cleaned.exists():
+                    elevenlabs_audio.isolate_audio(audio_path, str(cleaned))
+                asr_input = str(cleaned)
+                job.providers["audio_cleanup"] = "elevenlabs"
+                log("      audio cleaned (background noise removed) before transcription")
+            except Exception as exc:  # noqa: BLE001
+                job.warnings.append(f"Audio clean-up skipped, original audio used ({exc})")
+                log(f"      audio clean-up skipped: {exc}")
+        job.segments = asr_provider.transcribe(asr_input, language=source_lang)
         # TranskriptorASR (and any future provider with a real fallback) sets
         # these on itself rather than raising - the manifest's own
         # providers["asr"] must reflect what actually ran, not what was asked
@@ -544,6 +561,15 @@ def run(
         if not job.source_duration_ms and job.segments:
             job.source_duration_ms = job.segments[-1].end_ms
         job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
+        if label_speakers:
+            try:
+                turns = elevenlabs_audio.diarize_turns(audio_path)
+                found = elevenlabs_audio.assign_speakers(job.segments, turns)
+                job.providers["speaker_labels"] = "elevenlabs"
+                log(f"      {found} speaker(s) identified")
+            except Exception as exc:  # noqa: BLE001
+                job.warnings.append(f"Speaker labels skipped ({exc})")
+                log(f"      speaker labels skipped: {exc}")
         n_gaps = sum(1 for s in job.segments if s.segment_type == "gap")
         log(f"      {len(job.segments)} segments ({n_gaps} non-speech), {job.source_duration_ms/1000:.1f}s")
     job.save(out / "manifest.json")

@@ -928,6 +928,8 @@ def init_db() -> None:
         # during testing before this shipped).
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_flagged INTEGER NOT NULL DEFAULT 0")
         conn.execute("ALTER TABLE orders ADD COLUMN content_safety_detail TEXT")
+    if "audio_cleanup_refunded_at" not in existing_order_cols:
+        conn.execute("ALTER TABLE orders ADD COLUMN audio_cleanup_refunded_at REAL")
     if "premium_voice_refunded_at" not in existing_order_cols:
         # Set once, when a premium-voice order was NOT delivered in the premium voice (ElevenLabs failed and
         # the standard voice was used) and the add-on charge was credited back - never refunded twice.
@@ -2692,15 +2694,19 @@ def approve_difficulty_surcharge(order_id: str) -> None:
     conn.close()
 
 
-def mark_premium_voice_refunded(order_id: str) -> bool:
-    """True only for the call that sets it, so a retried job cannot refund twice."""
+def mark_addon_refunded(order_id: str, addon_key: str) -> bool:
+    """True only for the call that sets it, so a retried job cannot refund the same add-on twice."""
+    column = {"premium_voice": "premium_voice_refunded_at", "audio_cleanup": "audio_cleanup_refunded_at"}[addon_key]
     conn = get_conn()
-    cur = conn.execute("UPDATE orders SET premium_voice_refunded_at = ? WHERE id = ? AND premium_voice_refunded_at IS NULL",
-                       (time.time(), order_id))
+    cur = conn.execute(f"UPDATE orders SET {column} = ? WHERE id = ? AND {column} IS NULL", (time.time(), order_id))
     conn.commit()
     changed = cur.rowcount == 1
     conn.close()
     return changed
+
+
+def mark_premium_voice_refunded(order_id: str) -> bool:
+    return mark_addon_refunded(order_id, "premium_voice")
 
 
 def set_dub_voice(order_id: str, voice: str | None, job_status: str | None = None) -> None:

@@ -291,6 +291,7 @@
     const manualRate = Number(data.dataset.manualTranscriptionRate) || 0;
     const humanVoiceRate = Number(data.dataset.humanVoiceRate) || 0;
     const premiumVoiceRate = Number(data.dataset.premiumVoiceRate) || 0;
+    const audioCleanupRate = Number(data.dataset.audioCleanupRate) || 0;
     const rushPct = Number(data.dataset.rushPct) || 0;
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
 
@@ -395,6 +396,11 @@
     if (premiumVoiceChecked) loadPremiumVoices();
     $("#price-premium-voice-row").hidden = !premiumVoiceChecked;
 
+    // Audio clean-up applies to every service level.
+    const cleanupBox = $("#audio-cleanup-checkbox");
+    const cleanupChecked = !!(cleanupBox && cleanupBox.checked);
+    $("#price-audio-cleanup-row").hidden = !cleanupChecked;
+
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
     const durationEl = $("#price-duration");
     if (usingYoutube) {
@@ -429,13 +435,15 @@
       // per-minute cost the moment any of those is active.
       $("#price-free").textContent = "-";
       let perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0)
-        + (humanVoiceChecked ? humanVoiceRate : 0) + (premiumVoiceChecked ? premiumVoiceRate : 0);
+        + (humanVoiceChecked ? humanVoiceRate : 0) + (premiumVoiceChecked ? premiumVoiceRate : 0)
+        + (cleanupChecked ? audioCleanupRate : 0);
       if (rushChecked) perMinExtras += rate * rushPct;
       $("#price-total").textContent = formatMoney(rate + perMinExtras) + "/min";
       if (addonChecked) $("#price-addon").textContent = formatMoney(addonRate) + "/min";
       if (isManual) $("#price-manual").textContent = formatMoney(manualRate) + "/min";
       if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceRate) + "/min";
       if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceRate) + "/min";
+      if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(audioCleanupRate) + "/min";
       if (rushChecked) $("#price-rush").textContent = formatMoney(rate * rushPct) + "/min";
       return;
     }
@@ -458,8 +466,9 @@
     const manualCost = isManual ? manualRate * fileDurationMinutes : 0;
     const humanVoiceCost = humanVoiceChecked ? humanVoiceRate * fileDurationMinutes : 0;
     const premiumVoiceCost = premiumVoiceChecked ? premiumVoiceRate * fileDurationMinutes : 0;
+    const cleanupCost = cleanupChecked ? audioCleanupRate * fileDurationMinutes : 0;
     const rushSurcharge = rushChecked ? (fileDurationMinutes * rate) * rushPct : 0;
-    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + rushSurcharge;
+    const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
       : (freeMinutesEligible ? "none applied" : "not eligible (transcription-only)");
@@ -471,6 +480,7 @@
     if (isManual) $("#price-manual").textContent = formatMoney(manualCost);
     if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceCost);
     if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceCost);
+    if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(cleanupCost);
     if (rushChecked) $("#price-rush").textContent = formatMoney(rushSurcharge);
     $("#price-total").textContent = formatMoney(Math.max(0, total));
   }
@@ -512,6 +522,8 @@
     if (humanVoiceBoxEl) humanVoiceBoxEl.addEventListener("change", updatePricing);
     const premiumBoxEl = $("#premium-voice-checkbox");
     if (premiumBoxEl) premiumBoxEl.addEventListener("change", updatePricing);
+    const cleanupBoxEl = $("#audio-cleanup-checkbox");
+    if (cleanupBoxEl) cleanupBoxEl.addEventListener("change", updatePricing);
     const targetSelEl = document.querySelector('select[name="target_lang"]');
     if (targetSelEl) targetSelEl.addEventListener("change", updatePricing);
     const rushBox = $("#rush-checkbox");

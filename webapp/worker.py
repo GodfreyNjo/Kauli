@@ -112,22 +112,28 @@ def notify_staff_dead_letter(order, error: str) -> None:
                          link=f"/staff/orders/{order['id']}")
 
 
-def _refund_premium_voice_if_not_delivered(order, job) -> None:
-    """A customer who paid for a premium voice and got the standard one (ElevenLabs failed and the dub fell
-    back) is credited the add-on charge, once, as prepaid credit - they never pay for what they did not get."""
-    if not db.order_has_addon(order, "premium_voice") or order["premium_voice_refunded_at"]:
-        return
-    if (getattr(job, "providers", None) or {}).get("tts", "elevenlabs") == "elevenlabs":
-        return
-    try:
-        lines = json.loads(order["cost_breakdown_json"] or "{}").get("addons", [])
-        amount = sum(line["cost_usd"] for line in lines if line.get("key") == "premium_voice")
-    except (ValueError, TypeError, KeyError):
-        return
-    if amount > 0 and db.mark_premium_voice_refunded(order["id"]):
-        from . import billing
-        db.add_wallet_credits(order["client_id"], billing.usd_to_credits(amount))
-        log.info("premium voice not delivered - add-on credited back", extra={"job_id": order["id"]})
+def _refund_undelivered_elevenlabs_addons(order, job) -> None:
+    """A customer who paid for an ElevenLabs add-on and did not get it (the premium voice fell back to the
+    standard one, or the audio clean-up was skipped) is credited that add-on's charge, once, as prepaid
+    credit - they never pay for what they did not get."""
+    providers = getattr(job, "providers", None) or {}
+    delivered = {"premium_voice": providers.get("tts", "elevenlabs") == "elevenlabs",
+                 "audio_cleanup": providers.get("audio_cleanup") == "elevenlabs"}
+    for key, ok in delivered.items():
+        if ok or not db.order_has_addon(order, key):
+            continue
+        column = "premium_voice_refunded_at" if key == "premium_voice" else "audio_cleanup_refunded_at"
+        if order[column]:
+            continue
+        try:
+            lines = json.loads(order["cost_breakdown_json"] or "{}").get("addons", [])
+            amount = sum(line["cost_usd"] for line in lines if line.get("key") == key)
+        except (ValueError, TypeError, KeyError):
+            continue
+        if amount > 0 and db.mark_addon_refunded(order["id"], key):
+            from . import billing
+            db.add_wallet_credits(order["client_id"], billing.usd_to_credits(amount))
+            log.info("elevenlabs add-on not delivered - credited back", extra={"job_id": order["id"]})
 
 
 def _run_job(order_id: str, is_retry: bool = False) -> None:
@@ -149,6 +155,10 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
             # a premium-voice order carries its chosen ElevenLabs voice as "elevenlabs:<voice id>"
             voice_id=((order["dub_voice"] or "").split(":", 1)[1]
                       if order["tts"] == "elevenlabs" and (order["dub_voice"] or "").startswith("elevenlabs:") else None),
+            clean_audio=db.order_has_addon(order, "audio_cleanup"),
+            # "Identify speakers" at no extra charge: Scribe's speaker timing is about $0.004 a minute
+            label_speakers=bool(order["instr_speaker_ids"]) and bool(os.environ.get("ELEVENLABS_API_KEY"))
+                           and os.environ.get("KAULI_SPEAKER_LABELS", "1") != "0",
             verbose=False,
             # Real cost bug this fixes: a retry used to always re-run ASR/MT
             # from scratch even when the FAILED attempt's own manifest
@@ -163,7 +173,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
         )
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))
-        _refund_premium_voice_if_not_delivered(order, job)
+        _refund_undelivered_elevenlabs_addons(order, job)
         # Every order waits for an explicit staff sign-off in Ereri
         # ("Approve & mark ready for delivery") before a client ever sees
         # it as ready - no auto-bypass, even when the AI drafted it with
