@@ -4677,3 +4677,8 @@ body.m-public .m-nav-links a.btn, body.m-public .m-nav-links a.btn.cta-olive { b
 .ch-row .ch-act { margin-left: 4px; }
 @media (min-width: 861px) { .sidebar-nav { flex: 0 0 auto; } }
 @media (max-width: 560px) { .ch-row { flex-wrap: wrap; } .ch-act { margin-left: auto; } }
+
+/* the notification bell: one standard icon size (22px) in a 40px button, whatever else styles .icon */
+.topbar .notif-bell-trigger { width: 40px; height: 40px; }
+.topbar .notif-bell-trigger svg.icon { width: 22px; height: 22px; min-width: 22px; flex: none; }
+.topbar .notif-bell-badge { top: 2px; right: 2px; min-width: 16px; height: 16px; line-height: 16px; font-size: 0.66rem; }
