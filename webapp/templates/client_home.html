@@ -1,20 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Dashboard{% endblock %}
 {% block content %}
-{% macro short_status(s) -%}
-  {%- if s in ('ready_for_delivery', 'delivered') -%}Ready
-  {%- elif s in ('queued', 'processing') -%}Processing
-  {%- elif s in ('awaiting_review', 'editor_returned') -%}In review
-  {%- elif s == 'pending_payment' -%}Awaiting payment
-  {%- elif s == 'returned_to_client' -%}Needs you
-  {%- elif s in ('failed', 'dead_letter') -%}Failed
-  {%- else -%}{{ s|client_status_label }}{%- endif -%}
-{%- endmacro %}
-{% macro status_tone(s) -%}
-  {%- if s in ('ready_for_delivery', 'delivered') -%}ok
-  {%- elif s in ('queued', 'processing', 'awaiting_review', 'editor_returned') -%}busy
-  {%- else -%}attention{%- endif -%}
-{%- endmacro %}
+{% from "_status_macros.html" import short_status, status_tone %}
 
 <div class="ch">
   <div class="ch-top">

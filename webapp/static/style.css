@@ -4661,3 +4661,19 @@ body.m-public .m-nav-links a.btn, body.m-public .m-nav-links a.btn.cta-olive { b
 @media (max-width: 900px) { .ch-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .ch-actions { gap: 10px; } .ch-action { padding: 16px 14px; } .ch-files { padding: 18px 14px 6px; } .ch-state { padding: 4px 10px; } }
 @media (prefers-reduced-motion: reduce) { .ch-action { transition: none; } .ch-action:hover { transform: none; } }
+
+/* sidebar: a full-height column that reaches the bottom of the page, with Help, Email and Settings pinned to the foot */
+@media (min-width: 861px) {
+  .sidebar { align-self: stretch; max-height: none; overflow: visible; position: relative; }
+  .sidebar-top { position: sticky; top: 81px; z-index: 2; background: var(--chrome-bg); }
+  .sidebar-nav { position: sticky; top: 121px; min-height: calc(100vh - 140px); }
+  .sidebar-nav .sidebar-divider { margin-top: auto; }
+}
+
+.nav-badge { margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 999px; background: #f2b64a; color: #3d2a00; font-size: 0.74rem; font-weight: 800; text-align: center; line-height: 1.5; }
+.sidebar.collapsed .nav-badge { position: absolute; top: 2px; right: 2px; margin: 0; min-width: 16px; padding: 0 4px; font-size: 0.66rem; }
+.sidebar-nav a { position: relative; }
+.ch-act { flex: none; padding: 8px 16px; font-size: 0.9rem; }
+.ch-row .ch-act { margin-left: 4px; }
+@media (min-width: 861px) { .sidebar-nav { flex: 0 0 auto; } }
+@media (max-width: 560px) { .ch-row { flex-wrap: wrap; } .ch-act { margin-left: auto; } }

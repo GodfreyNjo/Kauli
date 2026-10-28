@@ -1293,6 +1293,7 @@ AI_ONLY_LANGUAGES = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES
 # Every code a stored order can carry, for display names.
 LANGUAGE_NAMES = {**AI_ONLY_LANGUAGES, **SOURCE_LANGUAGES}
 templates.env.globals["language_total"] = len(LANGUAGE_NAMES)
+templates.env.globals["pending_count"] = lambda u: db.pending_orders_count(u["client_scope_id"]) if (u and u["role"] == "client") else 0
 templates.env.globals["plan_chosen"] = lambda u: bool(u) and (u["role"] != "client" or _plan_chosen(u["client_scope_id"]))
 
 
@@ -5165,6 +5166,17 @@ def client_messages(request: Request):
     conversations = db.list_conversations_for_client(user["client_scope_id"])
     return templates.TemplateResponse(request, "client_messages.html", {
         "user": user, "conversations": conversations, "unread": unread,
+    })
+
+
+@app.get("/client/pending", response_class=HTMLResponse)
+def client_pending(request: Request):
+    """Orders that are not finished yet, with the one thing each is waiting for."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse(f"/login?next={quote(request.url.path)}")
+    return templates.TemplateResponse(request, "client_pending.html", {
+        "user": user, "orders": db.list_pending_orders(user["client_scope_id"]),
     })
 
 

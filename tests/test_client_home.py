@@ -32,3 +32,20 @@ def test_home_labels_use_short_status_words(env, wav_bytes):
 def test_a_new_client_gets_a_friendly_empty_state(env):
     page = env.client.get("/client/home").text
     assert "Nothing here yet" in page
+
+
+def test_pending_tab_lists_unfinished_orders_and_shows_a_count(env, wav_bytes):
+    assert "Nothing is waiting" in env.client.get("/client/pending").text
+    assert 'class="nav-badge"' not in env.client.get("/client/home").text
+    order = env.order_from(env.place(wav_bytes, review_tier="human"))           # waits for payment
+    page = env.client.get("/client/pending").text
+    assert "clip.wav" in page and "Awaiting payment" in page and f"/client/orders/{order['id']}/pay" in page
+    home = env.client.get("/client/home").text
+    assert 'href="/client/pending"' in home and 'class="nav-badge"' in home
+    assert env.db.pending_orders_count("u1") == 1
+    done = env.order_from(env.place(wav_bytes))
+    conn = env.db.get_conn()
+    conn.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", (done["id"],))
+    conn.commit()
+    conn.close()
+    assert env.db.pending_orders_count("u1") == 1 and "clip.wav" in env.client.get("/client/pending").text

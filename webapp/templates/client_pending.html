@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Pending orders{% endblock %}
+{% block content %}
+{% from "_status_macros.html" import short_status, status_tone %}
+<div class="ch">
+  <div class="ch-top">
+    <h1>Pending orders</h1>
+    <a href="/client#order-form" class="btn cta-olive">New order</a>
+  </div>
+  <section class="ch-files">
+    {% if not orders %}
+    <div class="ch-empty">
+      <p>You are all caught up. Nothing is waiting.</p>
+      <a href="/client#order-form" class="btn cta-olive">Upload files</a>
+    </div>
+    {% else %}
+    <ul class="ch-list">
+      {% for o in orders %}
+      <li>
+        <div class="ch-row">
+          <span class="ch-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
+          <span class="ch-row-main">
+            <strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong>
+            <small>{{ o['created_at']|timestamp_to_str }} &middot; {{ "%.1f"|format(o['duration_minutes'] or 0) }} min{% if o['cost_usd'] %} &middot; ${{ "%.2f"|format(o['cost_usd']) }}{% endif %}</small>
+          </span>
+          <span class="ch-state ch-{{ status_tone(o['status']) }}">{{ short_status(o['status']) }}</span>
+          {% if o['status'] == 'pending_payment' %}
+          <a class="btn cta-olive ch-act" href="/client/orders/{{ o['id'] }}/pay">Pay now</a>
+          {% elif o['status'] == 'returned_to_client' %}
+          <a class="btn secondary ch-act" href="/client/orders/{{ o['id'] }}">Reply</a>
+          {% else %}
+          <a class="btn secondary ch-act" href="/client/orders/{{ o['id'] }}">View</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

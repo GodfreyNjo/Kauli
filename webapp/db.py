@@ -3013,6 +3013,27 @@ def next_order_needing_review(exclude_id: str):
     return row
 
 
+# Orders that are not finished yet: waiting for payment, being worked on, with our staff, or waiting on the client.
+PENDING_STATUSES = ("pending_payment", "queued", "processing", "awaiting_review", "editor_returned", "returned_to_client")
+
+
+def list_pending_orders(client_id: str):
+    marks = ",".join("?" * len(PENDING_STATUSES))
+    conn = get_conn()
+    rows = conn.execute(f"SELECT * FROM orders WHERE client_id = ? AND status IN ({marks}) ORDER BY created_at DESC",
+                        (client_id, *PENDING_STATUSES)).fetchall()
+    conn.close()
+    return rows
+
+
+def pending_orders_count(client_id: str) -> int:
+    marks = ",".join("?" * len(PENDING_STATUSES))
+    conn = get_conn()
+    n = conn.execute(f"SELECT COUNT(*) FROM orders WHERE client_id = ? AND status IN ({marks})", (client_id, *PENDING_STATUSES)).fetchone()[0]
+    conn.close()
+    return n
+
+
 def usual_languages(client_id: str, recent: int = 10):
     """The language pair a client usually orders: the most common (spoken, target) pair among their last `recent`
     orders, the most recent one winning a tie. None for a client with no orders. Read straight from their own order
