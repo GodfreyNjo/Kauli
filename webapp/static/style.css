@@ -4824,3 +4824,5 @@ body.m-public .m-nav-links a.btn, body.m-public .m-nav-links a.btn.cta-olive { b
 .m-office { display: flex; align-items: flex-start; gap: 12px; margin: 0; font-style: normal; color: var(--on-navy-muted, #c3d0e6); font-size: 0.9rem; line-height: 1.5; }
 .m-office svg { flex: none; margin-top: 2px; color: var(--brand-olive-bright); }
 .m-office strong { display: block; color: #ffffff; font-size: 0.95rem; }
+/* cards on the human review pages are whole-card links: no underlines inside them */
+body.m-public .hr-lang a, body.m-public .hr-blogs a, body.m-public .hr-links a, body.m-public .hr-others a, body.m-public .hr-lang a:hover, body.m-public .hr-blogs a:hover { text-decoration: none; }
