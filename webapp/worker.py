@@ -49,8 +49,7 @@ PUBLIC_BASE_URL = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/")
 # duplicated here rather than imported (app.py imports this module, so
 # the reverse would be circular), not second real values to keep in sync
 # by hand.
-CONTACT_PHONE_WHATSAPP = "254712531841"
-CONTACT_EMAIL = "kahunyurogodfrey@gmail.com"
+CONTACT_EMAIL = "hello@kauli-forgemedia.com"
 FOUNDER_NAME = "Godfrey Njoroge"
 
 
@@ -72,7 +71,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
         f"Hi {name},\n\n"
         f"Your order ({order['original_filename']}) is ready.\n\n"
         + ("" if link else "Log in to your Kauli dashboard to view and download it.\n\n")
-        + f"Questions? Reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+        + "Questions? Just reply to this email.\n\n"
         + f"Talk soon,\n{FOUNDER_NAME}\n(Forge Media Services)"
     )
     log_in_note = "" if link else '<p style="margin:0 0 14px;">Log in to your Kauli dashboard to view and download it.</p>'
@@ -81,8 +80,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
         f'<p style="margin:0 0 14px;">Your order ({order["original_filename"]}) is ready.</p>'
         f'{log_in_note}'
         f'<p style="margin:0 0 14px;">Questions? '
-        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply</a> here or message me on '
-        f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply to this email</a>.</p>'
         f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
     )
     html = mailer.wrap_email_html(inner, cta_text="View & download your files" if link else None,

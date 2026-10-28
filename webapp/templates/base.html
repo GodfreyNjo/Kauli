@@ -122,7 +122,6 @@
         <a href="/settings" class="account-menu-item"><span class="icon">S</span>Settings</a>
         {% if user['role'] == 'client' %}
         <a href="/help" class="account-menu-item"><span class="icon">?</span>Help &amp; troubleshooting</a>
-        <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="account-menu-item"><span class="icon">W</span>WhatsApp us</a>
         <a href="mailto:{{ contact_email }}" class="account-menu-item"><span class="icon">@</span>Email us</a>
         {% endif %}
         <a href="/logout" class="account-menu-item account-menu-item-danger"><span class="icon">O</span>Sign out</a>
@@ -161,7 +160,6 @@
         <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>
         <div class="sidebar-divider"></div>
         <div class="sidebar-contact-row">
-          <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" title="WhatsApp us"><span class="icon">W</span><span class="label" style="font-size:0.76rem;">WhatsApp</span></a>
           <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
         </div>
         {% else %}
@@ -173,7 +171,6 @@
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">Help &amp; troubleshooting</span></a>
         <div class="sidebar-contact-row">
-          <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" title="WhatsApp us"><span class="icon">W</span><span class="label" style="font-size:0.76rem;">WhatsApp</span></a>
           <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
         </div>
         {% endif %}

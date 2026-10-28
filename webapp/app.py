@@ -1347,18 +1347,12 @@ MANUAL_TRANSCRIPTION_LANGUAGES = {"ki"}
 
 
 # ----------------------------------------------------------- marketing ----
-CONTACT_PHONE = "0712 531 841"
-CONTACT_PHONE_TEL = "+254712531841"  # tel: link needs the international form
-CONTACT_PHONE_WHATSAPP = "254712531841"  # wa.me links want the number with no "+" or leading 0
 CONTACT_EMAIL = "hello@kauli-forgemedia.com"
 # base.html's account menu (every authenticated page) needs a real contact
 # link without every single route threading it through by hand - same
 # reasoning as the other templates.env.globals assignments near the top
 # of this file (tat_status, free_minutes, etc).
 templates.env.globals["contact_email"] = CONTACT_EMAIL
-templates.env.globals["contact_whatsapp_url"] = f"https://wa.me/{CONTACT_PHONE_WHATSAPP}"
-templates.env.globals["contact_phone_tel"] = CONTACT_PHONE_TEL
-templates.env.globals["contact_phone_display"] = CONTACT_PHONE
 # Unset until a real Google Cloud OAuth Client ID (with kauli-forgemedia.com
 # added as an authorized JavaScript origin) is put in .env - see
 # _one_tap.html, which no-ops entirely when this is empty, same "silently
@@ -2366,9 +2360,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "plans": billing.PLANS, "service_levels": billing.SERVICE_LEVELS,
         "addons": billing.ADDONS,
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
-        "phone_display": CONTACT_PHONE, "phone_tel": CONTACT_PHONE_TEL,
         "email": CONTACT_EMAIL,
-        "whatsapp_url": f"https://wa.me/{CONTACT_PHONE_WHATSAPP}",
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
@@ -2680,8 +2672,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         "3. Pick your language pair (e.g. Swahili -> English).\n"
         "4. We'll notify you the moment your result is ready to download. Instant AI results arrive in "
         "minutes and are AI-generated; Human-reviewed results are checked by a real editor first.\n\n"
-        "If anything's unclear, or you'd rather just talk it through, reply to this email or "
-        f"message me directly on WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+        "If anything's unclear, or you'd rather just talk it through, just reply to this email.\n\n"
         f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
     )
     cta_url = f"{base_url.rstrip('/')}/client" if base_url else "/client"
@@ -2698,8 +2689,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         f'<li>We\'ll notify you the moment your result is ready to download. Instant AI results arrive in minutes and are AI-generated; Human-reviewed results are checked by a real editor first.</li>'
         f'</ol>'
         f'<p style="margin:0 0 14px;">If anything\'s unclear, or you\'d rather just talk it through, '
-        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email '
-        f'or message me directly on <a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
         f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
     )
     _queue_and_send(user, "welcome", subject, body, base_url=base_url,
@@ -2716,8 +2706,7 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
         "Thanks for the vote of confidence - that's your first paid order with Kauli, and we don't "
         "take that lightly at this stage.\n\n"
         "I'll be keeping an eye on this one personally. If the turnaround or the quality isn't "
-        f"what you expected, tell me directly - reply here or WhatsApp me: "
-        f"https://wa.me/{CONTACT_PHONE_WHATSAPP} - and we'll make it right.\n\n"
+        "what you expected, just reply to this email - and we'll make it right.\n\n"
         "One honest ask: how's it going so far?"
     )
     feedback_base = f"{base_url.rstrip('/')}" if base_url else ""
@@ -2743,9 +2732,8 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
         inner = (
             f'<p style="margin:0 0 14px;">Hi {name},</p>'
             + mailer.text_to_html_paragraphs(html_body)
-            + f'<p style="margin:0 0 14px;">Tell me directly - '
-              f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
-              f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a> '
+            + f'<p style="margin:0 0 14px;">Just '
+              f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email '
               f'- and we\'ll make it right.</p>'
             f'<p style="margin:0 0 14px;">One honest ask: how\'s it going so far?</p>'
         )
@@ -2882,6 +2870,7 @@ def sitemap(request: Request):
         (f"{base}/terms", "0.2"),
         (f"{base}/privacy", "0.2"),
         (f"{base}/developers", "0.5"),
+        (f"{base}/demo", "0.6"),
     ]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
     static_urls += [(f"{base}/languages", "0.8")]
@@ -2993,7 +2982,7 @@ Dubbing and human review: {', '.join(SOURCE_LANGUAGES.values())}.
 {post_lines}
 
 ## Contact
-{CONTACT_EMAIL} / WhatsApp: https://wa.me/{CONTACT_PHONE_WHATSAPP}
+{CONTACT_EMAIL}
 """
     return Response(content=body, media_type="text/plain")
 
@@ -3050,6 +3039,84 @@ def status_page(request: Request):
     })
 
 
+DEMO_INTERESTS = {
+    "transcription": "Transcription",
+    "translation": "Translation and subtitles",
+    "dubbing": "Dubbing and voice over",
+    "localization": "Full localization",
+    "api": "API and integrations",
+    "other": "Something else",
+}
+
+
+def _calendly_embed_url(name: str, email: str) -> str | None:
+    """The scheduling page with the visitor's name and email already filled in.
+    None until KAULI_CALENDLY_URL is set (a round-robin team event in Calendly)."""
+    base = os.environ.get("KAULI_CALENDLY_URL")
+    if not base:
+        return None
+    from urllib.parse import urlencode
+    return base + ("&" if "?" in base else "?") + urlencode(
+        {"name": name, "email": email, "hide_gdpr_banner": 1, "primary_color": "2262ec", "text_color": "030712"})
+
+
+def _demo_response(request: Request, error: str | None = None, form: dict | None = None, status_code: int = 200):
+    lead = request.session.get("demo_lead")
+    ctx = _marketing_context(home="/")
+    ctx.update({
+        "interests": DEMO_INTERESTS, "demo_error": error, "form": form or {}, "demo_lead": lead,
+        "calendly_embed_url": _calendly_embed_url(lead["name"], lead["email"]) if lead else None,
+    })
+    return templates.TemplateResponse(request, "demo.html", ctx, status_code=status_code)
+
+
+@app.get("/demo", response_class=HTMLResponse)
+def demo_page(request: Request):
+    return _demo_response(request)
+
+
+@app.get("/demo/new")
+def demo_new(request: Request):
+    request.session.pop("demo_lead", None)
+    return RedirectResponse("/demo", status_code=303)
+
+
+@app.post("/demo")
+def demo_submit(request: Request, first_name: str = Form(""), last_name: str = Form(""), email: str = Form(""),
+                company: str = Form(""), job_title: str = Form(""), interest: str = Form(""),
+                languages: str = Form(""), volume_estimate: str = Form(""), org_type: str = Form(""),
+                message: str = Form(""), website: str = Form("")):
+    if website.strip():                      # honeypot: pretend it worked
+        return RedirectResponse("/demo", status_code=303)
+    allowed, retry_after = rate_limit.check(f"demo:{rate_limit.client_ip(request)}", limit=5, window_s=600)
+    form = {"first_name": first_name, "last_name": last_name, "email": email, "company": company,
+            "job_title": job_title, "interest": interest, "languages": languages,
+            "volume_estimate": volume_estimate, "org_type": org_type, "message": message}
+    if not allowed:
+        return _demo_response(request, f"Too many requests - try again in {retry_after // 60 + 1} minute(s).",
+                              form, 429)
+    first, last, email = first_name.strip()[:80], last_name.strip()[:80], email.strip().lower()[:200]
+    if not first or not last or "@" not in email or "." not in email.split("@")[-1]:
+        return _demo_response(request, "Please enter your first and last name and a valid work email.", form, 400)
+    if not company.strip() or not volume_estimate.strip() or not org_type.strip() or interest not in DEMO_INTERESTS:
+        return _demo_response(request, "Please tell us your company, what you are interested in, your monthly "
+                                       "volume and what best describes your organization.", form, 400)
+    name = f"{first} {last}"
+    notes = [f"Job title: {job_title.strip()[:120] or '-'}", f"Interested in: {DEMO_INTERESTS[interest]}",
+             f"Languages: {languages.strip()[:200] or '-'}"]
+    if message.strip():
+        notes += ["", message.strip()[:2000]]
+    lead_id = db.create_lead(name, email, None, company.strip()[:160], "\n".join(notes), None, source="demo",
+                             volume_estimate=volume_estimate.strip(), org_type=org_type.strip(),
+                             personal_email_flag=_is_personal_email_domain(email))
+    _notify_internal_new_lead(lead_id, name, email, org_type.strip(), volume_estimate.strip(),
+                              base_url=str(request.base_url))
+    ga_events.send_event(ga_events.client_id_from_request(request), "generate_lead",
+                         {"org_type": org_type.strip(), "volume_estimate": volume_estimate.strip(), "kind": "demo"})
+    request.session["demo_lead"] = {"first": first, "name": name, "email": email}
+    return RedirectResponse("/demo", status_code=303)
+
+
 @app.post("/contact/request-callback")
 def request_callback(request: Request, name: str = Form(""), email: str = Form(""),
                       phone: str = Form(""), company: str = Form(""),
@@ -3061,7 +3128,7 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
     # non-empty here is a bot. Pretend success rather than 400 - telling a
     # bot "wrong field" just teaches it to leave that one blank next time.
     if website.strip():
-        return RedirectResponse("/?sent=1#book", status_code=303)
+        return RedirectResponse("/demo", status_code=303)
     # Public, unauthenticated, no CAPTCHA - the one endpoint on this site a
     # spam bot can hit for free. Keyed on IP, tight window; the global
     # per-IP limiter above (300/min) is nowhere near tight enough for a lead
@@ -3096,7 +3163,7 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
                           {"org_type": org_type.strip() or None, "volume_estimate": volume_estimate.strip() or None})
     # Redirect (not a direct render) so refreshing the confirmation page
     # never re-submits the form - standard POST/redirect/GET.
-    return RedirectResponse("/?sent=1#book", status_code=303)
+    return RedirectResponse("/demo", status_code=303)
 
 
 def _safe_next(path: str | None) -> str:
@@ -5483,15 +5550,15 @@ def create_order(
                 f"Hi {name},\n\n"
                 f"You're down to about {remaining:.0f} prepaid credits - just a heads up so an upcoming "
                 f"order doesn't get held up waiting on a top-up.\n\n"
-                f"Questions? WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+                "Questions? Just reply to this email.\n\n"
                 f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
             )
             inner = (
                 f'<p style="margin:0 0 14px;">Hi {name},</p>'
                 f'<p style="margin:0 0 14px;">You\'re down to about {remaining:.0f} prepaid credits - just '
                 f'a heads up so an upcoming order doesn\'t get held up waiting on a top-up.</p>'
-                f'<p style="margin:0 0 14px;">Questions? Message me on '
-                f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+                f'<p style="margin:0 0 14px;">Questions? '
+                f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply to this email</a>.</p>'
                 f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
             )
             html = mailer.wrap_email_html(inner, cta_text="Top up your credits", cta_url=billing_url,
@@ -6597,7 +6664,7 @@ def view_receipt(request: Request, receipt_id: str):
         line_items = None
     return templates.TemplateResponse(request, "receipt.html", {
         "user": user, "receipt": receipt, "client": client, "order": order, "line_items": line_items,
-        "phone_display": CONTACT_PHONE, "email": CONTACT_EMAIL,
+        "email": CONTACT_EMAIL,
     })
 
 
@@ -6993,7 +7060,7 @@ def _send_activation_nudge(client, base_url: str) -> None:
         f"Noticed you signed up for Kauli but haven't uploaded anything yet - your "
         f"{billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.\n\n"
         "No pressure at all, just wanted to check if anything's unclear or in the way. "
-        f"Happy to walk you through it - reply here or WhatsApp me: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+        "Happy to walk you through it - just reply to this email.\n\n"
         f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
     )
     nudge_cta_url = f"{base_url.rstrip('/')}/client"
@@ -7003,8 +7070,7 @@ def _send_activation_nudge(client, base_url: str) -> None:
         f'yet - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.</p>'
         f'<p style="margin:0 0 14px;">No pressure at all, just wanted to check if anything\'s unclear '
         f'or in the way. Happy to walk you through it - '
-        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here or message me on '
-        f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+        f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
         f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
     )
     _queue_and_send(client, "inactivity_nudge", subject, body, base_url=base_url,
@@ -8829,7 +8895,7 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
                     f"No need to submit a new order or pay again - reply on the order's message thread and, "
                     f"if we need a corrected file, attach it right there; we'll pick this same order back up "
                     f"as soon as it's sorted.\n\n"
-                    f"Or reply here, or WhatsApp me directly: https://wa.me/{CONTACT_PHONE_WHATSAPP}\n\n"
+                    "Or just reply to this email.\n\n"
                     f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services")
             reason_html = f'<p style="margin:0 0 14px;">{message.strip()}</p>' if message.strip() else ""
             inner = (
@@ -8840,10 +8906,8 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
                 f'<p style="margin:0 0 14px;">No need to submit a new order or pay again - reply on the '
                 f'order\'s message thread and, if we need a corrected file, attach it right there; we\'ll '
                 f'pick this same order back up as soon as it\'s sorted.</p>'
-                f'<p style="margin:0 0 14px;">Or '
-                f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> here, or '
-                f'message me directly on '
-                f'<a href="https://wa.me/{CONTACT_PHONE_WHATSAPP}" style="color:{mailer.BRAND_ACCENT};">WhatsApp</a>.</p>'
+                f'<p style="margin:0 0 14px;">Or just '
+                f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
                 f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
             )
             html = mailer.wrap_email_html(inner, cta_text="View order & resume", cta_url=link,

@@ -3873,7 +3873,7 @@ def mark_pending_import_ordered(client_id: str, video_id: str) -> None:
 # get_or_create_user), not by staff remembering to flag it.
 LEAD_STATUSES = ("new", "contacted", "qualified", "proposal", "won", "lost")
 LEAD_OPEN_STATUSES = ("new", "contacted", "qualified", "proposal")
-LEAD_SOURCES = ("website", "instagram", "facebook", "tiktok", "whatsapp", "calendly", "referral", "research", "other")
+LEAD_SOURCES = ("website", "demo", "instagram", "facebook", "tiktok", "whatsapp", "calendly", "referral", "research", "other")
 
 
 def create_lead(name: str, email: str, phone: str | None, company: str | None,

@@ -91,8 +91,8 @@
   {% if order['is_rush'] and (order['status'] in ('failed', 'dead_letter') or (ts and ts['overdue'])) %}
   <div class="modal-warning" style="margin-top:14px;">
     This is a rush order and something's actually gone wrong or run late - for exactly this situation, you
-    can call us directly: <a href="tel:{{ contact_phone_tel }}">{{ contact_phone_display }}</a>. For anything
-    else, WhatsApp or email still gets a real person fastest.
+    email us straight away at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> and mark it urgent -
+    that gets a real person on it fastest.
   </div>
   {% endif %}
 

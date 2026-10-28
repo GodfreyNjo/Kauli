@@ -16,8 +16,8 @@
     <dt>Rate</dt><dd>{{ '$%.2f/finished minute'|format(actor['rate_per_min_usd']) if actor['rate_per_min_usd'] else 'not set yet - contact us' }}</dd>
     <dt>Status</dt><dd>{{ actor['status'] }}</dd>
   </dl>
-  <p class="muted" style="font-size:0.82rem;">Rate or contact details wrong? Just reply to the job email or
-     WhatsApp us - we'll update it on our side.</p>
+  <p class="muted" style="font-size:0.82rem;">Rate or contact details wrong? Just reply to the job email
+     and we'll update it on our side.</p>
 </div>
 
 {% if not orders %}

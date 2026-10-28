@@ -110,7 +110,8 @@ def test_homepage_structure_follows_the_plan(client):
     assert "Nairobi" not in html
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
     assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
-    for needed in ("how", "faq", "book", "start"):
+    assert 'id="book"' not in html and 'href="/demo"' in html          # booking lives on /demo now
+    for needed in ("how", "faq", "start"):
         assert needed in ids
     # the plan's removed/condensed sections stay gone
     for gone in ("who", "choose"):
@@ -161,9 +162,11 @@ def test_login_errors_are_announced(client):
     assert 'role="alert"' in html and "Wrong email or password" in html
 
 
-def test_footer_shows_contact_details(client):
+def test_footer_shows_the_work_email_and_a_demo_link_but_no_phone(client):
     html = client.get("/").text
-    assert 'href="tel:' in html and "mailto:" in html
+    footer = re.search(r"<footer.*?</footer>", html, re.S).group(0)
+    assert 'href="mailto:hello@kauli-forgemedia.com"' in footer and 'href="/demo"' in footer
+    assert "tel:" not in html and "wa.me/254" not in html
 
 
 def test_developer_docs_page_is_public_and_linked(client):

@@ -4,7 +4,7 @@
 {% block content %}
 <h1>Help &amp; troubleshooting</h1>
 <p class="muted" style="margin-top:0;">Common questions about what's happening with your order, your minutes,
-   and your account. If nothing here solves it, email or WhatsApp us directly - a real person reads every
+   and your account. If nothing here solves it, email us directly - a real person reads every
    message, not a bot.</p>
 
 <div class="card">
@@ -28,7 +28,7 @@
     <p>Bank transfer is the one payment method that isn't confirmed automatically - there's no live bank
        integration, so a real staff member manually confirms once the transfer has actually landed, same as
        any business without automated bank reconciliation would. Card payments (Paystack) and M-Pesa confirm
-       automatically and start right away. If a bank transfer has been pending for a while, email or WhatsApp
+       automatically and start right away. If a bank transfer has been pending for a while, email
        us the reference number shown on your payment page and we'll check on it directly.</p>
   </details>
   <details class="m-faq-item">
@@ -53,7 +53,7 @@
     <summary>My order shows "Something went wrong on our end"</summary>
     <p>This means the processing job failed after a few automatic retries. You don't need to do anything -
        our team is notified automatically the moment this happens and looks into it. If you're on a real
-       deadline, email or WhatsApp us the order so we can prioritize it.</p>
+       deadline, email us the order so we can prioritize it.</p>
   </details>
   <details class="m-faq-item">
     <summary>I can't log in / forgot my password</summary>
@@ -73,7 +73,6 @@
   <p class="muted">A real person reads these, not a support queue bot.</p>
   <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
     <a href="mailto:{{ contact_email }}" class="btn secondary">Email us</a>
-    <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="btn cta-olive">WhatsApp us</a>
   </div>
 </div>
 {% endblock %}

@@ -19,7 +19,6 @@
   "url": "{{ request.url.scheme }}://{{ request.url.netloc }}/",
   "logo": "{{ request.url.scheme }}://{{ request.url.netloc }}/static/kauli-logo-full.png",
   "email": "{{ email }}",
-  "telephone": "{{ phone_tel }}",
   "areaServed": "Worldwide",
   "paymentAccepted": "Card, M-Pesa",
   "founder": { "@type": "Person", "name": "Godfrey Njoroge" },
@@ -102,7 +101,7 @@
       </details>
       <div class="tk-hero-ctas">
         <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
-        <a href="#book" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
+        <a href="/demo" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
       <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
 
@@ -439,7 +438,7 @@
         </article>
         {% endfor %}
       </div>
-      <p class="int-note">Need a specific integration sooner? <a href="#book">Tell us what you use</a> and it moves up the list.</p>
+      <p class="int-note">Need a specific integration sooner? <a href="/demo">Tell us what you use</a> and it moves up the list.</p>
     </div>
   </section>
 
@@ -490,8 +489,8 @@
               <span id="calc-total">$0.00</span>
               <span class="muted" id="calc-note"></span>
             </div>
-            <a href="{{ whatsapp_url }}" target="_blank" rel="noopener" id="calc-whatsapp" class="btn secondary m-calc-kes-btn">
-              Pay in KES or get volume discounts
+            <a href="/demo" class="btn secondary m-calc-kes-btn">
+              Pay in KES or get volume discounts: talk to us
             </a>
           </div>
         </div>
@@ -501,8 +500,6 @@
           var serviceEl = document.getElementById('calc-service');
           var totalEl = document.getElementById('calc-total');
           var noteEl = document.getElementById('calc-note');
-          var waLink = document.getElementById('calc-whatsapp');
-          var waBase = "{{ whatsapp_url }}";
           var freeMinutes = {{ free_minutes|int }};
           if (!minutesEl) return;
           function update() {
@@ -519,11 +516,6 @@
             noteEl.textContent = freeApplied > 0
               ? ' (' + freeApplied.toFixed(0) + ' free minute' + (freeApplied === 1 ? '' : 's') + ' applied - a paid plan discounts the rest further)'
               : ' (a paid plan discounts this further)';
-            if (waLink) {
-              var msg = "Hi, I'd like a KES quote (or volume discount) for " + minutes + " minutes of " +
-                serviceName + " - the USD estimate on your site is $" + total.toFixed(2) + ".";
-              waLink.href = waBase + '?text=' + encodeURIComponent(msg);
-            }
           }
           minutesEl.addEventListener('input', update);
           serviceEl.addEventListener('change', update);
@@ -553,7 +545,7 @@
             </div>
             <div class="m-plan-blurb">{{ p['blurb'] }}</div>
             {% if key == 'enterprise' %}
-              <a href="#book" class="btn secondary">Talk to us</a>
+              <a href="/demo" class="btn secondary">Talk to us</a>
             {% else %}
               <a href="/login?mode=signup" class="btn secondary" data-cta="pricing-plan">Get started</a>
             {% endif %}
@@ -606,82 +598,12 @@
     </div>
   </section>
 
-  <section class="m-section" id="book">
-    <div class="m-inner">
-      <div class="m-book-grid">
-        <div class="m-book-info">
-          <h2 class="m-h2">Talk to us before you commit</h2>
-          <p>Not sure which option fits? Leave your details and we'll call you back, usually the same day.</p>
-          <div class="m-contact-line">Call us: <a href="tel:{{ phone_tel }}">{{ phone_display }}</a></div>
-          <div class="m-contact-buttons">
-            <a href="mailto:{{ email }}" class="btn secondary">↗ Send us an email</a>
-            <a href="{{ whatsapp_url }}" target="_blank" rel="noopener" class="btn secondary">↗ WhatsApp us</a>
-          </div>
-
-          {% if calendly_url %}
-          <div class="m-calendly-embed">
-            <div class="calendly-inline-widget" data-url="{{ calendly_url }}" style="min-width:280px;height:480px;"></div>
-            <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
-          </div>
-          {% endif %}
-        </div>
-
-        <div class="m-book-form">
-          {% if sent %}
-            <p class="ok">Thanks - we've got your request and will reach out shortly, usually the same day.</p>
-          {% endif %}
-          {% if lead_error %}
-            <p class="error">{{ lead_error }}</p>
-          {% endif %}
-          <h3 style="margin-top:0;">Request a callback</h3>
-          <form method="post" action="/contact/request-callback">
-            <div style="position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
-              <label>Leave this field blank
-                <input type="text" name="website" tabindex="-1" autocomplete="off">
-              </label>
-            </div>
-            <label>Name
-              <input type="text" name="name" required>
-            </label>
-            <label>Email
-              <input type="email" name="email" required>
-            </label>
-            <label>Phone (optional)
-              <input type="tel" name="phone" placeholder="07XX XXX XXX">
-            </label>
-            <label>Estimated audio/video volume per month
-              <select name="volume_estimate" required>
-                <option value="">Select one...</option>
-                <option value="under_30min">Under 30 minutes</option>
-                <option value="30_100min">30-100 minutes</option>
-                <option value="100min_plus">100+ minutes</option>
-                <option value="not_sure">Not sure yet</option>
-              </select>
-            </label>
-            <label>What best describes your organization?
-              <select name="org_type" required>
-                <option value="">Select one...</option>
-                <option value="media_broadcast">Media / Broadcast</option>
-                <option value="ngo">NGO / Non-profit</option>
-                <option value="corporate">Corporate / Brand</option>
-                <option value="education">Education / E-learning</option>
-                <option value="individual">Individual creator</option>
-              </select>
-            </label>
-            <button type="submit" style="width:100%;">Request a callback</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </section>
-
-
   <section class="cta-band" id="start">
     <h2>Ready to localize your content?</h2>
     <p>Upload a file or paste a link and see your price before you commit.</p>
     <div class="m-hero-ctas">
       <a href="/login?mode=signup" class="btn cta-olive" data-cta="final">Start a project</a>
-      <a href="#book" class="btn secondary" data-cta="final-talk">Talk to us</a>
+      <a href="/demo" class="btn secondary" data-cta="final-talk">Talk to us</a>
     </div>
   </section>
 

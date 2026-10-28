@@ -93,10 +93,9 @@ if not hmac.compare_digest(expected, signature_header.removeprefix("sha256=")):
 
 <div class="card" style="max-width:720px; margin-top:20px; text-align:center;">
   <h2 style="margin-top:0;">Something not covered here?</h2>
-  <p class="muted">Email or WhatsApp us directly - a real person, not a bot.</p>
+  <p class="muted">Email us directly - a real person, not a bot.</p>
   <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
     <a href="mailto:{{ contact_email }}" class="btn secondary">Email us</a>
-    <a href="{{ contact_whatsapp_url }}" target="_blank" rel="noopener" class="btn cta-olive">WhatsApp us</a>
   </div>
 </div>
 {% endblock %}
