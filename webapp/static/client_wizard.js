@@ -759,5 +759,10 @@
     bindManualTranscriptionNote();
     bindUploadProgress();
     showStep(1);
+    // the dashboard's "Paste a YouTube link" card lands here with ?source=youtube
+    if (new URLSearchParams(window.location.search).get("source") === "youtube") {
+      const yt = $('#source-switch [data-source="youtube"]');
+      if (yt) yt.click();
+    }
   });
 })();

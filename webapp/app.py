@@ -5185,7 +5185,8 @@ def client_home(request: Request):
     greeting = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
     return templates.TemplateResponse(request, "client_home.html", {
         "user": user, "greeting": greeting,
-        "stats": stats, "recent_orders": orders[:6],
+        "stats": stats, "recent_orders": orders[:8],
+        "free_minutes_left": billing.free_minutes_remaining(db.get_subscription_current(user["client_scope_id"])),
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
     })
 
