@@ -3609,7 +3609,7 @@ body:not(.m-public) :focus-visible { outline-color: var(--accent); }
    buttons, nav, footer columns and pills are separate controls and keep
    their own styling. */
 body.m-public p a:not(.btn):not(.m-lang-pill):not(.svc-link),
-body.m-public li a:not(.btn):not(.m-lang-pill),
+body.m-public li a:not(.btn):not(.m-lang-pill):not(.int-chip),
 body.m-public dd a, body.m-public td a:not(.btn),
 .legal a, .m-faq-item p a, .auth-consent a, .auth-shell p a {
   text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px;
