@@ -308,6 +308,8 @@
 <div class="card">
   <div class="order-workspace-grid">
     <div class="order-workspace-media">
+      {# What plays here is the finished product, whatever the order was: the dubbed or captioned video if there is one,
+         otherwise the client's own video, YouTube link or audio with the real captions running over it. #}
       {% if dubbed_ready %}
       <div class="order-media-wrap">
         <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
@@ -317,21 +319,30 @@
         <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/burned"></video>
       </div>
       {% elif order['source_youtube_id'] %}
-      <div class="order-preview-yt"><iframe src="https://www.youtube.com/embed/{{ order['source_youtube_id'] }}"
-         title="Source video" frameborder="0" allowfullscreen></iframe></div>
-      {% elif has_dub %}
       <div class="order-media-wrap">
+        <div class="order-preview-yt"><iframe id="order-yt" src="https://www.youtube.com/embed/{{ order['source_youtube_id'] }}?enablejsapi=1&amp;rel=0"
+           title="Your video" frameborder="0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
+        <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
+      </div>
+      {% elif has_dub %}
+      <div class="order-audio-stage">
         <audio controls class="order-preview-media" id="order-preview-audio" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+        <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
+      </div>
+      {% elif source_media_ready and source_is_video %}
+      <div class="order-media-wrap">
+        <video controls preload="metadata" class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/source"></video>
+        <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
+      </div>
+      {% elif source_media_ready %}
+      <div class="order-audio-stage">
+        <div class="order-audio-wave" aria-hidden="true">{% for i in range(28) %}<i style="--d:{{ (i * 5) % 9 }}"></i>{% endfor %}</div>
+        <audio controls preload="metadata" class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/source"></audio>
+        <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
       </div>
       {% endif %}
-      {% if not burned_ready and (dubbed_ready or has_dub) %}
-      <!-- A LIVE caption overlay, not a burned-in one - real segment text,
-           synced to the same real playhead (timeupdate) the transcript
-           table's active-row highlight already uses below. Skipped
-           entirely when burned_ready, since that file already has real
-           captions baked into its pixels - showing this on top would be
-           a literal duplicate, not a second real thing. -->
-      <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
+      {% if dubbed_ready or has_dub or source_media_ready or order['source_youtube_id'] %}
+      <p class="muted order-preview-hint">Press play to preview your result. Click any line of the transcript to jump to it.</p>
       {% endif %}
     </div>
 
@@ -457,43 +468,69 @@
     // element; does nothing (no error) when the order has no player at
     // all, e.g. a transcription-only order.
     var media = document.querySelector(".order-preview-media");
+    var ytFrame = document.getElementById("order-yt");
     var rows = document.querySelectorAll("#order-transcript-table tr[data-start-ms]");
     var scrollBox = document.getElementById("order-transcript-scroll");
     var captionOverlay = document.getElementById("order-caption-overlay");
+    var activeRow = null, ytPlayer = null, ytTimer = null;
+
+    function highlight(nowMs) {
+      var match = null;
+      for (var i = 0; i < rows.length; i++) {
+        var start = Number(rows[i].dataset.startMs), end = Number(rows[i].dataset.endMs);
+        if (nowMs >= start && nowMs < end) { match = rows[i]; break; }
+      }
+      if (match === activeRow) return;
+      if (activeRow) activeRow.classList.remove("order-transcript-active");
+      if (match) {
+        match.classList.add("order-transcript-active");
+        if (scrollBox) {
+          var boxTop = scrollBox.getBoundingClientRect().top, rowTop = match.getBoundingClientRect().top;
+          scrollBox.scrollTop += (rowTop - boxTop) - scrollBox.clientHeight / 2 + match.clientHeight / 2;
+        }
+      }
+      activeRow = match;
+      // The same real text the transcript highlights, shown as live subtitles over the picture (never when the file
+      // already has captions burned into it).
+      if (captionOverlay) {
+        if (match && match.dataset.targetText) { captionOverlay.textContent = match.dataset.targetText; captionOverlay.hidden = false; }
+        else { captionOverlay.hidden = true; }
+      }
+    }
+
+    function seekTo(sec) {
+      if (media) { media.currentTime = sec; var p = media.play(); if (p && p.catch) p.catch(function () {}); }
+      else if (ytPlayer && ytPlayer.seekTo) { ytPlayer.seekTo(sec, true); ytPlayer.playVideo(); }
+    }
+    [].forEach.call(rows, function (row) {
+      row.title = "Play from here";
+      row.addEventListener("click", function () { seekTo(Number(row.dataset.startMs) / 1000); });
+    });
+
     if (media && rows.length) {
-      var activeRow = null;
-      media.addEventListener("timeupdate", function () {
-        var nowMs = media.currentTime * 1000;
-        var match = null;
-        for (var i = 0; i < rows.length; i++) {
-          var start = Number(rows[i].dataset.startMs), end = Number(rows[i].dataset.endMs);
-          if (nowMs >= start && nowMs < end) { match = rows[i]; break; }
-        }
-        if (match !== activeRow) {
-          if (activeRow) activeRow.classList.remove("order-transcript-active");
-          if (match) {
-            match.classList.add("order-transcript-active");
-            if (scrollBox) {
-              var boxTop = scrollBox.getBoundingClientRect().top, rowTop = match.getBoundingClientRect().top;
-              scrollBox.scrollTop += (rowTop - boxTop) - scrollBox.clientHeight / 2 + match.clientHeight / 2;
-            }
-          }
-          activeRow = match;
-          // Live caption overlay - the same real target-language text the
-          // transcript panel already highlights, just also shown burned-
-          // in-style on the video itself (see the template's own note on
-          // why this only renders at all when the file isn't ALREADY
-          // burned - never a duplicate of a real caption track).
-          if (captionOverlay) {
-            if (match && match.dataset.targetText) {
-              captionOverlay.textContent = match.dataset.targetText;
-              captionOverlay.hidden = false;
-            } else {
-              captionOverlay.hidden = true;
-            }
-          }
-        }
-      });
+      var stage = media.closest(".order-audio-stage");
+      media.addEventListener("timeupdate", function () { highlight(media.currentTime * 1000); });
+      media.addEventListener("seeked", function () { highlight(media.currentTime * 1000); });
+      if (stage) {
+        media.addEventListener("play", function () { stage.classList.add("is-playing"); });
+        media.addEventListener("pause", function () { stage.classList.remove("is-playing"); });
+        media.addEventListener("ended", function () { stage.classList.remove("is-playing"); });
+      }
+    }
+
+    // A YouTube video: ask the player for its time while it plays (the page cannot hear its <video>).
+    if (ytFrame && rows.length) {
+      var prior = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = function () {
+        if (prior) { try { prior(); } catch (e) { /* not ours */ } }
+        ytPlayer = new YT.Player("order-yt", { events: { onStateChange: function (e) {
+          if (ytTimer) { clearInterval(ytTimer); ytTimer = null; }
+          if (e.data === 1) { ytTimer = setInterval(function () { highlight(ytPlayer.getCurrentTime() * 1000); }, 250); }
+          else if (ytPlayer.getCurrentTime) { highlight(ytPlayer.getCurrentTime() * 1000); }
+        } } });
+      };
+      if (window.YT && window.YT.Player) { window.onYouTubeIframeAPIReady(); }
+      else { var tag = document.createElement("script"); tag.src = "https://www.youtube.com/iframe_api"; document.head.appendChild(tag); }
     }
   })();
 </script>

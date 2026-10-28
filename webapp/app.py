@@ -6210,6 +6210,8 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "user": user, "order": order, "job": job, "role": "client", "messages": messages,
         "has_translation": order_level["mt"], "has_dub": order_level["tts"],
         "has_video_deliverables": has_video_deliverables, "has_video_source": has_video_source,
+        "source_is_video": (not order["source_youtube_id"]) and is_video_file(order["audio_path"] or ""),
+        "source_media_ready": bool(order["audio_path"]) and Path(order["audio_path"]).is_file(),
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "subs_ready": (outdir / f"subs_{order['target_lang']}.srt").exists(),
@@ -8440,6 +8442,16 @@ def download_deliverable(request: Request, order_id: str, kind: str):
             media = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         return Response(content=data, media_type=media,
                         headers={"Content-Disposition": f'attachment; filename="{stem}_transcript.{kind}"'})
+
+    if kind == "source":
+        # The file the client uploaded, for the preview player on the order page (same payment and plan gates as
+        # every other download above). Served inline, with range support, so video can be scrubbed.
+        import mimetypes
+        src = Path(order["audio_path"] or "")
+        if not src.is_file():
+            return HTMLResponse("The original file is no longer stored.", status_code=404)
+        guessed = mimetypes.guess_type(src.name)[0] or ("video/mp4" if is_video_file(str(src)) else "audio/mpeg")
+        return FileResponse(str(src), media_type=guessed, content_disposition_type="inline")
 
     files = {
         "audio": f"dub_{order['target_lang']}.wav",
