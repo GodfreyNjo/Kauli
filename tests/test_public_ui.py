@@ -109,7 +109,7 @@ def test_homepage_structure_follows_the_plan(client):
     assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+ Languages</h1>", html)
     assert "Nairobi" not in html
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
-    assert ids[:4] == ["services", "demo", "why", "pricing"], ids       # services before pricing, as specified
+    assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
     for needed in ("how", "faq", "book", "start"):
         assert needed in ids
     # the plan's removed/condensed sections stay gone
@@ -174,3 +174,15 @@ def test_developer_docs_page_is_public_and_linked(client):
         assert needed in html
     assert 'href="/developers"' in client.get("/").text            # reachable from the nav and footer
     assert "/developers" in client.get("/sitemap.xml").text
+
+
+def test_integrations_section_is_honest_about_what_exists(client):
+    html = client.get("/").text
+    block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
+    # what is really built is marked Available and linked to its docs...
+    for name in ("API", "MCP server", "Webhooks"):
+        assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
+    # ...and nothing unbuilt is ever presented as available
+    for name in ("Zoom", "Slack", "Notion", "Google Drive", "HubSpot", "Salesforce"):
+        m = re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge (\w+)">', block)
+        assert m and m.group(1) == "soon", name

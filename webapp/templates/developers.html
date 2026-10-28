@@ -83,7 +83,7 @@
     <p><code>GET /api/v1/languages</code> needs no key and lists every code with what it supports:
        transcription, translation as a target, human review and dubbing.</p>
 
-    <h2>Webhooks</h2>
+    <h2 id="webhooks">Webhooks</h2>
     <p>Add a webhook URL in <a href="/settings">Settings</a> and Kauli sends a <code>POST</code> with
        <code>{"event": "order.ready", "order": {...}}</code> when an order is delivered. The body is signed so you can verify it came from
        Kauli: the <code>X-Kauli-Signature</code> header is <code>sha256=</code> plus the HMAC-SHA256 of

@@ -381,6 +381,47 @@
     </div>
   </section>
 
+  <section class="m-section" id="integrations">
+    <div class="m-inner">
+      <span class="m-section-eyebrow">Integrations</span>
+      <h2 class="m-h2">Connect Kauli to the tools you already use</h2>
+      <p class="m-lede">Send work in and pull results out with our API, MCP server and webhooks today. One-click
+         connections to the apps below are on the way.</p>
+      {% set integrations = [
+        ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12",
+          [("API", "live", "/developers"), ("MCP server", "live", "/developers#mcp"),
+           ("Webhooks", "live", "/developers#webhooks"), ("Zapier, Make, n8n", "live", "/developers#webhooks")]),
+        ("Publishing", "M4 6h16v10H4zM9 20h6M12 16v4", [("YouTube captions", "live", None)]),
+        ("Video conferencing", "M3 7h11v10H3zM14 11l7-4v10l-7-4", [("Zoom", "soon", None), ("Microsoft Teams", "soon", None), ("Google Meet", "soon", None)]),
+        ("Storage", "M3 7l3-3h12l3 3v12H3zM3 7h18", [("Google Drive", "soon", None), ("Dropbox", "soon", None), ("OneDrive", "soon", None)]),
+        ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", [("Notion", "soon", None), ("Google Docs", "soon", None)]),
+        ("Collaboration", "M4 5h16v11H9l-5 4z", [("Slack", "soon", None), ("Discord", "soon", None)]),
+        ("CRM", "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 3.5-6 8-6s8 2 8 6", [("HubSpot", "soon", None), ("Salesforce", "soon", None)]),
+        ("Project management", "M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z", [("Asana", "soon", None), ("Trello", "soon", None)]),
+        ("Calendar", "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", [("Google Calendar", "soon", None), ("Outlook Calendar", "soon", None)]),
+      ] %}
+      <div class="int-grid">
+        {% for title, icon, tools in integrations %}
+        <article class="int-card">
+          <h3><span class="int-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>{{ title|safe }}</h3>
+          <ul class="int-list">
+            {% for name, state, href in tools %}
+            <li>
+              {% if href %}<a href="{{ href }}" class="int-chip">{% else %}<span class="int-chip">{% endif %}
+                <span class="int-mono" aria-hidden="true">{{ name[0] }}</span>
+                <span class="int-name">{{ name }}</span>
+                <span class="int-badge {{ state }}">{{ 'Available' if state == 'live' else 'Coming soon' }}</span>
+              {% if href %}</a>{% else %}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </article>
+        {% endfor %}
+      </div>
+      <p class="int-note">Need a specific integration sooner? <a href="#book">Tell us what you use</a> and it moves up the list.</p>
+    </div>
+  </section>
+
   <section class="m-section" id="pricing">
     <div class="m-inner">
       <span class="m-section-eyebrow">Pricing</span>

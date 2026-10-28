@@ -3754,3 +3754,22 @@ html[data-theme="dark"] button.approve { color: #0b1730; }
 .dev-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .dev-table th, .dev-table td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); }
 .dev-table th { color: var(--heading-ink); }
+
+/* integrations (home) */
+.int-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.int-card { background: #ffffff; border: 1px solid var(--border-subtle); border-radius: 20px; padding: 22px 20px; box-shadow: 0 10px 34px -16px rgba(30, 70, 160, 0.28); }
+.int-card h3 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 1.02rem; color: var(--heading-ink); }
+.int-icon { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; flex: none; }
+.int-icon svg { width: 18px; height: 18px; }
+.int-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.int-chip { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border-subtle); border-radius: 12px; color: var(--heading-ink); text-decoration: none; background: #f8fafe; }
+a.int-chip:hover { border-color: var(--accent); background: #ffffff; text-decoration: none; color: var(--heading-ink); }
+.int-mono { width: 28px; height: 28px; border-radius: 8px; background: #e4edfb; color: #1d4ed8; font-weight: 800; font-size: 0.85rem; display: grid; place-items: center; flex: none; }
+.int-name { font-weight: 600; font-size: 0.92rem; flex: 1; min-width: 0; }
+.int-badge { font-size: 0.7rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.int-badge.live { background: #e4f1e9; color: #25603b; }
+.int-badge.soon { background: #eef1f6; color: #4b5b73; }
+.int-note { text-align: center; margin: 26px 0 0; color: var(--muted); font-size: 0.95rem; }
+@media (max-width: 960px) { .int-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .int-grid { grid-template-columns: 1fr; } }
+.int-card a.int-chip, .int-card a.int-chip:hover, .int-card a.int-chip * { text-decoration: none; }
