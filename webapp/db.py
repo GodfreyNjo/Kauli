@@ -755,6 +755,14 @@ CREATE TABLE IF NOT EXISTS integration_requests (
     body TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+-- One-click integrations (webapp/connections.py): the access a customer gave Kauli (stored encrypted) and their switches.
+CREATE TABLE IF NOT EXISTS integration_connections (
+    client_id TEXT NOT NULL, provider TEXT NOT NULL, token_enc TEXT, refresh_enc TEXT, expires_at REAL, account_label TEXT,
+    target_enc TEXT, settings_json TEXT NOT NULL DEFAULT '{}', connected_at REAL NOT NULL, PRIMARY KEY (client_id, provider)
+);
+CREATE TABLE IF NOT EXISTS integration_oauth_states (
+    state TEXT PRIMARY KEY, client_id TEXT NOT NULL, provider TEXT NOT NULL, created_at REAL NOT NULL
+);
 -- The narrated version of a blog post (webapp/blog_audio.py): one per post, the file lives in the data folder (blog_audio/).
 CREATE TABLE IF NOT EXISTS blog_audio (
     post_id TEXT PRIMARY KEY,

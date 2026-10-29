@@ -45,7 +45,17 @@
       <div class="ig-head"><span class="ws-badge">{{ i.name[0] }}</span><div><h3>{{ i.name }}</h3><span class="ig-cat">{{ i.cat }}</span></div></div>
       <p>{{ i.desc }}</p>
       <div class="ig-actions">
-        {% if i.state == 'live' %}
+        {% if i.connect %}
+          {% if i.connected %}
+            <span class="ig-on">Connected{% if i.account %} &middot; {{ i.account }}{% endif %}</span>
+            <button type="button" class="btn" data-settings="{{ i.connect }}">Settings</button>
+            <button type="button" class="ig-link" data-disconnect="{{ i.connect }}">Disconnect</button>
+          {% elif i.connectable %}
+            <button type="button" class="btn" data-connect="{{ i.connect }}">Connect</button>
+          {% else %}
+            <span class="ig-via">Coming soon</span>
+          {% endif %}
+        {% elif i.state == 'live' %}
           <a class="btn" href="{{ i.href }}">{{ 'Import a file' if i.import else ('Connect' if i.kind == 'built' else 'Set up') }}</a>
           {% if i.kind == 'zapier' %}<span class="ig-via">via Zapier / Make</span>{% endif %}
         {% else %}
@@ -66,6 +76,64 @@
     </form>
   </section>
 </div>
+<dialog id="ig-dialog" class="ig-dialog" aria-labelledby="ig-dialog-title">
+  <form method="dialog" class="ig-dialog-box" id="ig-dialog-form">
+    <div class="ig-dialog-head"><h2 id="ig-dialog-title">Settings</h2><button type="button" class="ig-x" id="ig-dialog-x" aria-label="Close">&times;</button></div>
+    <p class="muted" id="ig-dialog-account"></p>
+    <div id="ig-dialog-options"></div>
+    <p class="hub-flash bad" id="ig-dialog-error" role="alert" hidden></p>
+    <div class="ig-dialog-foot"><button type="button" class="ig-cancel" id="ig-dialog-cancel">Cancel</button><button type="submit" class="btn" id="ig-dialog-save">Save</button></div>
+  </form>
+</dialog>
+<script>
+  (function () {
+    var dlg = document.getElementById("ig-dialog"), optionsEl = document.getElementById("ig-dialog-options"), errEl = document.getElementById("ig-dialog-error");
+    var current = null;
+    function post(url, body) { return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : "{}", credentials: "same-origin" }); }
+    function openSettings(provider) {
+      fetch("/client/integrations/" + provider + "/settings", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.error) { location.reload(); return; }
+        current = provider; errEl.hidden = true;
+        document.getElementById("ig-dialog-title").textContent = d.name + " Settings";
+        document.getElementById("ig-dialog-account").textContent = d.account ? "Connected as " + d.account : "";
+        optionsEl.textContent = "";
+        d.options.forEach(function (o) {
+          var row = document.createElement("label"); row.className = "ig-opt";
+          var text = document.createElement("span"); text.textContent = o.label;
+          var box = document.createElement("input"); box.type = "checkbox"; box.setAttribute("role", "switch"); box.checked = o.on; box.dataset.key = o.key; box.className = "ig-switch";
+          row.appendChild(text); row.appendChild(box); optionsEl.appendChild(row);
+        });
+        if (dlg.showModal) dlg.showModal(); else dlg.setAttribute("open", "");
+      });
+    }
+    function close() { if (dlg.close) dlg.close(); else dlg.removeAttribute("open"); }
+    document.getElementById("ig-dialog-cancel").addEventListener("click", function () { close(); location.reload(); });
+    document.getElementById("ig-dialog-x").addEventListener("click", function () { close(); location.reload(); });
+    document.getElementById("ig-dialog-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var settings = {}; [].forEach.call(optionsEl.querySelectorAll("input"), function (b) { settings[b.dataset.key] = b.checked; });
+      post("/client/integrations/" + current + "/settings", { settings: settings }).then(function (r) {
+        if (r.ok) { close(); location.reload(); } else { errEl.textContent = "Could not save. Please try again."; errEl.hidden = false; }
+      });
+    });
+    [].forEach.call(document.querySelectorAll("[data-connect]"), function (b) {
+      b.addEventListener("click", function () {
+        var url = "/client/integrations/" + b.dataset.connect + "/connect";
+        if (!window.open(url, "kauliconnect", "width=520,height=720")) location.href = url;
+      });
+    });
+    [].forEach.call(document.querySelectorAll("[data-settings]"), function (b) { b.addEventListener("click", function () { openSettings(b.dataset.settings); }); });
+    [].forEach.call(document.querySelectorAll("[data-disconnect]"), function (b) {
+      b.addEventListener("click", function () {
+        if (confirm("Disconnect this service? Kauli stops sending to it.")) post("/client/integrations/" + b.dataset.disconnect + "/disconnect").then(function () { location.reload(); });
+      });
+    });
+    window.addEventListener("message", function (e) {
+      if (e.origin !== location.origin || !e.data || !e.data.kauliIntegration) return;
+      if (e.data.ok) openSettings(e.data.kauliIntegration);
+    });
+  })();
+</script>
 <script>
   (function () {
     var kind = "all", cat = "all", q = "";

@@ -20,7 +20,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import billing, blog_audio, cloud_import, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
+from . import billing, blog_audio, cloud_import, connections, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
 
 router = APIRouter()
 A = None          # the app module, set by register()
@@ -739,8 +739,8 @@ INTEGRATIONS = [
      "desc": "Turn finished transcripts into Asana tasks through Zapier."},
     {"id": "monday", "name": "monday.com", "cat": "Project Management", "kind": "zapier", "state": "live", "href": "/docs/api",
      "desc": "Send transcripts to monday.com boards through Zapier."},
-    {"id": "gdocs", "name": "Google Docs", "cat": "Notes & Documentation", "kind": "zapier", "state": "live", "href": "/docs/api",
-     "desc": "Save every transcript as a Google Doc through Zapier."},
+    {"id": "gdocs", "name": "Google Docs", "cat": "Notes & Documentation", "kind": "built", "state": "live", "href": "/client/integrations",
+     "desc": "Save transcripts directly to Google Docs for easy editing, sharing, and collaboration."},
     {"id": "gsheets", "name": "Google Sheets", "cat": "Notes & Documentation", "kind": "zapier", "state": "live", "href": "/docs/api",
      "desc": "Add a row per transcript to a Google Sheet through Zapier."},
     {"id": "gdrive", "name": "Google Drive", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
@@ -768,6 +768,14 @@ def integrations_page(request: Request, notice: str | None = None):
     on = cloud_import.config()
     cloud = {"gdrive": "google", "onedrive": "onedrive", "dropbox": "dropbox"}
     items = [({**i, "state": "live", "href": "/client#order-form", "import": True} if cloud.get(i["id"]) in on else i) for i in INTEGRATIONS]
+    # one-click connections: Google Docs always shows (as "Coming soon" until its keys are set); Slack switches from the old
+    # webhook set-up to Connect only once its app is set up
+    mine = connections.connections_for(user["client_scope_id"])
+    for i in items:
+        if i["id"] in connections.PROVIDERS and (i["id"] == "gdocs" or connections.configured(i["id"])):
+            i["connect"], i["connectable"] = i["id"], connections.configured(i["id"])
+            i["connected"] = i["id"] in mine
+            i["account"] = mine.get(i["id"], {}).get("label", "")
     return _render(request, "account_integrations.html", user, items=items, categories=CATEGORIES, calendars=CALENDARS,
                    interest=calendar_interest(user["client_scope_id"]), notice=notice)
 

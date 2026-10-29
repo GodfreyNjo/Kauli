@@ -53,7 +53,7 @@ from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -8398,6 +8398,11 @@ def _fire_client_webhook(request: Request, order, event: str = "order.ready") ->
             _notify_notion_order_ready(request, order)
     except Exception:
         pass
+    try:                                   # and the one-click connections (Google Docs, Slack)
+        if event == "order.ready":
+            connections.deliver_in_background(order, _public_base_url(request))
+    except Exception:
+        pass
     try:                                   # and Microsoft Teams
         if event == "order.ready":
             _notify_teams_order_ready(request, order)
@@ -10809,5 +10814,6 @@ threading.Thread(target=_activation_nudge_loop, daemon=True).start()
 account_hub.register(sys.modules[__name__])
 blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
+connections.register(sys.modules[__name__])
 calendar_feed.register(sys.modules[__name__])        # calendar links and sending Kauli to meetings        # import from Google Drive, OneDrive and Dropbox          # narrated blog posts and the podcast feed
 blog_audio.mark_stale_jobs_failed()         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant
