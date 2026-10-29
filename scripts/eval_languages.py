@@ -48,8 +48,16 @@ def config_for(code: str, available: list[str]) -> str | None:
     return next((c for c in available if c.split("_")[0] == code), None)
 
 
-def tsv(cfg: str) -> list[list[str]]:
-    return [r.split("\t") for r in get(BASE.format(cfg=cfg) + "test.tsv").decode("utf-8").strip().split("\n")]
+def tsv(cfg: str, split: str = "test") -> list[list[str]]:
+    return [r.split("\t") for r in get(BASE.format(cfg=cfg) + f"{split}.tsv").decode("utf-8").strip().split("\n")]
+
+
+def english_by_id() -> dict[str, str]:
+    """Every English sentence by its FLEURS sentence id, across all three splits: a language's test sentences are often English's train ones."""
+    out: dict[str, str] = {}
+    for split in ("train", "dev", "test"):
+        out.update({r[0]: r[2] for r in tsv("en_us", split)})
+    return out
 
 
 def norm(text: str) -> str:
@@ -131,13 +139,12 @@ def translate(text: str, tag: str) -> str:
     return sp.decode(res[0].hypotheses[0]).strip()
 
 
-def eval_translation(code: str, rows: list[list[str]], en_rows: list[list[str]], n: int) -> dict:
+def eval_translation(code: str, rows: list[list[str]], en: dict[str, str], n: int) -> dict:
     from sacrebleu.metrics import CHRF
     _t, sp = EVAL["mt"]
     tag = madlad_tag(sp, code)
     if not tag:
         return {"status": "model does not support this language"}
-    en = {r[0]: r[2] for r in en_rows}
     pairs = [(en[r[0]], r[2]) for r in rows if r[0] in en][:n]                 # (English, same sentence in this language), human-made
     if not pairs:
         return {"status": "no matching sentences"}
@@ -164,7 +171,7 @@ def main() -> int:
     EVAL["asr"] = OwnASR()
     EVAL["mt"] = MadladMT._load()
     available = configs()
-    en_rows = tsv("en_us")
+    en_text = english_by_id()
     done = set()
     out = Path(a.results)
     if out.exists():
@@ -179,7 +186,7 @@ def main() -> int:
         else:
             rows = tsv(cfg)
             for key, fn in (("speech", lambda: eval_speech(code, cfg, rows, a.clips)),
-                            ("translation", lambda: eval_translation(code, rows, en_rows, a.clips) if code != "en" else {"status": "source language"})):
+                            ("translation", lambda: eval_translation(code, rows, en_text, a.clips) if code != "en" else {"status": "source language"})):
                 try:
                     row[key] = fn()
                 except Exception as exc:  # noqa: BLE001 - one language failing must not stop the run

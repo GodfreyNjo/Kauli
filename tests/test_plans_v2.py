@@ -123,3 +123,16 @@ def test_included_minutes_cover_instant_ai_transcription_and_translation_on_paid
     assert cost["total_usd"] == 0 and cost["free_minutes_applied"] == 60
     over = billing.order_cost_usd(200, "translate", "pro", 150, review_tier="ai", market="intl")
     assert over["free_minutes_applied"] == 150 and over["billable_minutes"] == 50 and over["total_usd"] > 0
+
+
+def test_the_pages_structured_data_lists_only_the_monthly_prices_and_is_valid_json():
+    import re
+    from fastapi.testclient import TestClient
+    from webapp import app as app_mod
+    html = TestClient(app_mod.app, follow_redirects=False).get("/").text
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, flags=re.S)
+    assert blocks
+    for b in blocks:
+        json.loads(b)                                                                              # every block is valid
+    offers = [o["name"] for b in blocks for o in (json.loads(b).get("offers") or []) if isinstance(o, dict)]
+    assert {"Free", "Pro, monthly", "Premium, monthly"} <= set(offers) and not any("yearly" in o.lower() for o in offers)
