@@ -2,7 +2,12 @@
 <div id="as-root" class="as-root" lang="en" data-name="{{ (user['display_name'] or '').split(' ')[0] }}">
   <button type="button" id="as-open" class="as-fab" aria-label="Open help assistant" aria-expanded="false" aria-controls="as-panel">
     <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 10h7M8.5 13h4"/></svg>
+  <span id="as-count" class="as-count" hidden></span>
   </button>
+  <div id="as-toast" class="as-toast" role="status" hidden>
+    <button type="button" id="as-toast-btn" class="as-toast-main"><strong id="as-toast-title"></strong><span id="as-toast-body"></span></button>
+    <button type="button" id="as-toast-x" class="as-toast-x" aria-label="Dismiss">&times;</button>
+  </div>
   <section id="as-panel" class="as-panel" role="dialog" aria-label="Kauli help assistant" hidden>
     <header class="as-head">
       <strong>Kauli assistant</strong>
@@ -24,16 +29,20 @@
       </div>
     </div>
     <div class="as-body as-msgs" id="as-msgs" hidden>
+      <div class="as-inbox-head"><strong>Updates</strong><button type="button" id="as-readall" class="as-link">Mark all read</button></div>
+      <ul id="as-feed" class="as-feed"></ul>
+      <p class="muted" id="as-nofeed">Nothing new. Order updates and replies from the team show up here.</p>
+      <div class="as-inbox-head"><strong>Conversations</strong></div>
       <ul id="as-threads"></ul>
       <p class="muted" id="as-nomsgs">No conversations yet.</p>
     </div>
     <form id="as-form" class="as-form" autocomplete="off">
-      <input type="text" id="as-input" maxlength="1500" placeholder="Ask anything about Kauli" aria-label="Your question">
+      <input type="text" id="as-input" maxlength="1500" placeholder="Ask about an order, your account or Kauli" aria-label="Your question">
       <button type="submit" aria-label="Send">&uarr;</button>
     </form>
     <nav class="as-tabs" aria-label="Assistant sections">
       <button type="button" id="as-tab-home" class="is-on">Home</button>
-      <button type="button" id="as-tab-msgs">Messages <span id="as-dot" class="as-dot" hidden></span></button>
+      <button type="button" id="as-tab-msgs">Inbox <span id="as-dot" class="as-dot" hidden></span></button>
     </nav>
   </section>
 </div>

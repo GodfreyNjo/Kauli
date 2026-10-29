@@ -6126,7 +6126,31 @@ CHEAP_ASR_LANGUAGES = {"en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "tr
                        "fi", "cs", "el", "hu", "ro", "uk", "id", "vi"}
 
 
+OWN_ASR_DEFAULT_LANGUAGES = "en,es,fr,de,pt,it,nl"
+
+
+def _own_asr_first(source_lang: str) -> bool:
+    """Our own transcription model goes first for the languages it is reliable in, once switched on (KAULI_OWN_ASR=on). The languages are
+    KAULI_OWN_ASR_LANGUAGES; Swahili and the rest stay with the providers built for them until the model is proven there."""
+    if os.environ.get("KAULI_OWN_ASR", "").lower() not in ("on", "1", "true", "yes"):
+        return False
+    langs = {x.strip() for x in os.environ.get("KAULI_OWN_ASR_LANGUAGES", OWN_ASR_DEFAULT_LANGUAGES).split(",") if x.strip()}
+    return source_lang in langs
+
+
 def _route_asr(default_asr: str, *, source_lang: str, free_covered: bool) -> str:
+    """Which transcription provider (or chain of them) an order uses: see _route_asr_outside, with our own model in front where it is
+    reliable. If our own model is not confident about a recording the chain hands it to the next provider; if every other provider
+    fails, our own draft is delivered rather than lost."""
+    outside = _route_asr_outside(default_asr, source_lang=source_lang, free_covered=free_covered)
+    if not _own_asr_first(source_lang) or default_asr not in ("transkriptor", "faster-whisper"):
+        return outside
+    parts = outside[len("chain:"):].split(",") if outside.startswith("chain:") else [outside]
+    parts = [p for p in parts if p not in ("faster-whisper", "own")]        # our own model is the local one now
+    return "chain:" + ",".join(["own"] + parts)
+
+
+def _route_asr_outside(default_asr: str, *, source_lang: str, free_covered: bool) -> str:
     """Which transcription provider (or chain of them) an order uses.
 
     Transkriptor stays the go-to for everyone who pays. The low-cost providers (Groq, AssemblyAI) take the orders that the

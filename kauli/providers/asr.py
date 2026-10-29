@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from ..models import Segment, Word
 
 
@@ -47,18 +48,23 @@ class FasterWhisperASR(ASRProvider):
     """
     name = "faster-whisper"
 
-    def __init__(self, model_size: str = "small", compute_type: str = "int8",
+    def __init__(self, model_size: str | None = None, compute_type: str = "int8",
                  device: str = "cpu"):
-        self.model_size = model_size
+        self.model_size = model_size or os.environ.get("KAULI_WHISPER_MODEL") or "small"
         self.compute_type = compute_type
         self.device = device
         self._model = None
+
+    @staticmethod
+    def model_root() -> str:
+        """Where downloaded models are kept: the persistent data folder, so a redeploy does not download them all over again."""
+        return os.environ.get("KAULI_ASR_MODEL_DIR") or str(Path(__file__).resolve().parents[2] / "webapp" / "data" / "models" / "whisper")
 
     def _load(self):
         if self._model is None:
             from faster_whisper import WhisperModel  # lazy: keeps stub tests dep-free
             self._model = WhisperModel(self.model_size, device=self.device,
-                                       compute_type=self.compute_type)
+                                       compute_type=self.compute_type, download_root=self.model_root())
         return self._model
 
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
@@ -104,6 +110,38 @@ class FasterWhisperASR(ASRProvider):
                 words=words,
             ))
         return out
+
+
+class LowQualityTranscript(Exception):
+    """Our own model heard the recording but is not confident enough in what it wrote. The draft is kept, so that if no other provider
+    can do better it is still delivered (and reviewed) rather than lost."""
+    def __init__(self, segments, score: float):
+        super().__init__(f"low confidence ({score:.2f})")
+        self.segments, self.score = segments, score
+
+
+class OwnASR(FasterWhisperASR):
+    """Kauli's own transcription: an open speech model (Whisper, run through faster-whisper) on our own server. No per-minute cost, no
+    quota, and the audio never leaves the server. It checks its own work: if its average word confidence is below the bar
+    (KAULI_OWN_ASR_MIN_CONF, default 0.70) it raises LowQualityTranscript, and the chain hands the recording to an outside provider.
+    The model is chosen with KAULI_OWN_ASR_MODEL (default "small"; a larger one is more accurate and slower)."""
+    name = "own"
+
+    def __init__(self, **kw):
+        super().__init__(model_size=os.environ.get("KAULI_OWN_ASR_MODEL") or "small", **kw)
+
+    @staticmethod
+    def confidence(segments) -> float | None:
+        """Average confidence over every recognised word (None when there are no words)."""
+        probs = [w.confidence for s in segments for w in (s.words or [])]
+        return sum(probs) / len(probs) if probs else None
+
+    def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
+        segments = super().transcribe(audio_path, language=language)
+        score = self.confidence(segments)
+        if score is not None and score < float(os.environ.get("KAULI_OWN_ASR_MIN_CONF", "0.70")):
+            raise LowQualityTranscript(segments, score)
+        return segments
 
 
 def _ffprobe_duration_ms(audio_path: str) -> int:
@@ -476,6 +514,7 @@ _REGISTRY = {
     "aws-transcribe": AwsTranscribeASR,
     "transkriptor": TranskriptorASR,
     "elevenlabs-scribe": None,
+    "own": None,
 }
 
 
@@ -504,6 +543,7 @@ class ElevenLabsScribeASR(ASRProvider):
 
 
 _REGISTRY["elevenlabs-scribe"] = ElevenLabsScribeASR
+_REGISTRY["own"] = OwnASR
 
 
 def get_asr(name: str, **kwargs) -> ASRProvider:

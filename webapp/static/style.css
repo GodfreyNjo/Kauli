@@ -5575,3 +5575,52 @@ main:has(.order-workspace-grid) { max-width: none; padding: 0 clamp(12px, 2vw, 3
 @media (max-width: 860px) {
   .order-workspace-transcript #order-transcript-scroll { height: auto; max-height: 70vh; }
 }
+
+/* The assistant's inbox: one unread count, a pop-up for what matters, updates and conversations in one list */
+.as-fab { position: relative; }
+.as-count { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: #e5484d; color: #fff; font-size: 0.72rem; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--surface, #fff); }
+.as-count[hidden] { display: none; }
+.as-toast { position: absolute; right: 0; bottom: 68px; width: min(320px, calc(100vw - 24px)); display: flex; background: var(--surface); color: inherit; border: 1px solid var(--border-subtle); border-left: 4px solid var(--brand-blue, #2563eb); border-radius: 14px; box-shadow: 0 14px 36px rgba(8, 20, 45, 0.3); overflow: hidden; }
+.as-toast[hidden] { display: none; }
+.as-toast-main { flex: 1; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 12px 14px; cursor: pointer; display: grid; gap: 2px; }
+.as-toast-main span { font-size: 0.82rem; opacity: 0.75; }
+.as-toast-x { background: none; border: 0; color: inherit; font-size: 1.3rem; cursor: pointer; padding: 0 12px; }
+.as-inbox-head { display: flex; justify-content: space-between; align-items: center; margin: 4px 0 8px; font-size: 0.85rem; }
+.as-link { background: none; border: 0; color: var(--brand-blue, #2563eb); font: inherit; font-size: 0.8rem; cursor: pointer; padding: 4px; }
+.as-feed { list-style: none; margin: 0 0 14px; padding: 0; }
+.as-feed li { border-bottom: 1px solid var(--border-subtle); }
+.as-feed li.is-unread { border-left: 3px solid var(--brand-blue, #2563eb); background: rgba(37, 99, 235, 0.06); }
+.as-feed button { width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 10px 10px; cursor: pointer; display: grid; gap: 2px; }
+.as-feed button span { font-size: 0.82rem; opacity: 0.8; } .as-feed button small { opacity: 0.6; }
+
+/* Captions the way YouTube draws them: small, in a tight dark box, sized from the player so a phone keeps its picture clear */
+.order-media-wrap { container-type: inline-size; }
+.order-media-wrap .order-caption-overlay {
+  left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 92%; bottom: 11%;
+  padding: 0.12em 0.5em; border-radius: 4px; background: rgba(8, 8, 8, 0.78); color: #fff;
+  font-size: clamp(11px, 3.6cqw, 20px); line-height: 1.35; font-weight: 500; text-shadow: none;
+}
+/* what folds away, and the phone layout: video, then the transcript, then the rest */
+.ow-fold { border-top: 1px solid var(--border-subtle); padding: 10px 0; }
+.ow-fold > summary.ow-h { cursor: pointer; font-weight: 700; font-size: 1.05rem; margin: 0; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.ow-fold > summary.ow-h::-webkit-details-marker { display: none; }
+.ow-fold > summary.ow-h::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform 0.15s; opacity: 0.6; }
+.ow-fold[open] > summary.ow-h::after { transform: rotate(-135deg); }
+.ow-fold[open] > summary.ow-h { margin-bottom: 10px; }
+.tx-mobile-bar { display: none; }
+@media (max-width: 860px) {
+  .order-workspace-media { display: contents; }
+  .order-workspace-grid { display: flex; flex-direction: column; gap: 12px; }
+  .order-workspace-grid .order-media-wrap, .order-workspace-grid .order-audio-stage { order: 1; }
+  .order-workspace-grid .order-media-tools { order: 2; margin-top: 0; }
+  .order-workspace-grid .order-workspace-transcript { order: 3; }
+  .order-workspace-grid .order-workspace-extras { order: 4; margin-top: 4px; }
+  .tx-mobile-bar { display: flex; gap: 8px; margin: 8px 0; }
+  .tx-mini { min-height: 36px; padding: 0 14px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface, #fff); color: inherit; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+  .order-workspace-transcript:not(.tx-tools-open) .tx-tools,
+  .order-workspace-transcript:not(.tx-tools-open) .tx-edit-bar,
+  .order-workspace-transcript:not(.tx-tools-open) .tx-find { display: none; }
+  .order-workspace-transcript.tx-hide-source #order-transcript-table:not(.tx-same) th:nth-child(2),
+  .order-workspace-transcript.tx-hide-source #order-transcript-table:not(.tx-same) td:nth-child(2) { display: none; }
+  .order-workspace-transcript #order-transcript-scroll { height: auto; max-height: 68vh; }
+}

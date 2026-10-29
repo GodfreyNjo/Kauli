@@ -1,15 +1,18 @@
-/* Help assistant: topics, chat, hand-off to the team, and the Messages tab (including the team's replies). */
+/* The Kauli assistant: one place for questions, updates and replies from the team.
+   Home / chat: ask about your orders, your account or how to use Kauli (the assistant knows your own orders and passes anything that needs a
+   person to the team). Inbox: everything addressed to you in one list (order updates, replies from the team, conversations), with one unread
+   count on the button and a small pop-up when something important arrives. */
 (function () {
   "use strict";
   var root = document.getElementById("as-root");
   if (!root) return;
   var $ = function (id) { return document.getElementById(id); };
   var panel = $("as-panel"), openBtn = $("as-open"), log = $("as-log"), input = $("as-input");
-  var threadId = null, busy = false;
+  var threadId = null, ctxOrder = null, busy = false, threadsCache = [];
   var QUESTIONS = {
     product: ["What can Kauli do?", "Which languages do you support?", "How accurate is it?", "How do I make notes from a transcript?"],
-    support: ["How do I download my transcript?", "My YouTube link failed", "How do I edit a transcript?", "How long does an order take?"],
-    billing: ["What does each plan include?", "How do I cancel or downgrade?", "How do I earn free minutes?", "What payment methods do you accept?"]
+    support: ["Where is my latest order?", "How do I download my transcript?", "My YouTube link failed", "How long does an order take?"],
+    billing: ["What does each plan include?", "How many free minutes do I have left?", "How do I earn free minutes?", "What payment methods do you accept?"]
   };
 
   var name = root.dataset.name;
@@ -25,7 +28,7 @@
   }
   function setOpen(on) {
     panel.hidden = !on; openBtn.setAttribute("aria-expanded", on ? "true" : "false");
-    if (on) { input.focus(); checkReplies(); }
+    if (on) { hideToast(); input.focus(); refresh(); }
   }
   openBtn.addEventListener("click", function () { setOpen(panel.hidden); });
   $("as-close").addEventListener("click", function () { setOpen(false); openBtn.focus(); });
@@ -49,10 +52,11 @@
     if (!text || busy) return;
     busy = true; show("chat"); bubble("user", text); input.value = "";
     var wait = bubble("bot", "...");
-    api("/client/assistant/message", { text: text, thread_id: threadId, topic: topic || "" }).then(function (d) {
+    api("/client/assistant/message", { text: text, thread_id: threadId, topic: topic || "", order_id: ctxOrder }).then(function (d) {
       threadId = d.thread_id; wait.querySelector("p").textContent = d.reply;
       $("as-handoff").hidden = !d.handoff || d.escalated;
       log.scrollTop = log.scrollHeight;
+      if (d.escalated) refresh();
     }).catch(function (e) { wait.querySelector("p").textContent = e.message || "Could not reach the assistant. Check your connection."; })
       .then(function () { busy = false; });
   }
@@ -77,43 +81,100 @@
     }).catch(function (e) { bubble("bot", e.message); }).then(function () { btn.disabled = false; });
   });
 
-  // Messages tab: earlier conversations, including the team's replies.
-  var seenKey = "kauli_as_seen";
-  function loadThreads() {
-    return api("/client/assistant/threads").then(function (d) {
-      var ul = $("as-threads"); ul.textContent = "";
-      $("as-nomsgs").hidden = d.threads.length > 0;
-      d.threads.forEach(function (t) {
-        var li = document.createElement("li"), b = document.createElement("button");
-        b.type = "button";
-        var last = t.messages.length ? t.messages[t.messages.length - 1] : null;
-        b.innerHTML = "<strong></strong><span></span>";
-        b.firstChild.textContent = t.subject || "Conversation";
-        b.lastChild.textContent = (last && last.sender === "staff" ? "Team: " : "") + (last ? last.body.slice(0, 70) : "");
-        b.addEventListener("click", function () {
-          threadId = t.id; log.textContent = "";
-          t.messages.forEach(function (m) { bubble(m.sender, m.body); });
-          $("as-handoff").hidden = t.escalated; show("chat");
-        });
-        li.appendChild(b); ul.appendChild(li);
+  // ---- the inbox: updates and replies, then earlier conversations
+  function ago(ts) {
+    var s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+    if (s < 60) return "just now";
+    if (s < 3600) return Math.floor(s / 60) + " min ago";
+    if (s < 86400) return Math.floor(s / 3600) + " h ago";
+    return Math.floor(s / 86400) + " d ago";
+  }
+  function openThread(t) {
+    threadId = t.id; ctxOrder = t.order_id || null; log.textContent = "";
+    t.messages.forEach(function (m) { bubble(m.sender, m.body); });
+    $("as-handoff").hidden = t.escalated; show("chat");
+    api("/client/assistant/seen", { thread_id: t.id }).then(refresh).catch(function () { /* a nicety */ });
+  }
+  function drawFeed(d) {
+    var ul = $("as-feed"); ul.textContent = "";
+    $("as-nofeed").hidden = d.items.length > 0;
+    d.items.forEach(function (it) {
+      var li = document.createElement("li"); if (it.unread) li.className = "is-unread";
+      var b = document.createElement("button"); b.type = "button";
+      var t = document.createElement("strong"); t.textContent = it.title; b.appendChild(t);
+      if (it.body) { var p = document.createElement("span"); p.textContent = it.body; b.appendChild(p); }
+      var when = document.createElement("small"); when.textContent = ago(it.at); b.appendChild(when);
+      b.addEventListener("click", function () {
+        if (it.source === "thread") { var th = threadsCache.filter(function (x) { return x.id === it.thread_id; })[0]; if (th) openThread(th); return; }
+        if (it.source === "notification" && it.unread) fetch("/notifications/" + it.id + "/read", { method: "POST", credentials: "same-origin" });
+        if (it.link) location.href = it.link;
       });
-      return d.threads;
+      li.appendChild(b); ul.appendChild(li);
     });
   }
-  function checkReplies() {
-    loadThreads().then(function (threads) {
-      var latest = 0;
-      threads.forEach(function (t) { t.messages.forEach(function (m) { if (m.sender === "staff" && m.at > latest) latest = m.at; }); });
-      var seen = 0; try { seen = Number(localStorage.getItem(seenKey) || 0); } catch (e) { /* private window */ }
-      $("as-dot").hidden = !(latest > seen);
-      $("as-tab-msgs").dataset.latest = latest;
-    }).catch(function () { /* the dot is a nicety */ });
+  function drawThreads() {
+    var ul = $("as-threads"); ul.textContent = "";
+    $("as-nomsgs").hidden = threadsCache.length > 0;
+    threadsCache.forEach(function (t) {
+      var li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button";
+      var last = t.messages.length ? t.messages[t.messages.length - 1] : null;
+      b.innerHTML = "<strong></strong><span></span>";
+      b.firstChild.textContent = t.subject || "Conversation";
+      b.lastChild.textContent = (last && last.sender === "staff" ? "Team: " : "") + (last ? last.body.slice(0, 70) : "");
+      b.addEventListener("click", function () { openThread(t); });
+      li.appendChild(b); ul.appendChild(li);
+    });
   }
-  $("as-tab-home").addEventListener("click", function () { show(threadId ? "chat" : "home"); });
-  $("as-tab-msgs").addEventListener("click", function () {
-    show("msgs"); loadThreads();
-    try { localStorage.setItem(seenKey, $("as-tab-msgs").dataset.latest || String(Date.now() / 1000)); } catch (e) { /* private window */ }
-    $("as-dot").hidden = true;
+  var toastKey = "kauli_as_toast", lastCount = -1;
+  function badge(n) {
+    var c = $("as-count"); c.hidden = n < 1; c.textContent = n > 9 ? "9+" : String(n);
+    $("as-dot").hidden = n < 1;
+  }
+  function hideToast() { $("as-toast").hidden = true; }
+  function toast(it) {
+    $("as-toast-title").textContent = it.title; $("as-toast-body").textContent = it.body || "";
+    $("as-toast").hidden = false;
+    setTimeout(hideToast, 12000);
+  }
+  function refresh() {
+    return Promise.all([api("/client/assistant/feed"), api("/client/assistant/threads")]).then(function (r) {
+      var d = r[0]; threadsCache = r[1].threads;
+      drawFeed(d); drawThreads(); badge(d.unread);
+      // a pop-up only for something important and new, once, and never while the assistant is open
+      var seen = 0; try { seen = Number(sessionStorage.getItem(toastKey) || 0); } catch (e) { /* private window */ }
+      var fresh = d.items.filter(function (i) { return i.unread && i.important && i.at > seen; });
+      if (fresh.length) {
+        try { sessionStorage.setItem(toastKey, String(fresh[0].at)); } catch (e) { /* private window */ }
+        if (panel.hidden && lastCount !== -1) toast(fresh[0]);
+      }
+      lastCount = d.unread;
+    }).catch(function () { /* the count is a nicety */ });
+  }
+  $("as-toast-btn").addEventListener("click", function () { setOpen(true); show("msgs"); });
+  $("as-toast-x").addEventListener("click", hideToast);
+  $("as-readall").addEventListener("click", function () {
+    api("/client/assistant/feed/read", {}).then(refresh).catch(function () { /* a nicety */ });
   });
-  setTimeout(checkReplies, 4000);
+  $("as-tab-home").addEventListener("click", function () { show(threadId ? "chat" : "home"); });
+  $("as-tab-msgs").addEventListener("click", function () { show("msgs"); refresh(); });
+
+  // pages can open the assistant about one order: window.kauliAssistant.open({ orderId: "...", text: "..." })
+  window.kauliAssistant = {
+    open: function (o) {
+      o = o || {};
+      setOpen(true);
+      ctxOrder = o.orderId || null; threadId = null; log.textContent = ""; $("as-handoff").hidden = true;
+      show("chat");
+      if (ctxOrder) {
+        var mine = threadsCache.filter(function (t) { return t.order_id === ctxOrder; })[0];
+        if (mine) { openThread(mine); }
+        else { bubble("bot", "Ask me anything about this order: where it is, what you can download, or what to do next."); }
+      }
+      if (o.text) { input.value = o.text; input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    }
+  };
+
+  setTimeout(refresh, 2500);
+  setInterval(function () { if (!document.hidden) refresh(); }, 45000);
 })();

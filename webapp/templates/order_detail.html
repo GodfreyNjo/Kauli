@@ -56,7 +56,8 @@
       </div>
       {% endif %}
       <div class="order-workspace-extras">
-    <h2 class="ow-h">AI summary</h2>
+    <details class="ow-fold" data-mobile-closed open>
+    <summary class="ow-h">AI summary</summary>
     <div id="ai-summary-content">
       {% for sm in summaries %}
       <details class="sm-item" open data-template="{{ sm.template_id }}">
@@ -91,7 +92,10 @@
     </form>
     {% endif %}
 
-    <h2 class="ow-h">Ask about this transcript</h2>
+    </details>
+
+    <details class="ow-fold" data-mobile-closed open>
+    <summary class="ow-h">Ask about this transcript</summary>
     <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
     <div id="ai-chat-log" class="ai-chat-log"></div>
     <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
@@ -99,6 +103,7 @@
              maxlength="500" style="flex:1;" required>
       <button type="submit" class="secondary">Ask</button>
     </form>
+    </details>
       </div>
     </div>
 
@@ -113,6 +118,10 @@
           <span>&rarr;</span>
           <span class="order-transcript-lang-pill target">{{ order['target_lang']|upper }}</span>
         </div>
+      </div>
+      <div class="tx-mobile-bar">
+        {% if can_export_transcript or can_edit_transcript %}<button type="button" class="tx-mini" id="tx-tools-toggle" aria-expanded="false">Tools</button>{% endif %}
+        {% if not same_language %}<button type="button" class="tx-mini" id="tx-source-toggle" aria-pressed="true">Show original</button>{% endif %}
       </div>
       {% if can_export_transcript %}{% include "_transcript_tools.html" %}{% endif %}
       {% if can_edit_transcript %}
@@ -776,43 +785,58 @@
 </details>
 {% endif %}
 
-<details class="card message-collapsible" open id="revision-request">
-  <summary><h2 style="display:inline;">Messages ({{ messages|length }})</h2></summary>
-  <div class="message-thread">
-    {% if not messages %}
-      <p class="muted">No messages yet - questions, revisions and delivery updates will appear here.</p>
-    {% endif %}
-    {% for m in messages %}
-    <div class="message {{ 'message-me' if m['sender_id'] == user['id'] else 'message-them' }}">
-      <div class="message-meta">{{ m['sender_name'] if m['sender_id'] != user['id'] else 'You' }}
-        &middot; {{ m['created_at']|int|timestamp_to_str }}</div>
-      <div class="message-body">{{ m['body'] }}</div>
-    </div>
-    {% endfor %}
+<section class="card" id="revision-request">
+  <h2 style="margin:0 0 6px; font-size:1.05rem;">Questions or changes?</h2>
+  <p class="muted" style="margin:0 0 12px;">The Kauli assistant answers questions about this order right away, and passes anything that needs a person to our team. Replies from the team arrive in the assistant's inbox, and by email.</p>
+  <div style="display:flex; gap:10px; flex-wrap:wrap;">
+    <button type="button" class="btn" id="ask-assistant">Ask about this order</button>
+    {% if job and job.segments %}<button type="button" class="secondary" id="request-revision-btn">Request a revision</button>{% endif %}
   </div>
-  <form method="post" action="/client/orders/{{ order['id'] }}/messages" style="margin-top:14px;" id="message-form">
-    {% if job and job.segments %}
-    <button type="button" class="secondary" id="request-revision-btn" style="margin-bottom:8px;">Request a revision</button>
-    {% endif %}
-    <textarea name="body" id="message-body" rows="2" placeholder="Write a message..." aria-label="Write a message"
-              required></textarea>
-    <button type="submit">Send</button>
-  </form>
-</details>
+  {% if messages %}
+  <details class="od-more" style="margin-top:14px;">
+    <summary>Earlier messages on this order ({{ messages|length }})</summary>
+    <div class="message-thread">
+      {% for m in messages %}
+      <div class="message {{ 'message-me' if m['sender_id'] == user['id'] else 'message-them' }}">
+        <div class="message-meta">{{ m['sender_name'] if m['sender_id'] != user['id'] else 'You' }} &middot; {{ m['created_at']|int|timestamp_to_str }}</div>
+        <div class="message-body">{{ m['body'] }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endif %}
+</section>
 <script>
   (function () {
-    // Real action, no new backend: a revision request is just a message
-    // on this order's thread, same as any other - staff already see and
-    // act on these. This just saves the client from typing the same
-    // opening line every time.
-    var btn = document.getElementById('request-revision-btn');
-    var body = document.getElementById('message-body');
-    if (!btn || !body) return;
-    btn.addEventListener('click', function () {
-      body.value = "I'd like a revision on this order - here's what needs changing: ";
-      body.focus();
-      body.setSelectionRange(body.value.length, body.value.length);
+    var orderId = {{ order['id']|tojson }};
+    function ask(text) {
+      if (window.kauliAssistant) { window.kauliAssistant.open({ orderId: orderId, text: text || "" }); }
+      else { var fab = document.getElementById("as-open"); if (fab) fab.click(); }
+    }
+    var a = document.getElementById("ask-assistant"), r = document.getElementById("request-revision-btn");
+    if (a) a.addEventListener("click", function () { ask(""); });
+    if (r) r.addEventListener("click", function () { ask("I'd like a revision on this order. What needs changing: "); });
+  })();
+</script>
+<script>
+  (function () {
+    // On a phone the page shows the video, then the transcript, and keeps the rest out of the way until it is wanted.
+    var phone = window.matchMedia("(max-width: 860px)").matches;
+    var box = document.querySelector(".order-workspace-transcript");
+    if (!box) return;
+    if (phone) {
+      [].forEach.call(document.querySelectorAll("details.ow-fold[data-mobile-closed]"), function (d) { d.open = false; });
+      if (document.getElementById("tx-source-toggle")) box.classList.add("tx-hide-source");
+    }
+    var tools = document.getElementById("tx-tools-toggle"), src = document.getElementById("tx-source-toggle");
+    if (tools) tools.addEventListener("click", function () {
+      var on = box.classList.toggle("tx-tools-open"); tools.setAttribute("aria-expanded", on ? "true" : "false");
     });
+    function syncSource() {
+      var hidden = box.classList.contains("tx-hide-source");
+      src.textContent = hidden ? "Show original" : "Hide original"; src.setAttribute("aria-pressed", hidden ? "true" : "false");
+    }
+    if (src) { syncSource(); src.addEventListener("click", function () { box.classList.toggle("tx-hide-source"); syncSource(); }); }
   })();
 </script>
 {% endblock %}

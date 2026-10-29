@@ -20,7 +20,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import billing, blog_audio, cloud_import, connections, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
+from . import assistant_core, billing, blog_audio, cloud_import, connections, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
 
 router = APIRouter()
 A = None          # the app module, set by register()
@@ -889,26 +889,36 @@ HELP MATERIAL:
 {kb}"""
 
 
-def assistant_reply(question: str, history: list[dict]) -> tuple[str, bool]:
-    """(answer, offer_handoff). Claude answers from the curated help material when a key is set; otherwise the best match."""
+def assistant_reply_ex(question: str, history: list[dict], context: str = "", extra_docs: list[str] | None = None) -> dict:
+    """{"text", "handoff", "escalate"}. Claude answers from the help material and the customer's own account facts when a key is set;
+    otherwise the best match. Questions about how Kauli runs are refused before any model is asked, and company and model names are
+    scrubbed from whatever comes back. "escalate" means the assistant itself decided a person has to take over."""
+    if assistant_core.ops_probe(question):
+        return {"text": assistant_core.REFUSAL, "handoff": False, "escalate": False}
     wants_human = bool(re.search(r"\b(human|person|agent|someone|staff|team|representative|talk to)\b", question.lower()))
     if order_ai_assist.ai_assist_configured():
         try:
             kb = "\n".join(f"- {e['a']}" for e in _kb())
             msgs = [{"role": h["role"], "content": h["content"][:1500]} for h in history[-6:] if h.get("role") in ("user", "assistant")]
             msgs.append({"role": "user", "content": question[:1500]})
-            resp = order_ai_assist._client().messages.create(model="claude-haiku-4-5-20251001", max_tokens=400,
-                                                            system=ASSISTANT_PROMPT.format(kb=kb), messages=msgs)
+            resp = order_ai_assist._client().messages.create(model="claude-haiku-4-5-20251001", max_tokens=450,
+                                                            system=assistant_core.system_prompt(kb, context, extra_docs or []), messages=msgs)
             text = "".join(b.text for b in resp.content if b.type == "text").strip()
             if text:
                 esc = "[ESCALATE]" in text
-                return text.replace("[ESCALATE]", "").strip(), esc or wants_human
+                return {"text": assistant_core.scrub(text.replace("[ESCALATE]", "").strip()), "handoff": esc or wants_human, "escalate": esc}
         except Exception:  # noqa: BLE001 - fall through to the built-in answers
             pass
     hit = kb_answer(question)
     if hit and not (wants_human and len(set(_WORD.findall(question.lower())) - _STOP) <= 3):
-        return hit["a"], wants_human
-    return ("I am not sure about that one. I can pass it to the Kauli team and they will reply here and by email."), True
+        return {"text": hit["a"], "handoff": wants_human, "escalate": False}
+    return {"text": "I am not sure about that one. I can pass it to the Kauli team and they will reply here and by email.", "handoff": True, "escalate": False}
+
+
+def assistant_reply(question: str, history: list[dict]) -> tuple[str, bool]:
+    """(answer, offer_handoff) - the plain form of assistant_reply_ex."""
+    r = assistant_reply_ex(question, history)
+    return r["text"], r["handoff"]
 
 
 def _thread_messages(thread_id: str) -> list[dict]:
@@ -936,6 +946,14 @@ def _add_message(thread_id: str, sender: str, body: str) -> None:
     conn.close()
 
 
+def _own_order_id(user, order_id) -> str | None:
+    """An order id only when it is really this customer's order."""
+    if not order_id:
+        return None
+    order = db.get_order(str(order_id))
+    return order["id"] if order and order["client_id"] == user["client_scope_id"] else None
+
+
 @router.get("/client/assistant/threads")
 def assistant_threads(request: Request):
     user = _client(request)
@@ -945,7 +963,75 @@ def assistant_threads(request: Request):
     rows = conn.execute("SELECT * FROM support_threads WHERE user_id = ? ORDER BY updated_at DESC LIMIT 10", (user["id"],)).fetchall()
     conn.close()
     return JSONResponse({"threads": [{"id": r["id"], "subject": r["subject"], "escalated": bool(r["escalated"]), "status": r["status"],
-                                      "messages": _thread_messages(r["id"])} for r in rows]})
+                                      "order_id": r["order_id"], "messages": _thread_messages(r["id"])} for r in rows]})
+
+
+@router.get("/client/assistant/feed")
+def assistant_feed(request: Request):
+    """Everything addressed to this customer in one list with one unread count: see assistant_core.feed."""
+    user = _client(request)
+    if not user:
+        return JSONResponse({"error": "Sign in to continue."}, status_code=401)
+    return JSONResponse(assistant_core.feed(user), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/client/assistant/feed/read")
+async def assistant_feed_read(request: Request):
+    user = _client(request)
+    if not user:
+        return JSONResponse({"error": "Sign in to continue."}, status_code=401)
+    db.mark_all_notifications_read(user["id"])
+    conn = db.get_conn()
+    conn.execute("UPDATE support_threads SET client_seen_at = ? WHERE user_id = ?", (time.time(), user["id"]))
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True})
+
+
+@router.post("/client/assistant/seen")
+async def assistant_seen(request: Request):
+    user = _client(request)
+    if not user:
+        return JSONResponse({"error": "Sign in to continue."}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Bad request."}, status_code=400)
+    thread = _own_thread(user, body.get("thread_id"))
+    if thread is not None:
+        conn = db.get_conn()
+        conn.execute("UPDATE support_threads SET client_seen_at = ? WHERE id = ?", (time.time(), thread["id"]))
+        conn.commit()
+        conn.close()
+    return JSONResponse({"ok": True})
+
+
+def _escalate(request: Request, user, thread, announce: bool = True) -> None:
+    """Hand a conversation to the team: flag it, tell staff once, and (for a conversation about an order) put the customer's words on that
+    order's message thread, where the team already works. The customer is told the team has it, and that they will reply here and by email."""
+    track_feature(request, "assistant_escalated")
+    conn = db.get_conn()
+    conn.execute("UPDATE support_threads SET escalated = 1, status = 'open', updated_at = ? WHERE id = ?", (time.time(), thread["id"]))
+    last_user = conn.execute("SELECT body FROM support_messages WHERE thread_id = ? AND sender = 'user' ORDER BY created_at DESC LIMIT 1", (thread["id"],)).fetchone()
+    conn.commit()
+    conn.close()
+    if announce:
+        _add_message(thread["id"], "bot", "I have passed this to the Kauli team. They will reply here and by email.")
+    who = user["display_name"] or user["email"]
+    link = f"/staff/support/{thread['id']}"
+    if thread["order_id"]:
+        order = db.get_order(thread["order_id"])
+        if order and last_user:
+            db.create_message(order["id"], user["id"], "client", last_user["body"])
+            link = f"/staff/orders/{order['id']}"
+    db.notify_all_staff("support", f"Help request from {who}: {thread['subject'][:60]}", link)
+    try:
+        if mailer.email_configured():
+            contact = getattr(A, "CONTACT_EMAIL", None) or "info@kauli-forgemedia.com"
+            inner = f"<p><strong>{html.escape(user['email'])}</strong> asked for a person in the Kauli assistant:</p><p>{html.escape(thread['subject'])}</p>"
+            mailer.send_email(contact, "Kauli help request", mailer.wrap_email_html(inner, cta_text="Open the thread", cta_url=f"{A._site_base(request)}{link}"), tags=["support"])
+    except Exception:  # noqa: BLE001 - the in-app notification already went out
+        pass
 
 
 @router.post("/client/assistant/message")
@@ -963,26 +1049,40 @@ async def assistant_message(request: Request):
     allowed, retry_after = rate_limit.check(f"assistant:{user['id']}", limit=30, window_s=600)
     if not allowed:
         return JSONResponse({"error": f"Slow down a little. Try again in {retry_after}s."}, status_code=429)
+    order_id = _own_order_id(user, body.get("order_id"))
     thread = _own_thread(user, body.get("thread_id"))
     if thread is None:
         tid, now = uuid.uuid4().hex[:12], time.time()
         conn = db.get_conn()
-        conn.execute("INSERT INTO support_threads (id, client_id, user_id, subject, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                     (tid, user["client_scope_id"], user["id"], text[:80], now, now))
+        conn.execute("INSERT INTO support_threads (id, client_id, user_id, subject, created_at, updated_at, order_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                     (tid, user["client_scope_id"], user["id"], text[:80], now, now, order_id))
         conn.commit()
         conn.close()
     else:
         tid = thread["id"]
+        order_id = order_id or thread["order_id"]
     history = [{"role": "user" if m["sender"] == "user" else "assistant", "content": m["body"]} for m in _thread_messages(tid) if m["sender"] != "staff"]
     _add_message(tid, "user", text)
     if thread is not None and thread["escalated"]:            # the team has it: do not talk over them
+        if order_id:                                          # ... but what the customer adds goes to the order too
+            db.create_message(order_id, user["id"], "client", text)
         return JSONResponse({"thread_id": tid, "reply": "Thanks, I have added that for the team. They will reply here.", "handoff": False, "escalated": True})
     topic = str(body.get("topic") or "")
-    reply, handoff = assistant_reply((topic + ": " if topic and not history else "") + text, history)
-    _add_message(tid, "bot", reply)
+    r = assistant_reply_ex((topic + ": " if topic and not history else "") + text, history,
+                           context=assistant_core.account_context(user, order_id), extra_docs=assistant_core.docs_entries(A, text))
+    human = assistant_core.needs_human(text)
+    if human or r["escalate"]:                                # only a person can do this one: hand it over now, and say so
+        reply = ("That one needs a person, so I have passed it to the Kauli team with your details. They will reply here and by email."
+                 if human else r["text"])
+        _add_message(tid, "bot", reply)
+        _escalate(request, user, _own_thread(user, tid), announce=False)
+        if thread is None:
+            track_feature(request, "assistant_question")
+        return JSONResponse({"thread_id": tid, "reply": reply, "handoff": False, "escalated": True})
+    _add_message(tid, "bot", r["text"])
     if thread is None:
         track_feature(request, "assistant_question")
-    return JSONResponse({"thread_id": tid, "reply": reply, "handoff": handoff, "escalated": False})
+    return JSONResponse({"thread_id": tid, "reply": r["text"], "handoff": r["handoff"], "escalated": False})
 
 
 @router.post("/client/assistant/escalate")
@@ -1001,20 +1101,7 @@ async def assistant_escalate(request: Request):
     if note:
         _add_message(thread["id"], "user", note)
     if not thread["escalated"]:
-        track_feature(request, "assistant_escalated")
-        conn = db.get_conn()
-        conn.execute("UPDATE support_threads SET escalated = 1, status = 'open', updated_at = ? WHERE id = ?", (time.time(), thread["id"]))
-        conn.commit()
-        conn.close()
-        _add_message(thread["id"], "bot", "I have passed this to the Kauli team. They will reply here and by email.")
-        db.notify_all_staff("support", f"Help request from {user['display_name'] or user['email']}: {thread['subject'][:60]}", f"/staff/support/{thread['id']}")
-        try:
-            if mailer.email_configured():
-                contact = getattr(A, "CONTACT_EMAIL", None) or "info@kauli-forgemedia.com"
-                inner = f"<p><strong>{html.escape(user['email'])}</strong> asked for a person in the Kauli assistant:</p><p>{html.escape(thread['subject'])}</p>"
-                mailer.send_email(contact, "Kauli help request", mailer.wrap_email_html(inner, cta_text="Open the thread", cta_url=f"{A._site_base(request)}/staff/support/{thread['id']}"), tags=["support"])
-        except Exception:  # noqa: BLE001 - the in-app notification already went out
-            pass
+        _escalate(request, user, thread)
     return JSONResponse({"ok": True, "thread_id": thread["id"]})
 
 

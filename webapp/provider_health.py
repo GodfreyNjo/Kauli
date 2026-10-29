@@ -36,7 +36,7 @@ NAMES = {
     "lara": "Lara Translate", "azure-translate": "Azure Translator", "claude": "Claude", "aws-translate": "AWS Translate",
     "local": "Local translation model", "stub": "None", "transkriptor": "Transkriptor", "faster-whisper": "Whisper (our own server)",
     "groq-whisper": "Groq Whisper", "assemblyai": "AssemblyAI", "elevenlabs-scribe": "ElevenLabs Scribe", "manual": "Typed by hand",
-    "madlad": "Kauli's own translation model", "azure": "Azure Speech", "piper": "Piper (our own server)", "elevenlabs": "ElevenLabs", "xtts": "XTTS", "mms": "MMS",
+    "own": "Kauli's own transcription model", "madlad": "Kauli's own translation model", "azure": "Azure Speech", "piper": "Piper (our own server)", "elevenlabs": "ElevenLabs", "xtts": "XTTS", "mms": "MMS",
 }
 
 # order column each kind of provider is stored in
@@ -68,6 +68,12 @@ def configured(name: str) -> bool:
         return _env("ANTHROPIC_API_KEY")
     if name == "aws-translate":
         return _env("AWS_ACCESS_KEY_ID")
+    if name == "own":
+        try:
+            import faster_whisper  # noqa: F401
+            return True
+        except Exception:  # noqa: BLE001
+            return False
     if name == "madlad":
         try:
             from kauli.providers.mt import MadladMT
@@ -129,6 +135,7 @@ def alternatives(order, kind: str) -> list[dict]:
 
     if kind == "asr":
         add("transkriptor")
+        add("own", fits=src in {"en", "es", "fr", "de", "pt", "it", "nl"}, note="Our own model on our server: no cost, no quota")
         add("faster-whisper", note="Runs on our server; slower, no cost")
         add("groq-whisper", note="Cheap cloud Whisper")
         add("assemblyai")
@@ -152,7 +159,7 @@ def alternatives(order, kind: str) -> list[dict]:
 # When a provider fails it is set aside for a while, so new orders go straight to the next one instead of failing first, and an order that
 # fails on it is moved to the next connected provider that can take its languages and retried. Cheapest and most reliable first; our own
 # model before the paid AI, the placeholder local model last.
-AUTO_ORDER = {"asr": ["transkriptor", "groq-whisper", "assemblyai", "faster-whisper"],
+AUTO_ORDER = {"asr": ["transkriptor", "groq-whisper", "assemblyai", "own", "faster-whisper"],
               "mt": ["lara", "azure-translate", "madlad", "claude", "aws-translate", "local"],
               "tts": ["piper", "azure"]}
 PAUSE_SECONDS = {"out of quota or rate-limited": 30 * 60, "key rejected or not allowed": 30 * 60, "unreachable or timing out": 5 * 60}

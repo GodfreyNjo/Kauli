@@ -20,7 +20,7 @@ from pathlib import Path
 import httpx
 
 from ..models import Segment, Word
-from .asr import ASRProvider, FasterWhisperASR, _ffprobe_duration_ms, get_asr
+from .asr import ASRProvider, FasterWhisperASR, LowQualityTranscript, _ffprobe_duration_ms, get_asr
 
 # What Whisper recognises. A language outside this list is refused up front so the chain moves on instead of guessing.
 WHISPER_LANGUAGES = set(
@@ -175,11 +175,18 @@ class ChainASR(ASRProvider):
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
         failures: list[str] = []
         empty_ok: str | None = None
+        draft = None                                       # our own model's low-confidence transcript, kept in case nothing else works
         for i, name in enumerate(self.names):
             last = i == len(self.names) - 1
             try:
                 provider = get_asr(name, local_fallback=False) if name == "transkriptor" and not last else get_asr(name)
                 segments = provider.transcribe(audio_path, language=language)
+            except LowQualityTranscript as exc:
+                draft = draft or (exc.segments, name)
+                failures.append(f"{name}: {exc}")
+                if not last:
+                    continue
+                break
             except Exception as exc:  # noqa: BLE001 - any failure means "try the next one"
                 failures.append(f"{name}: {exc.__class__.__name__}: {exc}")
                 continue
@@ -191,6 +198,10 @@ class ChainASR(ASRProvider):
             if failures:
                 self.notes.append(f"Transcribed by {provider.name} after: " + "; ".join(failures))
             return segments
+        if draft:
+            self.used_name = draft[1]
+            self.notes.append("Transcribed by our own model; it was not fully confident and no other provider could take it: " + "; ".join(failures))
+            return draft[0]                                # low-confidence segments are flagged for review downstream
         if empty_ok:
             self.used_name = empty_ok
             return []

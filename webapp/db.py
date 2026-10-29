@@ -1091,6 +1091,11 @@ def init_db() -> None:
         # written before this existed - blog_index.html/blog_post.html fall
         # back to the generated SVG waveform card, never a broken <img>.
         conn.execute("ALTER TABLE blog_posts ADD COLUMN cover_image_path TEXT")
+    existing_thread_cols = {row["name"] for row in conn.execute("PRAGMA table_info(support_threads)")}
+    if "order_id" not in existing_thread_cols:
+        conn.execute("ALTER TABLE support_threads ADD COLUMN order_id TEXT")          # the order a conversation is about, if any
+    if "client_seen_at" not in existing_thread_cols:
+        conn.execute("ALTER TABLE support_threads ADD COLUMN client_seen_at REAL")    # when the customer last saw the team's reply
     existing_upload_audit_cols = {row["name"] for row in conn.execute("PRAGMA table_info(upload_audit_log)")}
     if "content_safety_flagged" not in existing_upload_audit_cols:
         conn.execute("ALTER TABLE upload_audit_log ADD COLUMN content_safety_flagged INTEGER")
