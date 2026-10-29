@@ -37,7 +37,7 @@ import httpx
 # Overridable via GA_MEASUREMENT_ID so the property can be repointed via
 # .env alone - this is just today's real, already-live ID (_ga.html's own
 # literal), not invented for this module.
-DEFAULT_MEASUREMENT_ID = "G-29L6CFPNEB"
+DEFAULT_MEASUREMENT_ID = "G-F77NCL15P8"
 
 
 def measurement_id() -> str:
