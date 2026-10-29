@@ -55,56 +55,6 @@
         <p class="muted order-preview-hint">Tap any line of the transcript to jump to it.</p>
       </div>
       {% endif %}
-      <div class="order-workspace-extras">
-    <details class="ow-fold" data-mobile-closed open>
-    <summary class="ow-h">AI summary</summary>
-    <div id="ai-summary-content">
-      {% for sm in summaries %}
-      <details class="sm-item" open data-template="{{ sm.template_id }}">
-        <summary><strong>{{ sm.name }}</strong> <span class="muted">{{ sm.when }}</span></summary>
-        <div class="sm-body">{{ sm.html|safe }}</div>
-        <button type="button" class="secondary sm-copy">Copy</button>
-      </details>
-      {% endfor %}
-      <p class="muted" id="sm-empty"{% if summaries %} hidden{% endif %}>No summary yet. Choose a format and we write it from your transcript, only when you ask.</p>
-    </div>
-    <button type="button" class="secondary" id="sm-open">{{ 'Create another summary' if summaries else 'Create summary' }}</button>
-    <dialog id="sm-dialog" class="sm-dialog" aria-labelledby="sm-title">
-      <div class="sm-box">
-        <div class="sm-head">
-          <h2 id="sm-title">Choose a summary format</h2>
-          <button type="button" class="sm-x" id="sm-close" aria-label="Close">&times;</button>
-        </div>
-        <input type="search" id="sm-search" placeholder="Search templates" aria-label="Search templates">
-        <div class="sm-cols">
-          <div id="sm-cats" class="sm-cats" role="group" aria-label="Category"></div>
-          <div class="sm-main">
-            <p id="sm-status" class="muted" role="status" aria-live="polite"></p>
-            <div id="sm-grid" class="sm-grid"></div>
-          </div>
-        </div>
-      </div>
-    </dialog>
-    {% if can_export_transcript %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
-      <button type="submit" class="secondary">Create AI notes</button>
-      <span class="muted">An editable note with the overview, key points and action items.</span>
-    </form>
-    {% endif %}
-
-    </details>
-
-    <details class="ow-fold" data-mobile-closed open>
-    <summary class="ow-h">Ask about this transcript</summary>
-    <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
-    <div id="ai-chat-log" class="ai-chat-log"></div>
-    <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
-      <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
-             maxlength="500" style="flex:1;" required>
-      <button type="submit" class="secondary">Ask</button>
-    </form>
-    </details>
-      </div>
     </div>
 
     <div class="order-workspace-transcript">
@@ -158,9 +108,63 @@
           </tbody>
         </table>
       </div>
+      {% if order['review_tier'] != 'ai' %}
       <p class="muted" style="font-size:0.78rem; margin-top:8px;">See something that needs fixing? <a href="#revision-request">Request a revision</a> below.</p>
+      {% elif can_edit_transcript %}
+      <p class="muted" style="font-size:0.78rem; margin-top:8px;">See something that needs fixing? Use <strong>Edit transcript</strong> above, or add human review.</p>
+      {% endif %}
     </div>
   </div>
+      <div class="order-workspace-extras">
+    <details class="ow-fold" data-mobile-closed open>
+    <summary class="ow-h">AI summary</summary>
+    <div id="ai-summary-content">
+      {% for sm in summaries %}
+      <details class="sm-item" open data-template="{{ sm.template_id }}">
+        <summary><strong>{{ sm.name }}</strong> <span class="muted">{{ sm.when }}</span></summary>
+        <div class="sm-body">{{ sm.html|safe }}</div>
+        <button type="button" class="secondary sm-copy">Copy</button>
+      </details>
+      {% endfor %}
+      <p class="muted" id="sm-empty"{% if summaries %} hidden{% endif %}>No summary yet. Choose a format and we write it from your transcript, only when you ask.</p>
+    </div>
+    <button type="button" class="secondary" id="sm-open">{{ 'Create another summary' if summaries else 'Create summary' }}</button>
+    <dialog id="sm-dialog" class="sm-dialog" aria-labelledby="sm-title">
+      <div class="sm-box">
+        <div class="sm-head">
+          <h2 id="sm-title">Choose a summary format</h2>
+          <button type="button" class="sm-x" id="sm-close" aria-label="Close">&times;</button>
+        </div>
+        <input type="search" id="sm-search" placeholder="Search templates" aria-label="Search templates">
+        <div class="sm-cols">
+          <div id="sm-cats" class="sm-cats" role="group" aria-label="Category"></div>
+          <div class="sm-main">
+            <p id="sm-status" class="muted" role="status" aria-live="polite"></p>
+            <div id="sm-grid" class="sm-grid"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    {% if can_export_transcript %}
+    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
+      <button type="submit" class="secondary">Create AI notes</button>
+      <span class="muted">An editable note with the overview, key points and action items.</span>
+    </form>
+    {% endif %}
+
+    </details>
+
+    <details class="ow-fold" data-mobile-closed open>
+    <summary class="ow-h">Ask about this transcript</summary>
+    <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
+    <div id="ai-chat-log" class="ai-chat-log"></div>
+    <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
+      <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
+             maxlength="500" style="flex:1;" required>
+      <button type="submit" class="secondary">Ask</button>
+    </form>
+    </details>
+      </div>
 
 
 </div>
@@ -785,6 +789,7 @@
 </details>
 {% endif %}
 
+{% if order['review_tier'] != 'ai' %}
 <section class="card" id="revision-request">
   <h2 style="margin:0 0 6px; font-size:1.05rem;">Questions or changes?</h2>
   <p class="muted" style="margin:0 0 12px;">The Kauli assistant answers questions about this order right away, and passes anything that needs a person to our team. Replies from the team arrive in the assistant's inbox, and by email.</p>
@@ -818,6 +823,7 @@
     if (r) r.addEventListener("click", function () { ask("I'd like a revision on this order. What needs changing: "); });
   })();
 </script>
+{% endif %}
 <script>
   (function () {
     // On a phone the page shows the video, then the transcript, and keeps the rest out of the way until it is wanted.

@@ -48,3 +48,10 @@ def test_the_player_and_transcript_come_right_after_the_title_and_captions_can_b
     src = (Path(__file__).parent.parent / "webapp" / "templates" / "order_detail.html").read_text(encoding="utf-8")
     assert src.index("<h1>") < src.index('class="order-workspace-grid"') < src.index('class="od-details"') < src.index('class="downloads"')
     assert 'id="order-cc-toggle"' in src and 'localStorage.getItem("kauliCaptions")' in src and "if (!ccOn)" in src
+
+
+def test_the_messages_tab_is_gone_and_old_links_land_on_the_dashboard(env):
+    page = env.client.get("/client/home").text
+    assert 'href="/client/messages"' not in page and 'id="as-open"' in page            # the assistant's inbox is where replies arrive
+    r = env.client.get("/client/messages", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/client"

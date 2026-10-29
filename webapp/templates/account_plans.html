@@ -29,10 +29,9 @@
     <article class="hub-card pl-card{% if key == current_plan %} is-current{% endif %}">
       <h3>{{ 'Pay as you go' if key == 'free' else p['name'] }}</h3>
       <p class="pl-price">{% if p['price_usd'] %}${{ p['price_usd'] }}<small>/month</small>{% else %}$0{% endif %}</p>
-      {% if key in ('pro', 'premium') %}<p class="muted">or ${{ p['price_usd_year'] }} a year (save {{ billing_saving(p) }}%)</p>{% endif %}
       <ul>
         <li><strong>{{ '{:,}'.format(p['included_ai_minutes']|int) }}</strong> Instant AI minutes{{ hours_suffix(p['included_ai_minutes']) }} a month, for transcription and translation</li>
-        <li>{{ ((p['discount'] * 100)|round|int ~ '% off everything else') if p['discount'] else 'Pay per minute for human review and dubbing' }}</li>
+        <li>Beyond that, the standard per-minute price, shown before you order</li>
         <li>{{ 'Priority translation' if p['mt'] == 'claude' else 'Standard translation' }}</li>
         <li>{{ 'Burned-in captions and dubbed video' if p['video_deliverables'] else 'Transcripts, subtitles and dubbed audio' }}</li>
         <li>{{ p['support'] }} support</li>

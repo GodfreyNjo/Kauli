@@ -830,7 +830,7 @@ def _kb() -> list[dict]:
         {"k": "time long turnaround fast how long take finish minutes ready", "topic": "support",
          "a": "Instant AI usually finishes in a few minutes for short files and scales with length. Human-reviewed orders take longer; the estimated time is shown before you pay. Open the order to see live progress."},
         {"k": "price pricing cost plans plan pay how much subscription upgrade", "topic": "billing",
-         "a": f"Pay as you go starts with {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes every month. Pro is ${p['pro']['price_usd']}/month with {p['pro']['included_ai_minutes']:,} Instant AI minutes; Premium is ${p['premium']['price_usd']}/month with {p['premium']['included_ai_minutes']:,}{billing.hours_suffix(p['premium']['included_ai_minutes'])}. Yearly billing saves about a third. See Plans in the menu to compare or switch."},
+         "a": f"Pay as you go starts with {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes every month. Pro is ${p['pro']['price_usd']}/month with {p['pro']['included_ai_minutes']:,} Instant AI minutes; Premium is ${p['premium']['price_usd']}/month with {p['premium']['included_ai_minutes']:,}{billing.hours_suffix(p['premium']['included_ai_minutes'])}. See Plans in the menu to compare or switch."},
         {"k": "free minutes trial free free-tier signup", "topic": "billing",
          "a": f"Every account gets {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes a month, covering transcription and translation. Unused free minutes do not carry over, but minutes you earn from referrals do."},
         {"k": "pay payment card mpesa m-pesa paystack bank transfer methods secure", "topic": "billing",
@@ -1021,7 +1021,7 @@ def _escalate(request: Request, user, thread, announce: bool = True) -> None:
     link = f"/staff/support/{thread['id']}"
     if thread["order_id"]:
         order = db.get_order(thread["order_id"])
-        if order and last_user:
+        if order and last_user and order["review_tier"] != "ai":          # an Instant AI order has no reviewer to read it
             db.create_message(order["id"], user["id"], "client", last_user["body"])
             link = f"/staff/orders/{order['id']}"
     db.notify_all_staff("support", f"Help request from {who}: {thread['subject'][:60]}", link)
@@ -1067,6 +1067,11 @@ async def assistant_message(request: Request):
         if order_id:                                          # ... but what the customer adds goes to the order too
             db.create_message(order_id, user["id"], "client", text)
         return JSONResponse({"thread_id": tid, "reply": "Thanks, I have added that for the team. They will reply here.", "handoff": False, "escalated": True})
+    order_row = db.get_order(order_id) if order_id else None
+    if order_row and order_row["review_tier"] == "ai" and assistant_core.revision_request(text):
+        # Instant AI is not reviewed by anyone, so there is no one to ask for a revision: say how to fix it, and do not bother the team
+        _add_message(tid, "bot", assistant_core.INSTANT_AI_REVISION_REPLY)
+        return JSONResponse({"thread_id": tid, "reply": assistant_core.INSTANT_AI_REVISION_REPLY, "handoff": False, "escalated": False})
     topic = str(body.get("topic") or "")
     r = assistant_reply_ex((topic + ": " if topic and not history else "") + text, history,
                            context=assistant_core.account_context(user, order_id), extra_docs=assistant_core.docs_entries(A, text))

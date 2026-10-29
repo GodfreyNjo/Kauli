@@ -522,23 +522,17 @@
       </details>
 
       {% set pro = plans['pro'] %}{% set prem = plans['premium'] %}
-      {% set save_pro = billing_saving(pro) %}{% set save_prem = billing_saving(prem) %}
       <div class="pz-plans" id="pz-plans">
         <h3 class="pz-plans-title">Monthly plans</h3>
-        <p class="pz-plans-sub">Commit once and Instant AI minutes, for both transcription and translation, are included every month, with a discount on everything beyond them. Pay yearly and keep even more.</p>
-        <div class="pz-interval" role="group" aria-label="Billing period">
-          <button type="button" class="is-on" data-interval="month" aria-pressed="true">Monthly</button>
-          <button type="button" data-interval="year" aria-pressed="false">Yearly <em>save up to {{ [save_pro, save_prem]|max }}%</em></button>
-        </div>
+        <p class="pz-plans-sub">Commit once and Instant AI minutes, for both transcription and translation, are included every month. Anything beyond them is the same standard per-minute price for everyone, shown before you order.</p>
         <div class="pz-plan-grid pz-plan-grid-3">
           <article class="pz-plan">
             <h4>{{ pro['name'] }}</h4>
             <p class="pz-plan-for">For steady, smaller projects</p>
-            <p class="pz-plan-price"><span class="pz-m"><b>${{ pro['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(pro['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ pro['price_usd_year'] }} a year</span></span></p>
-            <p class="pz-save pz-y">Save {{ save_pro }}% with yearly</p>
+            <p class="pz-plan-price"><span class="pz-m"><b>${{ pro['price_usd'] }}</b><span>/ month</span></span></p>
             <ul class="pz-list">
               <li><strong>{{ '{:,}'.format(pro['included_ai_minutes']|int) }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
-              <li>{{ (pro['discount'] * 100)|round|int }}% off everything beyond that</li>
+              <li>Anything beyond that is the standard per-minute price</li>
               <li>Downloads and delivery unlocked</li>
               {% if meetings_enabled() %}<li>Kauli can join your meetings</li>{% endif %}
               <li>Email support</li>
@@ -549,11 +543,10 @@
             <span class="pz-plan-flag">Best for regular premium work</span>
             <h4>{{ prem['name'] }}</h4>
             <p class="pz-plan-for">For premium work, small or in bulk</p>
-            <p class="pz-plan-price"><span class="pz-m"><b>${{ prem['price_usd'] }}</b><span>/ month</span></span><span class="pz-y"><b>${{ '%.2f'|format(prem['price_usd_year'] / 12) }}</b><span>/ month, billed ${{ prem['price_usd_year'] }} a year</span></span></p>
-            <p class="pz-save pz-y">Save {{ save_prem }}% with yearly</p>
+            <p class="pz-plan-price"><span class="pz-m"><b>${{ prem['price_usd'] }}</b><span>/ month</span></span></p>
             <ul class="pz-list">
               <li><strong>{{ '{:,}'.format(prem['included_ai_minutes']|int) }} Instant AI minutes{{ hours_suffix(prem['included_ai_minutes']) }}</strong> included every month, for both transcription and translation</li>
-              <li>{{ (prem['discount'] * 100)|round|int }}% off everything beyond that</li>
+              <li>Anything beyond that is the standard per-minute price</li>
               <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
               <li>Priority-quality translation and faster turnaround</li>
               <li>Early access to new languages and voices as they launch</li>
@@ -573,22 +566,8 @@
             <a href="/demo?interest=enterprise" class="btn secondary" data-cta="pricing-plan-enterprise">Talk to us</a>
           </article>
         </div>
-        <p class="pz-fine">Included minutes are Instant AI transcription and renew every month, also on a yearly plan.{% if meetings_enabled() %} Kauli can also join your meetings and use the same minutes.{% endif %}</p>
+        <p class="pz-fine">Included minutes are Instant AI transcription and renew every month.{% if meetings_enabled() %} Kauli can also join your meetings and use the same minutes.{% endif %}</p>
       </div>
-      <script>
-        (function () {
-          var box = document.getElementById('pz-plans');
-          if (!box) return;
-          var buttons = box.querySelectorAll('.pz-interval button');
-          [].forEach.call(buttons, function (b) {
-            b.addEventListener('click', function () {
-              var yearly = b.getAttribute('data-interval') === 'year';
-              box.classList.toggle('is-yearly', yearly);
-              [].forEach.call(buttons, function (x) { x.classList.toggle('is-on', x === b); x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-            });
-          });
-        })();
-      </script>
       <script>
         (function () {
           var panel = document.getElementById('pz');

@@ -61,9 +61,13 @@ def test_yearly_prices_save_real_money_and_never_lose_money():
         assert billing.yearly_monthly_equivalent(plan) < p["price_usd"]
 
 
-def test_the_discount_on_everything_else_still_applies_after_the_included_minutes():
-    one_hour = billing.order_cost_usd(60, "dub", "premium", 0.0, market="intl", review_tier="human")
-    assert one_hour["gross_usd"] == 239.4 and one_hour["total_usd"] == pytest.approx(239.4 * 0.8, abs=0.01)
+def test_there_is_no_discount_anywhere_the_price_beyond_included_minutes_is_the_same_for_everyone():
+    assert all(p["discount"] == 0 for p in billing.PLANS.values())
+    prices = {plan: billing.order_cost_usd(60, "dub", plan, 0.0, market="intl", review_tier="human") for plan in ("free", "pro", "premium", "enterprise")}
+    assert {c["gross_usd"] for c in prices.values()} == {239.4} and {c["total_usd"] for c in prices.values()} == {239.4}
+    assert all(c["discount_usd"] == 0 for c in prices.values())
+    assert billing.credit_discount_pct(500) == 0 and billing.custom_credit_price(500)["price_usd"] == pytest.approx(500 * billing.SERVICE_LEVELS["dub"]["rate_per_min"], abs=0.01)
+    assert all(pkg["price_usd"] == pytest.approx(int(k) * billing.SERVICE_LEVELS["dub"]["rate_per_min"], abs=0.01) for k, pkg in billing.CREDIT_PACKAGES.items())
 
 
 def test_yearly_checkout_activates_a_year_and_uses_the_yearly_plan_code(monkeypatch):
@@ -97,14 +101,15 @@ def test_activating_a_yearly_payment_sets_a_365_day_period(tmp_path, monkeypatch
     assert sub["plan"] == "pro" and 25 < (sub["current_period_end"] - time.time()) / 86400 <= 30.1
 
 
-def test_the_pricing_page_has_a_yearly_toggle_included_minutes_and_a_custom_tier():
+def test_the_pricing_page_is_simple_included_minutes_one_price_beyond_and_a_custom_tier():
     from fastapi.testclient import TestClient
     from webapp import app as app_mod
     html = TestClient(app_mod.app, follow_redirects=False).get("/").text
-    section = html.split('id="pz-plans"')[1].split("</section>")[0]
-    assert 'data-interval="month"' in section and 'data-interval="year"' in section
-    assert "2,500 Instant AI minutes" in section and "6,500 Instant AI minutes" in section
-    assert "$12.42" in section and "billed $149 a year" in section and "$31.58" in section
+    section = html.split('id="pz-plans"')[1].split("</section>")[0].split("<script>")[0]            # what a visitor reads, not the scripts after it
+    assert "2,500 Instant AI minutes" in section and "6,500 Instant AI minutes" in section and "$19" in section and "$49" in section
+    assert "standard per-minute price" in section
+    low = section.lower()
+    assert "% off" not in low and "discount" not in low and "yearly" not in low and "save " not in low and 'data-interval' not in section
     assert "Enterprise" in section and "Custom" in section and "/demo?interest=enterprise" in section
 
 

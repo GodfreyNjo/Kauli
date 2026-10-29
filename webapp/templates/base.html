@@ -189,7 +189,6 @@
         <a href="/client/pending" class="{{ 'active' if request.url.path == '/client/pending' else '' }}">{{ nav_icon('pulse') }}<span class="label">{{ t('nav_pending') }}</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
         {% if meetings_enabled() %}<a href="/client/meetings" class="{{ 'active' if request.url.path == '/client/meetings' else '' }}">{{ nav_icon('mic') }}<span class="label">{{ t('nav_meetings') }}</span></a>{% endif %}
         <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">{{ t('nav_files') }}</span></a>
-        <a href="/client/messages" class="{{ 'active' if request.url.path == '/client/messages' else '' }}">{{ nav_icon('message') }}<span class="label">{{ t('nav_messages') }}</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">{{ t('nav_billing') }}</span></a>
         <a href="/client/plans" class="{{ 'active' if '/client/plans' in request.url.path else '' }}">{{ nav_icon('shield') }}<span class="label">{{ t('nav_plans') }}</span></a>
         <div class="sidebar-divider"></div>

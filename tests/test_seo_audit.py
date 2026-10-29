@@ -114,7 +114,7 @@ def test_llms_txt_describes_the_business_as_it_is_and_hides_what_the_price_card_
     for text in (short, full):
         assert "Kenya & East Africa" not in text and "East Africa:" not in text and "$0.60" not in text and "$0.75" not in text
         assert "contact" in text.lower() or "@" in text
-    for needle in ("Nairobi", "Dallas", "Human review", "Pro", "Premium", "yearly", "/human-review/", "/languages", "/sw", "/zh",
+    for needle in ("Nairobi", "Dallas", "Human review", "Pro", "Premium", "/human-review/", "/languages", "/sw", "/zh",
                    "Swahili", "Kikuyu", "meeting", "API"):
         assert needle.lower() in full.lower(), needle
     assert full.count("\n") > short.count("\n")

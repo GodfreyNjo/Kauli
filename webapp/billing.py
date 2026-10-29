@@ -195,21 +195,21 @@ PLANS = {
     # $0.015 a minute (worst case about $0.033), so even the yearly price leaves a wide margin - see the test
     # tests/test_plans_v2.py that fails if a change here would let a plan lose money.
     "pro": {
-        "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.10, "included_ai_minutes": PRO_MINUTES,
+        "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.0, "included_ai_minutes": PRO_MINUTES,
         "quality_minutes": PRO_QUALITY_MINUTES,
         "mt": "local", "video_deliverables": False, "support": "Email",
-        "blurb": f"{PRO_MINUTES:,} Instant AI minutes every month for transcription and translation, 10% off everything else, email support.",
+        "blurb": f"{PRO_MINUTES:,} Instant AI minutes every month for transcription and translation, email support.",
     },
     "premium": {
-        "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": PREMIUM_MINUTES,
+        "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.0, "included_ai_minutes": PREMIUM_MINUTES,
         "quality_minutes": PREMIUM_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
-        "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes{hours_suffix(PREMIUM_MINUTES)} every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
+        "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes{hours_suffix(PREMIUM_MINUTES)} every month for transcription and translation, burned captions & dubbed video "
                  "included, priority-quality translation and turnaround.",
     },
     # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).
     "enterprise": {
-        "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.30, "included_ai_minutes": ENTERPRISE_MINUTES,
+        "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.0, "included_ai_minutes": ENTERPRISE_MINUTES,
         "quality_minutes": ENTERPRISE_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Dedicated account manager",
         "blurb": "Negotiated volume rate, dedicated account manager, bank transfer billing.",
@@ -556,11 +556,11 @@ def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_a
 # than they paid for, they can just now spend it honestly at any tier.
 CREDIT_PACKAGES = {
     "30": {"credits": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
-           "price_usd": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.90, 2)},
+           "price_usd": round(30 * SERVICE_LEVELS["dub"]["rate_per_min"] , 2)},
     "60": {"credits": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
-           "price_usd": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.85, 2)},
+           "price_usd": round(60 * SERVICE_LEVELS["dub"]["rate_per_min"] , 2)},
     "150": {"credits": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] * CREDITS_PER_DOLLAR),
-            "price_usd": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] * 0.80, 2)},
+            "price_usd": round(150 * SERVICE_LEVELS["dub"]["rate_per_min"] , 2)},
 }
 
 # Same discount schedule as the fixed packages above, generalized to any
@@ -569,7 +569,7 @@ CREDIT_PACKAGES = {
 # equivalent spend), just not limited to those three exact amounts.
 CREDIT_CUSTOM_MIN_MINUTES_EQUIV = 5
 CREDIT_CUSTOM_MAX_MINUTES_EQUIV = 2000
-_CREDIT_DISCOUNT_TIERS = [(150, 0.20), (60, 0.15), (30, 0.10), (0, 0.0)]
+_CREDIT_DISCOUNT_TIERS = [(0, 0.0)]          # no volume discount: the price is the same for everyone
 
 
 def credit_discount_pct(minutes_equiv: float) -> float:

@@ -106,7 +106,7 @@ def test_only_things_a_person_must_do_go_to_staff_and_the_rest_the_assistant_ans
 
 
 def test_a_request_about_an_order_lands_on_that_orders_message_thread(env, wav_bytes):
-    order = env.order_from(env.place(wav_bytes))
+    order = env.order_from(env.place(wav_bytes, review_tier="human"))
     _staff(env)
     r = _ask(env, "I'd like a revision on this order, the names are wrong", order_id=order["id"])
     assert r["escalated"] is True
@@ -160,8 +160,34 @@ def test_the_feed_and_threads_need_a_sign_in_and_stay_private(env):
 
 
 def test_the_order_page_opens_the_assistant_instead_of_a_separate_message_box(env, wav_bytes):
-    order = env.order_from(env.place(wav_bytes))
+    order = env.order_from(env.place(wav_bytes, review_tier="human"))
     html = env.client.get(f"/client/orders/{order['id']}").text
     assert 'id="ask-assistant"' in html and "Questions or changes?" in html and 'id="message-body"' not in html and "Write a message" not in html
     page = env.client.get("/client/home").text
     assert 'id="as-count"' in page and 'id="as-feed"' in page and 'id="as-toast"' in page and ">Inbox" in page and 'id="notif-bell"' in page   # the bell stays
+
+
+def test_an_instant_ai_order_has_no_questions_or_revision_requests(env, wav_bytes):
+    ai = env.order_from(env.place(wav_bytes))
+    assert ai["review_tier"] == "ai"
+    html = env.client.get(f"/client/orders/{ai['id']}").text
+    assert 'id="ask-assistant"' not in html and 'id="request-revision-btn"' not in html and "Questions or changes?" not in html
+    _staff(env)
+    r = _ask(env, "I'd like a revision, the names are wrong", order_id=ai["id"])
+    assert r["escalated"] is False and "not reviewed by a person" in r["reply"] and "Edit transcript" in r["reply"]
+    assert env.db.list_messages(ai["id"], include_internal=False) == [] and not env.db.list_recent_notifications("s1")     # nobody was bothered
+    post = env.client.post(f"/client/orders/{ai['id']}/messages", data={"body": "hello"}, follow_redirects=False)
+    assert post.status_code == 303 and "error=" in post.headers["location"] and env.db.list_messages(ai["id"], include_internal=False) == []
+    refund = _ask(env, "I want a refund for this", order_id=ai["id"])                          # money is still a person's job, on any order
+    assert refund["escalated"] is True and env.db.list_recent_notifications("s1")
+    assert env.db.list_messages(ai["id"], include_internal=False) == []                        # but it goes to the support desk, not an order thread
+    human = env.order_from(env.place(wav_bytes, review_tier="human"))
+    assert "Questions or changes?" in env.client.get(f"/client/orders/{human['id']}").text
+
+
+def test_the_summary_and_questions_sit_below_the_video_and_transcript_area():
+    src = (Path(__file__).parent.parent / "webapp" / "templates" / "order_detail.html").read_text(encoding="utf-8")
+    grid, transcript, extras = (src.index('class="order-workspace-grid"'), src.index('class="order-workspace-transcript"'), src.index('class="order-workspace-extras"'))
+    assert grid < transcript < extras
+    media = src[src.index('class="order-workspace-media"'):transcript]
+    assert "order-workspace-extras" not in media and "AI summary" not in media                    # nothing but the player is under the video

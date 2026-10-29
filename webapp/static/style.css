@@ -5624,3 +5624,9 @@ main:has(.order-workspace-grid) { max-width: none; padding: 0 clamp(12px, 2vw, 3
   .order-workspace-transcript.tx-hide-source #order-transcript-table:not(.tx-same) td:nth-child(2) { display: none; }
   .order-workspace-transcript #order-transcript-scroll { height: auto; max-height: 68vh; }
 }
+
+/* The transcript has the area beside the video to itself; the summary and the questions sit below, across the page */
+.order-workspace-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); }
+.order-workspace-media { position: sticky; top: 12px; align-self: start; }
+.order-workspace-grid + .order-workspace-extras { margin-top: 22px; padding-top: 6px; border-top: 1px solid var(--border-subtle); }
+@media (max-width: 860px) { .order-workspace-media { position: static; } }

@@ -2536,8 +2536,8 @@ def _llms_text(request: Request, full: bool) -> str:
             plan_lines.append(f"- Free: no card needed, {p['included_ai_minutes']:.0f} Instant AI minutes free every month, then pay as you go.")
         else:
             plan_lines.append(
-                f"- {p['name']}: ${p['price_usd']} a month or ${p['price_usd_year']} a year (yearly), {p['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(p['included_ai_minutes'])} (transcription and translation) included "
-                f"every month, {p['discount'] * 100:.0f}% off everything beyond them{', burned captions and dubbed video included' if p['video_deliverables'] else ''}.")
+                f"- {p['name']}: ${p['price_usd']} a month, {p['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(p['included_ai_minutes'])} (transcription and translation) included "
+                f"every month{', burned captions and dubbed video included' if p['video_deliverables'] else ''}.")
     plan_lines.append("- Enterprise: negotiated volume rate, invoicing and a named account manager. Contact us.")
     meetings = ("Kauli can join Zoom, Google Meet and Microsoft Teams meetings, record them and return a transcript (Pro and Premium plans)."
                 if meeting_bot.configured() else "A meeting notetaker for Zoom, Google Meet and Microsoft Teams is coming soon.")
@@ -2565,7 +2565,7 @@ Human review costs more than Instant AI because a person does the work, and take
 
 ## Plans
 {chr(10).join(plan_lines)}
-Plans are billed monthly or yearly (yearly costs less). Pay as you go needs no plan.
+Plans are billed monthly. Pay as you go needs no plan.
 
 ## Languages
 Instant AI transcription: {total} languages. The full list is at {base}/languages, and each language has a page at {base}/transcribe/<language>.
@@ -4876,22 +4876,11 @@ def client_files(request: Request):
     return templates.TemplateResponse(request, "client_files.html", {"user": user, "rows": rows})
 
 
-@app.get("/client/messages", response_class=HTMLResponse)
+@app.get("/client/messages", include_in_schema=False)
 def client_messages(request: Request):
-    """A real cross-order inbox - every order with a conversation, newest
-    activity first, so a client with several orders doesn't have to open
-    each one to check for a reply. Not a second messaging system:
-    clicking through goes to the real order page, where the full thread
-    and reply form already live (client_send_message) - this is a
-    read-only summary over that same data."""
-    user = current_user(request)
-    if not user or user["role"] != "client":
-        return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    unread = db.unread_order_ids(user["client_scope_id"], include_internal=False)
-    conversations = db.list_conversations_for_client(user["client_scope_id"])
-    return templates.TemplateResponse(request, "client_messages.html", {
-        "user": user, "conversations": conversations, "unread": unread,
-    })
+    """The separate Messages page is gone: replies from the team arrive in the assistant's inbox (the button at the bottom right) and on
+    the order itself. Old links and bookmarks land on the dashboard."""
+    return RedirectResponse("/client", status_code=303)
 
 
 # ------------------------------------------------------------------ Kauli in your meetings
@@ -6461,6 +6450,9 @@ def client_send_message(request: Request, order_id: str, body: str = Form(...)):
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
+    if order["review_tier"] == "ai":
+        return RedirectResponse(f"/client/orders/{order_id}?error=" + quote("Instant AI orders are not reviewed by a person, so messages and "
+                                "revisions are not available. Edit the transcript yourself, or add human review."), status_code=303)
     if body.strip():
         # visibility is hardcoded here, never read from the request - a
         # client has no form field that could set it to 'internal'.

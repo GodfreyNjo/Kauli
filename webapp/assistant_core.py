@@ -45,6 +45,17 @@ _HUMAN = re.compile(
     re.I)
 
 
+_REVISION = re.compile(r"\b(revisions?|re-?do (it|this|the)|wrong (translation|transcript)|incorrect (translation|transcript)|mistranslat\w*|fix (the|this) "
+                       r"(order|translation|transcript))\b", re.I)
+INSTANT_AI_REVISION_REPLY = ("Instant AI results are not reviewed by a person, so we cannot revise them for you. You can correct the transcript yourself "
+                             "with Edit transcript on the order page (Find & replace helps with names that repeat), or add human review so an editor checks it.")
+
+
+def revision_request(text: str) -> bool:
+    """Asking for something to be changed or redone: only possible where a person reviews the work."""
+    return bool(_REVISION.search(text or ""))
+
+
 def ops_probe(text: str) -> bool:
     """True when the question is about how Kauli itself runs rather than the customer's orders, account or use of the product."""
     return bool(_OPS.search(text or ""))

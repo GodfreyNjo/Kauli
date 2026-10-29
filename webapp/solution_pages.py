@@ -38,10 +38,10 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
              "detail": f"{free:.0f} Instant AI transcription minutes free every month, then pay per minute."},
             {"plan": "Pro", "for": for_pro,
              "detail": f"${pro['price_usd']}/month: {pro['included_ai_minutes']:.0f} Instant AI minutes every month for "
-                       f"transcription and translation, {pro['discount'] * 100:.0f}% off everything else."},
+                       f"transcription and translation."},
             {"plan": "Premium", "for": for_prem,
              "detail": f"${prem['price_usd']}/month: {prem['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(prem['included_ai_minutes'])} every month for "
-                       f"transcription and translation, {prem['discount'] * 100:.0f}% off everything else, burned-in captions "
+                       f"transcription and translation, burned-in captions "
                        "and dubbed video included."},
             {"plan": "Enterprise", "for": for_ent,
              "detail": "Negotiated volume rate, invoicing, a dedicated account manager and faster turnaround."},
@@ -489,7 +489,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "a": "Yes. Invoicing is part of the Enterprise plan for organizations with an ongoing relationship."},
                 {"q": "What if our language is not supported by speech recognition?",
                  "a": "Instant AI transcribes 70+ languages. For a language no model covers yet, such as Kikuyu, a human transcriber types the source by ear at a slightly higher per-minute price."},
-                {"q": "Is there a discount for volume?",
+                {"q": "How is pricing for volume?",
                  "a": f"Pro is ${pro['price_usd']}/month and includes {pro['included_ai_minutes']:.0f} Instant AI minutes for transcription and translation, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])}. For a custom volume rate, talk to us."},
             ],
             "fit_guide": plans("A pilot with a few recordings.", "Monthly programme reporting.", "Videos with burned captions or dubbed files for screenings.",
