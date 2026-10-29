@@ -204,7 +204,7 @@ def test_a_noisy_recording_can_be_cleaned_first_for_a_flat_per_minute_price(stud
     cleaned = studio.order_from(studio.place(studio.wav, addon_audio_cleanup="1"))
     assert studio.db.order_has_addon(cleaned, "audio_cleanup") and not studio.db.order_has_addon(plain, "audio_cleanup")
     line = [x for x in json.loads(cleaned["cost_breakdown_json"])["addons"] if x["key"] == "audio_cleanup"][0]
-    assert line["rate_per_min"] == 0.30 and abs(line["cost_usd"] - 0.30 * cleaned["duration_minutes"]) < 0.005
+    assert line["rate_per_min"] == billing.AUDIO_CLEANUP_AI_RATE == 0.18 and abs(line["cost_usd"] - 0.18 * cleaned["duration_minutes"]) < 0.005    # a small markup on Instant AI
     assert cleaned["cost_usd"] > plain["cost_usd"]                                    # paid for in full, never absorbed by free minutes
 
 
@@ -223,7 +223,7 @@ def test_clean_up_is_refused_without_a_key_or_a_safe_margin_or_spare_credits(stu
 
 def test_the_wizard_offers_clean_up_only_when_it_can_be_sold(studio, monkeypatch):
     html = studio.client.get("/client").text
-    assert 'id="audio-cleanup-checkbox"' in html and 'data-audio-cleanup-rate="0.3"' in html and "ElevenLabs" in html
+    assert 'id="audio-cleanup-checkbox"' in html and 'data-audio-cleanup-rate="0.3"' in html and 'data-audio-cleanup-rate-ai="0.18"' in html and "ElevenLabs" not in html
     assert 'id="price-audio-cleanup-row"' in html
     monkeypatch.delenv("ELEVENLABS_API_KEY")
     assert 'id="audio-cleanup-checkbox"' not in studio.client.get("/client").text
@@ -260,7 +260,7 @@ def test_a_skipped_clean_up_is_credited_back_once(studio):
     _run(studio, order, {"audio_cleanup": "elevenlabs"})                              # delivered as paid for
     assert studio.db.wallet_credits_remaining("u1") == before
     _run(studio, order, {})                                                           # ElevenLabs failed, original audio used
-    expected = billing.usd_to_credits(0.30 * order["duration_minutes"])
+    expected = billing.usd_to_credits(0.18 * order["duration_minutes"])
     assert abs(studio.db.wallet_credits_remaining("u1") - before - expected) < 0.01
     assert studio.db.get_order(order["id"])["audio_cleanup_refunded_at"]
     _run(studio, order, {})                                                           # a retry never refunds twice
@@ -278,7 +278,24 @@ def test_the_two_add_ons_are_refunded_independently(studio, monkeypatch):
     before = studio.db.wallet_credits_remaining("u1")
     _run(studio, order, {"tts": "elevenlabs"})                                        # voice fine, clean-up skipped
     minutes = order["duration_minutes"]
-    assert abs(studio.db.wallet_credits_remaining("u1") - before - billing.usd_to_credits(0.30 * minutes)) < 0.01
+    assert abs(studio.db.wallet_credits_remaining("u1") - before - billing.usd_to_credits(0.18 * minutes)) < 0.01
     _run(studio, order, {"tts": "piper"})                                             # now the voice fell back too
-    both = billing.usd_to_credits(0.30 * minutes) + billing.usd_to_credits(0.50 * minutes)
+    both = billing.usd_to_credits(0.18 * minutes) + billing.usd_to_credits(0.50 * minutes)
     assert abs(studio.db.wallet_credits_remaining("u1") - before - both) < 0.01
+
+
+def test_instant_ai_clean_up_has_a_small_markup_with_its_own_safety_floor(monkeypatch):
+    cost = billing.audio_cleanup_unit_cost_usd()
+    assert billing.addon_rate("audio_cleanup", "ai") == 0.18 and billing.addon_rate("audio_cleanup", "human") == 0.30
+    assert 1.3 < 0.18 / cost < 1.7                                                              # roughly 50% over what it costs us
+    assert billing.audio_cleanup_ai_margin_ok() and billing.audio_cleanup_ai_min_rate() <= 0.18
+    assert (0.18 * (1 - billing.PAYMENT_FEE_RATE) - cost) / 0.18 >= billing.MIN_AUDIO_CLEANUP_AI_MARGIN
+    monkeypatch.setenv("ELEVENLABS_ISOLATOR_USD_PER_MIN", "0.13")                              # a cost rise that the smaller markup cannot absorb
+    assert not billing.audio_cleanup_ai_margin_ok() and billing.audio_cleanup_margin_ok()      # the reviewed price still clears its floor
+
+
+def test_clean_up_is_priced_by_the_kind_of_order(studio):
+    ai = studio.order_from(studio.place(studio.wav, review_tier="ai", addon_audio_cleanup="1"))
+    human = studio.order_from(studio.place(studio.wav, review_tier="human", addon_audio_cleanup="1"))
+    rate = lambda o: [x for x in json.loads(o["cost_breakdown_json"])["addons"] if x["key"] == "audio_cleanup"][0]["rate_per_min"]   # noqa: E731
+    assert rate(ai) == 0.18 and rate(human) == 0.30

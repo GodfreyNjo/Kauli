@@ -51,6 +51,7 @@
        data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
        data-premium-voice-rate="{{ addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0 }}"
        data-audio-cleanup-rate="{{ addons['audio_cleanup']['rate_per_min'] if 'audio_cleanup' in addons else 0 }}"
+       data-audio-cleanup-rate-ai="{{ audio_cleanup_ai_rate }}"
        data-premium-langs="{{ premium_voice_languages()|join(',') }}"
        data-premium-asr-rate="{{ addons['premium_asr']['rate_per_min'] if 'premium_asr' in addons else 0 }}"
        data-rush-pct="{{ rush_surcharge_pct }}"></div>
@@ -91,6 +92,7 @@
             </div>
             <ul class="file-queue" id="file-queue" aria-live="polite"></ul>
             <p class="file-queue-note" id="file-queue-note" role="status"></p>
+            <div class="cloud-import" id="cloud-import" hidden></div>
           </div>
           <ul class="src-chips" aria-label="Common formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
         </section>
@@ -185,15 +187,13 @@
             </label>
             {% endfor %}
             {% if studio_available %}
-            <label class="tier-option tier-option-studio">
+            <label class="tier-option tier-option-studio" id="studio-option" hidden>
               <input type="radio" name="review_tier" value="studio" {% if chosen_tier == 'studio' %}checked{% endif %}>
               <div>
                 <strong>Studio <span class="tier-badge">Top tier</span></strong>
-                <p>Human-reviewed, with the best of our audio partner ElevenLabs: cleaned-up audio, premium speech
-                recognition with speaker labels, and a premium voice on dubs. English and Swahili. Adds
-                ${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min']) }}/audio-minute
-                to Human-reviewed (${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min'] + addons['premium_voice']['rate_per_min']) }}
-                for dubbing).</p>
+                <p>For dubbing: human-reviewed, with cleaner audio, better speaker labels and a premium voice. English and Swahili.
+                <span class="muted">+${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min']) }}/min on top of Human-reviewed
+                (+${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min'] + addons['premium_asr']['rate_per_min'] + addons['premium_voice']['rate_per_min']) }}/min for dubbing).</span></p>
               </div>
             </label>
             {% endif %}
@@ -217,70 +217,59 @@
             {% endfor %}
           </fieldset>
 
-          {% if not plans[plan]['video_deliverables'] %}
-          <label class="checkbox tier-option" style="margin-bottom:14px; align-items:center;">
-            <input type="checkbox" name="addon_video_deliverables" value="1" id="addon-checkbox"
-                   {% if form_values.get('addon_video_deliverables') %}checked{% endif %}>
-            <span>Add video deliverables - burned captions + dubbed video file
-            (+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}/audio-minute). Normally
-            {{ plans['premium']['name'] }} and up - add it to this one order without upgrading your plan.</span>
-          </label>
-          {% endif %}
+          <details class="od-more extras-box" id="extras" {% if form_values.get('addon_video_deliverables') or form_values.get('addon_human_voice_over') or form_values.get('addon_audio_cleanup') or form_values.get('addon_premium_voice') or form_values.get('voice_clone_consent') or form_values.get('rush') %}open{% endif %}>
+            <summary>Extras and extra charges (optional)</summary>
+            <div class="extras-body">
+              {% if not plans[plan]['video_deliverables'] %}
+              <label class="checkbox tier-option">
+                <input type="checkbox" name="addon_video_deliverables" value="1" id="addon-checkbox"
+                       {% if form_values.get('addon_video_deliverables') %}checked{% endif %}>
+                <span><strong>Video files</strong> (+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}/min). Burned-in captions and a dubbed video. Included in {{ plans['premium']['name'] }}.</span>
+              </label>
+              {% endif %}
 
-          <label class="checkbox tier-option" id="human-voice-field" hidden style="margin-bottom:14px; align-items:center;">
-            <input type="checkbox" name="addon_human_voice_over" value="1" id="human-voice-checkbox"
-                   {% if form_values.get('addon_human_voice_over') %}checked{% endif %}>
-            <span>Add a real human voice actor (instead of an AI dub voice)
-            (+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }}/audio-minute). The AI dub
-            still gets made either way - our team casts and delivers the human version separately once it's
-            ready, which takes longer than the automated dub.</span>
-          </label>
+              <label class="checkbox tier-option" id="human-voice-field" hidden>
+                <input type="checkbox" name="addon_human_voice_over" value="1" id="human-voice-checkbox"
+                       {% if form_values.get('addon_human_voice_over') %}checked{% endif %}>
+                <span><strong>Human voice actor</strong> (+${{ "%.2f"|format(addons['human_voice_over']['rate_per_min']) }}/min). A real voice instead of the AI one. Takes longer; the AI dub is still made.</span>
+              </label>
 
-          {% if audio_cleanup_available %}
-          <label class="checkbox tier-option" id="audio-cleanup-field" style="margin-bottom:14px; align-items:center;">
-            <input type="checkbox" name="addon_audio_cleanup" value="1" id="audio-cleanup-checkbox"
-                   {% if form_values.get('addon_audio_cleanup') %}checked{% endif %}>
-            <span><strong>Clean up the audio first</strong> (+${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min']) }}/audio-minute).
-            Removes background noise and music before we transcribe, which helps most on field interviews and phone or
-            WhatsApp recordings. Your audio is sent to our audio partner ElevenLabs to do this.</span>
-          </label>
-          {% endif %}
+              {% if audio_cleanup_available %}
+              <label class="checkbox tier-option" id="audio-cleanup-field">
+                <input type="checkbox" name="addon_audio_cleanup" value="1" id="audio-cleanup-checkbox"
+                       {% if form_values.get('addon_audio_cleanup') %}checked{% endif %}>
+                <span><strong>Clean up the audio first</strong> (<span class="cleanup-price">+${{ "%.2f"|format(addons['audio_cleanup']['rate_per_min']) }}/min</span>). Removes background noise before transcribing, done automatically. Your audio is processed by a trusted partner (see our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>).</span>
+              </label>
+              {% endif %}
 
-          {% if premium_voice_available %}
-          <div class="tier-option premium-voice-box" id="premium-voice-field" hidden style="margin-bottom:14px;">
-            <label class="checkbox" id="premium-voice-toggle" style="align-items:center; margin-bottom:6px;">
-              <input type="checkbox" name="addon_premium_voice" value="1" id="premium-voice-checkbox"
-                     {% if form_values.get('addon_premium_voice') %}checked{% endif %}>
-              <span><strong>Premium AI voice</strong> (+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/audio-minute).
-              Natural, expressive voices for your English or Swahili dub. Your translated script (not your audio)
-              is sent to our voice partner ElevenLabs to create the speech.</span>
-            </label>
-            <label id="premium-voice-picker" hidden style="margin:0;">Voice
-              <select name="premium_voice_id" id="premium-voice-select" data-selected="{{ form_values.get('premium_voice_id', '') }}">
-                <option value="">Loading voices...</option>
-              </select>
-            </label>
-          </div>
-          {% endif %}
+              {% if premium_voice_available %}
+              <div class="tier-option premium-voice-box" id="premium-voice-field" hidden>
+                <label class="checkbox" id="premium-voice-toggle">
+                  <input type="checkbox" name="addon_premium_voice" value="1" id="premium-voice-checkbox"
+                         {% if form_values.get('addon_premium_voice') %}checked{% endif %}>
+                  <span><strong>Premium AI voice</strong> (+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/min). Natural, expressive voices for English or Swahili dubs. Only your translated script is processed, not your audio.</span>
+                </label>
+                <label id="premium-voice-picker" hidden style="margin:0;">Voice
+                  <select name="premium_voice_id" id="premium-voice-select" data-selected="{{ form_values.get('premium_voice_id', '') }}">
+                    <option value="">Loading voices...</option>
+                  </select>
+                </label>
+              </div>
+              {% endif %}
 
-          <label class="checkbox tier-option" id="voice-clone-consent-field" hidden style="margin-bottom:14px; align-items:center;">
-            <input type="checkbox" name="voice_clone_consent" value="1" id="voice-clone-consent-checkbox"
-                   {% if form_values.get('voice_clone_consent') %}checked{% endif %}>
-            <span><strong>Optional:</strong> I confirm I hold the legal rights to, and consent to Kauli
-            cloning, any speaker's voice in this recording, and that this order is a translation of what
-            the speaker actually said - not new or different words in their voice. Kauli doesn't produce
-            deepfakes or impersonations; see our <a href="/terms#deepfakes" target="_blank" rel="noopener">Terms</a>.
-            Leave unchecked if you're not sure - our team can only use a real voice clone on this order
-            once this is checked, and you can grant it later from the order page instead.</span>
-          </label>
+              <label class="checkbox tier-option" id="voice-clone-consent-field" hidden>
+                <input type="checkbox" name="voice_clone_consent" value="1" id="voice-clone-consent-checkbox"
+                       {% if form_values.get('voice_clone_consent') %}checked{% endif %}>
+                <span><strong>Optional: allow voice cloning.</strong> I have the rights and consent to clone any speaker's voice in this recording, and the dub is a translation of what was actually said. Leave unchecked if unsure; you can allow it later from the order page. See our <a href="/terms#deepfakes" target="_blank" rel="noopener">Terms</a>.</span>
+              </label>
 
-          <label class="checkbox tier-option" style="margin-bottom:14px; align-items:center;">
-            <input type="checkbox" name="rush" value="1" id="rush-checkbox"
-                   {% if form_values.get('rush') %}checked{% endif %}>
-            <span><strong>Rush this order</strong> (+{{ (rush_surcharge_pct * 100)|round|int }}%) - real,
-            manual priority in the review queue. Only for a genuine deadline - it's not a faster pipeline,
-            it's Godfrey picking this one up and working it first.</span>
-          </label>
+              <label class="checkbox tier-option">
+                <input type="checkbox" name="rush" value="1" id="rush-checkbox"
+                       {% if form_values.get('rush') %}checked{% endif %}>
+                <span><strong>Rush</strong> (+{{ (rush_surcharge_pct * 100)|round|int }}%). Our team works your order first. For real deadlines.</span>
+              </label>
+            </div>
+          </details>
         </div>
 
         <div class="pricing-summary" id="pricing-summary">
@@ -334,7 +323,8 @@
         Label speakers in the transcript (e.g. "NARRATOR:", "SPEAKER 1:")
       </label>
 
-      <fieldset class="tiers" style="margin-top:14px;">
+      <p class="muted" id="ai-clean-note" hidden style="margin-top:14px;">Instant AI gives a clean read. To choose how exact the transcript is, or to give instructions to an editor, choose Human review.</p>
+      <fieldset class="tiers" id="verbatim-fieldset" style="margin-top:14px;">
         <legend>How exact should the transcript be?</legend>
         <label class="tier-option">
           <input type="radio" name="instr_verbatim_level" value="clean_read" {% if form_values.get('instr_verbatim_level', 'clean_read') == 'clean_read' %}checked{% endif %}>
@@ -349,9 +339,9 @@
           <div><strong>Full verbatim</strong><p>Every false start, stutter and filler word, exactly as spoken - for legal/research use.</p></div>
         </label>
       </fieldset>
-      <p class="muted" style="font-size:0.82rem; margin-top:-8px;"><a href="/formatting-standards" target="_blank" rel="noopener">See how we format by default &rarr;</a></p>
+      <p class="muted" id="verbatim-note" style="font-size:0.82rem; margin-top:-8px;"><a href="/formatting-standards" target="_blank" rel="noopener">See how we format by default &rarr;</a></p>
 
-      <details class="accordion" {% if form_values.get('instr_transcribe_lyrics') or form_values.get('instr_use_italics') or form_values.get('instr_existing_subs', 'ignore') != 'ignore' or form_values.get('instr_no_audio', 'tag') != 'tag' or form_values.get('instr_wrong_language', 'tag') != 'tag' or form_values.get('instr_instrumental_only', 'tag') != 'tag' or form_values.get('instr_notes') %}open{% endif %}>
+      <details class="accordion" id="advanced-settings" {% if form_values.get('instr_transcribe_lyrics') or form_values.get('instr_use_italics') or form_values.get('instr_existing_subs', 'ignore') != 'ignore' or form_values.get('instr_no_audio', 'tag') != 'tag' or form_values.get('instr_wrong_language', 'tag') != 'tag' or form_values.get('instr_instrumental_only', 'tag') != 'tag' or form_values.get('instr_notes') %}open{% endif %}>
         <summary>+ Advanced settings (optional)</summary>
         <div class="accordion-body">
           <div class="row">
@@ -416,6 +406,7 @@
   </form>
 </div>
 
+<script src="/static/cloud_import.js?v={{ static_version('cloud_import.js') }}" defer></script>
 <script src="/static/client_wizard.js?v={{ static_version('client_wizard.js') }}"></script>
 {% if show_tour %}
 <script src="/static/tour.js?v={{ static_version('tour.js') }}"></script>
@@ -501,8 +492,10 @@
   {% endif %}
 </div>
 
-<h2 style="margin-top:32px;">My orders</h2>
-{% if not orders %}
+{% from "_pager.html" import pager %}
+{% from "_status_macros.html" import short_status, status_tone with context %}
+<h2 style="margin-top:32px;" id="my-orders">My orders</h2>
+{% if not order_list.all_count %}
   <div class="empty-state">
     <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d="M32 8c-6 0-10 5-10 11v10a10 10 0 0 0 20 0V19c0-6-4-11-10-11Z" stroke="currentColor" stroke-width="2"/>
@@ -512,139 +505,62 @@
     <a href="#order-form" class="btn secondary" onclick="var dz = document.getElementById('dropzone'); if (dz) dz.focus();">+ Submit your first order</a>
   </div>
 {% else %}
-<input type="search" id="order-search" placeholder="Search your orders by filename or folder..."
-       style="margin-bottom:14px;" aria-label="Search your orders">
+<form method="get" action="/client#my-orders" class="ol-search" role="search">
+  <input type="search" id="order-search" name="q" value="{{ order_list.q }}" placeholder="Search file name" aria-label="Search your orders">
+  {% if order_list.status %}<input type="hidden" name="status" value="{{ order_list.status }}">{% endif %}
+  {% if order_list.folder %}<input type="hidden" name="folder" value="{{ order_list.folder }}">{% endif %}
+</form>
 <div class="filter-tabs" id="order-status-filter" style="margin-bottom:8px;">
-  <button type="button" class="active" data-bucket="">All</button>
-  <button type="button" data-bucket="in_progress">In progress</button>
-  <button type="button" data-bucket="ready">Ready to download</button>
-  <button type="button" data-bucket="needs_you">Needs your input</button>
+  {% for key, label in [('', 'All'), ('in_progress', 'In progress'), ('ready', 'Ready'), ('needs_you', 'Needs you')] %}
+  <a href="/client?{% if key %}status={{ key }}&amp;{% endif %}{% if order_list.folder %}folder={{ order_list.folder|urlencode }}&amp;{% endif %}{% if order_list.q %}q={{ order_list.q|urlencode }}{% endif %}#my-orders"
+     class="{{ 'active' if order_list.status == key else '' }}"{% if order_list.status == key %} aria-current="true"{% endif %}>{{ label }}</a>
+  {% endfor %}
 </div>
 {% if folders %}
 <div class="filter-tabs" id="folder-filter" style="margin-bottom:14px;">
-  <button type="button" class="active" data-folder="">All folders</button>
+  <a href="/client?{% if order_list.status %}status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'active' if not order_list.folder else '' }}">All folders</a>
   {% for f in folders %}
-  <button type="button" data-folder="{{ f }}">{{ f }}</button>
+  <a href="/client?folder={{ f|urlencode }}{% if order_list.status %}&amp;status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'active' if order_list.folder == f else '' }}">{{ f }}</a>
   {% endfor %}
 </div>
 {% endif %}
-<script>
-  (function () {
-    // pending_payment lives in NEEDS_YOU, not IN_PROGRESS: it's sitting on
-    // the CLIENT's own action (same as returned_to_client), not on staff -
-    // lumping it in with active work buried the one status that's most
-    // actionable for the person actually looking at this list.
-    var IN_PROGRESS = ['queued', 'processing', 'awaiting_review', 'editor_returned'];
-    var READY = ['ready_for_delivery', 'delivered'];
-    var NEEDS_YOU = ['returned_to_client', 'pending_payment'];
-    var searchInput = document.getElementById('order-search');
-    var statusBar = document.getElementById('order-status-filter');
-    var folderBar = document.getElementById('folder-filter');
-    var wantedBucket = '';
-    var wantedFolder = '';
 
-    function matchesBucket(status) {
-      if (!wantedBucket) return true;
-      if (wantedBucket === 'in_progress') return IN_PROGRESS.includes(status);
-      if (wantedBucket === 'ready') return READY.includes(status);
-      if (wantedBucket === 'needs_you') return NEEDS_YOU.includes(status);
-      return true;
-    }
-    function applyFilters() {
-      var q = (searchInput.value || '').trim().toLowerCase();
-      document.querySelectorAll('.order-row').forEach(function (card) {
-        var folderOk = !wantedFolder || card.dataset.folder === wantedFolder;
-        var bucketOk = matchesBucket(card.dataset.status);
-        var searchOk = !q || card.dataset.searchText.includes(q);
-        card.style.display = (folderOk && bucketOk && searchOk) ? '' : 'none';
-      });
-    }
-    if (searchInput) searchInput.addEventListener('input', applyFilters);
-    if (statusBar) {
-      statusBar.querySelectorAll('button').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          statusBar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          wantedBucket = btn.dataset.bucket;
-          applyFilters();
-        });
-      });
-    }
-    if (folderBar) {
-      folderBar.querySelectorAll('button').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          folderBar.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          wantedFolder = btn.dataset.folder;
-          applyFilters();
-        });
-      });
-    }
-  })();
-</script>
-<div style="overflow-x:auto;">
-<table class="orders-table">
+{% if not orders %}
+  <p class="muted ol-none">No orders match. <a href="/client#my-orders">Show all</a></p>
+{% else %}
+<div class="ol-wrap">
+<table class="orders-table orders-compact">
   <thead>
-    <tr>
-      <th>Order</th>
-      <th>Service</th>
-      <th>Status</th>
-      <th>Created</th>
-      <th>Due date</th>
-      <th>Total</th>
-      <th><span class="sr-only">Actions</span></th>
-    </tr>
+    <tr><th>Name</th><th>Created</th><th>Service</th><th>Status</th><th><span class="sr-only">Open</span></th></tr>
   </thead>
   <tbody>
   {% for o in orders %}
-  {% set ts = tat_status(o['tat_start_at'], o['deadline_at']) %}
-  <tr class="order-row" data-folder="{{ o['folder_name'] or '' }}" data-status="{{ o['status'] }}"
-      data-search-text="{{ (o['original_filename'] ~ ' ' ~ (o['folder_name'] or ''))|lower }}">
-    <td>
-      <a href="/client/orders/{{ o['id'] }}" class="order-table-name">{{ o['original_filename'] }}</a>
+  <tr class="order-row" data-status="{{ o['status'] }}">
+    <td class="ol-name">
+      <a href="/client/orders/{{ o['id'] }}" class="order-table-name" title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</a>
       {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
-      <br>
-      <span class="muted" style="font-size:0.78rem;">
-        {% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}
-      </span>
+      <small class="muted">{% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['source_lang']|upper }}{% if o['target_lang'] != o['source_lang'] %} &rarr; {{ o['target_lang']|upper }}{% endif %}</small>
     </td>
-    <td>
-      {% if o['service_level'] %}
-        {{ service_levels[o['service_level']]['name'] if o['service_level'] in service_levels else o['service_level']|capitalize }}
-      {% else %}
-        <span class="muted">Analysis in progress&hellip;</span>
-      {% endif %}
+    <td class="ol-date">{{ o['created_at']|int|short_date }}</td>
+    <td class="ol-service">
+      {% if o['service_level'] %}{{ {'transcribe': 'Transcription', 'translate': 'Translation', 'dub': 'Dubbing'}.get(o['service_level'], o['service_level']|capitalize) }}{% else %}<span class="muted">Analysing</span>{% endif %}
+      <small class="muted">{{ 'Human' if o['review_tier'] in ('human', 'studio') else 'AI' }}</small>
     </td>
-    <td>
-      <span class="status status-{{ o['status'] }}">{{ o['status']|client_status_label }}</span>
-      {% if o['difficulty_surcharge_status'] == 'pending_approval' %}
-        <br><a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill" style="margin-top:4px; display:inline-block;">Additional charge pending</a>
-      {% endif %}
-    </td>
-    <td class="muted">{{ o['created_at']|timestamp_to_str }}</td>
-    <td>
-      {% if ts and o['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}
-        <span class="deadline-pill deadline-{{ ts['level'] }}">
-          {% if ts['overdue'] %}Running behind{% else %}{{ o['deadline_at']|int|timestamp_to_date }}{% endif %}
-        </span>
-      {% else %}
-        <span class="muted">&mdash;</span>
-      {% endif %}
-    </td>
-    <td>
+    <td class="ol-status">
       {% if o['status'] == 'pending_payment' %}
         <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
-      {% elif o['cost_usd'] %}
-        ${{ "%.2f"|format(o['cost_usd']) }}
       {% else %}
-        <span class="muted">Trial credit</span>
+        <span class="ch-state ch-{{ status_tone(o['status']) }}">{{ short_status(o['status']) }}</span>
       {% endif %}
+      {% if o['difficulty_surcharge_status'] == 'pending_approval' %}<a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Extra charge</a>{% endif %}
     </td>
-    <td><a href="/client/orders/{{ o['id'] }}" class="row-action-btn" title="View">&rarr;</a></td>
+    <td class="ol-go"><a href="/client/orders/{{ o['id'] }}" class="row-action-btn" title="Open" aria-label="Open {{ o['original_filename'] }}">&rarr;</a></td>
   </tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+{{ pager(order_list.page, order_list.pages, "/client", order_list.params) }}
+{% endif %}
 {% endif %}
 {% endblock %}

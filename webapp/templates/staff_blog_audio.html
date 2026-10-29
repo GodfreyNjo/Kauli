@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Blog audio{% endblock %}
+{% block head_extra %}{% if busy %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}
+{% block content %}
+<div class="hub">
+  <div class="hub-top">
+    <div>
+      <h1>Blog audio and podcast</h1>
+      <p class="muted">Narrate posts so people can listen on the site and in podcast apps. A <strong>summary</strong> reads the key takeaways (about a minute); <strong>full</strong> reads the whole post.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+  {% if busy %}<p class="hub-flash ok" role="status">Narration in progress. This page refreshes by itself.</p>{% endif %}
+
+  <section class="hub-card">
+    <h2>Your ElevenLabs credits</h2>
+    {% if not configured %}<p class="muted">ElevenLabs is not set up on this server (ELEVENLABS_API_KEY), so audio cannot be made yet.</p>
+    {% elif credits_left is none %}<p class="muted">Could not read the balance just now. Narration is refused while the balance is unknown, so nothing can be overspent.</p>
+    {% else %}<p><strong>{{ '{:,}'.format(credits_left) }}</strong> credits left this period. The voice model is <code>{{ model }}</code>, which uses {{ per_char }} credit per character. The estimates below are for that model.</p>{% endif %}
+    <p class="muted an-note">Podcast feed to submit to Apple Podcasts and Spotify: <code>{{ base }}/podcast.xml</code></p>
+  </section>
+
+  <form method="post" action="/staff/blog-audio/make" class="hub-card ba-form">
+    <div class="ba-bar">
+      <label class="tx-switch"><input type="radio" name="mode" value="summary" checked> Summary (about a minute)</label>
+      <label class="tx-switch"><input type="radio" name="mode" value="full"> Full post</label>
+      <button type="submit"{% if not configured %} disabled{% endif %}>Make audio for the ticked posts</button>
+    </div>
+    <table class="ga-table ba-table">
+      <thead><tr><th>Make</th><th>Post</th><th>Audio</th><th>Credits: summary</th><th>Credits: full</th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><input type="checkbox" name="post_ids" value="{{ r.post['id'] }}" aria-label="Make audio for {{ r.post['title'] }}"></td>
+          <td><a href="/blog/{{ r.post['slug'] }}" target="_blank" rel="noopener">{{ r.post['title'] }}</a></td>
+          <td>
+            {% if r.audio and r.audio['status'] == 'ready' %}
+              <audio controls preload="none" src="/blog-audio/{{ r.audio['audio_file'] }}" style="max-width:220px"></audio><br>
+              <small class="muted">{{ r.audio['mode'] }}, {{ mmss(r.audio['duration_s'] or 0) }}, script by {{ r.audio['script_by'] or 'plain' }}{% if not r.audio['in_podcast'] %}, <strong>not in the podcast</strong>{% endif %}</small>
+            {% elif r.audio and r.audio['status'] in ('queued', 'scripting', 'voicing') %}<span>{{ r.audio['status']|capitalize }}...</span>
+            {% elif r.audio and r.audio['status'] == 'failed' %}<span class="ga-down">Failed: {{ r.audio['error'] }}</span>
+            {% else %}<span class="muted">None yet</span>{% endif %}
+          </td>
+          <td>{{ '{:,}'.format(r.summary.credits) }} <small class="muted">({{ r.summary.minutes }} min)</small></td>
+          <td>{{ '{:,}'.format(r.full.credits) }} <small class="muted">({{ r.full.minutes }} min)</small></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </form>
+
+  {% for r in rows if r.audio %}
+  <form method="post" action="/staff/blog-audio/{{ r.post['id'] }}/podcast" class="ba-inline" style="display:inline">
+    <input type="hidden" name="include" value="{{ '0' if r.audio['in_podcast'] else '1' }}">
+    <button type="submit" class="secondary">{{ 'Remove from podcast' if r.audio['in_podcast'] else 'Add to podcast' }}: {{ r.post['title'][:40] }}</button>
+  </form>
+  <form method="post" action="/staff/blog-audio/{{ r.post['id'] }}/delete" class="ba-inline" style="display:inline" onsubmit="return confirm('Delete this audio?');">
+    <button type="submit" class="secondary">Delete audio</button>
+  </form>
+  <br>
+  {% endfor %}
+</div>
+{% endblock %}

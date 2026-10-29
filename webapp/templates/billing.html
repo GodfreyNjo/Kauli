@@ -30,12 +30,14 @@
       {% if outstanding_usd > 0 %}Across orders awaiting payment{% else %}Nothing owed right now{% endif %}
     </span>
   </div>
+  {% if wallet_credits > 0 %}
   <div class="dashboard-stat-card">
     <div class="stat-icon ok">{{ icon_svg('target') }}</div>
-    <span class="stat-label">Prepaid credits</span>
-    <span class="stat-value" style="{{ 'color:var(--ok);' if wallet_credits > 0 else '' }}">{{ "%.0f"|format(wallet_credits) }}</span>
-    <span class="stat-hint">$0.10/credit, never expires</span>
+    <span class="stat-label">Credit balance</span>
+    <span class="stat-value" style="color:var(--ok);">{{ "%.0f"|format(wallet_credits) }}</span>
+    <span class="stat-hint">Applied automatically to your orders</span>
   </div>
+  {% endif %}
 </div>
 
 <div class="card">
@@ -44,11 +46,12 @@
       <span class="billing-snapshot-label">Your plan</span>
       <span class="billing-snapshot-value plan-value">{{ plans[current_plan]['name'] }}</span>
     </div>
+    {% if wallet_credits > 0 %}
     <div class="billing-snapshot-cell">
-      <span class="billing-snapshot-label">Prepaid credits</span>
-      <span class="billing-snapshot-value" style="color: {{ 'var(--ok)' if wallet_credits > 0 else 'var(--faint)' }};">
-        {{ "%.0f"|format(wallet_credits) }}</span>
+      <span class="billing-snapshot-label">Credit balance</span>
+      <span class="billing-snapshot-value" style="color: var(--ok);">{{ "%.0f"|format(wallet_credits) }}</span>
     </div>
+    {% endif %}
     <div class="billing-snapshot-cell">
       <span class="billing-snapshot-label">Free minutes left</span>
       <span class="billing-snapshot-value">{{ "%.1f"|format(free_minutes_remaining) }}</span>
@@ -69,100 +72,6 @@
   <p class="muted" style="margin-top:6px; font-size:0.85rem;">Bonus grant: {{ subscription['bonus_note'] }}</p>
   {% endif %}
 </div>
-
-<div class="card">
-  <h2>Prepaid credits</h2>
-  <p class="muted" style="margin-top:0;">
-    {{ "%.0f"|format(wallet_credits) }} credit{{ '' if wallet_credits == 1 else 's' }} in your balance. They never expire and are used automatically after your included minutes, at $0.10 each.
-  </p>
-  <details class="od-more"><summary>What a credit buys</summary>
-    <p>At a fixed $0.10 a credit on any service: 10 credits covers 1 transcription-only minute, about 1.1 translation minutes, or 2/3 of a full-dub minute. See the usage rates below.</p>
-  </details>
-  <div class="row" style="gap:10px; flex-wrap:wrap;">
-    {% for key, pkg in credit_packages.items() %}
-    <div class="pricing-card">
-      <div class="pricing-card-credits">{{ pkg['credits']|int }} credits</div>
-      <div class="pricing-card-price">${{ "%.2f"|format(pkg['price_usd']) }}</div>
-      <details>
-        <summary class="muted" style="cursor:pointer; font-size:0.78rem;">Buy this package</summary>
-        <form method="post" action="/client/billing/wallet" style="margin-top:12px;">
-          <input type="hidden" name="package" value="{{ key }}">
-          <label style="font-size:0.78rem;">Pay with
-            <select name="provider">
-              <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
-              {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
-              {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
-            </select>
-          </label>
-          {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
-            <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-          </label>{% endif %}
-          <button type="submit" class="secondary">Buy ${{ "%.2f"|format(pkg['price_usd']) }}</button>
-        </form>
-      </details>
-    </div>
-    {% endfor %}
-    <div class="pricing-card" style="border-style:dashed;">
-      <div class="pricing-card-credits">Custom amount</div>
-      <p class="muted" style="font-size:0.78rem; margin:4px 0 10px;">Choose your own amount.</p>
-      <form method="post" action="/client/billing/wallet" id="wallet-custom-form">
-        <label style="font-size:0.78rem;">Minutes-of-value to prepay
-          <input type="number" name="custom_minutes" id="wallet-custom-minutes" min="5" max="2000" step="1"
-                 placeholder="e.g. 90" required>
-        </label>
-        <p class="muted" style="font-size:0.76rem; margin:4px 0 10px;" id="wallet-custom-preview">
-          Save 10% from 30, 15% from 60 and 20% from 150 minutes' worth.
-        </p>
-        <label style="font-size:0.78rem;">Pay with
-          <select name="provider">
-            <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
-            {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
-            {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
-          </select>
-        </label>
-        {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
-          <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-        </label>{% endif %}
-        <button type="submit" class="secondary" id="wallet-custom-submit">Buy</button>
-      </form>
-    </div>
-  </div>
-  <p class="muted" style="font-size:0.78rem; margin-top:14px;">
-    Pay securely by card (powered by Paystack){% if (request.headers.get('cf-ipcountry', '') | upper) == 'KE' %}, M-Pesa in KES,{% endif %} or bank transfer, confirmed manually. Prices are in US dollars.</p>
-</div>
-<script>
-  (function () {
-    // Mirrors billing.custom_credit_price's real tier logic - client-side
-    // preview only, the actual price/credits are always computed
-    // server-side again before checkout, this just shows what to expect.
-    var RATE = {{ service_levels['dub']['rate_per_min'] }};
-    var CREDITS_PER_DOLLAR = 10;
-    var input = document.getElementById('wallet-custom-minutes');
-    var preview = document.getElementById('wallet-custom-preview');
-    var submitBtn = document.getElementById('wallet-custom-submit');
-    var defaultPreview = preview.textContent;
-    if (!input) return;
-    function tierDiscount(minutes) {
-      if (minutes >= 150) return 0.20;
-      if (minutes >= 60) return 0.15;
-      if (minutes >= 30) return 0.10;
-      return 0.0;
-    }
-    input.addEventListener('input', function () {
-      var minutes = parseFloat(input.value);
-      if (!minutes || minutes <= 0) { preview.textContent = defaultPreview; submitBtn.textContent = 'Buy'; return; }
-      var discount = tierDiscount(minutes);
-      var base = minutes * RATE;
-      var price = base * (1 - discount);
-      var saved = base - price;
-      var credits = Math.round(minutes * RATE * CREDITS_PER_DOLLAR);
-      preview.textContent = discount > 0
-        ? credits + ' credits - ' + Math.round(discount * 100) + '% off (you save $' + saved.toFixed(2) + ') - $' + price.toFixed(2) + ' total.'
-        : credits + ' credits - $' + price.toFixed(2) + ' total - add ' + (30 - minutes) + ' more minutes-worth to unlock a 10% discount.';
-      submitBtn.textContent = 'Buy $' + price.toFixed(2);
-    });
-  })();
-</script>
 
 <div class="card" style="padding:0; overflow-x:auto;">
   <table class="plans-table">
@@ -251,8 +160,8 @@
 </div>
 
 {% if payments %}
-<div class="card">
-  <h2>Payment history</h2>
+<details class="card collapsible-card" id="payment-history">
+  <summary><h2>Payment history <span class="muted collapsible-count">({{ payments|length }})</span></h2></summary>
   <table>
     <thead><tr><th>Date</th><th>For</th><th>Amount</th><th>Method</th><th>Status</th><th><span class="sr-only">Receipt</span></th></tr></thead>
     <tbody>
@@ -268,7 +177,7 @@
       {% endfor %}
     </tbody>
   </table>
-</div>
+</details>
 {% else %}
 <div class="card" style="text-align:center; padding:40px 24px;">
   <p class="muted" style="margin:0;">No payments yet. Your transaction history will appear here.</p>

@@ -378,6 +378,27 @@ def audio_cleanup_margin_ok() -> bool:
     return ADDONS["audio_cleanup"]["rate_per_min"] >= audio_cleanup_min_rate()
 
 
+# Clean-up on an Instant AI order carries a smaller markup than on a reviewed one: about 50% over what it costs us, which still
+# leaves a quarter of the price after payment fees. Like every add-on it switches itself off if the cost ever rises past that.
+AUDIO_CLEANUP_AI_RATE = 0.18
+MIN_AUDIO_CLEANUP_AI_MARGIN = 0.25
+
+
+def audio_cleanup_ai_min_rate() -> float:
+    return audio_cleanup_unit_cost_usd() / (1.0 - PAYMENT_FEE_RATE - MIN_AUDIO_CLEANUP_AI_MARGIN)
+
+
+def audio_cleanup_ai_margin_ok() -> bool:
+    return AUDIO_CLEANUP_AI_RATE >= audio_cleanup_ai_min_rate()
+
+
+def addon_rate(key: str, review_tier: str = "human") -> float:
+    """What an add-on costs per audio-minute on this kind of order (clean-up is cheaper on Instant AI)."""
+    if key == "audio_cleanup" and review_tier == "ai":
+        return AUDIO_CLEANUP_AI_RATE
+    return ADDONS[key]["rate_per_min"]
+
+
 def audio_cleanup_credits_needed(minutes: float) -> int:
     return int(minutes * AUDIO_CLEANUP_CREDITS_PER_MIN) + 1
 
@@ -501,8 +522,8 @@ def order_cost_usd(minutes: float, service_level: str, plan: str, free_minutes_a
     credits_applied_usd = round(min(after_discount, credits_value_usd), 2)
     credits_applied = round(usd_to_credits(credits_applied_usd), 2)
 
-    addon_lines = [{"key": a, "name": ADDONS[a]["name"], "rate_per_min": ADDONS[a]["rate_per_min"],
-                     "cost_usd": round(ADDONS[a]["rate_per_min"] * minutes, 2)} for a in addons]
+    addon_lines = [{"key": a, "name": ADDONS[a]["name"], "rate_per_min": addon_rate(a, review_tier),
+                     "cost_usd": round(addon_rate(a, review_tier) * minutes, 2)} for a in addons]
     addon_cost = round(sum(line["cost_usd"] for line in addon_lines), 2)
 
     # See RUSH_SURCHARGE_PCT's comment - a % of the FULL, undiscounted

@@ -3,7 +3,7 @@
 {% block body_class %}m-public{% endblock %}
 {% block title %}Audio &amp; Video Transcription in 70+ Languages, Dubbing &amp; Subtitles{% endblock %}
 {% block head_extra %}
-<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, from {{ '%.2f'|format(price_card['transcribe']['ai']) }} USD per minute - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
+<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, starting at $0 with free minutes every month - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
 <meta property="og:title" content="Kauli - Audio &amp; video transcription in 70+ languages, with human review when it counts">
 <meta property="og:description" content="Instant AI transcription, translation and dubbing - or add a real human reviewer. Transparent per-minute pricing, pay as you go.">
 <meta property="og:type" content="website">
@@ -136,8 +136,8 @@
               Time-stamped transcripts, synchronised subtitles, and dubbed voice tracks. Download Word, TXT,
               SRT and VTT. Voice cloning only with the speaker's consent.</li>
             <li><strong>Simple pricing</strong>
-              Pay as you go from ${{ '%.2f'|format(price_card['transcribe']['ai']) }} per audio-minute, shown
-              before you order. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</li>
+              Starting at $0: your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, and any price is
+              shown before you order.</li>
           </ul>
         </div>
       </details>
@@ -223,50 +223,6 @@
     <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>starting from $0 &middot; first {{ free_minutes|int }} minutes free</span></div>
   </section>
 
-  <section class="m-section" id="watch">
-    <div class="m-inner">
-      <span class="m-section-eyebrow m-eyebrow-lined">Watch</span>
-      <h2 class="m-h2">Type it? Never again.</h2>
-      <p class="m-lede">Seventy-eight seconds on how Kauli turns recordings into text, subtitles and dubs.</p>
-      <div class="promo-video" id="promo-video" data-video-id="i6R3flz8V1I">
-        <button type="button" class="promo-play" id="promo-play" aria-label="Play the Kauli promo video (78 seconds)">
-          <img src="/static/promo-thumbnail.jpg" alt="A woman holding her head in frustration beside the words Stop typing" width="1280" height="720" loading="lazy">
-          <span class="promo-play-icon" aria-hidden="true"></span>
-        </button>
-      </div>
-      <p class="promo-note">The video plays from YouTube when you press play.</p>
-    </div>
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "VideoObject",
-      "name": "Kauli: Turn Any Audio or Video into Text, Subtitles and Dubs",
-      "description": "Kauli turns audio and video into accurate transcripts in minutes, translates them into 70+ languages as subtitles or dubbed audio, and adds human review for up to 99% accuracy.",
-      "thumbnailUrl": "{{ site_origin() }}/static/promo-thumbnail.jpg",
-      "uploadDate": "2026-10-29",
-      "duration": "PT1M18S",
-      "embedUrl": "https://www.youtube.com/embed/i6R3flz8V1I",
-      "contentUrl": "https://youtu.be/i6R3flz8V1I"
-    }
-    </script>
-    <script>
-      (function () {
-        var box = document.getElementById("promo-video"), btn = document.getElementById("promo-play");
-        if (!box || !btn) return;
-        btn.addEventListener("click", function () {
-          // YouTube is only contacted now, because the visitor asked to watch.
-          var f = document.createElement("iframe");
-          f.src = "https://www.youtube-nocookie.com/embed/" + box.dataset.videoId + "?autoplay=1&rel=0&modestbranding=1";
-          f.title = "Kauli promo video";
-          f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
-          f.allowFullscreen = true;
-          box.replaceChildren(f);
-          if (window.kauliTrack) window.kauliTrack("promo_play", { placement: "home" });
-        });
-      })();
-    </script>
-  </section>
-
   <section class="m-section" id="services">
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Services</span>
@@ -277,21 +233,21 @@
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h6"/></svg></span>
           <h3>Transcription</h3>
           <p>Accurate, time-stamped transcripts for audio and video, as Word, text or SRT.</p>
-          <span class="svc-price">From $0 <small>first {{ free_minutes|int }} minutes free, then ${{ '%.2f'|format(price_card['transcribe']['ai']) }}/min</small></span>
+          <span class="svc-price">Starting at $0 <small>first {{ free_minutes|int }} minutes free every month</small></span>
           <a class="svc-link" href="/solutions/audio-to-text">Learn more →</a>
         </article>
         <article class="svc-card">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 12h3M8 15h8M14 12h2"/></svg></span>
           <h3>Subtitles &amp; translation</h3>
           <p>Synchronized subtitles and translated text in {{ ai_only_languages|length + source_languages|length - 1 }} languages, ready for YouTube and video players.</p>
-          <span class="svc-price">From ${{ '%.2f'|format(price_card['translate']['ai']) }} <small>per audio-minute</small></span>
+          <span class="svc-price">Pay as you go <small>price shown before you order</small></span>
           <a class="svc-link" href="/solutions/video-translation">Learn more →</a>
         </article>
         <article class="svc-card">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
           <h3>Video dubbing</h3>
           <p>Dubbed voice tracks in selected languages, with human review and consent for any voice cloning. <a href="/human-review">See which</a>.</p>
-          <span class="svc-price">From ${{ '%.2f'|format(price_card['dub']['ai']) }} <small>per audio-minute</small></span>
+          <span class="svc-price">Pay as you go <small>price shown before you order</small></span>
           <a class="svc-link" href="/solutions/video-dubbing">Learn more →</a>
         </article>
       </div>

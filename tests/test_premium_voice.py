@@ -222,7 +222,7 @@ def test_not_offered_without_a_key_or_when_the_plan_is_full(premium, monkeypatch
 
 def test_the_wizard_only_shows_premium_voice_when_it_can_be_sold(premium, monkeypatch):
     html = premium.client.get("/client").text
-    assert 'id="premium-voice-field"' in html and 'name="addon_premium_voice"' in html and "ElevenLabs" in html
+    assert 'id="premium-voice-field"' in html and 'name="addon_premium_voice"' in html and "ElevenLabs" not in html.split("data-pane=\"2\"", 1)[1].split("data-pane=\"3\"", 1)[0]
     assert 'data-premium-voice-rate="0.5"' in html
     monkeypatch.delenv("ELEVENLABS_API_KEY")
     assert 'id="premium-voice-field"' not in premium.client.get("/client").text

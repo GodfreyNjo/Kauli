@@ -14,15 +14,14 @@
   <section class="hub-card cal" aria-labelledby="cal-h">
     <div>
       <h2 id="cal-h">Connect your calendar</h2>
-      <p class="muted">Add event details such as attendees and agendas to improve your notes. Calendar connections are opening soon; tell us which one you want and we will email you the day it is ready.</p>
+      <p class="muted">See your coming meetings and send Kauli to the ones you want recorded and transcribed. Connect with your calendar's private link: no sign-in to share, and you can disconnect any time.</p>
     </div>
     <div class="cal-cards">
       {% for c in calendars %}
-      <form method="post" action="/client/calendar/interest" class="cal-card">
+      <div class="cal-card">
         <span class="ws-badge">{{ c.name[0] }}</span><strong>{{ c.name }}</strong>
-        <input type="hidden" name="provider" value="{{ c.id }}">
-        {% if c.id in interest %}<span class="plan-active-pill">&#10003; We will email you</span>{% else %}<button type="submit" class="secondary">Notify me</button>{% endif %}
-      </form>
+        <a class="btn" href="/client/calendar">Connect</a>
+      </div>
       {% endfor %}
     </div>
   </section>
@@ -47,7 +46,7 @@
       <p>{{ i.desc }}</p>
       <div class="ig-actions">
         {% if i.state == 'live' %}
-          <a class="btn" href="{{ i.href }}">{{ 'Connect' if i.kind == 'built' else 'Set up' }}</a>
+          <a class="btn" href="{{ i.href }}">{{ 'Import a file' if i.import else ('Connect' if i.kind == 'built' else 'Set up') }}</a>
           {% if i.kind == 'zapier' %}<span class="ig-via">via Zapier / Make</span>{% endif %}
         {% else %}
           <span class="ig-via">Coming soon</span>

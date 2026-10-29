@@ -66,6 +66,25 @@
       <button type="button" class="m-share-copy" data-copy-url="{{ post_url }}" aria-label="Copy link to this post">Copy link</button>
     </div>
 
+    {% if audio %}
+    <div class="blog-listen" id="blog-listen">
+      <div><strong>Listen to this guide</strong> <span class="muted">{{ ((audio['duration_s'] or 0) / 60)|round(1) }} min{% if audio['mode'] == 'summary' %}, the key takeaways{% endif %}. Narrated with an AI voice.</span></div>
+      <audio id="blog-audio" controls preload="none" src="/blog-audio/{{ audio['audio_file'] }}"></audio>
+    </div>
+    <script type="application/ld+json">
+    {"@context": "https://schema.org", "@type": "AudioObject", "name": {{ post['title']|tojson }}, "description": {{ (post['description'] or post['title'])|tojson }},
+     "contentUrl": "{{ site_origin() }}/blog-audio/{{ audio['audio_file'] }}", "encodingFormat": "audio/mpeg", "duration": "PT{{ ((audio['duration_s'] or 0) // 60)|int }}M{{ ((audio['duration_s'] or 0) % 60)|int }}S"}
+    </script>
+    <script>
+      (function () {
+        var a = document.getElementById("blog-audio");
+        if (!a) return;
+        a.addEventListener("play", function () { if (window.kauliTrack && !a.dataset.played) { a.dataset.played = "1"; window.kauliTrack("blog_audio_play", { slug: {{ post['slug']|tojson }} }); } });
+        a.addEventListener("ended", function () { if (window.kauliTrack) window.kauliTrack("blog_audio_complete", { slug: {{ post['slug']|tojson }} }); });
+      })();
+    </script>
+    {% endif %}
+
     <details class="m-blog-toc" id="blog-toc" hidden>
       <summary>Contents</summary>
       <ol id="blog-toc-list"></ol>

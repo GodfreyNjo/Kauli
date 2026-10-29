@@ -2,6 +2,48 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Review {{ order['id'] }}{% endblock %}
 {% block content %}
+{% macro provider_panel(f) %}
+{% if f %}
+<div class="pf-panel">
+  <h3>What failed</h3>
+  {% if f.kind %}
+  <p><strong>{{ {'asr': 'Speech recognition', 'mt': 'Translation', 'tts': 'Voice', 'cleanup': 'Audio clean-up'}[f.kind] }}</strong>
+     {% if f.label %} with <strong>{{ f.label }}</strong>{% endif %}{% if f.reason %}: {{ f.reason }}{% endif %}.</p>
+  {% else %}
+  <p class="muted">The error does not say which provider it was, so there is nothing to switch.</p>
+  {% endif %}
+  {% if f.options %}
+  <table class="pf-table">
+    <thead><tr><th>Switch to</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for o in f.options %}
+    <tr class="{{ 'pf-current' if o.current else '' }}">
+      <td>{{ o.label }}{% if o.note %}<small class="muted"> &middot; {{ o.note }}</small>{% endif %}</td>
+      <td>{% if o.current %}<span class="pf-tag bad">Failed here</span>
+          {% elif not o.connected %}<span class="pf-tag">Not connected</span>
+          {% elif not o.fits %}<span class="pf-tag">Cannot take this language pair</span>
+          {% else %}<span class="pf-tag ok">Connected</span>{% endif %}</td>
+      <td>{% if o.connected and o.fits %}
+        <form method="post" action="/staff/orders/{{ order['id'] }}/switch-provider">
+          <input type="hidden" name="kind" value="{{ f.kind }}"><input type="hidden" name="provider" value="{{ o.name }}">
+          <button type="submit" class="secondary">{{ 'Retry with this one' if o.current else 'Switch and retry' }}</button>
+        </form>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <details class="pf-resources"><summary>What each provider has left</summary>
+    <ul>
+    {% for r in f.resources %}
+      <li><strong>{{ r.label }}</strong>: {% if not r.connected %}<span class="muted">not connected</span>{% else %}connected{% if r.detail %}, <span class="{{ 'pf-low' if r.low else '' }}">{{ r.detail }}</span>{% endif %}{% endif %}</li>
+    {% endfor %}
+    </ul>
+    <p class="muted"><a href="/staff/providers">All providers</a></p>
+  </details>
+</div>
+{% endif %}
+{% endmacro %}
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
 <div class="card">
@@ -43,11 +85,13 @@
     <p class="error">Failed {{ order['retry_count'] }} times and gave up automatically: {{ order['error'] }}</p>
     <p class="muted" style="margin-top:-8px;">Worth checking the file itself before retrying - if it's
        genuinely corrupt or malicious, retrying just burns time the same way again.</p>
+    {{ provider_panel(provider_failure) }}
     <form method="post" action="/staff/orders/{{ order['id'] }}/retry" style="margin-top:10px;">
       <button type="submit" class="secondary">Retry processing</button>
     </form>
   {% elif order['status'] == 'failed' %}
     <p class="error">Pipeline failed: {{ order['error'] }}</p>
+    {{ provider_panel(provider_failure) }}
   {% elif not job %}
     <p class="muted">Still processing - nothing to review yet.</p>
   {% else %}

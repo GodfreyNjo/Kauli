@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Calendar</h1>
+      <p class="muted">Connect your Google or Outlook calendar to see your coming meetings and send Kauli to the ones you want recorded and transcribed.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+  {% if feeds and meetings_on and not can_send %}<p class="hub-flash bad" role="status">{{ why_not }}</p>{% endif %}
+
+  {% for f in feeds %}
+  <section class="hub-card cal-feed" aria-label="Calendar {{ loop.index }}">
+    <div class="cal-feed-head">
+      <div><h2>{{ {'google': 'Google Calendar', 'outlook': 'Outlook Calendar'}.get(f.row['provider'], 'Calendar') }}</h2><small class="muted">{{ f.masked }}</small></div>
+      <div class="cal-feed-actions">
+        <a class="btn secondary" href="/client/calendar?refresh=1">Refresh</a>
+        <form method="post" action="/client/calendar/{{ f.row['id'] }}/disconnect" onsubmit="return confirm('Disconnect this calendar and delete its private link?');"><button type="submit" class="secondary">Disconnect</button></form>
+      </div>
+    </div>
+    {% if f.error %}<p class="hub-flash bad">{{ f.error }}</p>
+    {% elif not f.events %}<p class="muted">No meetings in the next 14 days.</p>
+    {% else %}
+    <ul class="cal-events">
+      {% for e in f.events %}
+      <li>
+        <span class="cal-when"><strong>{{ e.start.strftime('%a %b %d') }}</strong><small>{{ e.start.strftime('%H:%M') }} UTC</small></span>
+        <span class="cal-title">{{ e.title }}{% if e.platform %} <small class="muted">{{ {'zoom': 'Zoom', 'meet': 'Google Meet', 'teams': 'Teams'}.get(e.platform, e.platform) }}</small>{% endif %}</span>
+        {% if e.url and meetings_on %}
+        <form method="post" action="/client/calendar/send" class="cal-send">
+          <input type="hidden" name="feed_id" value="{{ f.row['id'] }}"><input type="hidden" name="key" value="{{ e.key }}">
+          <select name="source_lang" aria-label="Language spoken in {{ e.title }}"><option value="en">English</option><option value="es">Spanish</option><option value="fr">French</option><option value="de">German</option><option value="pt">Portuguese</option><option value="sw">Swahili</option></select>
+          <button type="submit"{% if not can_send %} disabled title="{{ why_not }}"{% endif %}>Send Kauli</button>
+        </form>
+        {% else %}<span class="muted cal-nolink">{{ 'No video link' if not e.url else 'Meetings are not switched on' }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  {% if can_add %}
+  <section class="hub-card" aria-labelledby="cal-add">
+    <h2 id="cal-add">{{ 'Connect a calendar' if not feeds else 'Connect another calendar' }}</h2>
+    <form method="post" action="/client/calendar/connect" class="vc-form">
+      <label for="cal-url">Paste your calendar's private link</label>
+      <input type="url" id="cal-url" name="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" required autocomplete="off" spellcheck="false">
+      <button type="submit">Connect</button>
+    </form>
+    <div class="cal-howto">
+      <details><summary>Where do I find it in Google Calendar?</summary>
+        <ol><li>Open Google Calendar on a computer, click the gear, then <strong>Settings</strong>.</li><li>On the left, click your calendar under <strong>Settings for my calendars</strong>.</li><li>Scroll to <strong>Integrate calendar</strong> and copy the <strong>Secret address in iCal format</strong>.</li></ol></details>
+      <details><summary>Where do I find it in Outlook?</summary>
+        <ol><li>Open Outlook on the web, click the gear, then <strong>Calendar &gt; Shared calendars</strong>.</li><li>Under <strong>Publish a calendar</strong>, choose your calendar and set it to <strong>Can view all details</strong>, then <strong>Publish</strong>.</li><li>Copy the <strong>ICS</strong> link.</li></ol></details>
+    </div>
+    <p class="muted an-note">The link lets Kauli read this calendar's events, nothing else. Treat it like a password: we store it privately, show it masked, and delete it when you disconnect. You can also reset it in your calendar settings at any time.</p>
+  </section>
+  {% else %}<p class="muted">You have connected the most calendars you can ({{ feeds|length }}). Disconnect one to add another.</p>{% endif %}
+</div>
+{% endblock %}

@@ -103,8 +103,9 @@ def studio(env, wav_bytes, monkeypatch):
     monkeypatch.setattr(env.app, "_premium_capacity_ok", lambda minutes: True)
     monkeypatch.setattr(env.app, "_premium_voices", lambda force=False: [{"id": VOICE, "name": "Rachel", "description": ""}])
     env.wav = wav_bytes
-    env.go = lambda **kw: env.place(wav_bytes, **{"source_lang": "sw", "target_lang": "en", "service_level": "translate",
-                                                   "review_tier": "studio", **kw})
+    # Studio is made for dubbing, so a Studio order is a dub with a chosen premium voice unless a test says otherwise
+    env.go = lambda **kw: env.place(wav_bytes, **{"source_lang": "sw", "target_lang": "en", "service_level": "dub",
+                                                   "review_tier": "studio", "premium_voice_id": VOICE, **kw})
     return env
 
 
@@ -115,20 +116,20 @@ def _addons(order):
 def test_studio_is_a_human_reviewed_order_with_elevenlabs_recognition(studio):
     order = studio.order_from(studio.go())
     assert order["review_tier"] == "human" and order["asr"] == "elevenlabs-scribe"
-    assert set(_addons(order)) == {"audio_cleanup", "premium_asr"}
-    human = studio.order_from(studio.go(review_tier="human"))
+    assert set(_addons(order)) == {"audio_cleanup", "premium_asr", "premium_voice"}
+    human = studio.order_from(studio.go(review_tier="human", premium_voice_id=""))
     assert human["asr"] != "elevenlabs-scribe" and _addons(human) == []                   # today's tier is untouched
     extra = order["cost_usd"] - human["cost_usd"]
-    assert extra == pytest.approx(0.40 * order["duration_minutes"], abs=0.01)             # human rate + $0.40/min, nothing more
+    assert extra == pytest.approx(0.90 * order["duration_minutes"], abs=0.01)             # human rate + $0.90/min for a dub, nothing more
 
 
 def test_studio_dubbing_adds_the_premium_voice_and_needs_a_chosen_voice(studio):
-    order = studio.order_from(studio.go(service_level="dub", premium_voice_id=VOICE))
+    order = studio.order_from(studio.go())
     assert set(_addons(order)) == {"audio_cleanup", "premium_asr", "premium_voice"}
     assert order["tts"] == "elevenlabs" and order["dub_voice"] == f"elevenlabs:{VOICE}" and order["review_tier"] == "human"
-    human_dub = studio.order_from(studio.go(service_level="dub", review_tier="human"))
+    human_dub = studio.order_from(studio.go(review_tier="human", premium_voice_id=""))
     assert order["cost_usd"] - human_dub["cost_usd"] == pytest.approx(0.90 * order["duration_minutes"], abs=0.01)
-    r = studio.go(service_level="dub", premium_voice_id="NOTAVOICEID123456")
+    r = studio.go(premium_voice_id="NOTAVOICEID123456")
     assert "listed premium voices" in r.text
 
 
@@ -145,10 +146,21 @@ def test_studio_is_refused_where_it_cannot_be_delivered(studio, monkeypatch):
     assert studio.db.list_orders_for_client("u1") == []
 
 
+def test_studio_is_for_dubbing_only(studio):
+    for service in ("transcribe", "translate"):
+        assert "made for dubbing" in studio.go(service_level=service).text, service
+    assert studio.db.list_orders_for_client("u1") == []
+    assert studio.order_from(studio.go())["review_tier"] == "human"                      # the dub itself is fine
+    page = studio.client.get("/client").text
+    assert 'id="studio-option"' in page and "For dubbing:" in page
+    js = studio.client.get("/static/client_wizard.js").text
+    assert "studioOption.hidden = !studioWanted" in js and 'selected.value === "dub"' in js
+
+
 def test_the_wizard_offers_studio_only_when_it_can_be_sold(studio, monkeypatch):
     html = studio.client.get("/client").text
     assert 'value="studio"' in html and "Top tier" in html and 'data-premium-asr-rate="0.1"' in html
-    assert "$0.40/audio-minute" in html and "$0.90" in html and 'id="price-studio-row"' in html
+    assert "+$0.40/min" in html and "$0.90" in html and "ElevenLabs" not in html and 'id="price-studio-row"' in html
     monkeypatch.delenv("ELEVENLABS_API_KEY")
     assert 'value="studio"' not in studio.client.get("/client").text
 
@@ -199,20 +211,20 @@ def test_the_switch_only_accepts_chinese_german_and_spanish(extras):
 
 
 def test_chinese_german_and_spanish_can_be_human_reviewed_with_the_specialist_add_on(extras):
-    base = extras.order_from(extras.go(source_lang="sw", target_lang="en", review_tier="human"))
+    base = extras.order_from(extras.go(service_level="translate", premium_voice_id="", source_lang="sw", target_lang="en", review_tier="human"))
     for code in ("zh", "de", "es"):
-        order = extras.order_from(extras.go(source_lang=code, target_lang="en", review_tier="human"))
+        order = extras.order_from(extras.go(service_level="translate", premium_voice_id="", source_lang=code, target_lang="en", review_tier="human"))
         assert order["review_tier"] == "human" and "review_extra" in _addons(order)
         assert order["cost_usd"] - base["cost_usd"] == pytest.approx(1.20 * order["duration_minutes"], abs=0.01)
-    into = extras.order_from(extras.go(source_lang="en", target_lang="de", review_tier="human"))
+    into = extras.order_from(extras.go(service_level="translate", premium_voice_id="", source_lang="en", target_lang="de", review_tier="human"))
     assert "review_extra" in _addons(into) and into["target_lang"] == "de"
-    ai = extras.order_from(extras.go(source_lang="zh", target_lang="en", review_tier="ai"))
+    ai = extras.order_from(extras.go(service_level="translate", premium_voice_id="", source_lang="zh", target_lang="en", review_tier="ai"))
     assert ai["review_tier"] == "ai" and _addons(ai) == []                                  # Instant AI is exactly as before
 
 
 def test_studio_works_for_the_extra_languages_including_dubbing_with_a_premium_voice(extras):
     order = extras.order_from(extras.go(source_lang="es", target_lang="en"))
-    assert order["review_tier"] == "human" and set(_addons(order)) == {"audio_cleanup", "premium_asr", "review_extra"}
+    assert order["review_tier"] == "human" and set(_addons(order)) == {"audio_cleanup", "premium_asr", "premium_voice", "review_extra"}
     dub = extras.order_from(extras.go(source_lang="en", target_lang="zh", service_level="dub", premium_voice_id=VOICE))
     assert dub["tts"] == "elevenlabs" and dub["target_lang"] == "zh"
     assert set(_addons(dub)) == {"audio_cleanup", "premium_asr", "premium_voice", "review_extra"}
@@ -228,12 +240,12 @@ def test_dubbing_into_an_extra_language_needs_a_premium_voice(extras):
 
 def test_extra_language_review_is_refused_where_it_would_lose_money(extras, monkeypatch):
     extras.db.set_billing_market("u1", "ea")                                                # lower East Africa prices
-    r = extras.go(source_lang="zh", target_lang="en", review_tier="human")
+    r = extras.go(service_level="translate", premium_voice_id="", source_lang="zh", target_lang="en", review_tier="human")
     assert "pricing region" in r.text and extras.db.list_orders_for_client("u1") == []
-    assert extras.order_from(extras.go(source_lang="zh", target_lang="en", review_tier="ai"))["review_tier"] == "ai"
+    assert extras.order_from(extras.go(service_level="translate", premium_voice_id="", source_lang="zh", target_lang="en", review_tier="ai"))["review_tier"] == "ai"
     extras.db.set_billing_market("u1", "intl")
     monkeypatch.setenv("KAULI_EXTRA_REVIEW_COST_PER_MIN", "5.00")                           # a contractor quote we cannot cover
-    assert "pricing region" in extras.go(source_lang="de", target_lang="en", review_tier="human").text
+    assert "pricing region" in extras.go(service_level="translate", premium_voice_id="", source_lang="de", target_lang="en", review_tier="human").text
 
 
 def test_the_wizard_lists_the_extra_languages_for_human_review_when_on(extras):
@@ -272,9 +284,8 @@ def test_services_show_transcription_starting_from_zero_without_hiding_the_real_
     assert "m-eyebrow-lined" in section and "Everything your video or audio needs to travel" in section
     assert "and selected languages can add human review." in section and 'href="/human-review"' in section
     prices = [p.strip() for p in __import__("re").findall(r'<span class="svc-price">(.*?)</span>', section, __import__("re").S)]
-    assert prices[0].startswith("From $0") and "first 30 minutes free" in prices[0] and "/min" in prices[0]   # honest: free minutes, then a rate
-    assert prices[1].startswith("From $") and prices[1].startswith("From $0 ") is False                      # translation and dubbing still show their rates
-    assert prices[2].startswith("From $") and "per audio-minute" in prices[2]
+    assert prices[0].startswith("Starting at $0") and "first 30 minutes free" in prices[0] and "/min" not in prices[0]
+    assert prices[1].startswith("Pay as you go") and prices[2].startswith("Pay as you go")                   # translation and dubbing: priced when you order
 
 
 # ------------------------------------------------------------------ the integrations section

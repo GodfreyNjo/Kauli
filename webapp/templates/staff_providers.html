@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Providers{% endblock %}
+{% block content %}
+<div class="hub">
+  <div class="hub-top"><div>
+    <h1>Providers</h1>
+    <p class="muted">The outside services Kauli relies on, whether each is connected on this server, and what it has left where it can tell us.</p>
+  </div></div>
+  <section class="hub-card">
+    <table class="pf-table">
+      <thead><tr><th>Provider</th><th>Status</th><th>What is left</th></tr></thead>
+      <tbody>
+      {% for r in resources %}
+      <tr><td>{{ r.label }}</td>
+          <td>{% if r.connected %}<span class="pf-tag ok">Connected</span>{% else %}<span class="pf-tag">Not connected</span>{% endif %}</td>
+          <td class="{{ 'pf-low' if r.low else '' }}">{{ r.detail or '-' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted">When an order fails on one of these, its page offers the others that can take it and a one-click switch. Quotas for Lara, Azure, Claude and Groq are only visible in their own dashboards.</p>
+  </section>
+</div>
+{% endblock %}

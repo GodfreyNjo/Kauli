@@ -169,13 +169,9 @@ def test_the_call_center_offering_is_on_the_site_with_a_demo_and_a_guide(env):
         assert (Path(__file__).parent.parent / "webapp" / "static" / "demo" / f"vid-call-{lang}.mp4").exists()
 
 
-def test_the_promo_video_is_on_the_home_page_and_youtube_is_only_contacted_after_a_click(env):
+def test_the_promo_video_is_not_on_the_public_site(env):
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
-    r = env.client.get("/")
-    html = r.text
-    assert 'id="watch"' in html and 'data-video-id="i6R3flz8V1I"' in html and "/static/promo-thumbnail.jpg" in html
-    assert "<iframe" not in html and "youtube.com/embed" not in html.split('"@type": "VideoObject"')[0]        # nothing from YouTube is in the page itself
-    assert '"@type": "VideoObject"' in html and '"embedUrl": "https://www.youtube.com/embed/i6R3flz8V1I"' in html
-    assert "youtube-nocookie.com/embed/" in html                                                          # the player the click creates
-    assert "https://www.youtube-nocookie.com" in r.headers["content-security-policy"]
-    assert env.client.get("/static/promo-thumbnail.jpg").status_code == 200
+    html = env.client.get("/").text
+    assert "i6R3flz8V1I" not in html and 'id="watch"' not in html and "VideoObject" not in html and "promo-thumbnail" not in html
+    for path in ("/solutions/call-centers", "/blog", "/try"):
+        assert "i6R3flz8V1I" not in env.client.get(path).text, path

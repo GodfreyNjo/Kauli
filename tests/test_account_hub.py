@@ -17,7 +17,7 @@ def _as_user(env, user_id, email, role="client"):
 
 
 # ------------------------------------------------------------------------------------------------ pages and navigation
-PAGES = ["/client/notes", "/client/analytics", "/client/workspace", "/client/vocabulary", "/client/rewards", "/client/plans", "/client/integrations"]
+PAGES = ["/client/notes", "/client/analytics", "/client/workspace", "/client/vocabulary", "/client/rewards", "/client/plans", "/client/integrations", "/client/resources"]
 
 
 def test_every_account_page_opens_and_the_menu_links_to_them(env):
@@ -40,7 +40,7 @@ def test_signed_out_visitors_are_sent_to_log_in(env):
 def test_the_menu_is_translated_for_other_languages(env):
     from webapp import ui_text
     for lang in ui_text.LANGS:
-        for key in ("nav_notes", "nav_analytics", "nav_workspace", "nav_vocabulary", "nav_integrations", "nav_rewards", "nav_plans"):
+        for key in ("nav_notes", "nav_analytics", "nav_workspace", "nav_vocabulary", "nav_integrations", "nav_rewards", "nav_plans", "nav_resources"):
             assert ui_text.translate(lang, key) != key
 
 
@@ -249,7 +249,7 @@ def test_the_integrations_page_lists_real_options_and_takes_requests(env):
     assert env.client.post("/client/calendar/interest", data={"provider": "google_calendar"}).status_code == 303
     assert env.client.post("/client/calendar/interest", data={"provider": "bogus"}).status_code == 303
     assert env.db.get_conn().execute("SELECT COUNT(*) FROM calendar_interest").fetchone()[0] == 1
-    assert "We will email you" in env.client.get("/client/integrations").text
+    assert 'href="/client/calendar"' in page
 
 
 def test_nothing_in_the_live_list_points_nowhere():

@@ -755,6 +755,36 @@ CREATE TABLE IF NOT EXISTS integration_requests (
     body TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+-- The narrated version of a blog post (webapp/blog_audio.py): one per post, the file lives in the data folder (blog_audio/).
+CREATE TABLE IF NOT EXISTS blog_audio (
+    post_id TEXT PRIMARY KEY,
+    mode TEXT NOT NULL DEFAULT 'summary',          -- 'summary' | 'full'
+    status TEXT NOT NULL DEFAULT 'queued',         -- queued | scripting | voicing | ready | failed
+    script_text TEXT,
+    script_by TEXT,                                -- 'claude' | 'plain'
+    audio_file TEXT,
+    duration_s REAL,
+    bytes INTEGER,
+    chars INTEGER,
+    voice_id TEXT,
+    content_hash TEXT,
+    in_podcast INTEGER NOT NULL DEFAULT 1,
+    error TEXT,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL
+);
+-- A customer's private calendar link (Google "secret address in iCal format", Outlook published ICS). The URL is a secret: it is shown
+-- masked and deleted on disconnect. See webapp/calendar_feed.py.
+CREATE TABLE IF NOT EXISTS calendar_feeds (
+    id TEXT PRIMARY KEY,
+    client_id TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    url TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    last_ok_at REAL,
+    last_error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_calendar_feeds_client ON calendar_feeds(client_id);
 CREATE TABLE IF NOT EXISTS calendar_interest (
     client_id TEXT NOT NULL,
     provider TEXT NOT NULL,
@@ -2844,6 +2874,15 @@ def update_order_status(order_id: str, status: str, error: str | None = None) ->
         "UPDATE orders SET status = ?, error = ?, updated_at = ?, status_changed_at = ? WHERE id = ?",
         (status, error, now, now, order_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def set_order_provider(order_id: str, kind: str, name: str) -> None:
+    """Point one step of an order (asr, mt or tts) at a different provider, e.g. after the first one ran out of quota."""
+    column = {"asr": "asr", "mt": "mt", "tts": "tts"}[kind]       # the column name is never taken from the request
+    conn = get_conn()
+    conn.execute(f"UPDATE orders SET {column} = ?, updated_at = ? WHERE id = ?", (name, time.time(), order_id))
     conn.commit()
     conn.close()
 

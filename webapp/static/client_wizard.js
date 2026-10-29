@@ -80,6 +80,18 @@
     });
   }
 
+  // A file the customer picked from Google Drive, OneDrive or Dropbox (static/cloud_import.js): it is already on the server, so
+  // the order is submitted with its key instead of uploading anything.
+  window.kauliUseCloudFile = function (uploadKey, filename) {
+    fileQueue.length = 0;
+    if (typeof renderQueue === "function") renderQueue();
+    resumedUploadKey = uploadKey;
+    const dz = $("#dropzone");
+    if (dz) dz.classList.add("has-file");
+    const text = $("#dropzone-text");
+    if (text) text.textContent = filename + " (imported - ready to submit)";
+  };
+
   // ------------------------------------------------------ friction log ----
   // Real, in-house signal of where clients actually get stuck - see
   // db.log_wizard_step / db.client_funnel_stats and /staff/ops. Never
@@ -342,6 +354,7 @@
     const humanVoiceRate = Number(data.dataset.humanVoiceRate) || 0;
     const premiumVoiceRate = Number(data.dataset.premiumVoiceRate) || 0;
     const audioCleanupRate = Number(data.dataset.audioCleanupRate) || 0;
+    const audioCleanupRateAi = Number(data.dataset.audioCleanupRateAi) || 0;
     const premiumAsrRate = Number(data.dataset.premiumAsrRate) || 0;
     const rushPct = Number(data.dataset.rushPct) || 0;
     const CREDITS_PER_DOLLAR = 10; // mirrors billing.CREDITS_PER_DOLLAR
@@ -392,9 +405,29 @@
             : "This language is available as Instant AI transcription only (no translation, dubbing or human review).")
         : "This language is transcribed by one of our team by hand, so it is always human-reviewed.";
     }
+    // Studio is made for dubbing: it is offered with the Dubbing service only, and a switch to anything else puts the choice back on Human-reviewed.
+    const studioOption = $("#studio-option");
+    const studioWanted = !!(selected && selected.value === "dub");
+    if (studioOption) {
+      studioOption.hidden = !studioWanted;
+      const studioRadio = $('input[name="review_tier"][value="studio"]');
+      if (!studioWanted && studioRadio && studioRadio.checked) { const h = $('input[name="review_tier"][value="human"]'); if (h) h.checked = true; }
+    }
     const tierRadio = $('input[name="review_tier"]:checked');
     const tier = tierRadio ? tierRadio.value : "human";
     const isAiTier = tier === "ai";
+    // Clean-up costs less on an Instant AI order.
+    const cleanupUnit = isAiTier && audioCleanupRateAi ? audioCleanupRateAi : audioCleanupRate;
+    [].forEach.call(document.querySelectorAll(".cleanup-price"), (el) => { el.textContent = "+" + formatMoney(cleanupUnit) + "/min"; });
+    // A dub has its own extras (voice, voice actor, cloning consent): show them the first time a dub is chosen.
+    const extrasBox = $("#extras");
+    if (extrasBox && selected && selected.value === "dub" && !extrasBox.dataset.shown) { extrasBox.open = true; extrasBox.dataset.shown = "1"; }
+    // How exact the transcript is, and the other advanced options, are instructions for a human editor. Instant AI has none, so they
+    // are hidden for it (the server ignores them too) and shown again when Human review is chosen.
+    ["verbatim-fieldset", "verbatim-note", "advanced-settings"].forEach((id) => { const el = $("#" + id); if (el) el.hidden = isAiTier; });
+    const cleanNote = $("#ai-clean-note");
+    if (cleanNote) cleanNote.hidden = !isAiTier;
+    if (isAiTier) { const clean = $('input[name="instr_verbatim_level"][value="clean_read"]'); if (clean) clean.checked = true; }
     // Studio is a human-reviewed order that bundles clean-up, Scribe recognition and (on a dub) a premium voice:
     // the extra boxes are ticked for the customer while it is chosen and put back when it is not.
     const isStudio = tier === "studio";
@@ -509,14 +542,14 @@
       $("#price-free").textContent = "-";
       let perMinExtras = (addonChecked ? addonRate : 0) + (isManual ? manualRate : 0)
         + (humanVoiceChecked ? humanVoiceRate : 0) + (premiumVoiceChecked ? premiumVoiceRate : 0)
-        + (cleanupChecked ? audioCleanupRate : 0) + (isStudio ? premiumAsrRate : 0);
+        + (cleanupChecked ? cleanupUnit : 0) + (isStudio ? premiumAsrRate : 0);
       if (rushChecked) perMinExtras += rate * rushPct;
       $("#price-total").textContent = formatMoney(rate + perMinExtras) + "/min";
       if (addonChecked) $("#price-addon").textContent = formatMoney(addonRate) + "/min";
       if (isManual) $("#price-manual").textContent = formatMoney(manualRate) + "/min";
       if (humanVoiceChecked) $("#price-human-voice").textContent = formatMoney(humanVoiceRate) + "/min";
       if (premiumVoiceChecked) $("#price-premium-voice").textContent = formatMoney(premiumVoiceRate) + "/min";
-      if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(audioCleanupRate) + "/min";
+      if (cleanupChecked) $("#price-audio-cleanup").textContent = formatMoney(cleanupUnit) + "/min";
       if (isStudio) $("#price-studio").textContent = formatMoney(premiumAsrRate) + "/min";
       if (rushChecked) $("#price-rush").textContent = formatMoney(rate * rushPct) + "/min";
       return;
@@ -540,7 +573,7 @@
     const manualCost = isManual ? manualRate * fileDurationMinutes : 0;
     const humanVoiceCost = humanVoiceChecked ? humanVoiceRate * fileDurationMinutes : 0;
     const premiumVoiceCost = premiumVoiceChecked ? premiumVoiceRate * fileDurationMinutes : 0;
-    const cleanupCost = cleanupChecked ? audioCleanupRate * fileDurationMinutes : 0;
+    const cleanupCost = cleanupChecked ? cleanupUnit * fileDurationMinutes : 0;
     const studioAsrCost = isStudio ? premiumAsrRate * fileDurationMinutes : 0;
     const rushSurcharge = rushChecked ? (fileDurationMinutes * rate) * rushPct : 0;
     const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + studioAsrCost + rushSurcharge;

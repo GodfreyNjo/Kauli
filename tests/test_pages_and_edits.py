@@ -154,3 +154,79 @@ def test_the_page_script_edits_only_changed_lines_and_never_pastes_formatting(en
     page = env.client.get(f"/client/orders/{order['id']}").text
     assert 'contenteditable", on ? "plaintext-only"' in page and 'getData("text/plain")' in page and "beforeunload" in page
     assert "if (plain(c) !== c.dataset.orig)" in page and "window.txEditing" in page
+
+
+# ------------------------------------------------------------------------------------------------ editor-only options
+def test_the_editor_instructions_are_hidden_for_instant_ai_and_ignored_by_the_server(env, wav_bytes):
+    page = env.client.get("/client").text
+    for needle in ('id="verbatim-fieldset"', 'id="advanced-settings"', 'id="ai-clean-note"', 'id="verbatim-note"'):
+        assert needle in page, needle
+    js = env.client.get("/static/client_wizard.js").text
+    assert '["verbatim-fieldset", "verbatim-note", "advanced-settings"]' in js and "el.hidden = isAiTier" in js
+    order = env.order_from(env.place(wav_bytes, review_tier="ai", instr_verbatim_level="verbatim", instr_existing_subs="match_existing",
+                                     instr_no_audio="return", instr_transcribe_lyrics="1", instr_use_italics="1", instr_notes="keep this note"))
+    row = env.db.get_order(order["id"])
+    assert row["instr_verbatim_level"] == "clean_read" and row["instr_existing_subs"] == "ignore" and row["instr_no_audio"] == "tag"
+    assert not row["instr_transcribe_lyrics"] and not row["instr_use_italics"] and row["instr_notes"] == "keep this note"        # a note is not an editor-only choice
+
+
+def test_human_review_orders_still_keep_their_editor_instructions(env, wav_bytes):
+    order = env.order_from(env.place(wav_bytes, review_tier="human", instr_verbatim_level="verbatim", instr_existing_subs="match_existing",
+                                     instr_transcribe_lyrics="1"))
+    row = env.db.get_order(order["id"])
+    assert row["instr_verbatim_level"] == "verbatim" and row["instr_existing_subs"] == "match_existing" and row["instr_transcribe_lyrics"]
+
+
+def test_the_service_step_keeps_extras_in_one_collapsed_section_and_names_no_vendors(env):
+    page = env.client.get("/client").text
+    assert 'id="extras"' in page and "Extras and extra charges (optional)" in page
+    extras = page.split('id="extras"', 1)[1].split("</details>", 1)[0]
+    for ident in ("human-voice-field", "voice-clone-consent-field", "rush-checkbox"):
+        assert ident in extras, ident                                                         # every optional charge lives inside it
+    step = page.split('data-pane="2"', 1)[1].split('data-pane="3"', 1)[0]
+    for vendor in ("ElevenLabs", "Claude", "Anthropic", "Transkriptor", "Groq", "AssemblyAI", "Godfrey"):
+        assert vendor not in step, vendor
+    assert "+$" in extras and "/min" in extras
+    assert "extrasBox.open = true" in env.client.get("/static/client_wizard.js").text         # a dub opens its own extras
+
+
+# ------------------------------------------------------------------------------------------------ the order list
+def _orders_page(env, query=""):
+    return env.client.get("/client" + query).text
+
+
+def _order_rows(html):
+    return len(re.findall(r'<tr class="order-row"', html))
+
+
+def test_the_order_list_has_numbered_pages_that_keep_the_filters(env, wav_bytes):
+    for _ in range(23):
+        env.order_from(env.place(wav_bytes, folder_name="Podcast"))
+    for _ in range(4):
+        env.order_from(env.place(wav_bytes, folder_name="Calls"))
+    first = _orders_page(env)
+    assert _order_rows(first) == 10 and 'class="pager"' in first and 'aria-current="page">1<' in first
+    assert 'href="/client?page=2"' in first and 'href="/client?page=3"' in first
+    assert _order_rows(_orders_page(env, "?page=3")) == 7 and _order_rows(_orders_page(env, "?page=99")) == 7      # past the end: the last page
+    assert _order_rows(_orders_page(env, "?page=0")) == 10 and "View all" not in first
+    calls = _orders_page(env, "?folder=Calls")
+    assert _order_rows(calls) == 4 and 'class="pager"' not in calls
+    podcast = _orders_page(env, "?folder=Podcast&page=2")
+    assert _order_rows(podcast) == 10 and "folder=Podcast" in podcast and 'aria-current="page">2<' in podcast
+    assert _order_rows(_orders_page(env, "?status=in_progress")) == 10 and "status=in_progress" in _orders_page(env, "?status=in_progress")
+    assert _order_rows(_orders_page(env, "?status=ready")) == 0 and "No orders match" in _orders_page(env, "?status=ready")
+    assert _order_rows(_orders_page(env, "?q=clip&folder=Calls")) == 4 and _order_rows(_orders_page(env, "?q=zzz")) == 0
+    assert _order_rows(_orders_page(env, "?status=bogus")) == 10                              # an unknown filter is ignored
+
+
+def test_the_order_rows_are_short(env, wav_bytes):
+    from test_media_preview import _finished
+    _finished(env, wav_bytes)
+    html = _orders_page(env)
+    row = html.split('<tr class="order-row"', 1)[1].split("</tr>", 1)[0]
+    assert "Transcription" in row and "AI" in row and "Ready" in row and "clip.wav" in row
+    table = html.split('class="orders-table orders-compact"', 1)[1].split("</table>", 1)[0]
+    assert "your order is ready" not in table.lower()                                             # the short status, not the sentence
+    for dropped in ("Due date", "Transcription only", "Trial credit", "Analysis in progress"):
+        assert dropped not in table, dropped
+    assert re.search(r"[A-Z][a-z]{2} \d{2}, 20\d\d", row)                                       # a short date such as Oct 29, 2026

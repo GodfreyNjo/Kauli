@@ -20,7 +20,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import billing, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
+from . import billing, blog_audio, cloud_import, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
 
 router = APIRouter()
 A = None          # the app module, set by register()
@@ -744,11 +744,11 @@ INTEGRATIONS = [
     {"id": "gsheets", "name": "Google Sheets", "cat": "Notes & Documentation", "kind": "zapier", "state": "live", "href": "/docs/api",
      "desc": "Add a row per transcript to a Google Sheet through Zapier."},
     {"id": "gdrive", "name": "Google Drive", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Import recordings straight from Drive. Tell us you want it."},
+     "desc": "Pick a recording from Google Drive when you upload a file."},
     {"id": "onedrive", "name": "OneDrive", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Import recordings straight from OneDrive. Tell us you want it."},
+     "desc": "Pick a recording from OneDrive when you upload a file."},
     {"id": "dropbox", "name": "Dropbox", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Import recordings straight from Dropbox. Tell us you want it."},
+     "desc": "Pick a recording from Dropbox when you upload a file."},
 ]
 CALENDARS = [{"id": "google_calendar", "name": "Google Calendar"}, {"id": "outlook_calendar", "name": "Outlook Calendar"}]
 
@@ -765,7 +765,10 @@ def integrations_page(request: Request, notice: str | None = None):
     user = _client(request)
     if not user:
         return _to_login(request)
-    return _render(request, "account_integrations.html", user, items=INTEGRATIONS, categories=CATEGORIES, calendars=CALENDARS,
+    on = cloud_import.config()
+    cloud = {"gdrive": "google", "onedrive": "onedrive", "dropbox": "dropbox"}
+    items = [({**i, "state": "live", "href": "/client#order-form", "import": True} if cloud.get(i["id"]) in on else i) for i in INTEGRATIONS]
+    return _render(request, "account_integrations.html", user, items=items, categories=CATEGORIES, calendars=CALENDARS,
                    interest=calendar_interest(user["client_scope_id"]), notice=notice)
 
 
@@ -1160,3 +1163,23 @@ def site_analytics(request: Request, days: int = 28, refresh: int = 0):
         "internal_line": _line_chart([(d[5:], n) for d, n in internal["orders_by_day"]]) if len(internal["orders_by_day"]) > 1 else "",
         "property": ga_reports.property_id(), "measurement_id": ga_events.measurement_id(),
         "fetched": datetime.fromtimestamp(ga["fetched_at"]).strftime("%b %d, %H:%M") if ga else None})
+
+
+# ================================================================================================ RESOURCES
+# Videos and guides for customers, inside the account only. Add a video here once it is on YouTube: {"id": "<the YouTube id>", ...}.
+VIDEOS = [
+    {"id": "i6R3flz8V1I", "title": "Kauli in 78 seconds", "about": "What Kauli does: transcripts, translation, dubbing and human review.", "length": "1:18", "thumb": "/static/promo-thumbnail.jpg"},
+]
+
+
+@router.get("/client/resources", response_class=HTMLResponse)
+def resources_page(request: Request):
+    user = _client(request)
+    if not user:
+        return _to_login(request)
+    posts = []
+    for post in list(db.list_blog_posts(published_only=True))[:8]:
+        row = blog_audio.ready_for(post["id"])
+        posts.append({"post": post, "audio": row})
+    return _render(request, "account_resources.html", user, videos=[v for v in VIDEOS if v.get("id")], posts=posts,
+                   podcast_ready=any(p["audio"] and p["audio"]["in_podcast"] for p in posts), base=A._site_base(request))

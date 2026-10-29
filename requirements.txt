@@ -111,3 +111,7 @@ supabase>=2.0.0               # email/password auth - see webapp/supabase_auth.p
 
 # --- Google Analytics reporting (webapp/ga_reports.py): signs the service-account token request ---
 PyJWT[crypto]>=2.8.0
+
+# --- calendar links (webapp/calendar_feed.py): read iCal feeds and expand recurring meetings ---
+icalendar>=6.0.0
+recurring-ical-events>=3.3.0

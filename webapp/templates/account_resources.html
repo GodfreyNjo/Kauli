@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set translated = true %}
+{% block title %}Resources{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Resources</h1>
+      <p class="muted">Short videos, guides you can read or listen to, and help for getting the most from Kauli.</p>
+    </div>
+  </div>
+
+  {% if videos %}
+  <section class="hub-card" aria-labelledby="rs-videos">
+    <h2 id="rs-videos">Watch</h2>
+    <div class="rs-videos">
+      {% for v in videos %}
+      <article class="rs-video">
+        <div class="promo-video" data-video-id="{{ v.id }}">
+          <button type="button" class="promo-play" aria-label="Play: {{ v.title }}">
+            <img src="{{ v.thumb }}" alt="" width="1280" height="720" loading="lazy">
+            <span class="promo-play-icon" aria-hidden="true"></span>
+          </button>
+        </div>
+        <h3>{{ v.title }} <small class="muted">{{ v.length }}</small></h3>
+        <p class="muted">{{ v.about }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="muted an-note">Videos play from YouTube when you press play.</p>
+  </section>
+  {% endif %}
+
+  <section class="hub-card" aria-labelledby="rs-guides">
+    <h2 id="rs-guides">Guides</h2>
+    <ul class="rs-guides">
+      {% for g in posts %}
+      <li>
+        <a href="/blog/{{ g.post['slug'] }}">{{ g.post['title'] }}</a>
+        {% if g.audio %}<audio controls preload="none" src="/blog-audio/{{ g.audio['audio_file'] }}"></audio>{% endif %}
+      </li>
+      {% else %}
+      <li class="muted">Guides will appear here.</li>
+      {% endfor %}
+    </ul>
+    <p><a href="/blog">All guides</a>{% if podcast_ready %} &middot; <a href="{{ base }}/podcast.xml">Podcast feed</a> (add it to your podcast app){% endif %}</p>
+  </section>
+
+  <section class="hub-card" aria-labelledby="rs-help">
+    <h2 id="rs-help">Help and documentation</h2>
+    <ul class="rs-links">
+      <li><a href="/help">Help and troubleshooting</a> <span class="muted">Answers to common questions about orders and payments.</span></li>
+      <li><a href="/docs/api">API and webhooks</a> <span class="muted">Send recordings in and get transcripts out automatically.</span></li>
+      <li><a href="/client/integrations">Integrations</a> <span class="muted">Connect Kauli to Slack, Teams, Notion, Zapier and more.</span></li>
+      <li><a href="/formatting-standards">Formatting standards</a> <span class="muted">How transcripts and captions are laid out.</span></li>
+      <li><a href="/solutions/call-centers">Call center transcription</a> <span class="muted">Searchable calls with agent and customer separated.</span></li>
+    </ul>
+    <p class="muted an-note">Can't find it? Ask the assistant (the chat button at the bottom right) or <a href="mailto:{{ contact_email }}">email us</a>.</p>
+  </section>
+</div>
+<script>
+  [].forEach.call(document.querySelectorAll(".promo-video"), function (box) {
+    var btn = box.querySelector(".promo-play");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      // YouTube is only contacted now, because the customer asked to watch.
+      var f = document.createElement("iframe");
+      f.src = "https://www.youtube-nocookie.com/embed/" + box.dataset.videoId + "?autoplay=1&rel=0&modestbranding=1";
+      f.title = "Kauli video";
+      f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+      f.allowFullscreen = true;
+      box.replaceChildren(f);
+    });
+  });
+</script>
+{% endblock %}

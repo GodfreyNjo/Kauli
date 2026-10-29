@@ -46,6 +46,7 @@
        icon while the marketing site showed the real one. -->
   <link rel="icon" href="/static/kauli-icon.png">
   <link rel="alternate" type="application/rss+xml" title="Kauli blog" href="/blog/rss.xml">
+  <link rel="alternate" type="application/rss+xml" title="Kauli Guides (podcast)" href="/podcast.xml">
   <!-- PWA: installable app shell (manifest.json + sw.js), no native app -
        see the "why a PWA, not native" note in sw.js's own docstring.
        theme-color matches the real brand accent (--accent in style.css). -->
@@ -162,7 +163,9 @@
         <a href="/staff/analytics" class="{{ 'active' if '/staff/analytics' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Site analytics</span></a>
         <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}">{{ nav_icon('alert') }}<span class="label">Exceptions</span></a>
         <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
-        <a href="/staff/blog" class="{{ 'active' if '/staff/blog' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
+        <a href="/staff/blog" class="{{ 'active' if request.url.path.startswith('/staff/blog') and 'audio' not in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
+        <a href="/staff/blog-audio" class="{{ 'active' if '/staff/blog-audio' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Blog audio</span></a>
+        <a href="/staff/providers" class="{{ 'active' if '/staff/providers' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Providers</span></a>
         <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
         <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
         <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">Handbook</span></a>
@@ -196,6 +199,7 @@
         <a href="/client/vocabulary" class="{{ 'active' if '/client/vocabulary' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">{{ t('nav_vocabulary') }}</span></a>
         <a href="/client/integrations" class="{{ 'active' if '/client/integrations' in request.url.path else '' }}">{{ nav_icon('gear') }}<span class="label">{{ t('nav_integrations') }}</span></a>
         <a href="/client/rewards" class="{{ 'active' if '/client/rewards' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">{{ t('nav_rewards') }}</span></a>
+        <a href="/client/resources" class="{{ 'active' if '/client/resources' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">{{ t('nav_resources') }}</span></a>
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">{{ t('nav_help') }}</span></a>
         <div class="sidebar-contact-row">
