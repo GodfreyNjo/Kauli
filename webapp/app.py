@@ -53,7 +53,7 @@ from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -6107,7 +6107,8 @@ def client_edit_transcript(request: Request, order_id: str, body: dict = Body(..
     if changed:
         _rewrite_caption_files(order, job)
         job.save(str(Path(order["outdir"]) / "manifest.json"))
-        db.set_order_ai_summary(order_id, "")               # the summary is written again from the corrected text
+        db.set_order_ai_summary(order_id, "")               # the summaries are written again, on request, from the corrected text
+        db.clear_order_summaries(order_id)
     return JSONResponse({"ok": True, "changed": changed}, headers={"Cache-Control": "no-store"})
 
 
@@ -6266,6 +6267,10 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "subs_ready": (outdir / f"subs_{order['target_lang']}.srt").exists(),
         "caption_looks": [{"key": k, "label": v, "state": _captioned_state(order, k)} for k, v in CAPTION_LOOKS.items()],
+        "summaries": [{"template_id": r["template_id"], "name": summary_templates.get(r["template_id"])["name"],
+                       "html": order_ai_assist.render_summary_html(r["body"]), "when": datetime.fromtimestamp(r["created_at"]).strftime("%b %d, %H:%M")}
+                      for r in db.list_order_summaries(order_id)],
+        "summary_catalog": summary_templates.catalog(),
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
@@ -6353,8 +6358,9 @@ def _transcript_text_for_order(job, order_level: dict) -> str:
 
 
 @app.post("/client/orders/{order_id}/ai-summary")
-def client_order_ai_summary(request: Request, order_id: str):
-    """Lazy-generated, cached forever after - see the ai_summary_text
+def client_order_ai_summary(request: Request, order_id: str, template: str = Form("")):
+    """Made only when the customer asks, in the template they chose, and kept: asking again for the same template shows the saved
+    one. (Older note: lazy-generated, cached forever after - see the ai_summary_text
     migration note in db.py and order_ai_assist.py's own module docstring
     for why this is a real Claude call grounded in the order's own
     transcript, not something pulled from Transkriptor (their API doesn't
@@ -6368,8 +6374,11 @@ def client_order_ai_summary(request: Request, order_id: str):
     if not _plan_chosen(user["client_scope_id"]):
         return JSONResponse({"ok": False, "error": "Choose a plan to use this - the Free plan is enough."},
                              status_code=403)
-    if order["ai_summary_text"]:
-        return JSONResponse({"ok": True, "summary": order["ai_summary_text"]})
+    chosen = summary_templates.get(template)
+    saved = next((r for r in db.list_order_summaries(order_id) if r["template_id"] == chosen["id"]), None)
+    if saved:
+        return JSONResponse({"ok": True, "summary": saved["body"], "html": order_ai_assist.render_summary_html(saved["body"]),
+                             "template": chosen["id"], "name": chosen["name"]})
     # Keyed on the account, not the order - a real result is cached forever
     # right below, so this only ever fires repeatedly on a *failing*
     # generation; without a limit that's an unbounded retry loop straight
@@ -6381,9 +6390,12 @@ def client_order_ai_summary(request: Request, order_id: str):
     job = _load_job(order)
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     text = _transcript_text_for_order(job, order_level)
-    result = order_ai_assist.generate_order_summary(text)
+    result = order_ai_assist.generate_templated_summary(text, chosen)
     if result["ok"]:
-        db.set_order_ai_summary(order_id, result["summary"])
+        db.save_order_summary(order_id, chosen["id"], result["summary"])
+        if not order["ai_summary_text"]:                    # integrations that include "the summary" use the first one made
+            db.set_order_ai_summary(order_id, order_ai_assist.plain_summary(result["summary"]))
+        result.update(html=order_ai_assist.render_summary_html(result["summary"]), template=chosen["id"], name=chosen["name"])
     return JSONResponse(result)
 
 

@@ -755,6 +755,12 @@ CREATE TABLE IF NOT EXISTS integration_requests (
     body TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+-- The AI summaries a customer chose to create for an order, one per template (webapp/summary_templates.py). Nothing is made
+-- automatically: each row exists because the customer pressed the button.
+CREATE TABLE IF NOT EXISTS order_summaries (
+    order_id TEXT NOT NULL, template_id TEXT NOT NULL, body TEXT NOT NULL, created_at REAL NOT NULL,
+    PRIMARY KEY (order_id, template_id)
+);
 -- One-click integrations (webapp/connections.py): the access a customer gave Kauli (stored encrypted) and their switches.
 CREATE TABLE IF NOT EXISTS integration_connections (
     client_id TEXT NOT NULL, provider TEXT NOT NULL, token_enc TEXT, refresh_enc TEXT, expires_at REAL, account_label TEXT,
@@ -2977,6 +2983,29 @@ def set_dub_voice(order_id: str, voice: str | None, job_status: str | None = Non
         "UPDATE orders SET dub_voice = ?, dub_voice_job_status = ?, updated_at = ? WHERE id = ?",
         (voice, job_status, time.time(), order_id),
     )
+    conn.commit()
+    conn.close()
+
+
+def save_order_summary(order_id: str, template_id: str, body: str) -> None:
+    conn = get_conn()
+    conn.execute("INSERT OR REPLACE INTO order_summaries (order_id, template_id, body, created_at) VALUES (?, ?, ?, ?)",
+                 (order_id, template_id, body, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def list_order_summaries(order_id: str):
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM order_summaries WHERE order_id = ? ORDER BY created_at DESC", (order_id,)).fetchall()
+    conn.close()
+    return rows
+
+
+def clear_order_summaries(order_id: str) -> None:
+    """The transcript changed, so every summary written from the old text is out of date."""
+    conn = get_conn()
+    conn.execute("DELETE FROM order_summaries WHERE order_id = ?", (order_id,))
     conn.commit()
     conn.close()
 

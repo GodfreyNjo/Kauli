@@ -55,6 +55,51 @@
         <p class="muted order-preview-hint">Tap any line of the transcript to jump to it.</p>
       </div>
       {% endif %}
+      <div class="order-workspace-extras">
+    <h2 class="ow-h">AI summary</h2>
+    <div id="ai-summary-content">
+      {% for sm in summaries %}
+      <details class="sm-item" open data-template="{{ sm.template_id }}">
+        <summary><strong>{{ sm.name }}</strong> <span class="muted">{{ sm.when }}</span></summary>
+        <div class="sm-body">{{ sm.html|safe }}</div>
+        <button type="button" class="secondary sm-copy">Copy</button>
+      </details>
+      {% endfor %}
+      <p class="muted" id="sm-empty"{% if summaries %} hidden{% endif %}>No summary yet. Choose a format and we write it from your transcript, only when you ask.</p>
+    </div>
+    <button type="button" class="secondary" id="sm-open">{{ 'Create another summary' if summaries else 'Create summary' }}</button>
+    <dialog id="sm-dialog" class="sm-dialog" aria-labelledby="sm-title">
+      <div class="sm-box">
+        <div class="sm-head">
+          <h2 id="sm-title">Choose a summary format</h2>
+          <button type="button" class="sm-x" id="sm-close" aria-label="Close">&times;</button>
+        </div>
+        <input type="search" id="sm-search" placeholder="Search templates" aria-label="Search templates">
+        <div class="sm-cols">
+          <div id="sm-cats" class="sm-cats" role="group" aria-label="Category"></div>
+          <div class="sm-main">
+            <p id="sm-status" class="muted" role="status" aria-live="polite"></p>
+            <div id="sm-grid" class="sm-grid"></div>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    {% if can_export_transcript %}
+    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
+      <button type="submit" class="secondary">Create AI notes</button>
+      <span class="muted">An editable note with the overview, key points and action items.</span>
+    </form>
+    {% endif %}
+
+    <h2 class="ow-h">Ask about this transcript</h2>
+    <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
+    <div id="ai-chat-log" class="ai-chat-log"></div>
+    <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
+      <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
+             maxlength="500" style="flex:1;" required>
+      <button type="submit" class="secondary">Ask</button>
+    </form>
+      </div>
     </div>
 
     <div class="order-workspace-transcript">
@@ -108,57 +153,81 @@
     </div>
   </div>
 
-  <h2 style="margin-top:24px;">AI summary</h2>
-  <div id="ai-summary-content">
-    {% if order['ai_summary_text'] %}
-    <p>{{ order['ai_summary_text'] }}</p>
-    {% else %}
-    <p class="muted" id="ai-summary-loading">Generating a summary from your reviewed transcript…</p>
-    {% endif %}
-  </div>
-  {% if can_export_transcript %}
-  <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
-    <button type="submit" class="secondary">Create AI notes</button>
-    <span class="muted">An editable note with the overview, key points and action items.</span>
-  </form>
-  {% endif %}
-
-  <h2 style="margin-top:24px;">Ask about this transcript</h2>
-  <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
-  <div id="ai-chat-log" class="ai-chat-log"></div>
-  <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
-    <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
-           maxlength="500" style="flex:1;" required>
-    <button type="submit" class="secondary">Ask</button>
-  </form>
 
 </div>
 <script>
   (function () {
     var orderId = {{ order['id']|tojson }};
 
-    // AI summary - render the cached value server-side if it's already
-    // there (see order['ai_summary_text'] above); only fire this request
-    // when the page rendered the "generating…" placeholder instead.
-    var loadingEl = document.getElementById("ai-summary-loading");
-    if (loadingEl) {
-      fetch("/client/orders/" + orderId + "/ai-summary", { method: "POST" })
+    // AI summary: nothing is written until the customer picks a format. Saved summaries are shown from the server; the picker
+    // lists every template with the sections it writes, and a click makes (or shows) that one.
+    var smCatalog = {{ summary_catalog|tojson }};
+    var smDlg = document.getElementById("sm-dialog"), smGrid = document.getElementById("sm-grid"), smCats = document.getElementById("sm-cats");
+    var smSearch = document.getElementById("sm-search"), smStatus = document.getElementById("sm-status"), smList = document.getElementById("ai-summary-content");
+    var smCat = "All", smBusy = false, smColors = ["#12b886", "#f0828e", "#8c8cf5", "#66c2c9", "#f6b26b", "#a8d672", "#12b886"];
+    function smHas(id) { return !!smList.querySelector('[data-template="' + id + '"]'); }
+    function smCopyButtons() {
+      [].forEach.call(smList.querySelectorAll(".sm-copy:not([data-bound])"), function (b) {
+        b.setAttribute("data-bound", "1");
+        b.addEventListener("click", function () {
+          var text = b.parentNode.querySelector(".sm-body").innerText;
+          if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500); });
+        });
+      });
+    }
+    smCopyButtons();
+    function smDraw() {
+      var q = (smSearch.value || "").trim().toLowerCase();
+      smCats.textContent = ""; smGrid.textContent = "";
+      ["All"].concat(smCatalog.categories.map(function (c) { return c.name; })).forEach(function (name) {
+        var b = document.createElement("button"); b.type = "button"; b.textContent = name; if (name === smCat) b.className = "is-on";
+        b.addEventListener("click", function () { smCat = name; smDraw(); });
+        smCats.appendChild(b);
+      });
+      var n = 0;
+      smCatalog.categories.forEach(function (cat) {
+        if (smCat !== "All" && smCat !== cat.name) return;
+        var items = cat.templates.filter(function (t) { return !q || (t.name + " " + t.sections.map(function (s) { return s.title; }).join(" ")).toLowerCase().indexOf(q) !== -1; });
+        if (!items.length) return;
+        var h = document.createElement("h3"); h.className = "sm-cat"; h.textContent = (cat.icon ? cat.icon + " " : "") + cat.name; smGrid.appendChild(h);
+        var row = document.createElement("div"); row.className = "sm-row";
+        items.forEach(function (t, i) {
+          var card = document.createElement("button"); card.type = "button"; card.className = "sm-card"; card.style.setProperty("--c", smColors[(n++) % smColors.length]);
+          var head = document.createElement("strong"); head.textContent = t.heading + ":";
+          var ol = document.createElement("ol");
+          t.sections.forEach(function (s) { var li = document.createElement("li"); var b = document.createElement("b"); b.textContent = s.title; li.appendChild(b); li.appendChild(document.createTextNode(" - " + s.hint)); ol.appendChild(li); });
+          var name = document.createElement("span"); name.className = "sm-name"; name.textContent = t.name + (smHas(t.id) ? "  \u2713" : "");
+          card.appendChild(head); card.appendChild(ol); card.appendChild(name);
+          card.addEventListener("click", function () { smPick(t); });
+          row.appendChild(card);
+        });
+        smGrid.appendChild(row);
+      });
+      if (!n) { var none = document.createElement("p"); none.className = "muted"; none.textContent = "No templates match."; smGrid.appendChild(none); }
+    }
+    function smPick(t) {
+      if (smBusy) return;
+      if (smHas(t.id)) { smDlg.close(); smList.querySelector('[data-template="' + t.id + '"]').scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+      smBusy = true; smGrid.classList.add("is-busy"); smStatus.textContent = "Writing your " + t.name + " summary from the transcript...";
+      var fd = new FormData(); fd.append("template", t.id);
+      fetch("/client/orders/" + orderId + "/ai-summary", { method: "POST", body: fd })
         .then(function (r) { return r.json(); })
         .then(function (data) {
-          var container = document.getElementById("ai-summary-content");
-          if (!container) return;
-          if (data.ok) {
-            container.innerHTML = "<p></p>";
-            container.querySelector("p").textContent = data.summary;
-          } else {
-            container.innerHTML = '<p class="muted"></p>';
-            container.querySelector("p").textContent = data.error || "Couldn't generate a summary right now.";
-          }
+          smBusy = false; smGrid.classList.remove("is-busy");
+          if (!data.ok) { smStatus.textContent = data.error || "Couldn't write the summary just now."; return; }
+          var d = document.createElement("details"); d.className = "sm-item"; d.open = true; d.setAttribute("data-template", data.template);
+          var sum = document.createElement("summary"); var strong = document.createElement("strong"); strong.textContent = data.name; sum.appendChild(strong); d.appendChild(sum);
+          var body = document.createElement("div"); body.className = "sm-body"; body.innerHTML = data.html; d.appendChild(body);   // the server escapes all text
+          var copy = document.createElement("button"); copy.type = "button"; copy.className = "secondary sm-copy"; copy.textContent = "Copy"; d.appendChild(copy);
+          smList.insertBefore(d, smList.firstChild); var empty = document.getElementById("sm-empty"); if (empty) empty.hidden = true;
+          smCopyButtons(); smStatus.textContent = ""; smDlg.close(); d.scrollIntoView({ behavior: "smooth", block: "center" });
+          document.getElementById("sm-open").textContent = "Create another summary";
         })
-        .catch(function () {
-          if (loadingEl) loadingEl.textContent = "Couldn't generate a summary right now.";
-        });
+        .catch(function () { smBusy = false; smGrid.classList.remove("is-busy"); smStatus.textContent = "Couldn't write the summary just now."; });
     }
+    document.getElementById("sm-open").addEventListener("click", function () { smStatus.textContent = ""; smDraw(); if (smDlg.showModal) smDlg.showModal(); else smDlg.setAttribute("open", ""); });
+    document.getElementById("sm-close").addEventListener("click", function () { smDlg.close(); });
+    smSearch.addEventListener("input", smDraw);
 
     // Ask-the-transcript - stateless per question, client-side-only log
     // (nothing persisted server-side, see the route's own docstring).
