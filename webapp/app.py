@@ -506,7 +506,7 @@ _CSP = (
     "https://calendly.com https://*.calendly.com https://*.r2.cloudflarestorage.com "
     "https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com "
     "https://accounts.google.com; "
-    "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com https://accounts.google.com; "
+    "frame-src https://calendly.com https://*.calendly.com https://www.youtube.com https://www.youtube-nocookie.com https://accounts.google.com; "
     "object-src 'none'; base-uri 'self'; frame-ancestors 'none'; "
     "form-action 'self' https://checkout.paystack.com"
 )

@@ -223,6 +223,50 @@
     <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>starting from $0 &middot; first {{ free_minutes|int }} minutes free</span></div>
   </section>
 
+  <section class="m-section" id="watch">
+    <div class="m-inner">
+      <span class="m-section-eyebrow m-eyebrow-lined">Watch</span>
+      <h2 class="m-h2">Type it? Never again.</h2>
+      <p class="m-lede">Seventy-eight seconds on how Kauli turns recordings into text, subtitles and dubs.</p>
+      <div class="promo-video" id="promo-video" data-video-id="i6R3flz8V1I">
+        <button type="button" class="promo-play" id="promo-play" aria-label="Play the Kauli promo video (78 seconds)">
+          <img src="/static/promo-thumbnail.jpg" alt="A woman holding her head in frustration beside the words Stop typing" width="1280" height="720" loading="lazy">
+          <span class="promo-play-icon" aria-hidden="true"></span>
+        </button>
+      </div>
+      <p class="promo-note">The video plays from YouTube when you press play.</p>
+    </div>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoObject",
+      "name": "Kauli: Turn Any Audio or Video into Text, Subtitles and Dubs",
+      "description": "Kauli turns audio and video into accurate transcripts in minutes, translates them into 70+ languages as subtitles or dubbed audio, and adds human review for up to 99% accuracy.",
+      "thumbnailUrl": "{{ site_origin() }}/static/promo-thumbnail.jpg",
+      "uploadDate": "2026-10-29",
+      "duration": "PT1M18S",
+      "embedUrl": "https://www.youtube.com/embed/i6R3flz8V1I",
+      "contentUrl": "https://youtu.be/i6R3flz8V1I"
+    }
+    </script>
+    <script>
+      (function () {
+        var box = document.getElementById("promo-video"), btn = document.getElementById("promo-play");
+        if (!box || !btn) return;
+        btn.addEventListener("click", function () {
+          // YouTube is only contacted now, because the visitor asked to watch.
+          var f = document.createElement("iframe");
+          f.src = "https://www.youtube-nocookie.com/embed/" + box.dataset.videoId + "?autoplay=1&rel=0&modestbranding=1";
+          f.title = "Kauli promo video";
+          f.allow = "autoplay; encrypted-media; picture-in-picture; fullscreen";
+          f.allowFullscreen = true;
+          box.replaceChildren(f);
+          if (window.kauliTrack) window.kauliTrack("promo_play", { placement: "home" });
+        });
+      })();
+    </script>
+  </section>
+
   <section class="m-section" id="services">
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Services</span>

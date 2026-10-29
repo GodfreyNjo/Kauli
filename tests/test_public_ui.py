@@ -109,7 +109,7 @@ def test_homepage_structure_follows_the_plan(client):
     assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+\+ Languages</h1>", html)
     assert "Nairobi sample" not in html                       # the old sample is gone (the Nairobi office is in the footer)
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
-    assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
+    assert ids[:6] == ["watch", "services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
     assert 'id="book"' not in html and 'href="/demo"' in html          # booking lives on /demo now
     for needed in ("how", "faq", "start"):
         assert needed in ids

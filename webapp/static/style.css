@@ -5385,3 +5385,15 @@ a.pager-num:hover, a.pager-step:hover { border-color: var(--brand-blue); backgro
 .ga-up { color: #2f9e6b; } .ga-down { color: #e0603a; }
 .ga-sub { margin: 28px 0 10px; font-size: 1.1rem; }
 @media (max-width: 640px) { .ga-table { font-size: 0.8rem; } .ga-table th, .ga-table td { padding: 6px 4px; } }
+
+/* The promo video on the home page: a picture with a play button; YouTube loads only after the click */
+.promo-video { position: relative; max-width: 960px; margin: 22px auto 0; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #0b1d38; box-shadow: 0 18px 48px rgba(8, 20, 45, 0.28); }
+.promo-video iframe, .promo-play, .promo-play img { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.promo-play { padding: 0; cursor: pointer; background: none; display: block; }
+.promo-play img { object-fit: cover; display: block; transition: transform 0.4s ease; }
+.promo-play:hover img, .promo-play:focus-visible img { transform: scale(1.03); }
+.promo-play:focus-visible { outline: 3px solid #7cc4f0; outline-offset: -3px; }
+.promo-play-icon { position: absolute; left: 50%; top: 50%; width: 92px; height: 92px; margin: -46px 0 0 -46px; border-radius: 50%; background: rgba(244, 122, 10, 0.95); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35); }
+.promo-play-icon::after { content: ""; position: absolute; left: 36px; top: 28px; border-style: solid; border-width: 18px 0 18px 30px; border-color: transparent transparent transparent #fff; }
+.promo-note { text-align: center; margin: 10px 0 0; font-size: 0.85rem; opacity: 0.7; }
+@media (max-width: 640px) { .promo-play-icon { width: 68px; height: 68px; margin: -34px 0 0 -34px; } .promo-play-icon::after { left: 27px; top: 20px; border-width: 14px 0 14px 23px; } }
