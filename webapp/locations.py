@@ -45,7 +45,7 @@ OFFICES = {
             ("Fast transcripts for meetings and interviews", "Instant AI turns recordings into text in minutes, with speakers and timestamps.", "/solutions/interview-transcription"),
             ("Subtitles and translation", "Captions for training videos, webinars and social video, and translation between 70+ languages.", "/solutions/captioning"),
             ("Dubbing", "The same video spoken in a new language. You get a draft in minutes, and human review is available in selected languages.", "/solutions/video-dubbing"),
-            ("Human review", "A real editor checks the work against your audio in selected languages. See which are available now.", "/human-review"),
+            ("Human review", "A dedicated editor checks the work against your audio in selected languages. See which are available now.", "/human-review"),
         ],
         "who": "Teams that record a lot: training and HR, marketing and communications, research and universities, podcasters, producers and agencies.",
         "faq": [

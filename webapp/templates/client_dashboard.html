@@ -125,12 +125,13 @@
   <div id="pricing-data" hidden
        data-discount="{{ plans[plan]['discount'] }}"
        data-free-minutes="{{ free_minutes_remaining }}"
+       data-human-minutes="{{ human_minutes_left(user) }}"
        data-allowance-translate="{{ 1 if allowance_translate(user) else 0 }}"
        data-wallet-credits="{{ wallet_credits }}"
        data-addon-rate="{{ addons['video_deliverables']['rate_per_min'] if 'video_deliverables' in addons else 0 }}"
        data-manual-transcription-rate="{{ addons['manual_transcription']['rate_per_min'] if 'manual_transcription' in addons else 0 }}"
        data-human-voice-rate="{{ addons['human_voice_over']['rate_per_min'] if 'human_voice_over' in addons else 0 }}"
-       data-premium-voice-rate="{{ addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0 }}"
+       data-premium-voice-rate="{{ 0 if (plan in addons['premium_voice']['included_in']) else (addons['premium_voice']['rate_per_min'] if 'premium_voice' in addons else 0) }}"
        data-audio-cleanup-rate="{{ addons['audio_cleanup']['rate_per_min'] if 'audio_cleanup' in addons else 0 }}"
        data-audio-cleanup-rate-ai="{{ audio_cleanup_ai_rate }}"
        data-premium-langs="{{ premium_voice_languages()|join(',') }}"
@@ -328,7 +329,7 @@
                 <label class="checkbox" id="premium-voice-toggle">
                   <input type="checkbox" name="addon_premium_voice" value="1" id="premium-voice-checkbox"
                          {% if form_values.get('addon_premium_voice') %}checked{% endif %}>
-                  <span><strong>Premium AI voice</strong> (+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/min). Natural, expressive voices for English or Swahili dubs. Only your translated script is processed, not your audio.</span>
+                  <span><strong>Premium AI voice</strong> ({% if plan in addons['premium_voice']['included_in'] %}included in your plan, applied automatically{% else %}+${{ "%.2f"|format(addons['premium_voice']['rate_per_min']) }}/min{% endif %}). Natural, expressive voices for English or Swahili dubs. Only your translated script is processed, not your audio.</span>
                 </label>
                 <label id="premium-voice-picker" hidden style="margin:0;">Voice
                   <select name="premium_voice_id" id="premium-voice-select" data-selected="{{ form_values.get('premium_voice_id', '') }}">

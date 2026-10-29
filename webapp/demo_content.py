@@ -145,6 +145,33 @@ LANGUAGES = {
     "sw": {"name": "Swahili", "native": "Kiswahili", "flag": "flag-ke"},
 }
 
+# The names above are what the data is written with; when the text is shown (or burned into a video) in another language the
+# labels are shown in that language too: "Speaker 1" becomes "Hablante 1", "Sprecher 1", "说话人 1", "Msemaji 1".
+SPEAKER_WORDS = {
+    "es": {"Speaker": "Hablante", "Instructor": "Instructora", "Anchor": "Presentador", "Field officer": "Oficial de campo", "Narrator": "Narrador"},
+    "de": {"Speaker": "Sprecher", "Instructor": "Dozentin", "Anchor": "Moderator", "Field officer": "Feldmitarbeiterin", "Narrator": "Erz\u00e4hler"},
+    "zh": {"Speaker": "\u8bf4\u8bdd\u4eba", "Instructor": "\u8bb2\u5e08", "Anchor": "\u4e3b\u64ad", "Field officer": "\u5916\u52e4\u4eba\u5458", "Narrator": "\u65c1\u767d"},
+    "sw": {"Speaker": "Msemaji", "Instructor": "Mwalimu", "Anchor": "Mtangazaji", "Field officer": "Afisa wa shambani", "Narrator": "Msimulizi"},
+}
+
+
+def label_in(name: str, lang: str | None) -> str:
+    """A speaker's label as it reads in `lang` (English, or an unknown language, keeps the original)."""
+    words = SPEAKER_WORDS.get(lang or "")
+    if not words:
+        return name
+    head, _, number = name.partition(" ")
+    if head == "Speaker" and number.isdigit():
+        return f"{words['Speaker']} {number}"
+    return words.get(name, name)
+
+
+def speaker_labels() -> dict:
+    """{language: {original label: label in that language}} for every name in every cast, for the page's script."""
+    names = {p["name"] for s in SCENARIOS.values() for p in s["cast"]}
+    return {lang: {n: label_in(n, lang) for n in sorted(names)} for lang in SPEAKER_WORDS}
+
+
 # Visitor country (Cloudflare's CF-IPCountry) -> the language they are most likely to want.
 COUNTRY_LANGUAGE = {
     **{c: "es" for c in ("ES", "MX", "AR", "CO", "CL", "PE", "VE", "EC", "GT", "CU", "BO", "DO", "HN", "PY", "SV", "NI",

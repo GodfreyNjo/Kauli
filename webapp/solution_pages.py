@@ -54,13 +54,13 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
     instant = {"name": "Instant AI", "best": "Drafts, internal use, anything you will review yourself.",
                "get": "Ready in minutes and machine-generated, and labelled that way. Transcription in 70+ languages, translation between them."}
     human = {"name": "Human-reviewed", "best": "Anything you will publish, air, submit or quote.",
-             "get": f"A real editor checks the work against your audio, and {QUALITY[0].lower()}{QUALITY[1:]}. Available in {hr_names}."}
+             "get": f"A dedicated editor checks the work against your audio, and {QUALITY[0].lower()}{QUALITY[1:]}. Available in {hr_names}."}
 
     pages = {
         # ------------------------------------------------------------------ translation
         "video-translation": {
             "title": "AI Video Translation and Subtitles, Human-Reviewed on Request",
-            "meta_description": "Translate videos and audio into 70+ languages in minutes with Instant AI, or add a real editor for up to 99% accuracy. Transcript, subtitles or a dub. Per-minute pricing.",
+            "meta_description": "Translate videos and audio into 70+ languages in minutes with Instant AI, or add a dedicated editor for up to 99% accuracy. Transcript, subtitles or a dub. Per-minute pricing.",
             "kicker": "Video and audio translation",
             "h1": "Translate your videos for every audience",
             "intro": "Upload a file or paste a link and get a translated transcript, subtitles or a dubbed track back. Instant AI "
@@ -72,7 +72,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "body": "Transcribe the speech and translate it in one order. Instant AI is machine translation and is labelled "
                          "as not reviewed by a person."},
                 {"title": "Human review for up to 99% accuracy",
-                 "body": f"On a Human-reviewed order a real editor checks every line against the source audio. Available in {hr_names}, with more languages coming soon."},
+                 "body": f"On a Human-reviewed order a dedicated editor checks every line against the source audio. Available in {hr_names}, with more languages coming soon."},
                 {"title": "Transcript, subtitles or a full dub",
                  "body": f"Pick the deliverable your video needs: a translated transcript to read, SRT or VTT subtitles to upload, or a dubbed track (dubbing is available in {dub_names})."},
                 {"title": "Minutes included on every paid plan",
@@ -96,7 +96,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "a": "Instant AI translates between more than 70 languages. The full list is on the languages page, and each language has a page of its own."},
                 {"q": "How accurate is the translation?",
                  "a": "Instant AI is machine translation, so it is fast and good for understanding, and it is labelled as not reviewed by a person. "
-                      f"{QUALITY} because a real editor checks the work against the audio."},
+                      f"{QUALITY} because a dedicated editor checks the work against the audio."},
                 {"q": "Which languages have human review?",
                  "a": f"Human review is available in {hr_names}, and more languages are coming soon. The human review page shows what is available now."},
                 {"q": "Can I get subtitles instead of a dub?",
@@ -162,7 +162,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "why_heading": "Built for dubs people will actually watch",
             "points": [
                 {"title": "A script you can trust",
-                 "body": f"Add human review and a real editor checks the transcript and translation against the audio first, for up to 99% accuracy. Available in {hr_names}."},
+                 "body": f"Add human review and a dedicated editor checks the transcript and translation against the audio first, for up to 99% accuracy. Available in {hr_names}."},
                 {"title": "Natural voices",
                  "body": f"Dubbing is available in {dub_names}, with more languages coming soon. Choose a premium AI voice for the most natural result, or a human voice actor as an add-on."},
                 {"title": "A dubbed video file, not just audio",
@@ -195,7 +195,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "a": f"Both are possible. Audio and subtitles are included on every plan, and a dubbed video with burned-in captions is included on Premium or ${video_rate:.2f}/minute on any plan."},
             ],
             "fit_guide": plans("Hearing what a dub sounds like.", "Dubbing a few videos a month.",
-                               "Finished dubbed video files every month.", "A catalogue to dub, with invoicing and a named contact."),
+                               "Finished dubbed video files every month.", "A catalogue to dub, with managed billing and invoicing and a dedicated account manager."),
         },
         # ------------------------------------------------------------------ voice over
         "voice-over": {
@@ -251,7 +251,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Transcribe, translate, caption, dub",
                  "body": "Choose what the video needs or combine the steps: a translated transcript, subtitles, or a fully dubbed track with captions."},
                 {"title": "Up to 99% accurate with human review",
-                 "body": f"A real editor checks each step against the source audio. Available in {hr_names}, with more languages coming soon."},
+                 "body": f"A dedicated editor checks each step against the source audio. Available in {hr_names}, with more languages coming soon."},
                 {"title": "70+ languages",
                  "body": f"Instant AI transcribes and translates 70+ languages. Dubbing is available in {dub_names}."},
                 pricing,
@@ -292,7 +292,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Minutes, not days",
                  "body": "Instant AI returns a draft as soon as processing finishes, in 70+ languages."},
                 {"title": "Up to 99% accurate with human review",
-                 "body": f"A real editor checks the draft against the audio. Available in {hr_names}."},
+                 "body": f"A dedicated editor checks the draft against the audio. Available in {hr_names}."},
                 {"title": "Clean read or verbatim",
                  "body": "Pick the style: a tidy read for publishing, or a verbatim record that keeps every false start."},
                 {"title": "Speakers, timestamps, exports",
@@ -383,7 +383,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Broadcast-ready files",
                  "body": f"SRT and VTT subtitles, burned-in captions and dubbed video files (included on Premium, or ${video_rate:.2f}/minute on any plan)."},
                 {"title": "Enterprise turnaround and invoicing",
-                 "body": "A dedicated faster tier, a named contact and invoicing for organizations with an ongoing relationship."},
+                 "body": "A dedicated faster tier, a dedicated account manager and managed billing and invoicing for organizations with an ongoing relationship."},
             ],
             "choose": [
                 {**instant, "name": "Instant AI for live news", "best": "Monitoring, logging and first-pass subtitles under a tight clock."},
@@ -465,7 +465,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Transcribe in the language spoken",
                  "body": "Instant AI transcribes 70+ languages, with a manual transcription option for languages no speech model covers yet."},
                 {"title": "Up to 99% accurate with human review",
-                 "body": f"A real editor checks the work against the audio. Available in {hr_names}, with more languages coming soon."},
+                 "body": f"A dedicated editor checks the work against the audio. Available in {hr_names}, with more languages coming soon."},
                 {"title": "Consent before any voice is cloned",
                  "body": "Dubbing in the speaker's own voice needs your confirmation of rights and consent. It is enforced on the server."},
                 {"title": "Budget-friendly and predictable",
@@ -513,7 +513,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Notes in seconds",
                  "body": "Make an overview, key points and action items from any call with AI notes, then check and edit them."},
                 {"title": "Up to 99% accurate where it matters",
-                 "body": f"Use Instant AI for coaching and trends, and add a real editor for complaints, disputes and evidence. Human review is available in {hr_names}."},
+                 "body": f"Use Instant AI for coaching and trends, and add a dedicated editor for complaints, disputes and evidence. Human review is available in {hr_names}."},
                 {"title": "Calls in other languages",
                  "body": "Transcribe and translate calls so a supervisor who does not speak the language can still review them."},
                 {"title": "Connects to the tools you use",

@@ -41,7 +41,7 @@
       if (label) {
         var b = document.createElement("b");
         b.className = "hd-spk";
-        b.textContent = label;
+        b.textContent = ((D.labels || {})[lang] || {})[label] || label;      // "Speaker 1" reads "Hablante 1" in Spanish and so on
         turn.appendChild(b);
         if (starts && starts[i] != null) {
           var ts = document.createElement("small");

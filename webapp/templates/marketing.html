@@ -128,7 +128,7 @@
               Ready in minutes. Transcription in {{ language_total }} languages and translation into
               {{ language_total - 1 }}. Clearly labelled as AI-generated, not reviewed by a person.</li>
             <li><strong>Human-reviewed</strong>
-              In selected languages (<a href="/human-review">see which</a>), with more coming soon. A real editor checks the work against the audio before it is
+              In selected languages (<a href="/human-review">see which</a>), with more coming soon. A dedicated editor checks the work against the audio before it is
               marked ready.</li>
             <li><strong>Transcripts, subtitles and dubbing</strong>
               Time-stamped transcripts, synchronised subtitles, and dubbed voice tracks. Download Word, TXT,
@@ -278,7 +278,7 @@
       <h2 class="m-h2">Built for work you put your name on</h2>
       <p class="m-lede">Fast when you want a draft, careful when it has to be right.</p>
       <div class="why-grid">
-        <div class="why-item"><h3>Human review when you need it</h3><p>Choose Human-reviewed and a real editor checks the result before delivery. Instant AI is clearly labelled as AI-generated.</p></div>
+        <div class="why-item"><h3>Human review when you need it</h3><p>Choose Human-reviewed and a dedicated editor checks the result before delivery. Instant AI is clearly labelled as AI-generated.</p></div>
         <div class="why-item"><h3>Transparent pricing</h3><p>Published per-minute rates, shown before you order. No hidden fees.</p></div>
         <div class="why-item"><h3>Consent-based voice cloning</h3><p>Where dubbing offers it, a voice is only cloned after the speaker's consent is confirmed.</p></div>
         <div class="why-item"><h3>Human review in selected languages</h3><p>Real editors, plus Instant AI transcription in {{ ai_only_languages|length + source_languages|length }} languages. <a href="/human-review">See the languages</a>.</p></div>
@@ -479,7 +479,7 @@
               <li>Ready in minutes</li>
               <li>Word, text and SRT downloads</li>
               <li>{{ language_total }} languages</li>
-              <li>Clearly labelled as machine-generated</li>
+              <li>Accurate AI transcription and translations</li>
             </ul>
             <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-ai">Try it free</a>
           </article>
@@ -488,7 +488,7 @@
             <p class="pz-price"><b id="pz-rate-human">$0.00</b><span>/ audio-minute</span></p>
             <p class="pz-est" id="pz-est-human"></p>
             <ul class="pz-list">
-              <li>A real editor checks it against your audio</li>
+              <li>A dedicated editor checks it against your audio</li>
               <li>Marked ready only after review</li>
               <li>Selected languages &middot; <a href="/human-review">see which</a></li>
               <li>Word, text and SRT downloads</li>
@@ -529,7 +529,9 @@
             <p class="pz-plan-for">For steady, smaller projects</p>
             <p class="pz-plan-price"><span class="pz-m"><b>${{ pro['price_usd'] }}</b><span>/ month</span></span></p>
             <ul class="pz-list">
+              <li><strong>All benefits in Free</strong> included</li>
               <li><strong>{{ '{:,}'.format(pro['included_ai_minutes']|int) }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
+              <li><strong>{{ pro['included_human_minutes']|int }} human-reviewed minutes</strong> included every month</li>
               <li>Anything beyond that is the standard per-minute price</li>
               <li>Downloads and delivery unlocked</li>
               {% if meetings_enabled() %}<li>Kauli can join your meetings</li>{% endif %}
@@ -543,11 +545,13 @@
             <p class="pz-plan-for">For premium work, small or in bulk</p>
             <p class="pz-plan-price"><span class="pz-m"><b>${{ prem['price_usd'] }}</b><span>/ month</span></span></p>
             <ul class="pz-list">
+              <li><strong>All benefits in Pro</strong> included</li>
               <li><strong>{{ '{:,}'.format(prem['included_ai_minutes']|int) }} Instant AI minutes{{ hours_suffix(prem['included_ai_minutes']) }}</strong> included every month, for both transcription and translation</li>
+              <li><strong>{{ prem['included_human_minutes']|int }} human-reviewed minutes</strong> included every month</li>
               <li>Anything beyond that is the standard per-minute price</li>
               <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
-              <li>Priority-quality translation and faster turnaround</li>
-              <li>Early access to new languages and voices as they launch</li>
+              <li>Faster turnaround</li>
+              <li>Realistic voices and high-quality translations, allocated to your orders automatically</li>
             </ul>
             <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-plan-premium">Choose {{ prem['name'] }}</a>
           </article>
@@ -556,10 +560,11 @@
             <p class="pz-plan-for">For heavy users and organisations</p>
             <p class="pz-plan-price"><b>Custom</b></p>
             <ul class="pz-list">
+              <li><strong>All benefits in Pro and Premium</strong> included</li>
               <li>A volume rate set for your usage</li>
-              <li>Invoicing and bank transfer</li>
+              <li>Managed billing and invoicing</li>
               <li>Higher limits and priority handling</li>
-              <li>A named contact at Kauli</li>
+              <li>Dedicated account manager</li>
             </ul>
             <a href="/demo?interest=enterprise" class="btn secondary" data-cta="pricing-plan-enterprise">Talk to us</a>
           </article>

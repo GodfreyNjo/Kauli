@@ -6031,3 +6031,49 @@ body.auth-page { background: #061a3f; }
 .hd.is-dub .hd-video { grid-template-columns: minmax(0, 1fr); max-width: 880px; margin-left: auto; margin-right: auto; }
 .hd.is-dub .hd-video-info { display: none; }
 @media (max-width: 1000px) { .hd.is-dub .hd-stage { grid-template-columns: minmax(0, 1fr); } }
+
+/* Sign-in fits the window (no scrolling to reach the button) and the card is lightly frosted so the photo shows through. */
+@media (min-width: 901px) {
+  body.auth-page { overflow: hidden; }
+  .auth-shell--welcome { height: 100vh; height: 100dvh; min-height: 0; }
+  .auth-shell--welcome .auth-form-panel { padding: clamp(12px, 2.4vh, 40px) clamp(20px, 3vw, 56px); overflow-y: auto; }
+  .auth-shell--welcome .auth-brand-panel.auth-welcome { padding-top: clamp(16px, 4vh, 40px); padding-bottom: clamp(16px, 4vh, 40px); }
+  .auth-shell--welcome .auth-welcome-logo { top: clamp(16px, 3.6vh, 32px); }
+  .auth-shell--welcome .auth-facts { gap: clamp(12px, 2.4vh, 22px); }
+  .auth-shell--welcome .auth-welcome-lede { margin-bottom: clamp(18px, 4.5vh, 40px); }
+  .auth-lang--top { top: clamp(14px, 3vh, 28px); }
+}
+.auth-shell--welcome .auth-form-inner {
+  background: rgba(255, 255, 255, 0.84);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25); backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  padding: clamp(16px, 3.2vh, 36px) clamp(22px, 3vw, 44px) clamp(14px, 2.6vh, 30px);
+  margin: auto 0;
+}
+.auth-shell--welcome .auth-brand { margin-bottom: clamp(6px, 1.8vh, 22px); }
+.auth-shell--welcome .auth-brand-logo { height: clamp(30px, 4.8vh, 42px); width: auto; }
+.auth-shell--welcome h1 { font-size: clamp(1.45rem, 3.3vh, 1.9rem); }
+.auth-shell--welcome .auth-sub { margin: 0 0 clamp(8px, 1.8vh, 20px); font-size: 0.93rem; }
+.auth-shell--welcome .error, .auth-shell--welcome .ok { margin: 0 0 clamp(8px, 1.6vh, 14px); padding: 9px 12px; font-size: 0.9rem; }
+.auth-shell--welcome .auth-google-btn { padding: clamp(9px, 1.7vh, 14px); margin-bottom: clamp(8px, 1.8vh, 18px); }
+.auth-shell--welcome .auth-divider { margin-bottom: clamp(8px, 1.8vh, 18px); }
+.auth-shell--welcome .auth-field { margin-bottom: clamp(8px, 1.7vh, 18px); }
+.auth-shell--welcome .auth-field-label { margin-bottom: 6px; }
+.auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: clamp(9px, 1.5vh, 14px); padding-bottom: clamp(9px, 1.5vh, 14px); }
+.auth-shell--welcome .auth-forgot { margin: -2px 0 clamp(8px, 1.8vh, 18px); }
+.auth-shell--welcome button[type="submit"] { padding: clamp(11px, 1.8vh, 15px); }
+.auth-shell--welcome .auth-switch { margin-top: clamp(8px, 1.8vh, 18px); }
+.auth-shell--welcome .auth-consent { margin-top: clamp(6px, 1.3vh, 16px); font-size: 0.78rem; line-height: 1.45; color: #4a5a72; }
+.auth-shell--welcome .auth-sub, .auth-shell--welcome .auth-switch { color: #3e4e66; }
+.auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"], .auth-shell--welcome .auth-google-btn { background: rgba(255, 255, 255, 0.78); }
+
+/* staff switchboard (Providers) */
+.pf-modes { display: grid; gap: 10px; margin: 8px 0 12px; }
+.pf-mode { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border: 1px solid rgba(150, 175, 220, 0.3); border-radius: 12px; cursor: pointer; }
+.pf-mode input { width: 18px; height: 18px; margin-top: 3px; flex: none; }
+.pf-mode > span { display: grid; gap: 3px; }
+.pf-mode small { color: var(--muted, #9aa8c4); font-weight: 400; line-height: 1.5; }
+.pf-mode.is-on { border-color: #3b95ff; background: rgba(59, 149, 255, 0.1); }
+.pf-cost { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+.pf-cost input[type="text"] { width: 96px; padding: 6px 8px; }
+.pf-tag.off { background: #3a1d22; color: #f4b1ac; }

@@ -348,6 +348,7 @@
     if (!data) return;
     const discount = Number(data.dataset.discount) || 0;
     const freeMinutes = Number(data.dataset.freeMinutes) || 0;
+    const humanMinutes = Number(data.dataset.humanMinutes) || 0;      // included human-reviewed minutes left this month
     const walletCredits = Number(data.dataset.walletCredits) || 0;
     const addonRate = Number(data.dataset.addonRate) || 0;
     const manualRate = Number(data.dataset.manualTranscriptionRate) || 0;
@@ -559,7 +560,10 @@
     // then the plan discount, THEN prepaid credits as real dollar value
     // against that discounted base (never against add-ons or rush - those
     // are priced on the full minute count/value, matching the server).
-    const freeApplied = freeMinutesEligible ? Math.min(fileDurationMinutes, Math.max(0, freeMinutes)) : 0;
+    // Human-reviewed transcription: the plan's included human minutes come off first (server: billing.human_allowance_covers).
+    const humanIncludedEligible = !!selected && !isAiTier && !isStudio && selected.value === "transcribe";
+    const freeApplied = freeMinutesEligible ? Math.min(fileDurationMinutes, Math.max(0, freeMinutes))
+      : (humanIncludedEligible ? Math.min(fileDurationMinutes, Math.max(0, humanMinutes)) : 0);
     const billableMinutes = Math.max(0, fileDurationMinutes - freeApplied);
     const gross = billableMinutes * rate;
     const discountAmount = gross * discount;
@@ -579,7 +583,7 @@
     const total = afterDiscount - creditsAppliedUsd + addonCost + manualCost + humanVoiceCost + premiumVoiceCost + cleanupCost + studioAsrCost + rushSurcharge;
 
     $("#price-free").textContent = freeApplied > 0 ? freeApplied.toFixed(1) + " min"
-      : (freeMinutesEligible ? "none applied" : "not eligible");
+      : ((freeMinutesEligible || (humanIncludedEligible && humanMinutes > 0)) ? "none applied" : "not eligible");
     $("#price-wallet-row").hidden = creditsAppliedUsd <= 0;
     if (creditsAppliedUsd > 0) {
       $("#price-wallet").textContent = Math.round(creditsAppliedUsd * CREDITS_PER_DOLLAR) + " credits (" + formatMoney(creditsAppliedUsd) + ")";

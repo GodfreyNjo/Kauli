@@ -39,6 +39,114 @@ NAMES = {
     "own": "Kauli's own transcription model", "madlad": "Kauli's own translation model", "azure": "Azure Speech", "piper": "Piper (our own server)", "elevenlabs": "ElevenLabs", "xtts": "XTTS", "mms": "MMS",
 }
 
+# The providers staff can switch on and off, by step. Each one that is off is passed over everywhere: new orders, automatic switching and
+# the failed-order switch. (ElevenLabs is not in the list: its premium voice and Studio tier are products customers pay for.)
+TOGGLEABLE = {
+    "asr": ["transkriptor", "groq-whisper", "assemblyai", "own"],
+    "mt": ["lara", "azure-translate", "madlad", "claude", "aws-translate"],
+    "tts": ["piper", "azure"],
+}
+STEP_TITLES = {"asr": "Turning speech into text", "mt": "Translating", "tts": "Voices for dubbing"}
+# What each provider costs us per audio-minute, in US dollars. Where the provider publishes a price it is filled in (an estimate: real bills depend
+# on your plan and on how many characters a minute of speech has); None means we do not know, and staff enter the real figure on the switchboard.
+COST_DEFAULTS = {
+    "transkriptor": None, "groq-whisper": 0.0019, "assemblyai": 0.0025, "own": 0.0, "faster-whisper": 0.0, "elevenlabs-scribe": 0.0037,
+    "lara": None, "azure-translate": 0.010, "claude": None, "aws-translate": 0.015, "madlad": 0.0, "local": 0.0,
+    "piper": 0.0, "azure": 0.016, "elevenlabs": 0.072,
+}
+MODES = {
+    "saver": ("Spend less", "The cheap providers go first for any order in the widely spoken languages, with Transkriptor behind them if they fail. "
+                            "Swahili and the other languages they are not good at still go to the providers built for them."),
+    "balanced": ("Balanced", "How it works today: Transkriptor for paying customers, the cheap providers for orders the free allowance covers."),
+    "quality": ("Best quality", "Transkriptor first for every order, free ones too. Highest quality, highest cost."),
+}
+
+
+def _settings() -> dict:
+    from . import db
+    try:
+        return db.get_provider_settings()
+    except Exception:  # noqa: BLE001 - a missing table must never take orders down
+        return {}
+
+
+def is_enabled(name: str) -> bool:
+    """False only when staff turned this provider off on the switchboard."""
+    row = _settings().get(name)
+    return True if row is None else bool(row["enabled"])
+
+
+def usable(name: str) -> bool:
+    """Connected on this server and not switched off by staff."""
+    return bool(configured(name)) and is_enabled(name)
+
+
+def blocked(name: str) -> bool:
+    """Set aside after a failure, or switched off: new orders do not go to it."""
+    return is_paused(name) or not is_enabled(name)
+
+
+def cost_per_min(name: str) -> float | None:
+    """Staff's figure if they entered one, else the published estimate, else None (not known)."""
+    row = _settings().get(name)
+    if row is not None and row["cost_per_min"] is not None:
+        return float(row["cost_per_min"])
+    return COST_DEFAULTS.get(name)
+
+
+def mode() -> str:
+    from . import db
+    try:
+        value = db.get_flag("provider_mode", "balanced")
+    except Exception:  # noqa: BLE001
+        value = "balanced"
+    return value if value in MODES else "balanced"
+
+
+def typical_route(level: str) -> dict:
+    """The provider each step of a service normally uses under the current mode, for the cost estimate."""
+    m = mode()
+    asr_order = {"saver": ["groq-whisper", "assemblyai", "own", "transkriptor"], "quality": ["transkriptor", "assemblyai", "groq-whisper", "own"]}.get(
+        m, ["transkriptor", "groq-whisper", "assemblyai", "own"])
+    route = {"asr": next((n for n in asr_order if usable(n)), "faster-whisper")}
+    if level in ("translate", "dub"):
+        route["mt"] = next((n for n in ["lara", "azure-translate", "madlad", "claude", "aws-translate"] if usable(n)), None)
+    if level == "dub":
+        route["tts"] = next((n for n in ["piper", "azure"] if usable(n)), None)
+    return route
+
+
+def cost_estimates() -> list[dict]:
+    """For each service: what one audio-minute of Instant AI costs us under the current setup, against what we charge for it."""
+    from . import billing
+    out = []
+    for level, price in billing.AI_PRICES.items():
+        route = typical_route(level)
+        costs = [cost_per_min(n) if n else 0.0 for n in route.values()]
+        known = all(c is not None for c in costs) and bool(route)
+        total = sum(c for c in costs if c is not None)
+        out.append({"level": level, "price": price, "route": [NAMES.get(n, n or "none") for n in route.values()],
+                    "cost": total if known else None, "known": known,
+                    "margin": ((price - total) / price * 100) if known and price else None})
+    return out
+
+
+def switchboard() -> list[dict]:
+    """Every provider staff can switch, grouped by step, with its state, cost and what is left where it can tell us."""
+    detail = {r["name"]: r for r in resources()}
+    steps = []
+    for kind, names in TOGGLEABLE.items():
+        rows = []
+        for name in names:
+            d = detail.get(name, {})
+            rows.append({"name": name, "label": NAMES.get(name, name), "connected": bool(configured(name)), "enabled": is_enabled(name),
+                         "paused": is_paused(name), "detail": d.get("detail", ""), "low": d.get("low", False),
+                         "cost": cost_per_min(name), "default_cost": COST_DEFAULTS.get(name),
+                         "custom_cost": (_settings().get(name) is not None and _settings()[name]["cost_per_min"] is not None)})
+        steps.append({"kind": kind, "title": STEP_TITLES[kind], "rows": rows})
+    return steps
+
+
 # order column each kind of provider is stored in
 COLUMN = {"asr": "asr", "mt": "mt", "tts": "tts"}
 
@@ -100,9 +208,9 @@ def configured(name: str) -> bool:
 
 
 def madlad_ok(source_lang: str, target_lang: str) -> bool:
-    """Our own translation model is installed and can be trusted with this language pair."""
+    """Our own translation model is installed, switched on and can be trusted with this language pair."""
     from kauli.providers.mt import MadladMT
-    return configured("madlad") and MadladMT.pair_ok(source_lang, target_lang)
+    return configured("madlad") and is_enabled("madlad") and MadladMT.pair_ok(source_lang, target_lang)
 
 
 def diagnose(order) -> dict | None:
@@ -137,7 +245,7 @@ def alternatives(order, kind: str) -> list[dict]:
 
     def add(name: str, fits: bool = True, note: str = ""):
         rows.append({"name": name, "label": NAMES.get(name, name), "current": name == current, "connected": configured(name),
-                     "fits": fits, "note": note})
+                     "fits": fits, "note": note, "off": not is_enabled(name)})
 
     if kind == "asr":
         add("transkriptor")
@@ -205,7 +313,7 @@ def auto_switch(order, error: str):
     options = {a["name"]: a for a in alternatives(order, d["kind"])}
     for name in AUTO_ORDER.get(d["kind"], []):
         a = options.get(name)
-        if a and not a["current"] and a["connected"] and a["fits"] and not is_paused(name):
+        if a and not a["current"] and a["connected"] and a["fits"] and not a["off"] and not is_paused(name):
             db.set_order_provider(order["id"], d["kind"], name)
             return d["kind"], d["provider"], name
     return None
@@ -283,6 +391,8 @@ def valid_switch(order, kind: str, name: str) -> str | None:
         return "That provider is not an option for this step."
     if not row["connected"]:
         return f"{row['label']} is not connected on this server."
+    if row.get("off"):
+        return f"{row['label']} is turned off on the Providers page. Turn it on there first."
     if not row["fits"]:
         return f"{row['label']} cannot take this language pair."
     return None

@@ -77,7 +77,7 @@ def test_with_lara_it_is_the_engine(monkeypatch, app_module):
     assert app_module._pick_mt("en", "sw", "local", "ai") == ("lara", None)
     # a priority plan's Claude upgrade on a human-reviewed order is kept
     assert app_module._pick_mt("sw", "en", "claude", "human") == ("claude", None)
-    # ...but an Instant AI order always uses Lara
+    # ...and an Instant AI order uses Lara, unless the plan includes Claude and Claude is connected (see test_plan_allocations.py)
     assert app_module._pick_mt("sw", "en", "claude", "ai") == ("lara", None)
     # Kikuyu: Claude if connected, otherwise Lara (ki-KE) - both then human-reviewed
     assert app_module._pick_mt("ki", "en", "local", "human") == ("lara", None)

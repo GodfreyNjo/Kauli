@@ -185,10 +185,24 @@ def hours_suffix(minutes: float) -> str:
     """" (about 108 hours)" after a big minute count, where hours are what people picture; nothing for small ones."""
     return f" (about {round(minutes / 60):,} hours)" if minutes >= 6000 else ""
 PRO_QUALITY_MINUTES, PREMIUM_QUALITY_MINUTES, ENTERPRISE_QUALITY_MINUTES = 150, 400, 1000
+# Human-reviewed transcription minutes included every month, on top of the Instant AI minutes (the way a subscription at Rev bundles some human
+# minutes): a person checks these without a per-minute charge, and anything beyond them is the normal human-review price per minute. They
+# are kept small on purpose: a person's time costs real money (HUMAN_REVIEW_COST_USD_PER_MIN), and tests/test_plans_v2.py fails if a plan with
+# every included minute used, AI and human, would lose money. Bigger numbers need a higher plan price.
+PRO_HUMAN_MINUTES, PREMIUM_HUMAN_MINUTES, ENTERPRISE_HUMAN_MINUTES = 5, 15, 60
+HUMAN_REVIEW_COST_USD_PER_MIN = 0.50      # assumed reviewer cost per audio-minute until the real figure is set: KAULI_HUMAN_REVIEW_COST_PER_MIN
+
+
+def human_review_cost_per_min() -> float:
+    try:
+        return float(os.environ.get("KAULI_HUMAN_REVIEW_COST_PER_MIN") or HUMAN_REVIEW_COST_USD_PER_MIN)
+    except ValueError:
+        return HUMAN_REVIEW_COST_USD_PER_MIN
 
 PLANS = {
     "free": {
         "name": "Free", "price_usd": 0, "price_usd_year": 0, "discount": 0.0, "included_ai_minutes": FREE_MINUTES_PER_MONTH,
+        "included_human_minutes": 0,
         "mt": "local", "video_deliverables": False, "support": "-",
         "blurb": f"Pay as you go. Your first {FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are "
                  "free each month; anything beyond that is billed per minute. Downloads unlock once you have "
@@ -200,13 +214,13 @@ PLANS = {
     # tests/test_plans_v2.py that fails if a change here would let a plan lose money.
     "pro": {
         "name": "Pro", "price_usd": 19, "price_usd_year": 149, "discount": 0.0, "included_ai_minutes": PRO_MINUTES,
-        "quality_minutes": PRO_QUALITY_MINUTES,
+        "included_human_minutes": PRO_HUMAN_MINUTES, "quality_minutes": PRO_QUALITY_MINUTES,
         "mt": "local", "video_deliverables": False, "support": "Email",
-        "blurb": f"{PRO_MINUTES:,} Instant AI minutes every month for transcription and translation, email support.",
+        "blurb": f"{PRO_MINUTES:,} Instant AI minutes every month for transcription and translation, {PRO_HUMAN_MINUTES} human-reviewed minutes, email support.",
     },
     "premium": {
         "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.0, "included_ai_minutes": PREMIUM_MINUTES,
-        "quality_minutes": PREMIUM_QUALITY_MINUTES,
+        "included_human_minutes": PREMIUM_HUMAN_MINUTES, "quality_minutes": PREMIUM_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
         "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes{hours_suffix(PREMIUM_MINUTES)} every month for transcription and translation, burned captions & dubbed video "
                  "included, priority-quality translation and turnaround.",
@@ -214,7 +228,7 @@ PLANS = {
     # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).
     "enterprise": {
         "name": "Enterprise", "price_usd": 199, "price_usd_year": 1990, "discount": 0.0, "included_ai_minutes": ENTERPRISE_MINUTES,
-        "quality_minutes": ENTERPRISE_QUALITY_MINUTES,
+        "included_human_minutes": ENTERPRISE_HUMAN_MINUTES, "quality_minutes": ENTERPRISE_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Dedicated account manager",
         "blurb": "Negotiated volume rate, dedicated account manager, bank transfer billing.",
     },
@@ -226,6 +240,29 @@ PLAN_YEAR_DAYS = 365
 def plan_included_minutes(plan: str) -> float:
     """Instant AI transcription minutes a plan includes every month (the free plan's is the trial allowance)."""
     return float(PLANS.get(plan, PLANS["free"]).get("included_ai_minutes", FREE_MINUTES_PER_MONTH))
+
+
+def plan_human_minutes(plan: str) -> float:
+    """Human-reviewed transcription minutes a plan includes every month (none on the free plan)."""
+    return float(PLANS.get(plan, PLANS["free"]).get("included_human_minutes", 0))
+
+
+def human_allowance_covers(plan: str, service_level: str, review_tier: str) -> bool:
+    """Whether a plan's included human-reviewed minutes pay for an order: human-reviewed transcription only (a translation or a dub is
+    a lot more reviewer work, so those are always priced on their own)."""
+    return review_tier == "human" and service_level == "transcribe" and plan_human_minutes(plan) > 0
+
+
+def human_minutes_remaining(subscription, plan: str | None = None) -> float:
+    """Included human-reviewed minutes left this month. Same period and the same reset as the Instant AI minutes."""
+    if subscription is None:
+        return 0.0
+    plan = plan or _plan_in_force(subscription)
+    try:
+        used = subscription["human_minutes_used_this_period"] or 0.0
+    except (KeyError, IndexError):
+        used = 0.0
+    return max(0.0, plan_human_minutes(plan) - used)
 
 
 def yearly_monthly_equivalent(plan: str) -> float:
@@ -294,7 +331,7 @@ ADDONS = {
     "premium_voice": {
         "name": "Premium AI voice (ElevenLabs)",
         "rate_per_min": 0.50,
-        "included_in": (),
+        "included_in": ("premium", "enterprise"),     # realistic voices come with the top plans, given automatically on a dub into English or Swahili
     },
     # Removes background noise and music from the recording BEFORE it is transcribed (ElevenLabs Voice
     # Isolator, $0.12 per audio-minute), which improves accuracy on field interviews and phone or WhatsApp

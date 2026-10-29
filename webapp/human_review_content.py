@@ -13,7 +13,7 @@ LANGUAGES = {
         "countries": ["US", "GB", "CA", "AU", "KE", "NG", "IN"],
         "regions": "the United States, the United Kingdom, Canada, Australia and everywhere English is a working language",
         "title": "Human-Reviewed English Transcription, Subtitles and Dubbing",
-        "description": "English transcripts and subtitles checked by a real editor against your audio. Accents, names, numbers and technical terms handled before you publish.",
+        "description": "English transcripts and subtitles checked by a dedicated editor against your audio. Accents, names, numbers and technical terms handled before you publish.",
         "headline": "English you can publish without a second read",
         "intro": "Instant AI is very good at clear English. Human review is for the moments it is not: strong accents, overlapping speakers, product names, numbers and specialist terms.",
         "context": "English audio is rarely one English. A Nairobi panel, a Lagos podcast and a Chicago webinar all sound different, and automatic transcripts stumble on all three in different places.",
@@ -29,7 +29,7 @@ LANGUAGES = {
         "title": "Swahili Dubbing, Translation, Subtitles and Human Review",
         "description": "Convert a Swahili video to English, or back: dubbing, translation, subtitles and captions for YouTube or any video. AI-drafted in minutes, checked by a human editor. Transparent per-minute pricing.",
         "headline": "Swahili and English dubbing, without the six-week turnaround",
-        "intro": "Kauli began with Swahili and Kikuyu, and it is still where our editors are strongest. Upload a video, choose the languages, and get a draft in minutes that a real editor checks line by line.",
+        "intro": "Kauli began with Swahili and Kikuyu, and it is still where our editors are strongest. Upload a video, choose the languages, and get a draft in minutes that a dedicated editor checks line by line.",
         "context": "Swahili changes between Nairobi, Dar es Salaam and the coast, and everyday speech mixes in English and Sheng. A tool that only knows textbook Swahili misses what your audience actually says.",
         "checks": ["Kenyan, Tanzanian and coastal usage", "Code-switching with English and Sheng", "Names, places and local institutions", "Time expressions, such as saa moja meaning seven o'clock"],
         "faq": [("Can you dub a Swahili video into English?", "Yes. Choose full dubbing, Swahili as the spoken language and English as the target. The translated English is spoken in a synthetic voice; your original Swahili is never re-voiced unless you ask for the reverse."),
@@ -124,7 +124,7 @@ ORDER = ["english", "swahili", "kikuyu", "chinese", "german", "spanish", "french
 BENEFITS = [
     ("Accuracy where it counts", "Names, numbers, dates and technical terms are exactly where machines slip. A reviewer checks them against your audio.", "check"),
     ("The right tone for your audience", "Formal or friendly, regional or neutral. A person decides, and follows what you ask for.", "voice"),
-    ("Someone is accountable", "A real editor signs the order off before it is marked ready. If something is wrong, you can ask for a revision.", "shield"),
+    ("Someone is accountable", "A dedicated editor signs the order off before it is marked ready. If something is wrong, you can ask for a revision.", "shield"),
     ("Publish with confidence", "Subtitles, transcripts and dubs you do not have to proofread again, for work that carries your name.", "play"),
 ]
 

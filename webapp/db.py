@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     status TEXT NOT NULL DEFAULT 'active',   -- 'active' | 'expired' | 'cancelled'
     current_period_end REAL,                 -- NULL for free (never expires)
     minutes_used_this_period REAL NOT NULL DEFAULT 0,
+    human_minutes_used_this_period REAL NOT NULL DEFAULT 0,   -- the plan's included human-reviewed minutes used this period
     period_started_at REAL,
     bonus_minutes REAL NOT NULL DEFAULT 0,   -- staff-granted trial extension, see grant_bonus_minutes
     bonus_note TEXT,                          -- who granted it and why - account-manager audit trail
@@ -478,6 +479,22 @@ CREATE TABLE IF NOT EXISTS payment_failures (
     extension_used INTEGER NOT NULL DEFAULT 0,
     resolved_at REAL,
     outcome TEXT                                -- 'paid' | 'downgraded' | 'paused'
+);
+
+-- The staff switchboard (see provider_health.py): which outside providers may be used, and what each really costs per audio-minute.
+-- No row means "on, default cost". app_flags holds the few global choices, such as the provider mode.
+CREATE TABLE IF NOT EXISTS provider_settings (
+    name TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    cost_per_min REAL,
+    updated_by TEXT,
+    updated_at REAL
+);
+CREATE TABLE IF NOT EXISTS app_flags (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_by TEXT,
+    updated_at REAL
 );
 
 -- What a customer says when they close their account (optional survey). Read by staff on /staff/exit-feedback.
@@ -1031,6 +1048,8 @@ def init_db() -> None:
         # One-time minutes earned from referrals. Unlike bonus_minutes (a standing monthly top-up) they are spent once and
         # roll over from month to month until used; get_subscription_current takes what was used out of them at each reset.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN reward_minutes REAL NOT NULL DEFAULT 0")
+    if "human_minutes_used_this_period" not in existing_sub_cols:
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN human_minutes_used_this_period REAL NOT NULL DEFAULT 0")
     if "grace_until" not in existing_sub_cols:
         # While a subscription payment is failing the plan stays open until here (see dunning.py), past the normal 3-day grace.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN grace_until REAL")
@@ -3659,7 +3678,7 @@ def get_subscription_current(user_id: str):
     row = conn.execute("SELECT * FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
     if row and row["period_started_at"] and time.time() - row["period_started_at"] > PERIOD_SECONDS:
         conn.execute(
-            "UPDATE subscriptions SET minutes_used_this_period = 0, period_started_at = ?, reward_minutes = ? "
+            "UPDATE subscriptions SET minutes_used_this_period = 0, human_minutes_used_this_period = 0, period_started_at = ?, reward_minutes = ? "
             "WHERE user_id = ?",
             (time.time(), _reward_after_period(row), user_id),
         )
@@ -3684,7 +3703,7 @@ def set_subscription_plan(user_id: str, plan: str, period_days: int | None) -> N
              plan = excluded.plan, status = 'active',
              current_period_end = excluded.current_period_end,
              period_started_at = excluded.period_started_at,
-             minutes_used_this_period = 0""",
+             minutes_used_this_period = 0, human_minutes_used_this_period = 0""",
         (user_id, plan, period_end, now),
     )
     if before is not None and (before["reward_minutes"] or 0) > 0:
@@ -3761,6 +3780,28 @@ def reserve_free_minutes(user_id: str, minutes_requested: float, cap: float) -> 
         # against the now-current value rather than granting on stale data.
     conn.close()
     return 0.0  # gave up after retries - safe default is to bill it, not free it
+
+
+def reserve_human_minutes(user_id: str, minutes_requested: float, cap: float) -> float:
+    """The plan's included human-reviewed minutes, reserved the same careful way as reserve_free_minutes (compare-and-swap, so two orders
+    placed at once cannot both be given the same minutes). Returns how many were granted."""
+    conn = get_conn()
+    for _ in range(5):
+        row = conn.execute("SELECT human_minutes_used_this_period FROM subscriptions WHERE user_id = ?", (user_id,)).fetchone()
+        used = (row["human_minutes_used_this_period"] or 0.0) if row else 0.0
+        grant = round(min(max(0.0, minutes_requested), max(0.0, cap - used)), 4)
+        if grant <= 0:
+            conn.close()
+            return 0.0
+        cur = conn.execute(
+            "UPDATE subscriptions SET human_minutes_used_this_period = human_minutes_used_this_period + ? "
+            "WHERE user_id = ? AND human_minutes_used_this_period = ?", (grant, user_id, used))
+        conn.commit()
+        if cur.rowcount == 1:
+            conn.close()
+            return grant
+    conn.close()
+    return 0.0  # gave up after retries: the safe default is to bill it, not give it away
 
 
 def wallet_credits_remaining(user_id: str) -> float:
@@ -5241,5 +5282,45 @@ def mark_payout_paid(payout_id: str, paid_by_user_id: str, reference: str | None
            WHERE id = ? AND status = 'owed'""",
         (time.time(), paid_by_user_id, (reference or "").strip() or None, payout_id),
     )
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------------------------------- provider switchboard
+def get_provider_settings() -> dict:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM provider_settings").fetchall()
+    conn.close()
+    return {r["name"]: r for r in rows}
+
+
+def set_provider_setting(name: str, enabled: bool | None = None, cost_per_min: float | None = None, clear_cost: bool = False,
+                         by: str | None = None) -> None:
+    """Change one provider's switch and/or its cost per audio-minute. Only what is passed changes."""
+    conn = get_conn()
+    conn.execute("INSERT OR IGNORE INTO provider_settings (name, enabled) VALUES (?, 1)", (name,))
+    if enabled is not None:
+        conn.execute("UPDATE provider_settings SET enabled = ? WHERE name = ?", (1 if enabled else 0, name))
+    if cost_per_min is not None:
+        conn.execute("UPDATE provider_settings SET cost_per_min = ? WHERE name = ?", (cost_per_min, name))
+    if clear_cost:
+        conn.execute("UPDATE provider_settings SET cost_per_min = NULL WHERE name = ?", (name,))
+    conn.execute("UPDATE provider_settings SET updated_by = ?, updated_at = ? WHERE name = ?", (by, time.time(), name))
+    conn.commit()
+    conn.close()
+
+
+def get_flag(key: str, default: str | None = None) -> str | None:
+    conn = get_conn()
+    row = conn.execute("SELECT value FROM app_flags WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+
+def set_flag(key: str, value: str, by: str | None = None) -> None:
+    conn = get_conn()
+    conn.execute("INSERT INTO app_flags (key, value, updated_by, updated_at) VALUES (?, ?, ?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at",
+                 (key, value, by, time.time()))
     conn.commit()
     conn.close()

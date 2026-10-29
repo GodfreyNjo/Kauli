@@ -124,7 +124,7 @@ def caption_pages(key: str, text: str, lang: str, marks: list, total: float) -> 
     turns = demo_content.turns(key, text)
     pages = []
     for (who, body), mark in zip(turns, marks):
-        label = cast[who]["name"] if len(cast) > 1 else ""
+        label = demo_content.label_in(cast[who]["name"], lang) if len(cast) > 1 else ""
         t0, t1 = float(mark[1]) + 0.05, float(mark[2]) + 0.1
         prefix = f"{label}: " if label else ""
         sentences = [s.strip() for s in __import__("re").findall(r"[^.!?。！？]+[.!?。！？]*", body) if s.strip()]
@@ -339,7 +339,7 @@ def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: st
     pages = caption_pages(key, text, caption_lang, marks, secs)
     bg = backdrop(key)
     bag = bag_image() if key == "video" else None
-    f_badge, f_tag, f_cap = font("en", 20, True), font("en", 20, True), font(caption_lang, 26, True)
+    f_badge, f_tag, f_cap = font("en", 20, True), font(caption_lang, 20, True), font(caption_lang, 26, True)
     spots = layout(key, len(cast))
     cache: dict[tuple, Image.Image] = {}
     badge = badge_text(key, lang)
@@ -396,7 +396,7 @@ def render(key: str, lang: str, audio: pathlib.Path, text: str, caption_lang: st
                 show_bag(frame, d, look, cx, cy, bag, t)
                 d = ImageDraw.Draw(frame)
             if len(cast) > 1 or key != "course":
-                name_tag(d, person["name"], cx, int(cy + 118 * k), speaking, f_tag)
+                name_tag(d, demo_content.label_in(person["name"], caption_lang), cx, int(cy + 118 * k), speaking, f_tag)
         bw = f_badge.getlength(badge) + 30
         d.rounded_rectangle((W - 28 - bw, 28, W - 28, 66), radius=19, fill=BLUE + (255,))
         d.text((W - 28 - bw + 15, 36), badge, font=f_badge, fill=(255, 255, 255))

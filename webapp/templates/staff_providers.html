@@ -2,12 +2,76 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Providers{% endblock %}
 {% block content %}
-<div class="hub">
+<div class="hub" lang="en">
   <div class="hub-top"><div>
     <h1>Providers</h1>
-    <p class="muted">The outside services Kauli relies on, whether each is connected on this server, and what it has left where it can tell us.</p>
+    <p class="muted">The outside services Kauli relies on. Spend less, keep the quality: pick how orders are routed, turn a provider off when it is not worth it, and keep its real cost up to date so the margin below is true. Changes apply to new orders straight away.</p>
   </div></div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+
   <section class="hub-card">
+    <h2>How orders are routed</h2>
+    <form method="post" action="/staff/providers/mode" class="pf-modes">
+      {% for key, m in modes.items() %}
+      <label class="pf-mode{% if key == mode %} is-on{% endif %}"><input type="radio" name="mode" value="{{ key }}"{% if key == mode %} checked{% endif %}>
+        <span><strong>{{ m[0] }}{% if key == 'balanced' %} <small>(default)</small>{% endif %}</strong><small>{{ m[1] }}</small></span></label>
+      {% endfor %}
+      <button type="submit">Save mode</button>
+    </form>
+    <p class="muted">Transcription is the step this changes. Translation always goes to Lara first, then the next connected provider; voices to our own free voice first. The customer's price never changes with the mode.</p>
+  </section>
+
+  <section class="hub-card">
+    <h2>What one audio-minute of Instant AI costs us</h2>
+    <table class="pf-table">
+      <thead><tr><th>Service</th><th>Providers in use</th><th>We charge</th><th>Our cost</th><th>Margin</th></tr></thead>
+      <tbody>
+        {% for e in estimates %}
+        <tr><td>{{ {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'}[e.level] }}</td>
+            <td>{{ e.route|join(' + ') }}</td><td class="num">${{ '%.2f'|format(e.price) }}</td>
+            <td class="num">{% if e.known %}${{ '%.4f'|format(e.cost) }}{% else %}<span class="pf-low">not known</span>{% endif %}</td>
+            <td class="num">{% if e.margin is not none %}{{ '%.0f'|format(e.margin) }}%{% else %}-{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted">"Not known" means a provider on that route has no cost entered yet. Fill in what the invoice works out to per audio-minute below. Figures marked "estimate" are public list prices, not your bill.</p>
+  </section>
+
+  {% for step in steps %}
+  <section class="hub-card">
+    <h2>{{ step.title }}</h2>
+    <div class="ds-scroll"><table class="pf-table">
+      <thead><tr><th>Provider</th><th>Status</th><th>Cost per audio-minute</th><th>What is left</th><th>Use it</th></tr></thead>
+      <tbody>
+      {% for r in step.rows %}
+      <tr>
+        <td>{{ r.label }}</td>
+        <td>{% if not r.enabled %}<span class="pf-tag off">Turned off</span>{% elif not r.connected %}<span class="pf-tag">Not connected</span>{% elif r.paused %}<span class="pf-tag pf-low">Set aside after a failure</span>{% else %}<span class="pf-tag ok">Ready</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/staff/providers/set" class="pf-cost">
+            <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="action" value="cost">
+            <span>$</span><input type="text" name="cost" inputmode="decimal" value="{% if r.custom_cost and r.cost is not none %}{{ '%g'|format(r.cost) }}{% endif %}" placeholder="{% if r.default_cost is not none %}{{ '%g'|format(r.default_cost) }}{% else %}not known{% endif %}" aria-label="Cost per audio-minute for {{ r.label }}">
+            <button type="submit" class="secondary">Save</button>
+          </form>
+          <small class="muted">{% if r.custom_cost %}your figure{% elif r.default_cost is not none %}estimate{% else %}enter yours{% endif %}</small>
+        </td>
+        <td class="{{ 'pf-low' if r.low else '' }}">{{ r.detail or '-' }}</td>
+        <td>
+          <form method="post" action="/staff/providers/set">
+            <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="action" value="{{ 'off' if r.enabled else 'on' }}">
+            <button type="submit" class="{{ 'secondary' if r.enabled else '' }}">{{ 'Turn off' if r.enabled else 'Turn on' }}</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endfor %}
+
+  <section class="hub-card">
+    <h2>Everything else we rely on</h2>
     <table class="pf-table">
       <thead><tr><th>Provider</th><th>Status</th><th>What is left</th></tr></thead>
       <tbody>
@@ -18,7 +82,7 @@
       {% endfor %}
       </tbody>
     </table>
-    <p class="muted">When an order fails on one of these, its page offers the others that can take it and a one-click switch. Quotas for Lara, Azure, Claude and Groq are only visible in their own dashboards.</p>
+    <p class="muted">When an order fails on a provider, its page offers the others that can take it and a one-click switch (providers turned off here are not offered). Quotas for Lara, Azure, Claude and Groq are only visible in their own dashboards.</p>
   </section>
 </div>
 {% endblock %}

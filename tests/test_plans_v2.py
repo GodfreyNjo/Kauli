@@ -58,6 +58,9 @@ def test_yearly_prices_save_real_money_and_never_lose_money():
         assert _worst_case(plan, GROQ_WORST) <= 0.6 * yearly_month, (plan, _worst_case(plan, GROQ_WORST), yearly_month)
         # and if Groq were down for the whole month and AssemblyAI served the rest, a monthly subscriber still pays for themselves
         assert _worst_case(plan, ASSEMBLYAI_WORST) < monthly, (plan, _worst_case(plan, ASSEMBLYAI_WORST), monthly)
+        human = p["included_human_minutes"] * billing.human_review_cost_per_min()
+        # the plan's included human-reviewed minutes are part of the same worst case: everything used, nothing lost
+        assert _worst_case(plan, GROQ_WORST) + human <= yearly_month and _worst_case(plan, ASSEMBLYAI_WORST) + human < monthly, plan
         assert billing.yearly_monthly_equivalent(plan) < p["price_usd"]
 
 
