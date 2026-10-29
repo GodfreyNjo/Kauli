@@ -44,4 +44,56 @@
     });
   });
 </script>
+<script>
+  // What visitors DO on a page, beyond the page view. Every call goes through kauliTrack, which sends nothing until analytics has been
+  // loaded after real cookie consent (gtag does not exist before then), so nobody who said no is measured. No personal data is sent:
+  // page paths, kinds of interaction and counts only.
+  window.kauliTrack = function (name, params) {
+    if (typeof window.gtag === 'function') window.gtag('event', name, params || {});
+  };
+  (function () {
+    var track = window.kauliTrack, page = location.pathname;
+
+    // How far down the page people read (25, 50, 75 and 100 percent), once each.
+    var marks = [25, 50, 75, 100], sent = {}, waiting = false;
+    function depth() {
+      waiting = false;
+      var h = document.documentElement, total = Math.max(h.scrollHeight, 1);
+      var pct = Math.round((window.scrollY + window.innerHeight) / total * 100);
+      marks.forEach(function (m) { if (pct >= m && !sent[m]) { sent[m] = 1; track('scroll_depth', { percent: m, page_path: page }); } });
+    }
+    window.addEventListener('scroll', function () { if (!waiting) { waiting = true; setTimeout(depth, 250); } }, { passive: true });
+
+    // The pricing section coming into view.
+    var pricing = document.getElementById('pricing');
+    if (pricing && 'IntersectionObserver' in window) {
+      var seen = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { track('view_pricing', { page_path: page }); seen.disconnect(); } });
+      }, { threshold: 0.4 });
+      seen.observe(pricing);
+    }
+
+    // Any video on the site: started, and watched to the end. Media events do not bubble, so listen in the capture phase.
+    function label(v) { return ((v.currentSrc || v.getAttribute('src') || '').split('/').pop() || 'video').slice(0, 60); }
+    document.addEventListener('play', function (e) { if (e.target && e.target.tagName === 'VIDEO') track('video_play', { video: label(e.target), page_path: page }); }, true);
+    document.addEventListener('ended', function (e) { if (e.target && e.target.tagName === 'VIDEO') track('video_complete', { video: label(e.target), page_path: page }); }, true);
+
+    // The first time someone touches a form (the contact and demo forms, the sign-up form): how many start versus how many finish.
+    var started = {};
+    document.addEventListener('focusin', function (e) {
+      var form = e.target && e.target.closest && e.target.closest('form');
+      if (!form) return;
+      var id = form.id || form.getAttribute('action') || 'form';
+      if (started[id]) return;
+      started[id] = 1;
+      track('form_start', { form: String(id).slice(0, 60), page_path: page });
+    });
+
+    // People who go for the email address instead of a button.
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest && e.target.closest('a[href^="mailto:"]');
+      if (a) track('contact_click', { method: 'email', page_path: page });
+    });
+  })();
+</script>
 <!-- End Google Analytics -->

@@ -108,3 +108,6 @@ jinja2>=3.1.0
 python-multipart>=0.0.9
 itsdangerous>=2.1.0          # required by Starlette's SessionMiddleware
 supabase>=2.0.0               # email/password auth - see webapp/supabase_auth.py
+
+# --- Google Analytics reporting (webapp/ga_reports.py): signs the service-account token request ---
+PyJWT[crypto]>=2.8.0

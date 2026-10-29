@@ -5370,3 +5370,18 @@ a.pager-num:hover, a.pager-step:hover { border-color: var(--brand-blue); backgro
 .svc-wide h3 { margin: 0 0 6px; }
 .svc-wide p { margin: 0; max-width: 62ch; }
 .svc-wide-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* Site analytics (staff) */
+.ga-steps { padding-left: 1.2em; display: grid; gap: 8px; }
+.ga-steps code, .hub code { background: rgba(148, 163, 184, 0.18); padding: 1px 6px; border-radius: 6px; font-size: 0.85em; }
+.ga-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.ga-table th { text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); }
+.ga-table td { padding: 8px; border-bottom: 1px solid var(--border-subtle); overflow-wrap: anywhere; }
+.ga-table td:not(:first-child), .ga-table th:not(:first-child) { text-align: right; white-space: nowrap; }
+.ga-insights { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.ga-insights li { display: grid; gap: 2px; padding: 10px 12px; border-radius: 10px; border-left: 4px solid #94a3b8; background: rgba(148, 163, 184, 0.1); }
+.ga-insights li span { color: var(--muted); font-size: 0.88rem; }
+.ga-insights .ga-bad { border-left-color: #e0603a; } .ga-insights .ga-warn { border-left-color: #f0b429; } .ga-insights .ga-good { border-left-color: #2f9e6b; }
+.ga-up { color: #2f9e6b; } .ga-down { color: #e0603a; }
+.ga-sub { margin: 28px 0 10px; font-size: 1.1rem; }
+@media (max-width: 640px) { .ga-table { font-size: 0.8rem; } .ga-table th, .ga-table td { padding: 6px 4px; } }

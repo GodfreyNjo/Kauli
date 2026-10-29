@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Site analytics{% endblock %}
+{% block content %}
+{% macro bars(rows, label_key, count_key, share_key='share') %}
+<ul class="an-bars">
+  {% for r in rows %}
+  <li><span class="an-bar-label">{{ r[label_key] }}</span><span class="an-bar"><i style="width: {{ '%.1f'|format(r[share_key]) }}%"></i></span><span class="an-bar-val">{{ '{:,.0f}'.format(r[count_key]) }}</span></li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+<div class="hub">
+  <div class="hub-top">
+    <div>
+      <h1>Site analytics</h1>
+      <p class="muted">How the website is doing: who comes, what they read, what they do, and what to change.{% if fetched %} Google numbers fetched {{ fetched }}.{% endif %}</p>
+    </div>
+    <nav class="hub-chips" aria-label="Time range">
+      {% for d in [7, 28, 90] %}<a href="/staff/analytics?days={{ d }}" class="{{ 'is-on' if days == d else '' }}">{{ d }} days</a>{% endfor %}
+      {% if configured %}<a href="/staff/analytics?days={{ days }}&amp;refresh=1">Refresh</a>{% endif %}
+    </nav>
+  </div>
+
+  {% if not configured %}
+  <section class="hub-card">
+    <h2>Connect Google Analytics to see visitors, sources and pages here</h2>
+    <p class="muted">The website already sends data to Google Analytics (property <strong>{{ measurement_id }}</strong>), after visitors accept the cookie banner. Reading it here takes a one-time setup of about ten minutes:</p>
+    <ol class="ga-steps">
+      <li>In Google Cloud (console.cloud.google.com) create a project, turn on the <strong>Google Analytics Data API</strong>, and create a <strong>service account</strong> with a JSON key.</li>
+      <li>In Google Analytics open <strong>Admin &gt; Property access management</strong> and add that service account's email as a <strong>Viewer</strong>.</li>
+      <li>Copy the numeric <strong>Property ID</strong> from <strong>Admin &gt; Property details</strong>.</li>
+      <li>On the server set <code>GA4_PROPERTY_ID</code> and either <code>GA4_SERVICE_ACCOUNT_FILE</code> (path to the key) or <code>GA4_SERVICE_ACCOUNT_JSON</code>, then restart.</li>
+    </ol>
+    <p class="muted">The full walk-through, plus what to switch on inside Google Analytics, is in <code>marketing/google-analytics-guide.md</code>. The numbers below from Kauli itself work already.</p>
+  </section>
+  {% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+
+  {% if ga %}
+  <div class="an-tiles">
+    {% for t in tiles %}
+    <div class="hub-card"><span class="muted">{{ t.label }}</span><strong>{{ t.value }}</strong>
+      {% if t.change is not none %}<small class="{{ 'ga-up' if t.change > 0 else 'ga-down' if t.change < 0 else 'muted' }}">{{ '+' if t.change > 0 else '' }}{{ t.change }}% vs the {{ days }} days before</small>{% else %}<small class="muted">no earlier data</small>{% endif %}</div>
+    {% endfor %}
+  </div>
+
+  <section class="hub-card" aria-labelledby="ga-ins">
+    <h2 id="ga-ins">What to look at</h2>
+    <ul class="ga-insights">
+      {% for i in insights %}<li class="ga-{{ i.level }}"><strong>{{ i.title }}</strong><span>{{ i.detail }}</span></li>{% endfor %}
+    </ul>
+  </section>
+
+  <section class="hub-card"><h2>Visitors each day</h2>{{ line|safe if line else '<p class="muted">No daily data yet.</p>'|safe }}</section>
+
+  <div class="an-grid-2">
+    <section class="hub-card"><h2>From visit to payment</h2>{{ bars(funnel, 'label', 'count') }}
+      <p class="muted an-note">Built from events the site and server send: start-button clicks, account creation, orders and payments. Percentages are of all visitors.</p></section>
+    <section class="hub-card"><h2>Where visitors come from</h2>
+      <table class="ga-table"><thead><tr><th>Channel</th><th>Visits</th><th>Engaged</th><th>Key events</th></tr></thead><tbody>
+        {% for r in ga.channels %}<tr><td>{{ r.sessionDefaultChannelGroup }}</td><td>{{ '{:,.0f}'.format(r.sessions) }}</td><td>{{ '%.0f'|format(r.engagementRate * 100) }}%</td><td>{{ '{:,.0f}'.format(r.keyEvents) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>Top sources</h2>
+      <table class="ga-table"><thead><tr><th>Source / medium</th><th>Visits</th><th>Engaged</th><th>Key events</th></tr></thead><tbody>
+        {% for r in ga.sources %}<tr><td>{{ r.sessionSourceMedium }}</td><td>{{ '{:,.0f}'.format(r.sessions) }}</td><td>{{ '%.0f'|format(r.engagementRate * 100) }}%</td><td>{{ '{:,.0f}'.format(r.keyEvents) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>Landing pages</h2>
+      <table class="ga-table"><thead><tr><th>Page</th><th>Visits</th><th>Engaged</th><th>Key events</th></tr></thead><tbody>
+        {% for r in ga.landing %}<tr><td>{{ r.landingPage }}</td><td>{{ '{:,.0f}'.format(r.sessions) }}</td><td>{{ '%.0f'|format(r.engagementRate * 100) }}%</td><td>{{ '{:,.0f}'.format(r.keyEvents) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>Most viewed pages</h2>
+      <table class="ga-table"><thead><tr><th>Page</th><th>Views</th><th>Visitors</th><th>Seconds each</th></tr></thead><tbody>
+        {% for r in ga.pages %}<tr><td>{{ r.pagePath }}</td><td>{{ '{:,.0f}'.format(r.screenPageViews) }}</td><td>{{ '{:,.0f}'.format(r.activeUsers) }}</td><td>{{ '%.0f'|format(r.userEngagementDuration / r.activeUsers if r.activeUsers else 0) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>Countries</h2>
+      <table class="ga-table"><thead><tr><th>Country</th><th>Visitors</th><th>Engaged</th><th>Key events</th></tr></thead><tbody>
+        {% for r in ga.countries %}<tr><td>{{ r.country }}</td><td>{{ '{:,.0f}'.format(r.activeUsers) }}</td><td>{{ '%.0f'|format(r.engagementRate * 100) }}%</td><td>{{ '{:,.0f}'.format(r.keyEvents) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>Devices</h2>
+      <table class="ga-table"><thead><tr><th>Device</th><th>Visits</th><th>Engaged</th><th>Key events</th></tr></thead><tbody>
+        {% for r in ga.devices %}<tr><td>{{ r.deviceCategory|capitalize }}</td><td>{{ '{:,.0f}'.format(r.sessions) }}</td><td>{{ '%.0f'|format(r.engagementRate * 100) }}%</td><td>{{ '{:,.0f}'.format(r.keyEvents) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+    <section class="hub-card"><h2>What people do (events)</h2>
+      <table class="ga-table"><thead><tr><th>Event</th><th>Times</th><th>People</th></tr></thead><tbody>
+        {% for r in ga.events[:25] %}<tr><td>{{ r.eventName }}</td><td>{{ '{:,.0f}'.format(r.eventCount) }}</td><td>{{ '{:,.0f}'.format(r.totalUsers) }}</td></tr>{% endfor %}
+      </tbody></table></section>
+  </div>
+  {% endif %}
+
+  <h2 class="ga-sub">Inside Kauli <span class="muted">(last {{ days }} days, from our own records)</span></h2>
+  <div class="an-tiles">
+    <div class="hub-card"><span class="muted">Orders placed</span><strong>{{ internal.orders }}</strong></div>
+    <div class="hub-card"><span class="muted">New customers ordering</span><strong>{{ internal.new_clients_ordering }}</strong></div>
+    <div class="hub-card"><span class="muted">Payments</span><strong>{{ internal.paid }}</strong><small class="muted">${{ '{:,.2f}'.format(internal.revenue) }}</small></div>
+    <div class="hub-card"><span class="muted">Contact requests</span><strong>{{ internal.leads }}</strong></div>
+    <div class="hub-card"><span class="muted">Blog readers</span><strong>{{ internal.blog_readers }}</strong><small class="muted">{{ internal.blog_views }} views</small></div>
+  </div>
+  <div class="an-grid-2">
+    {% if internal_line %}<section class="hub-card an-wide"><h2>Orders each day</h2>{{ internal_line|safe }}</section>{% endif %}
+    <section class="hub-card"><h2>Upload steps</h2>
+      {% if internal.wizard %}{{ bars(internal.wizard, 'label', 'count') }}<p class="muted an-note">How many customers reached each step of the upload form. A big drop shows where it is hard.</p>
+      {% else %}<p class="muted">No upload activity in this period.</p>{% endif %}</section>
+    <section class="hub-card"><h2>Top blog posts</h2>
+      {% if internal.posts %}<table class="ga-table"><thead><tr><th>Post</th><th>Views</th><th>Readers</th></tr></thead><tbody>
+        {% for r in internal.posts %}<tr><td><a href="/blog/{{ r.slug }}">{{ r.title }}</a></td><td>{{ r.n }}</td><td>{{ r.u }}</td></tr>{% endfor %}</tbody></table>
+      {% else %}<p class="muted">No blog reads in this period.</p>{% endif %}</section>
+    <section class="hub-card"><h2>Blog readers by country</h2>
+      {% if internal.countries %}<table class="ga-table"><tbody>{% for r in internal.countries %}<tr><td>{{ r.c }}</td><td>{{ r.n }}</td></tr>{% endfor %}</tbody></table>
+      {% else %}<p class="muted">No data.</p>{% endif %}</section>
+  </div>
+</div>
+{% endblock %}

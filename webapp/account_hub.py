@@ -20,7 +20,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import billing, db, mailer, order_ai_assist, rate_limit, transcript_export
+from . import billing, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
 
 router = APIRouter()
 A = None          # the app module, set by register()
@@ -248,6 +248,7 @@ def notes_new(request: Request):
                  (note_id, user["client_scope_id"], user["id"], "Untitled note", "", now, now))
     conn.commit()
     conn.close()
+    track_feature(request, "note_created", source="blank")
     return RedirectResponse(f"/client/notes?id={note_id}", status_code=303)
 
 
@@ -334,6 +335,7 @@ def notes_from_order(request: Request, order_id: str, kind: str = Query("ai", al
                  (note_id, user["client_scope_id"], user["id"], order_id, title, body, now, now))
     conn.commit()
     conn.close()
+    track_feature(request, "note_created", source="transcript" if kind == "transcript" else "ai")
     return RedirectResponse(f"/client/notes?id={note_id}", status_code=303)
 
 
@@ -533,6 +535,7 @@ def vocabulary_add(request: Request, entries: str = Form("")):
             conn.execute("UPDATE vocab_terms SET variants = ? WHERE client_id = ? AND term = ?", (variants, cid, term))
     conn.commit()
     conn.close()
+    track_feature(request, "vocabulary_added", count=added)
     note = f"Added {added}." if added else "Those are already in your list."
     if have + added >= MAX_VOCAB_TERMS:
         note += f" Your list is full ({MAX_VOCAB_TERMS} terms)."
@@ -628,6 +631,7 @@ def on_plan_paid(user_id: str, plan: str) -> None:
 
 @router.get("/r/{code}")
 def referral_landing(request: Request, code: str):
+    track_feature(request, "referral_visit")
     resp = RedirectResponse("/signup", status_code=303)
     if re.fullmatch(r"[a-z0-9]{4,16}", code.lower()):
         resp.set_cookie("kauli_ref", code.lower(), max_age=30 * 86400, httponly=True, samesite="lax", secure=request.url.scheme == "https")
@@ -778,6 +782,7 @@ def integrations_request(request: Request, body: str = Form(...)):
                      (uuid.uuid4().hex[:12], user["client_scope_id"], user["id"], text, time.time()))
         conn.commit()
         conn.close()
+        track_feature(request, "integration_request")
         db.notify_all_staff("integration_request", "Integration request: " + text[:60], "/staff/support")
     return RedirectResponse("/client/integrations?notice=" + quote("Thanks. We read every request." if text else "Write a few words first."), status_code=303)
 
@@ -793,6 +798,7 @@ def calendar_notify(request: Request, provider: str = Form(...)):
                      (user["client_scope_id"], provider, time.time()))
         conn.commit()
         conn.close()
+    track_feature(request, "calendar_interest", provider=provider)
     return RedirectResponse("/client/integrations?notice=" + quote("Noted. We will email you the day calendar connections open."), status_code=303)
 
 
@@ -963,6 +969,8 @@ async def assistant_message(request: Request):
     topic = str(body.get("topic") or "")
     reply, handoff = assistant_reply((topic + ": " if topic and not history else "") + text, history)
     _add_message(tid, "bot", reply)
+    if thread is None:
+        track_feature(request, "assistant_question")
     return JSONResponse({"thread_id": tid, "reply": reply, "handoff": handoff, "escalated": False})
 
 
@@ -982,6 +990,7 @@ async def assistant_escalate(request: Request):
     if note:
         _add_message(thread["id"], "user", note)
     if not thread["escalated"]:
+        track_feature(request, "assistant_escalated")
         conn = db.get_conn()
         conn.execute("UPDATE support_threads SET escalated = 1, status = 'open', updated_at = ? WHERE id = ?", (time.time(), thread["id"]))
         conn.commit()
@@ -1063,3 +1072,91 @@ def staff_support_reply(request: Request, thread_id: str, body: str = Form(...),
         conn.commit()
         conn.close()
     return RedirectResponse(f"/staff/support/{thread_id}", status_code=303)
+
+
+# ================================================================================================ SITE ANALYTICS (staff)
+def track_feature(request: Request, name: str, **params) -> None:
+    """A server-side GA4 event for something a customer did in the app (never raises, and sends nothing without their analytics cookie).
+    Only counts and kinds go in the parameters: no names, emails, file names or transcript text."""
+    try:
+        ga_events.send_event(ga_events.client_id_from_request(request), name, params)
+    except Exception:  # noqa: BLE001 - measuring must never break the feature being measured
+        pass
+
+
+def _q(conn, sql: str, args: tuple = ()):
+    try:
+        return conn.execute(sql, args).fetchall()
+    except Exception:  # noqa: BLE001 - a missing table on an old database must not take the page down
+        return []
+
+
+def internal_site_stats(days: int) -> dict:
+    """What Kauli itself knows, with no Google involved: the real orders, payments, upload steps and blog readers in the window."""
+    since = time.time() - days * 86400
+    conn = db.get_conn()
+    try:
+        orders = _q(conn, "SELECT date(created_at, 'unixepoch') AS d, COUNT(*) AS n FROM orders WHERE created_at >= ? GROUP BY d ORDER BY d", (since,))
+        first_orders = _q(conn, "SELECT COUNT(*) AS n FROM (SELECT client_id, MIN(created_at) AS m FROM orders GROUP BY client_id) WHERE m >= ?", (since,))
+        paid = _q(conn, "SELECT COUNT(*) AS n, COALESCE(SUM(amount_usd), 0) AS usd FROM payments WHERE status = 'completed' AND completed_at >= ?", (since,))
+        wizard = _q(conn, "SELECT step, COUNT(DISTINCT client_id) AS n FROM wizard_step_events WHERE created_at >= ? GROUP BY step", (since,))
+        leads = _q(conn, "SELECT COUNT(*) AS n FROM leads WHERE created_at >= ?", (since,))
+        views = _q(conn, "SELECT COUNT(*) AS n, COUNT(DISTINCT visitor_id) AS u FROM blog_views WHERE viewed_at >= ?", (since,))
+        posts = _q(conn, "SELECT p.title AS title, p.slug AS slug, COUNT(*) AS n, COUNT(DISTINCT v.visitor_id) AS u FROM blog_views v "
+                         "JOIN blog_posts p ON p.id = v.post_id WHERE v.viewed_at >= ? GROUP BY p.id ORDER BY n DESC LIMIT 8", (since,))
+        countries = _q(conn, "SELECT COALESCE(country, '?') AS c, COUNT(*) AS n FROM blog_views WHERE viewed_at >= ? GROUP BY c ORDER BY n DESC LIMIT 8", (since,))
+    finally:
+        conn.close()
+    order = ["1", "2", "3", "submitted"]
+    steps = {r["step"]: r["n"] for r in wizard}
+    first = max(steps.values(), default=0) or 1
+    return {"orders": sum(r["n"] for r in orders), "orders_by_day": [(r["d"], r["n"]) for r in orders],
+            "new_clients_ordering": first_orders[0]["n"] if first_orders else 0, "paid": paid[0]["n"] if paid else 0,
+            "revenue": paid[0]["usd"] if paid else 0.0, "leads": leads[0]["n"] if leads else 0,
+            "blog_views": views[0]["n"] if views else 0, "blog_readers": views[0]["u"] if views else 0,
+            "posts": [dict(r) for r in posts], "countries": [dict(r) for r in countries],
+            "wizard": [{"label": {"1": "Chose the file", "2": "Chose the service", "3": "Reached review", "submitted": "Submitted"}[k],
+                        "count": steps.get(k, 0), "share": 100.0 * steps.get(k, 0) / first} for k in order if k in steps]}
+
+
+def _fmt_day(raw: str) -> str:
+    months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    try:
+        return f"{months[int(raw[4:6]) - 1]} {int(raw[6:8])}"
+    except (ValueError, IndexError):
+        return raw
+
+
+@router.get("/staff/analytics", response_class=HTMLResponse)
+def site_analytics(request: Request, days: int = 28, refresh: int = 0):
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    days = days if days in (7, 28, 90) else 28
+    ga, error, tiles, line = None, None, [], ""
+    if ga_reports.configured():
+        try:
+            ga = ga_reports.overview(days, force=bool(refresh))
+        except ga_reports.GAError as exc:
+            error = str(exc)
+        except Exception as exc:  # noqa: BLE001
+            error = f"Could not read Google Analytics just now ({exc.__class__.__name__}). Try again in a minute."
+    if ga:
+        t, p = ga["totals"]["this"], ga["totals"]["previous"]
+
+        def tile(label, key, fmt):
+            now, before = t.get(key, 0.0), p.get(key, 0.0)
+            ch = ga_reports.pct_change(now, before)
+            return {"label": label, "value": fmt(now), "change": None if ch is None else round(ch)}
+        mmss = lambda s: f"{int(s // 60)}:{int(s % 60):02d}"      # noqa: E731
+        tiles = [tile("Visitors", "activeUsers", lambda v: f"{v:,.0f}"), tile("New visitors", "newUsers", lambda v: f"{v:,.0f}"),
+                 tile("Visits", "sessions", lambda v: f"{v:,.0f}"), tile("Engagement rate", "engagementRate", lambda v: f"{v * 100:.0f}%"),
+                 tile("Average visit", "averageSessionDuration", mmss), tile("Key events", "keyEvents", lambda v: f"{v:,.0f}")]
+        line = _line_chart([(_fmt_day(r["date"]), r["activeUsers"]) for r in ga["daily"]])
+    internal = internal_site_stats(days)
+    return A.templates.TemplateResponse(request, "staff_site_analytics.html", {
+        "user": user, "theme": "dark", "days": days, "configured": ga_reports.configured(), "error": error, "ga": ga, "tiles": tiles, "line": line,
+        "insights": ga_reports.insights(ga) if ga else [], "funnel": ga_reports.funnel(ga) if ga else [], "internal": internal,
+        "internal_line": _line_chart([(d[5:], n) for d, n in internal["orders_by_day"]]) if len(internal["orders_by_day"]) > 1 else "",
+        "property": ga_reports.property_id(), "measurement_id": ga_events.measurement_id(),
+        "fetched": datetime.fromtimestamp(ga["fetched_at"]).strftime("%b %d, %H:%M") if ga else None})

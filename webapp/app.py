@@ -8464,6 +8464,7 @@ def client_export_transcript(request: Request, order_id: str, format: str = "doc
         data, filename = _export_transcript(job, order, format.lower(), side, split, _flag(timestamps), _flag(speakers))
     except ValueError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
+    account_hub.track_feature(request, "transcript_download", format=format.lower(), side=side, split=split)
     return Response(content=data, media_type=EXPORT_FORMATS[format.lower()][0],
                     headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
 
@@ -8485,6 +8486,7 @@ async def client_share_transcript(request: Request, order_id: str):
     if not allowed:
         return JSONResponse({"error": f"Too many share requests. Try again in {retry_after}s."}, status_code=429)
     token = db.create_order_share(order_id, user["client_scope_id"])
+    account_hub.track_feature(request, "transcript_share", method=action)
     url = f"{_site_base(request)}/s/{token}"
     name = order["original_filename"] or "a transcript"
     if action == "email":

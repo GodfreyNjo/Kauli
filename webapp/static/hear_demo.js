@@ -166,9 +166,12 @@
 
   function pickedLine() { return ""; }          // the suggestion is shown as a "Recommended" badge, not as a sentence about the visitor
 
+  function track(name, params) { if (window.kauliTrack) window.kauliTrack(name, params); }
+
   function play(which) {
     if (state.playing === which) { stop(); return; }
     stop();
+    track("demo_play", { scenario: state.scenario, language: state.lang, direction: state.dir, clip: which });
     var src = clipFor(which);
     state.playing = which;
     audio.src = src;
@@ -202,10 +205,10 @@
   $("hd-play-in").addEventListener("click", function () { play("in"); });
   $("hd-play-out").addEventListener("click", function () { play("out"); });
   [].forEach.call(document.querySelectorAll('input[name="hd-scenario"]'), function (r) {
-    r.addEventListener("change", function () { state.scenario = r.value; render(); });
+    r.addEventListener("change", function () { state.scenario = r.value; track("demo_scenario", { scenario: r.value }); render(); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-lang"]'), function (r) {
-    r.addEventListener("change", function () { state.lang = r.value; render(); });
+    r.addEventListener("change", function () { state.lang = r.value; track("demo_language", { language: r.value }); render(); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-dir"]'), function (r) {
     r.addEventListener("change", function () { state.dir = r.value; render(); });
