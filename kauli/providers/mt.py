@@ -395,9 +395,77 @@ class AzureTranslateMT(MTProvider):
         }
 
 
+class MadladMT(MTProvider):
+    """Kauli's own translation engine: Google's MADLAD-400 (3B, Apache-2.0, so fine to sell with), converted to CTranslate2 int8 and run
+    on our own server. No API key, no per-character cost, no quota that can run out: this is what an order falls back to when a paid
+    translation service fails or is not connected, and what staff can switch a failed order to.
+
+    It covers every language Kauli sells (English, Swahili, Kikuyu, Spanish, French, German, Chinese) in both directions. It returns ONE
+    translation, like the other plain engines, so duration fitting has only the literal text to work with. Slower than a paid service
+    (a few seconds a sentence on 3 CPU threads) and about 3 GB of RAM while loaded, so the model is loaded once and kept.
+
+    The converted model folder is made by scripts/prepare_madlad.py and lives on the persistent volume:
+    webapp/data/models/madlad400-3b-mt-ct2 (or wherever KAULI_MADLAD_DIR points)."""
+    name = "madlad"
+    cost_per_char_usd = 0.0
+    _lock = None
+    _translator = None
+    _sp = None
+
+    @staticmethod
+    def model_dir():
+        from pathlib import Path
+        return Path(os.environ.get("KAULI_MADLAD_DIR") or Path(__file__).resolve().parents[2] / "webapp" / "data" / "models" / "madlad400-3b-mt-ct2")
+
+    @classmethod
+    def available(cls) -> bool:
+        """The converted model is on disk and the runtime can load it."""
+        d = cls.model_dir()
+        if not ((d / "model.bin").exists() and (d / "spiece.model").exists()):
+            return False
+        try:
+            import ctranslate2  # noqa: F401
+            import sentencepiece  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    @classmethod
+    def _load(cls):
+        import threading
+        if cls._lock is None:
+            cls._lock = threading.Lock()
+        with cls._lock:
+            if cls._translator is None:
+                import ctranslate2
+                import sentencepiece as spm
+                d = cls.model_dir()
+                cls._sp = spm.SentencePieceProcessor(model_file=str(d / "spiece.model"))
+                cls._translator = ctranslate2.Translator(str(d), device="cpu", compute_type="int8", inter_threads=1,
+                                                         intra_threads=int(os.environ.get("KAULI_MADLAD_THREADS", "3")))
+        return cls._translator, cls._sp
+
+    def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
+        text = (text or "").strip()
+        if not text:
+            return {"literal": "", "spoken": "", "shorter": None, "longer": None, "notes": "", "confidence": 0.0, "flags": ["unclear"]}
+        translator, sp = self._load()
+        tokens = sp.encode(f"<2{target_lang}> {text}", out_type=str) + ["</s>"]
+        with self._lock:                       # one sentence at a time: the model already uses every CPU thread it is given
+            result = translator.translate_batch([tokens], beam_size=4, max_decoding_length=max(64, min(512, len(tokens) * 3)),
+                                                no_repeat_ngram_size=4)
+        out = sp.decode(result[0].hypotheses[0]).strip()
+        return {
+            "literal": out, "spoken": out, "shorter": None, "longer": None,
+            "notes": "Kauli's own translation model (MADLAD-400): one translation, no length-targeted paraphrase.",
+            "confidence": 0.7 if out else 0.0,
+            "flags": [] if out else ["unclear"],
+        }
+
+
 _REGISTRY = {
     "stub": StubMT, "claude": ClaudeMT, "aws-translate": AwsTranslateMT,
-    "local": LocalMT, "lara": LaraMT, "azure-translate": AzureTranslateMT,
+    "local": LocalMT, "lara": LaraMT, "azure-translate": AzureTranslateMT, "madlad": MadladMT,
 }
 
 
@@ -453,7 +521,10 @@ class ResilientMT(MTProvider):
 # bidirectional and Kiswahili-capable independent of Claude being up (see
 # that class's own docstring) - not just "some other provider happened to
 # be available".
-MT_FALLBACK_CHAIN = {"claude": "azure-translate", "aws-translate": "azure-translate", "lara": "azure-translate"}
+# Each entry lists its fallbacks in order; the first one that is really connected is used. Kauli's own model comes last: slower than
+# Azure, but it can never run out of quota.
+MT_FALLBACK_CHAIN = {"claude": ["azure-translate", "madlad"], "aws-translate": ["azure-translate", "madlad"],
+                     "lara": ["azure-translate", "madlad"], "azure-translate": ["madlad"]}
 
 
 def _mt_fallback_configured(name: str) -> bool:
@@ -468,6 +539,8 @@ def _mt_fallback_configured(name: str) -> bool:
         return bool(os.environ.get("AWS_ACCESS_KEY_ID"))
     if name == "lara":
         return bool(os.environ.get("LARA_ACCESS_KEY_ID"))
+    if name == "madlad":
+        return MadladMT.available()
     return True
 
 
@@ -475,7 +548,7 @@ def get_mt(name: str, **kwargs) -> MTProvider:
     if name not in _REGISTRY:
         raise ValueError(f"Unknown MT provider '{name}'. Options: {list(_REGISTRY)}")
     primary = _REGISTRY[name](**kwargs)
-    fallback_name = MT_FALLBACK_CHAIN.get(name)
-    if fallback_name and fallback_name != name and _mt_fallback_configured(fallback_name):
+    fallback_name = next((f for f in MT_FALLBACK_CHAIN.get(name, []) if f != name and _mt_fallback_configured(f)), None)
+    if fallback_name:
         return ResilientMT(primary, _REGISTRY[fallback_name](), fallback_name)
     return primary

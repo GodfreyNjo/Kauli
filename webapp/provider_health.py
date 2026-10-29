@@ -16,6 +16,7 @@ STAGE_KIND = {"clean": "cleanup", "transcribe": "asr", "translate": "mt", "voice
 
 # Words in an error that point at a provider, most specific first.
 _SIGNATURES = (
+    ("madlad", ("madlad", "ctranslate2")),
     ("lara", ("api_translation_chars", "lara", "translated.com")),
     ("azure-translate", ("api.cognitive.microsofttranslator", "azure translator")),
     ("azure", ("speechsdk", "azure speech", "cognitiveservices.speech")),
@@ -34,7 +35,7 @@ NAMES = {
     "lara": "Lara Translate", "azure-translate": "Azure Translator", "claude": "Claude", "aws-translate": "AWS Translate",
     "local": "Local translation model", "stub": "None", "transkriptor": "Transkriptor", "faster-whisper": "Whisper (our own server)",
     "groq-whisper": "Groq Whisper", "assemblyai": "AssemblyAI", "elevenlabs-scribe": "ElevenLabs Scribe", "manual": "Typed by hand",
-    "azure": "Azure Speech", "piper": "Piper (our own server)", "elevenlabs": "ElevenLabs", "xtts": "XTTS", "mms": "MMS",
+    "madlad": "Kauli's own translation model", "azure": "Azure Speech", "piper": "Piper (our own server)", "elevenlabs": "ElevenLabs", "xtts": "XTTS", "mms": "MMS",
 }
 
 # order column each kind of provider is stored in
@@ -66,6 +67,12 @@ def configured(name: str) -> bool:
         return _env("ANTHROPIC_API_KEY")
     if name == "aws-translate":
         return _env("AWS_ACCESS_KEY_ID")
+    if name == "madlad":
+        try:
+            from kauli.providers.mt import MadladMT
+            return MadladMT.available()
+        except Exception:  # noqa: BLE001
+            return False
     if name == "transkriptor":
         return _env("TRANSKRIPTOR_API_KEY", "TRANSKRIPTOR_API_KEY_BACKUP", "TRANSKRIPTOR_API_KEY_BACKUP_2")
     if name == "groq-whisper":
@@ -94,13 +101,13 @@ def diagnose(order) -> dict | None:
     kind = STAGE_KIND.get(stage)
     named = next((name for name, words in _SIGNATURES if any(w in error.lower() for w in words)), None)
     if named and not kind:
-        kind = ("mt" if named in ("lara", "azure-translate", "claude", "aws-translate") else
+        kind = ("mt" if named in ("lara", "azure-translate", "claude", "aws-translate", "madlad") else
                 "tts" if named in ("azure", "piper", "elevenlabs") else "asr")
     if not kind:
         return {"kind": None, "stage": stage, "provider": named, "reason": _quota_reason(error), "error": error}
     column = COLUMN.get(kind)
     # a provider the order is set to use for this step is the likely culprit when the error does not name one
-    provider = named if named and (kind != "mt" or named in ("lara", "azure-translate", "claude", "aws-translate", "local")) else \
+    provider = named if named and (kind != "mt" or named in ("lara", "azure-translate", "claude", "aws-translate", "madlad", "local")) else \
         (order[column] if column else None)
     return {"kind": kind, "stage": stage, "provider": provider, "reason": _quota_reason(error), "error": error}
 
@@ -128,6 +135,7 @@ def alternatives(order, kind: str) -> list[dict]:
         add("claude")
         add("azure-translate")
         add("aws-translate")
+        add("madlad", note="Our own model, runs on our server: no quota, slower")
         add("local", fits=(src, tgt) == ("sw", "en"), note="Swahili to English only")
     elif kind == "tts":
         add("azure", fits=tgt in ("sw", "en"))
@@ -161,7 +169,7 @@ def elevenlabs_credits() -> dict | None:
 def resources() -> list[dict]:
     """One line per outside provider: connected or not, and what is left where the provider can tell us."""
     rows = []
-    for name in ("lara", "claude", "azure-translate", "aws-translate", "transkriptor", "groq-whisper", "assemblyai", "elevenlabs", "azure", "piper"):
+    for name in ("lara", "claude", "azure-translate", "aws-translate", "madlad", "transkriptor", "groq-whisper", "assemblyai", "elevenlabs", "azure", "piper"):
         row = {"name": name, "label": NAMES.get(name, name), "connected": configured(name), "detail": ""}
         if name == "transkriptor" and row["connected"]:
             keys = sum(1 for n in ("TRANSKRIPTOR_API_KEY", "TRANSKRIPTOR_API_KEY_BACKUP", "TRANSKRIPTOR_API_KEY_BACKUP_2") if os.environ.get(n))

@@ -1522,6 +1522,8 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str)
     if mt == "local" and not (source_lang == "sw" and target_lang == "en"):
         if os.environ.get("AZURE_TRANSLATOR_KEY"):
             return "azure-translate", None
+        if provider_health.configured("madlad"):
+            return "madlad", None
         return None, ("Translating that language pair needs our translation provider connected first, "
                       "which isn't done yet - contact us and we'll handle this one manually in the meantime.")
     return mt, None
