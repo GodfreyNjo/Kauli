@@ -99,6 +99,12 @@ def configured(name: str) -> bool:
     return name in ("faster-whisper", "local", "stub")
 
 
+def madlad_ok(source_lang: str, target_lang: str) -> bool:
+    """Our own translation model is installed and can be trusted with this language pair."""
+    from kauli.providers.mt import MadladMT
+    return configured("madlad") and MadladMT.pair_ok(source_lang, target_lang)
+
+
 def diagnose(order) -> dict | None:
     """What failed on this order: the step, the provider the error names (or the one the order was set to use for that step), why."""
     if order["status"] not in ("dead_letter", "failed"):
@@ -145,7 +151,8 @@ def alternatives(order, kind: str) -> list[dict]:
         add("claude")
         add("azure-translate")
         add("aws-translate")
-        add("madlad", note="Our own model, runs on our server: no quota, slower")
+        from kauli.providers.mt import MadladMT
+        add("madlad", fits=MadladMT.pair_ok(src, tgt), note="Our own model, no quota; slower, and not for English to Swahili or Kikuyu")
         add("local", fits=(src, tgt) == ("sw", "en"), note="Swahili to English only")
     elif kind == "tts":
         add("azure", fits=tgt in ("sw", "en"))

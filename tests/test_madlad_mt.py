@@ -1,5 +1,6 @@
 """Kauli's own translation model: how it is asked, when an order falls back to it, and that staff can switch a failed order to it."""
 import sys
+import pytest
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -93,3 +94,34 @@ def test_staff_can_switch_a_failed_order_to_our_own_model_once_it_is_installed(e
     assert provider_health.valid_switch(order, "mt", "madlad") is None
     assert any(o["name"] == "madlad" and o["connected"] for o in provider_health.alternatives(order, "mt"))
     assert provider_health.diagnose(env.db.get_order(order["id"]))["provider"] == "lara"
+
+
+# ------------------------------------------------------------------------------------------------ where it can be trusted
+def test_it_is_refused_where_testing_showed_it_is_wrong(monkeypatch):
+    for src, tgt, ok in (("sw", "en", True), ("en", "es", True), ("es", "en", True), ("de", "zh", True), ("en", "sw", False),
+                         ("es", "sw", False), ("ki", "en", False), ("en", "ki", False)):
+        assert mt.MadladMT.pair_ok(src, tgt) is ok, (src, tgt)
+    _fake_model(monkeypatch)
+    with pytest.raises(ValueError, match="not reliable for en to sw"):
+        mt.MadladMT().translate("Hello", 10, source_lang="en", target_lang="sw")
+    with pytest.raises(ValueError):
+        mt.MadladMT().translate("Wĩ mwega?", 10, source_lang="ki", target_lang="en")
+
+
+def test_swahili_to_english_is_flagged_low_so_a_person_checks_it(monkeypatch):
+    _fake_model(monkeypatch)
+    sw = mt.MadladMT().translate("Habari yako", 20, source_lang="sw", target_lang="en")
+    assert sw["confidence"] == 0.5 and "clock times" in sw["notes"]
+    es = mt.MadladMT().translate("Hola", 20, source_lang="es", target_lang="en")
+    assert es["confidence"] == 0.7 and "clock times" not in es["notes"]
+
+
+def test_the_order_picker_only_offers_it_for_pairs_it_can_be_trusted_with(env, monkeypatch):
+    for k in ("LARA_ACCESS_KEY_ID", "LARA_ACCESS_KEY_SECRET", "AZURE_TRANSLATOR_KEY", "ANTHROPIC_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(mt.MadladMT, "available", classmethod(lambda cls: True))
+    assert env.app._pick_mt("en", "es", "local", "ai") == ("madlad", None)
+    for src, tgt in (("en", "sw"), ("ki", "en")):
+        model, error = env.app._pick_mt(src, tgt, "local", "ai")
+        assert model is None and error, (src, tgt)
+    assert provider_health.madlad_ok("sw", "en") and not provider_health.madlad_ok("en", "sw")

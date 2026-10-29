@@ -417,6 +417,13 @@ class MadladMT(MTProvider):
         from pathlib import Path
         return Path(os.environ.get("KAULI_MADLAD_DIR") or Path(__file__).resolve().parents[2] / "webapp" / "data" / "models" / "madlad400-3b-mt-ct2")
 
+    @staticmethod
+    def pair_ok(source_lang: str, target_lang: str) -> bool:
+        """Where it can be trusted. Measured on real sentences: Swahili to English and the major languages in both directions are good
+        enough for a last-resort fallback. English to Swahili is not (wrong grammar, wrong words, and it turned Monday into Sunday),
+        and Kikuyu is wrong, so those pairs are refused rather than delivered badly."""
+        return target_lang not in ("sw", "ki") and source_lang != "ki"
+
     @classmethod
     def available(cls) -> bool:
         """The converted model is on disk and the runtime can load it."""
@@ -447,6 +454,8 @@ class MadladMT(MTProvider):
 
     def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
         text = (text or "").strip()
+        if not self.pair_ok(source_lang, target_lang):
+            raise ValueError(f"our own translation model is not reliable for {source_lang} to {target_lang}")
         if not text:
             return {"literal": "", "spoken": "", "shorter": None, "longer": None, "notes": "", "confidence": 0.0, "flags": ["unclear"]}
         translator, sp = self._load()
@@ -457,8 +466,10 @@ class MadladMT(MTProvider):
         out = sp.decode(result[0].hypotheses[0]).strip()
         return {
             "literal": out, "spoken": out, "shorter": None, "longer": None,
-            "notes": "Kauli's own translation model (MADLAD-400): one translation, no length-targeted paraphrase.",
-            "confidence": 0.7 if out else 0.0,
+            "notes": "Kauli's own translation model (MADLAD-400): one translation, no length-targeted paraphrase."
+                     + (" Swahili clock times (saa kumi na moja = 5 pm) and loan words need a human check." if source_lang == "sw" else ""),
+            # Swahili is the weaker direction (clock times and mixed-in English words went wrong in testing): low enough to be flagged for review
+            "confidence": (0.5 if source_lang == "sw" else 0.7) if out else 0.0,
             "flags": [] if out else ["unclear"],
         }
 
