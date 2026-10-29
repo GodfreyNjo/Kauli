@@ -1,7 +1,7 @@
 # Google Analytics for Kauli: set it up once, read it every week
 
 **What is already in place**
-- The site sends data to Google Analytics 4 (property 499248248, measurement id **G-F77NCL15P8**) from all public pages, **only after the visitor accepts the cookie banner**.
+- The site sends data to Google Analytics 4 (web stream "Kauli Marketing Site", measurement id **G-29L6CFPNEB**) from all public pages, **only after the visitor accepts the cookie banner**.
 - Server-side events are sent for people who accepted analytics: `sign_up`, `login`, `generate_lead`, `order_submitted`, `purchase`.
 - **New in this release** (also only after consent):
   - Visitor events: `scroll_depth` (25/50/75/100%), `view_pricing`, `video_play`, `video_complete`, `form_start`, `contact_click` (email clicks), `cta_click` (with the button's `cta_location`), and for the interactive demo `demo_play`, `demo_scenario`, `demo_language`.
