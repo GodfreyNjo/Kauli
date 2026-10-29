@@ -6,6 +6,7 @@ are connected and able to take this order's languages, and a one-click switch th
 from __future__ import annotations
 
 import os
+import re
 import time
 from pathlib import Path
 
@@ -96,20 +97,22 @@ def diagnose(order) -> dict | None:
     """What failed on this order: the step, the provider the error names (or the one the order was set to use for that step), why."""
     if order["status"] not in ("dead_letter", "failed"):
         return None
-    error = order["error"] or ""
-    stage = order["processing_stage"] or ""
+    return diagnose_error(order, order["error"] or "", order["processing_stage"] or "")
+
+
+def diagnose_error(order, error: str, stage: str = "") -> dict:
     kind = STAGE_KIND.get(stage)
     named = next((name for name, words in _SIGNATURES if any(w in error.lower() for w in words)), None)
     if named and not kind:
         kind = ("mt" if named in ("lara", "azure-translate", "claude", "aws-translate", "madlad") else
                 "tts" if named in ("azure", "piper", "elevenlabs") else "asr")
     if not kind:
-        return {"kind": None, "stage": stage, "provider": named, "reason": _quota_reason(error), "error": error}
+        return {"kind": None, "stage": stage, "provider": named, "named": bool(named), "reason": _quota_reason(error), "error": error}
     column = COLUMN.get(kind)
     # a provider the order is set to use for this step is the likely culprit when the error does not name one
     provider = named if named and (kind != "mt" or named in ("lara", "azure-translate", "claude", "aws-translate", "madlad", "local")) else \
         (order[column] if column else None)
-    return {"kind": kind, "stage": stage, "provider": provider, "reason": _quota_reason(error), "error": error}
+    return {"kind": kind, "stage": stage, "provider": provider, "named": bool(named), "reason": _quota_reason(error), "error": error}
 
 
 def alternatives(order, kind: str) -> list[dict]:
@@ -145,6 +148,66 @@ def alternatives(order, kind: str) -> list[dict]:
     return [r for r in rows if r["name"] != "stub"]
 
 
+# ------------------------------------------------------------------------------------------------ automatic switching
+# When a provider fails it is set aside for a while, so new orders go straight to the next one instead of failing first, and an order that
+# fails on it is moved to the next connected provider that can take its languages and retried. Cheapest and most reliable first; our own
+# model before the paid AI, the placeholder local model last.
+AUTO_ORDER = {"asr": ["transkriptor", "groq-whisper", "assemblyai", "faster-whisper"],
+              "mt": ["lara", "azure-translate", "madlad", "claude", "aws-translate", "local"],
+              "tts": ["piper", "azure"]}
+PAUSE_SECONDS = {"out of quota or rate-limited": 30 * 60, "key rejected or not allowed": 30 * 60, "unreachable or timing out": 5 * 60}
+_paused: dict[str, float] = {}
+
+
+def mark_failed(name: str, error: str) -> None:
+    """Set a provider aside after a failure that is plainly its own (quota, rejected key, outage)."""
+    seconds = PAUSE_SECONDS.get(_quota_reason(error) or "")
+    if name and seconds:
+        _paused[name] = time.time() + seconds
+
+
+def is_paused(name: str) -> bool:
+    until = _paused.get(name)
+    if until and until > time.time():
+        return True
+    _paused.pop(name, None)
+    return False
+
+
+def paused_for(name: str) -> int:
+    return max(int(_paused.get(name, 0) - time.time()), 0)
+
+
+def auto_switch(order, error: str):
+    """After a failed attempt: if the error is a provider's own (it names one, or says quota/key/outage), pause that provider and point the
+    order at the next one. Returns (step, failed provider, new provider), or None when there is nothing sensible to switch to."""
+    from . import db
+    d = diagnose_error(order, error, order["processing_stage"] or "")
+    if not d["kind"] or d["kind"] not in COLUMN or not d["provider"] or not (d["named"] or d["reason"]):
+        return None
+    mark_failed(d["provider"], error)
+    if order[COLUMN[d["kind"]]] != d["provider"]:
+        return None
+    options = {a["name"]: a for a in alternatives(order, d["kind"])}
+    for name in AUTO_ORDER.get(d["kind"], []):
+        a = options.get(name)
+        if a and not a["current"] and a["connected"] and a["fits"] and not is_paused(name):
+            db.set_order_provider(order["id"], d["kind"], name)
+            return d["kind"], d["provider"], name
+    return None
+
+
+_FALLBACK_NOTE = re.compile(r"^([\w-]+) failed \((.*)\) - used ", re.S)
+
+
+def note_job_fallbacks(job) -> None:
+    """A run that finished by falling back inside itself (Lara down, Azure used) still tells us the first provider failed: pause it too."""
+    for text in getattr(job, "warnings", None) or []:
+        m = _FALLBACK_NOTE.match(str(text))
+        if m:
+            mark_failed(m.group(1), m.group(2))
+
+
 _credit_cache: dict = {"at": 0.0, "value": None}
 
 
@@ -171,6 +234,9 @@ def resources() -> list[dict]:
     rows = []
     for name in ("lara", "claude", "azure-translate", "aws-translate", "madlad", "transkriptor", "groq-whisper", "assemblyai", "elevenlabs", "azure", "piper"):
         row = {"name": name, "label": NAMES.get(name, name), "connected": configured(name), "detail": ""}
+        if is_paused(name):
+            row["detail"] = f"set aside for {paused_for(name) // 60 + 1} more minutes after a failure; orders use the next provider"
+            row["low"] = True
         if name == "transkriptor" and row["connected"]:
             keys = sum(1 for n in ("TRANSKRIPTOR_API_KEY", "TRANSKRIPTOR_API_KEY_BACKUP", "TRANSKRIPTOR_API_KEY_BACKUP_2") if os.environ.get(n))
             row["detail"] = f"{keys} key{'s' if keys != 1 else ''} (a backup key is used when one runs out)"

@@ -111,9 +111,12 @@ class AzureTTS(TTSProvider):
     Verify current pricing and the free-tier allowance before you rely on it."""
     name = "azure"
     sample_rate = 24000
+    # the voice and locale it speaks in, by the language of the dub (Swahili is what it was built for; English is the fallback for Piper)
+    LANGUAGES = {"sw": ("sw-KE", "sw-KE-ZuriNeural"), "en": ("en-US", "en-US-JennyNeural")}
 
-    def __init__(self, default_voice: str = "sw-KE-ZuriNeural"):
-        self.default_voice = default_voice
+    def __init__(self, default_voice: str | None = None, language: str = "sw"):
+        self.locale, voice = self.LANGUAGES.get(language, self.LANGUAGES["sw"])
+        self.default_voice = default_voice or voice
 
     def synthesize(self, text: str, out_path: str, voice_id=None, rate: float = 1.0) -> int:
         import azure.cognitiveservices.speech as speechsdk
@@ -124,7 +127,7 @@ class AzureTTS(TTSProvider):
         voice = voice_id or self.default_voice
         pct = int(round((rate - 1.0) * 100))
         ssml = (f'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" '
-                f'xml:lang="sw-KE"><voice name="{voice}">'
+                f'xml:lang="{self.locale}"><voice name="{voice}">'
                 f'<prosody rate="{pct:+d}%">{text}</prosody></voice></speak>')
         out = speechsdk.audio.AudioOutputConfig(filename=out_path)
         synth = speechsdk.SpeechSynthesizer(speech_config=cfg, audio_config=out)
@@ -427,10 +430,14 @@ class ResilientTTS(TTSProvider):
         return self.fallback.synthesize(text, out_path, voice_id=None, rate=rate)
 
 
-TTS_FALLBACK_CHAIN = {"azure": "piper"}
+# Voices, cheapest first: our own Piper voice (free) where it speaks the language, Azure next, ElevenLabs only for orders sold with a
+# premium realistic voice. So an English dub that cannot use Piper moves to Azure, and Azure moves back to Piper for English.
+TTS_FALLBACK_CHAIN = {"azure": "piper", "piper": "azure"}
 
 
 def _tts_fallback_configured(name: str) -> bool:
+    if name == "azure":
+        return bool(os.environ.get("AZURE_SPEECH_KEY"))
     if name == "piper":
         return bool(PIPER_VOICES) and any(Path(v["path"]).exists() for v in PIPER_VOICES.values())
     return True
@@ -447,9 +454,12 @@ def get_tts(name: str, target_lang: str | None = None, **kwargs) -> TTSProvider:
         # warnings so staff can see the premium voice was not delivered.
         fallback_name = "azure" if target_lang == "sw" and os.environ.get("AZURE_SPEECH_KEY") else (
             "piper" if target_lang == "en" else None)
+    if name == "azure":
+        kwargs.setdefault("language", target_lang if target_lang in AzureTTS.LANGUAGES else "sw")
     primary = _REGISTRY[name](**kwargs)
     # Piper's fallback needs target_lang == "en" - a hard requirement, not a preference - see
     # ResilientTTS's own docstring on why any other target makes it actively wrong. Azure speaks Swahili.
-    if fallback_name and (target_lang == "en" or fallback_name == "azure") and _tts_fallback_configured(fallback_name):
-        return ResilientTTS(primary, _REGISTRY[fallback_name](), fallback_name)
+    if fallback_name and (target_lang in ("en", "sw") if fallback_name == "azure" else target_lang == "en") and _tts_fallback_configured(fallback_name):
+        spare = _REGISTRY[fallback_name](language=target_lang) if fallback_name == "azure" and target_lang in AzureTTS.LANGUAGES else _REGISTRY[fallback_name]()
+        return ResilientTTS(primary, spare, fallback_name)
     return primary

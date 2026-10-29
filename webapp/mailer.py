@@ -48,8 +48,7 @@ def email_configured() -> bool:
 def text_to_html_paragraphs(body: str) -> str:
     """Plain text -> simple HTML paragraphs - blank-line-separated blocks
     become separate <p> tags, and a single newline WITHIN one block (e.g.
-    a multi-line signature: "Talk soon,\\nGodfrey\\n(Forge Media
-    Services)") becomes a real <br>, not silently collapsed the way raw
+    a multi-line signature: "Talk soon,\\nKauli Team") becomes a real <br>, not silently collapsed the way raw
     HTML always does with a bare newline. Every email body up to now used
     only the paragraph split, which is exactly why a 3-line signature was
     rendering as one run-on line - found from a real screenshot of a real

@@ -1500,7 +1500,7 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str)
     Claude-first rule, and the original local/Azure fallbacks are kept for
     anything Lara can't take - so nothing changes for an account until Lara's
     keys are actually set."""
-    lara_ok = _lara_configured()
+    lara_ok = _lara_configured() and not provider_health.is_paused("lara")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Kikuyu: Claude if connected (as before), otherwise Lara (which
         # supports ki-KE) - always followed by a human review.
@@ -1508,6 +1508,8 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str)
             return "claude", None
         if lara_ok:
             return "lara", None
+        if provider_health.configured("madlad"):
+            return "madlad", None
         return None, ("Kikuyu translation needs our AI translation provider connected first, "
                       "which isn't done yet - contact us and we'll handle this one manually "
                       "in the meantime.")
@@ -1516,6 +1518,12 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str)
     if plan_mt == "claude":
         return "claude", None  # a Premium/Enterprise plan's priority-translation upgrade
     if lara_ok:
+        return "lara", None
+    if _lara_configured():                 # Lara is set aside after a failure: another connected engine first
+        if os.environ.get("AZURE_TRANSLATOR_KEY"):
+            return "azure-translate", None
+        if provider_health.configured("madlad"):
+            return "madlad", None
         return "lara", None
     # Lara not connected: the original behaviour, unchanged.
     mt = plan_mt
@@ -2105,13 +2113,12 @@ def languages_hub(request: Request):
 
 # ------------------------------------------------------- onboarding CS ----
 # The honest version of the "Founder's Welcome" / "CSM handoff" pattern:
-# Kauli is one person (Godfrey, Forge Media Services), not a company with a
-# separate Customer Success team, so these are both genuinely from him, not
-# a fictional CSM persona. Every message is queued (see db.py's
+# These come from the Kauli team (Forge Media Services), signed as a team and
+# never under one person's name. Every message is queued (see db.py's
 # onboarding_messages) AND, now that Brevo is configured, auto-sent - see
 # _queue_and_send below. A staff view of the queue (and anything that
 # needed a manual fallback) lives on /staff/leads.
-FOUNDER_NAME = "Godfrey Njoroge"
+TEAM_NAME = "Kauli Team"                  # how every customer email is signed
 
 
 def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = "",
@@ -2121,7 +2128,7 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
     record) and, if a real mailer is configured, immediately attempts to
     actually send it - same "create the real record first, then try to
     deliver it, fall back gracefully" pattern as _activate_payment's
-    receipt email. body is plain text (Godfrey's real voice, unchanged) -
+    receipt email. body is plain text (the team's own plain wording) -
     always the text_body fallback, and the HTML source too unless
     html_inner is given (a caller-built version with real <a> links on
     "reply"/"WhatsApp" and a properly line-broken signature - see
@@ -2220,8 +2227,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
     subject = f"Welcome to Kauli, {name} - your {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are ready"
     body = (
         f"Hi {name},\n\n"
-        f"I'm {FOUNDER_NAME.split()[0]} - I actually run Kauli day to day at Forge Media "
-        "Services, so this is genuinely from me, not an automated \"team\".\n\n"
+        "Welcome aboard - we're glad you're here.\n\n"
         f"Your account has {billing.FREE_MINUTES_PER_MONTH:.0f} free minutes loaded already - "
         "here's the fastest way to see a real result:\n\n"
         "1. Open your dashboard.\n"
@@ -2230,13 +2236,12 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         "4. We'll notify you the moment your result is ready to download. Instant AI results arrive in "
         "minutes and are AI-generated; Human-reviewed results are checked by a real editor first.\n\n"
         "If anything's unclear, or you'd rather just talk it through, just reply to this email.\n\n"
-        f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
+        f"Talk soon,\n{TEAM_NAME}"
     )
     cta_url = f"{base_url.rstrip('/')}/client" if base_url else "/client"
     html_inner = (
         f'<p style="margin:0 0 14px;">Hi {name},</p>'
-        f'<p style="margin:0 0 14px;">I\'m {FOUNDER_NAME.split()[0]} - I actually run Kauli day to day '
-        f'at Forge Media Services, so this is genuinely from me, not an automated "team".</p>'
+        f'<p style="margin:0 0 14px;">Welcome aboard - we\'re glad you\'re here.</p>'
         f'<p style="margin:0 0 6px;">Your account has <strong>{billing.FREE_MINUTES_PER_MONTH:.0f} free '
         f'minutes</strong> loaded already - here\'s the fastest way to see a real result:</p>'
         f'<ol style="margin:0 0 14px; padding-left:20px;">'
@@ -2247,7 +2252,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         f'</ol>'
         f'<p style="margin:0 0 14px;">If anything\'s unclear, or you\'d rather just talk it through, '
         f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
-        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        f'<p style="margin:0;">Talk soon,<br>{TEAM_NAME}</p>'
     )
     _queue_and_send(user, "welcome", subject, body, base_url=base_url,
                      cta_text="Upload your first file", cta_url=cta_url, html_inner=html_inner)
@@ -2262,7 +2267,7 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
         f"Hi {name},\n\n"
         "Thanks for the vote of confidence - that's your first paid order with Kauli, and we don't "
         "take that lightly at this stage.\n\n"
-        "I'll be keeping an eye on this one personally. If the turnaround or the quality isn't "
+        "We'll be keeping an eye on this one personally. If the turnaround or the quality isn't "
         "what you expected, just reply to this email - and we'll make it right.\n\n"
         "One honest ask: how's it going so far?"
     )
@@ -2276,15 +2281,14 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
         f'<a href="{feedback_base}/feedback/first_payment/{user["id"]}/needs_work" style="color:{mailer.BRAND_MUTED}; font-weight:600; text-decoration:none;">Needs work</a>'
         f'</p>'
     )
-    message_id = db.queue_onboarding_message(
-        user["id"], "first_payment", subject,
-        body + f"\n\n{FOUNDER_NAME}\nForge Media Services")
+    body = body + f"\n\nTalk soon,\n{TEAM_NAME}"
+    message_id = db.queue_onboarding_message(user["id"], "first_payment", subject, body)
     if mailer.email_configured():
         html_body = (
             f'Thanks for the vote of confidence - that\'s your first paid order with Kauli, and we '
             f'don\'t take that lightly at this stage.\n\n'
-            f'I\'ll be keeping an eye on this one personally. If the turnaround or the quality isn\'t '
-            f'what you expected, tell me directly.'
+            f'We\'ll be keeping an eye on this one personally. If the turnaround or the quality isn\'t '
+            f'what you expected, tell us directly.'
         )
         inner = (
             f'<p style="margin:0 0 14px;">Hi {name},</p>'
@@ -2295,7 +2299,7 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
             f'<p style="margin:0 0 14px;">One honest ask: how\'s it going so far?</p>'
         )
         inner += rating_row
-        inner += f'<p style="margin:20px 0 0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        inner += f'<p style="margin:20px 0 0;">Talk soon,<br>{TEAM_NAME}</p>'
         html = mailer.wrap_email_html(inner, base_url=base_url)
         ok, detail = mailer.send_email(user["email"], subject, html, body)
         db.set_onboarding_message_email_result(message_id, ok, detail)
@@ -5845,7 +5849,8 @@ def create_order(
                 "contact us and we'll handle this one manually in the meantime.", form_values=form_values)
         tts = "azure"
     else:
-        tts = "piper"
+        # our own free voice first; Azure only while Piper is set aside after a failure
+        tts = "azure" if provider_health.is_paused("piper") and os.environ.get("AZURE_SPEECH_KEY") else "piper"
 
     # The monthly allowance covers Instant AI transcription on every plan and Instant AI translation on the paid
     # plans (billing.allowance_covers); a dub or a human-reviewed order pays the full rate from its first minute.
@@ -5960,7 +5965,7 @@ def create_order(
                 f"You're down to about {remaining:.0f} prepaid credits - just a heads up so an upcoming "
                 f"order doesn't get held up waiting on a top-up.\n\n"
                 "Questions? Just reply to this email.\n\n"
-                f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
+                f"Talk soon,\n{TEAM_NAME}"
             )
             inner = (
                 f'<p style="margin:0 0 14px;">Hi {name},</p>'
@@ -5968,7 +5973,7 @@ def create_order(
                 f'a heads up so an upcoming order doesn\'t get held up waiting on a top-up.</p>'
                 f'<p style="margin:0 0 14px;">Questions? '
                 f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply to this email</a>.</p>'
-                f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+                f'<p style="margin:0;">Talk soon,<br>{TEAM_NAME}</p>'
             )
             html = mailer.wrap_email_html(inner, cta_text="Top up your credits", cta_url=billing_url,
                                            base_url=str(request.base_url))
@@ -7648,7 +7653,7 @@ def _send_activation_nudge(client, base_url: str) -> None:
         f"{billing.FREE_MINUTES_PER_MONTH:.0f} free minutes are still sitting there unused.\n\n"
         "No pressure at all, just wanted to check if anything's unclear or in the way. "
         "Happy to walk you through it - just reply to this email.\n\n"
-        f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services"
+        f"Talk soon,\n{TEAM_NAME}"
     )
     nudge_cta_url = f"{base_url.rstrip('/')}/client"
     html_inner = (
@@ -7658,7 +7663,7 @@ def _send_activation_nudge(client, base_url: str) -> None:
         f'<p style="margin:0 0 14px;">No pressure at all, just wanted to check if anything\'s unclear '
         f'or in the way. Happy to walk you through it - '
         f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
-        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        f'<p style="margin:0;">Talk soon,<br>{TEAM_NAME}</p>'
     )
     _queue_and_send(client, "inactivity_nudge", subject, body, base_url=base_url,
                      cta_text="Upload your first order for free", cta_url=nudge_cta_url, html_inner=html_inner)
@@ -9641,7 +9646,7 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
                     f"if we need a corrected file, attach it right there; we'll pick this same order back up "
                     f"as soon as it's sorted.\n\n"
                     "Or just reply to this email.\n\n"
-                    f"Talk soon,\n{FOUNDER_NAME}\nForge Media Services")
+                    f"Talk soon,\n{TEAM_NAME}")
             reason_html = f'<p style="margin:0 0 14px;">{message.strip()}</p>' if message.strip() else ""
             inner = (
                 f'<p style="margin:0 0 14px;">Hi {client_name},</p>'
@@ -9653,7 +9658,7 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
                 f'pick this same order back up as soon as it\'s sorted.</p>'
                 f'<p style="margin:0 0 14px;">Or just '
                 f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">reply</a> to this email.</p>'
-                f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+                f'<p style="margin:0;">Talk soon,<br>{TEAM_NAME}</p>'
             )
             html = mailer.wrap_email_html(inner, cta_text="View order & resume", cta_url=link,
                                            base_url=str(request.base_url))

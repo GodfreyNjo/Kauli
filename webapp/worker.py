@@ -25,7 +25,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from kauli.pipeline import run as kauli_run  # noqa: E402
 from kauli.models import Job  # noqa: E402
-from . import account_hub, db, logging_setup, mailer, notifications  # noqa: E402
+from . import account_hub, db, logging_setup, mailer, notifications, provider_health  # noqa: E402
 
 log = logging_setup.get_logger("worker")
 
@@ -51,7 +51,7 @@ PUBLIC_BASE_URL = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/")
 # the reverse would be circular), not second real values to keep in sync
 # by hand.
 CONTACT_EMAIL = "hello@kauli-forgemedia.com"
-FOUNDER_NAME = "Godfrey Njoroge"
+TEAM_NAME = "Kauli Team"                  # how every customer email is signed
 
 
 def notify_client_order_ready(order, base_url: str | None = None) -> None:
@@ -73,7 +73,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
         f"Your order ({order['original_filename']}) is ready.\n\n"
         + ("" if link else "Log in to your Kauli dashboard to view and download it.\n\n")
         + "Questions? Just reply to this email.\n\n"
-        + f"Talk soon,\n{FOUNDER_NAME}\n(Forge Media Services)"
+        + f"Talk soon,\n{TEAM_NAME}"
     )
     log_in_note = "" if link else '<p style="margin:0 0 14px;">Log in to your Kauli dashboard to view and download it.</p>'
     inner = (
@@ -82,7 +82,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
         f'{log_in_note}'
         f'<p style="margin:0 0 14px;">Questions? '
         f'<a href="mailto:{CONTACT_EMAIL}" style="color:{mailer.BRAND_ACCENT};">Reply to this email</a>.</p>'
-        f'<p style="margin:0;">Talk soon,<br>{FOUNDER_NAME}<br>(Forge Media Services)</p>'
+        f'<p style="margin:0;">Talk soon,<br>{TEAM_NAME}</p>'
     )
     html = mailer.wrap_email_html(inner, cta_text="View & download your files" if link else None,
                                    cta_url=link, base_url=link_base)
@@ -137,6 +137,21 @@ def _refund_undelivered_elevenlabs_addons(order, job) -> None:
             log.info("elevenlabs add-on not delivered - credited back", extra={"job_id": order["id"]})
 
 
+def _auto_switch_provider(order_id: str, exc: Exception) -> None:
+    """A provider ran out of quota or went down: point the order at the next connected one before its retry, and tell staff."""
+    try:
+        order = db.get_order(order_id)
+        switched = provider_health.auto_switch(order, str(exc))
+        if switched:
+            kind, old, new = switched
+            names = provider_health.NAMES
+            log.warning("provider failed, switched automatically", extra={"job_id": order_id, "step": kind, "from": old, "to": new})
+            db.notify_all_staff("provider_switched", f"{order['original_filename']}: {names.get(old, old)} failed, switched to {names.get(new, new)}",
+                                link=f"/staff/orders/{order_id}")
+    except Exception:  # noqa: BLE001 - this is a helper; the normal retry runs either way
+        log.warning("automatic provider switch failed", extra={"job_id": order_id}, exc_info=True)
+
+
 def _run_job(order_id: str, is_retry: bool = False) -> None:
     order = db.get_order(order_id)
     if not order:
@@ -179,6 +194,10 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
         manifest_path = Path(order["outdir"]) / "manifest.json"
         job = Job.load(str(manifest_path))
         _refund_undelivered_elevenlabs_addons(order, job)
+        try:
+            provider_health.note_job_fallbacks(job)
+        except Exception:  # noqa: BLE001 - bookkeeping must never fail a finished order
+            pass
         # Every order waits for an explicit staff sign-off in Ereri
         # ("Approve & mark ready for delivery") before a client ever sees
         # it as ready - no auto-bypass, even when the AI drafted it with
@@ -215,6 +234,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
         else:
             notify_staff_needs_review(order)
     except Exception as exc:  # noqa: BLE001 - surface it to the client/staff UI
+        _auto_switch_provider(order_id, exc)
         retry_count = db.increment_retry_count(order_id)
         if retry_count <= MAX_RETRIES:
             delay = RETRY_BACKOFF_S[min(retry_count - 1, len(RETRY_BACKOFF_S) - 1)]
