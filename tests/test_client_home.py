@@ -10,10 +10,12 @@ from test_order_flow import env, wav_bytes  # noqa: E402,F401
 def test_home_is_short_and_clear(env, wav_bytes):
     env.order_from(env.place(wav_bytes))
     page = env.client.get("/client/home").text
-    for action in ("Upload files", "YouTube link", "Hear a demo", "Plans &amp; billing"):
+    for action in ("Upload media", "Import from YouTube", "Explore a sample"):
         assert action in page
-    assert "Recent files" in page and 'id="ch-search"' in page and "clip.wav" in page
-    assert "Processing" in page and "In review" in page and "Needs you" in page
+    assert "Recent projects" in page and 'id="ch-search"' in page and "clip.wav" in page
+    assert "Processing" in page and "In review" in page and "Needs your input" in page and "Awaiting quality check" in page
+    for column in ("File / Project", "Service", "Languages", "Updated", "Status", "Actions"):
+        assert column in page
     # none of the old wordy cards
     for gone in ("Here's what's happening with your orders", "All-time, confirmed payments", "Payment or a file we need from you"):
         assert gone not in page
@@ -26,7 +28,7 @@ def test_home_is_short_and_clear(env, wav_bytes):
 def test_home_labels_use_short_status_words(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
     page = env.client.get("/client/home").text
-    assert "Awaiting payment" in page and "YOUR ORDER" not in page.upper().split("RECENT FILES", 1)[1]
+    assert "Awaiting payment" in page and "YOUR ORDER" not in page.upper().split("RECENT PROJECTS", 1)[1]
 
 
 def test_a_new_client_gets_a_friendly_empty_state(env):

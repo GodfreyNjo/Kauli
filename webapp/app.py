@@ -53,7 +53,7 @@ from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -1353,6 +1353,7 @@ AI_ONLY_LANGUAGES = {code: label for code, (label, _t) in TRANSKRIPTOR_LANGUAGES
 # Every code a stored order can carry, for display names.
 LANGUAGE_NAMES = {**AI_ONLY_LANGUAGES, **SOURCE_LANGUAGES}
 templates.env.globals["language_total"] = len(LANGUAGE_NAMES)
+templates.env.globals["language_names"] = LANGUAGE_NAMES
 # Bank transfer is kept only for accounts that already existed when it was switched off for new clients
 # (override the date with BANK_TRANSFER_LEGACY_BEFORE, a Unix time). M-Pesa is offered only to people in Kenya
 # (Cloudflare's country header) and to the older Kenyan accounts; everyone else pays by card.
@@ -4841,7 +4842,7 @@ def avatar(request: Request, user_id: str):
 
 # -------------------------------------------------------------- client ----
 @app.get("/client/files", response_class=HTMLResponse)
-def client_files(request: Request):
+def client_files(request: Request, type: str = "", q: str = ""):
     """A real cross-order file view - every order's source file plus
     whatever's actually deliverable for it, in one place, instead of
     having to open each order individually to find a download link.
@@ -4872,8 +4873,16 @@ def client_files(request: Request):
         source_size = None
         if o["audio_path"] and Path(o["audio_path"]).exists():
             source_size = Path(o["audio_path"]).stat().st_size
-        rows.append({"order": o, "deliverables": deliverables, "source_size": source_size})
-    return templates.TemplateResponse(request, "client_files.html", {"user": user, "rows": rows})
+        ext = (o["original_filename"] or "").rsplit(".", 1)[-1].lower() if "." in (o["original_filename"] or "") else ""
+        kind = "video" if ext in ("mp4", "mov", "mkv", "webm", "avi", "m4v", "mpeg", "mpg", "3gp") or o["source_youtube_id"] else \
+            "audio" if ext in ("mp3", "wav", "m4a", "flac", "ogg", "opus", "aac", "wma") else "other"
+        rows.append({"order": o, "deliverables": deliverables, "source_size": source_size, "kind": kind})
+    counts = {"": len(rows), **{k: sum(1 for r in rows if r["kind"] == k) for k in ("audio", "video", "other")}}
+    type = type if type in ("audio", "video", "other") else ""
+    needle = (q or "").strip().lower()[:100]
+    shown = [r for r in rows if (not type or r["kind"] == type) and (not needle or needle in (r["order"]["original_filename"] or "").lower())]
+    return templates.TemplateResponse(request, "client_files.html", {"user": user, "rows": shown, "counts": counts, "type": type, "q": needle,
+                                                                      "all_count": len(rows)})
 
 
 @app.get("/client/messages", include_in_schema=False)
@@ -5068,15 +5077,31 @@ async def recall_webhook(request: Request):
     return JSONResponse({"ok": True})
 
 
+def _attention_kind(order) -> str:
+    """Why an unfinished order is on the Needs attention page: "pay", "input" and "charge" are waiting on the customer; "review" and
+    "progress" are on their way."""
+    if order["status"] == "pending_payment":
+        return "pay"
+    if order["status"] == "returned_to_client":
+        return "input"
+    if order["difficulty_surcharge_status"] == "pending_approval":
+        return "charge"
+    return "review" if order["status"] in ("awaiting_review", "editor_returned") else "progress"
+
+
 @app.get("/client/pending", response_class=HTMLResponse)
-def client_pending(request: Request, page: int = 1):
+def client_pending(request: Request, page: int = 1, tab: str = ""):
     """Orders that are not finished yet, with the one thing each is waiting for."""
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
-    page, pages, shown = _paginate(db.list_pending_orders(user["client_scope_id"]), page, FILES_PER_PAGE + 2)
+    rows = [(o, _attention_kind(o)) for o in db.list_pending_orders(user["client_scope_id"])]
+    counts = {"": len(rows), "needs": sum(1 for _o, k in rows if k in ("pay", "input", "charge")), "progress": sum(1 for _o, k in rows if k in ("review", "progress"))}
+    tab = tab if tab in ("needs", "progress") else ""
+    shown_rows = [r for r in rows if not tab or (r[1] in ("pay", "input", "charge")) == (tab == "needs")]
+    page, pages, shown = _paginate(shown_rows, page, FILES_PER_PAGE + 2)
     return templates.TemplateResponse(request, "client_pending.html", {
-        "user": user, "orders": shown, "page": page, "pages": pages,
+        "user": user, "rows": shown, "page": page, "pages": pages, "tab": tab, "counts": counts,
     })
 
 
@@ -5091,7 +5116,7 @@ def _paginate(items: list, page: int, per_page: int) -> tuple[int, int, list]:
 
 
 @app.get("/client/home", response_class=HTMLResponse)
-def client_home(request: Request, page: int = 1, q: str = ""):
+def client_home(request: Request, page: int = 1, q: str = "", status: str = ""):
     """The client portal's real landing page - summary stats + a preview
     of recent orders, separate from /client (the full order list +
     submission wizard, kept at its existing URL so none of the 'back to
@@ -5103,28 +5128,30 @@ def client_home(request: Request, page: int = 1, q: str = ""):
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
     orders = db.list_orders_for_client(user["client_scope_id"])
     stats = db.client_dashboard_stats(user["client_scope_id"])
-    needle = q.strip().lower()[:100]
-    matching = [o for o in orders if needle in (o["original_filename"] or "").lower()] if needle else orders
-    page, pages, recent = _paginate(matching, page, FILES_PER_PAGE)
+    view = _orders_view(orders, status, "", q[:100], page, per_page=FILES_PER_PAGE)
+    counts = {"": len(orders), **{k: sum(1 for o in orders if o["status"] in v) for k, v in _ORDER_BUCKETS.items()}}
     hour = datetime.now().hour
     greeting = "greet_morning" if hour < 12 else "greet_afternoon" if hour < 18 else "greet_evening"
     return templates.TemplateResponse(request, "client_home.html", {
         "user": user, "greeting": greeting,
-        "stats": stats, "recent_orders": recent, "page": page, "pages": pages, "q": needle,
+        "stats": stats, "recent_orders": view["orders"], "page": view["page"], "pages": view["pages"], "q": view["q"], "status": view["status"], "counts": counts,
         "free_minutes_left": billing.free_minutes_remaining(db.get_subscription_current(user["client_scope_id"])),
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
+        "winback_offer": winback.open_offer(user["id"]) if user["client_scope_id"] == user["id"] else None,
     })
 
 
 ORDERS_PER_PAGE = 10
 _ORDER_BUCKETS = {
+    "processing": ("queued", "processing"),
+    "in_review": ("awaiting_review", "editor_returned"),
     "in_progress": ("queued", "processing", "awaiting_review", "editor_returned"),
     "ready": ("ready_for_delivery", "delivered"),
     "needs_you": ("returned_to_client", "pending_payment"),
 }
 
 
-def _orders_view(orders: list, status: str = "", folder: str = "", q: str = "", page: int = 1) -> dict:
+def _orders_view(orders: list, status: str = "", folder: str = "", q: str = "", page: int = 1, per_page: int = ORDERS_PER_PAGE) -> dict:
     """The order list as the customer asked to see it: one filter, one folder, one search, one numbered page. The parameters are
     kept in the page links so moving between pages never loses the filter."""
     status = status if status in _ORDER_BUCKETS else ""
@@ -5132,9 +5159,11 @@ def _orders_view(orders: list, status: str = "", folder: str = "", q: str = "", 
     shown = [o for o in orders
              if (not status or o["status"] in _ORDER_BUCKETS[status])
              and (not folder or (o["folder_name"] or "") == folder)
-             and (not needle or needle in (o["original_filename"] or "").lower() or needle in (o["folder_name"] or "").lower())]
-    page, pages, items = _paginate(shown, page, ORDERS_PER_PAGE)
-    return {"orders": items, "page": page, "pages": pages, "total": len(shown), "all_count": len(orders),
+             and (not needle or needle in (o["original_filename"] or "").lower() or needle in (o["folder_name"] or "").lower()
+                  or needle.lstrip("#") in o["id"].lower() or needle in (o["service_level"] or "").lower())]
+    page, pages, items = _paginate(shown, page, per_page)
+    counts = {"": len(orders), **{k: sum(1 for o in orders if o["status"] in v) for k, v in _ORDER_BUCKETS.items()}}
+    return {"orders": items, "page": page, "pages": pages, "total": len(shown), "all_count": len(orders), "counts": counts,
             "status": status, "folder": folder, "q": (q or "").strip(), "params": {"status": status, "folder": folder, "q": (q or "").strip()}}
 
 
@@ -6649,6 +6678,7 @@ def billing_cancel_subscription(request: Request):
     if not result["ok"]:
         return RedirectResponse(f"/client/billing?error={quote(result['error'])}", status_code=303)
     db.set_paystack_subscription(user["id"], None, None)
+    dunning.resolve(user["id"], "downgraded")
     return RedirectResponse(
         "/client/billing?notice=Auto-renewal+cancelled.+You+keep+your+plan+until+the+period+you+paid+for+ends.",
         status_code=303)
@@ -6801,6 +6831,8 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     just not auto-emailed with a working link, same as before this existed."""
     if not db.complete_payment(payment["id"], provider_reference, billing.PLAN_PERIOD_DAYS):
         return False
+    if not payment["order_id"]:
+        dunning.resolve(payment["user_id"], "paid")        # a plan payment went through: any failed-payment recovery is over
     # Any real payment confirms the card and counts as choosing a plan.
     db.set_plan_chosen(db.get_team_owner_for_member(payment["user_id"]) or payment["user_id"])
     payer = db.get_user(payment["user_id"])
@@ -7340,7 +7372,9 @@ async def paystack_webhook(request: Request):
         # stop treating them as auto-renewing (no more grace period).
         customer = (data.get("customer") or {})
         user = db.get_user_by_email((customer.get("email") or "").strip().lower())
-        if user:
+        if user and dunning._open(user["id"]):
+            dunning.finish(user, base_url)                  # Paystack gave up on a failing card: pause kindly, keep everything
+        elif user:
             db.set_paystack_subscription(user["id"], None, None)
             db.create_notification(user["id"], "subscription_ended",
                                     "Your Kauli subscription won't renew",
@@ -7354,6 +7388,7 @@ async def paystack_webhook(request: Request):
                                     link="/client/billing")
             notifications.notify_staff("Kauli: a subscription payment failed",
                                         f"{user['email']}'s recurring subscription charge failed.")
+            dunning.record_failure(user, base_url, str(data.get("gateway_response") or data.get("message") or ""))
     return JSONResponse({"ok": True})
 
 
@@ -10984,9 +11019,28 @@ def _activation_nudge_loop() -> None:
 
 threading.Thread(target=_activation_nudge_loop, daemon=True).start()
 
+
+def _winback_loop() -> None:
+    """Once a day: take back finished free months, and (only when KAULI_WINBACK_AUTOSEND is switched on) offer a new one to
+    customers who paid and went quiet. Sleeps first, like the loops above."""
+    while True:
+        time.sleep(winback.SWEEP_INTERVAL_S)
+        try:
+            _base = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or "https://kauli-forgemedia.com"
+            winback.sweep_once(_base)
+            dunning.expire_backstop()
+        except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the loop forever
+            api_log.warning("winback sweep failed", extra={"error": str(exc)})
+
+
+threading.Thread(target=_winback_loop, daemon=True).start()
+
 account_hub.register(sys.modules[__name__])
 blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
 connections.register(sys.modules[__name__])
+account_closure.register(sys.modules[__name__])
+winback.register(sys.modules[__name__])
+dunning.register(sys.modules[__name__])
 calendar_feed.register(sys.modules[__name__])        # calendar links and sending Kauli to meetings        # import from Google Drive, OneDrive and Dropbox          # narrated blog posts and the podcast feed
 blog_audio.mark_stale_jobs_failed()         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant

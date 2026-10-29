@@ -2,42 +2,52 @@
 {% set translated = true %}
 {% block title %}{{ t('pending_title') }}{% endblock %}
 {% block content %}
-{% from "_status_macros.html" import short_status, status_tone with context %}
+{% from "_ds.html" import ico, file_ic, status_pill with context %}
 {% from "_pager.html" import pager %}
-<div class="ch">
-  <div class="ch-top">
-    <h1>{{ t('pending_title') }}</h1>
-    <a href="/client#order-form" class="btn cta-olive">{{ t('new_order') }}</a>
+<div class="ds-page">
+  <div class="ds-head">
+    <div>
+      <h1>{{ t('pending_title') }}</h1>
+      <p>{{ t('pending_sub') }}</p>
+    </div>
+    <div class="ds-head-actions"><a href="/client#order-form" class="ds-btn">{{ t('new_order') }}</a></div>
   </div>
-  <section class="ch-files">
-    {% if not orders %}
-    <div class="ch-empty">
+
+  <section class="ds-card ch-files">
+    <div class="ds-tabs" role="group" aria-label="{{ t('col_status') }}">
+      {% for key, label in [('', t('tab_all')), ('needs', t('tab_attention')), ('progress', t('tab_progress'))] %}
+      <a href="/client/pending{% if key %}?tab={{ key }}{% endif %}" class="{{ 'is-on' if tab == key else '' }}"{% if tab == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
+      {% endfor %}
+    </div>
+    {% if not rows %}
+    <div class="ds-empty ch-empty">
       <p>{{ t('caught_up') }}</p>
-      <a href="/client#order-form" class="btn cta-olive">{{ t('act_upload_t') }}</a>
+      <a href="/client#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
     </div>
     {% else %}
-    <ul class="ch-list">
-      {% for o in orders %}
-      <li>
-        <div class="ch-row">
-          <span class="ch-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
-          <span class="ch-row-main">
-            <strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong>
-            <small>{{ o['created_at']|ts_ui }} &middot; {{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }}{% if o['cost_usd'] %} &middot; ${{ "%.2f"|format(o['cost_usd']) }}{% endif %}</small>
-          </span>
-          <span class="ch-state ch-{{ status_tone(o['status']) }}">{{ short_status(o['status']) }}</span>
-          {% if o['status'] == 'pending_payment' %}
-          <a class="btn cta-olive ch-act" href="/client/orders/{{ o['id'] }}/pay">{{ t('pay_now') }}</a>
-          {% elif o['status'] == 'returned_to_client' %}
-          <a class="btn secondary ch-act" href="/client/orders/{{ o['id'] }}">{{ t('reply') }}</a>
-          {% else %}
-          <a class="btn secondary ch-act" href="/client/orders/{{ o['id'] }}">{{ t('view') }}</a>
-          {% endif %}
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
-    {{ pager(page, pages, '/client/pending') }}
+    <div class="ds-scroll">
+      <table class="ds-table">
+        <thead><tr><th>{{ t('col_file') }}</th><th>{{ t('col_issue') }}</th><th class="hide-sm">{{ t('col_updated') }}</th><th>{{ t('col_status') }}</th><th>{{ t('col_actions') }}</th></tr></thead>
+        <tbody>
+          {% for o, kind in rows %}
+          <tr>
+            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/client/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
+              <small>{{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }}{% if o['cost_usd'] %} &middot; ${{ "%.2f"|format(o['cost_usd']) }}{% endif %}</small></div></div></td>
+            <td><span class="ds-issue {{ 'is-you' if kind in ('pay', 'input', 'charge') else '' }}">{{ t('issue_' ~ kind) }}</span></td>
+            <td class="hide-sm num">{{ o['created_at']|ts_ui }}</td>
+            <td>{{ status_pill(o['status']) }}</td>
+            <td>
+              {% if kind == 'pay' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}/pay">{{ t('pay_now') }}</a>
+              {% elif kind == 'input' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}">{{ t('reply') }}</a>
+              {% elif kind == 'charge' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}/difficulty-surcharge">{{ t('view') }}</a>
+              {% else %}<a class="ds-act" href="/client/orders/{{ o['id'] }}">{{ t('view') }}</a>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ds-pager">{{ pager(page, pages, '/client/pending', {'tab': tab}) }}</div>
     {% endif %}
   </section>
 </div>

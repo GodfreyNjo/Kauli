@@ -32,14 +32,14 @@ def test_every_t_call_in_the_templates_names_a_real_key():
     used = set()
     for path in Path(__file__).parent.parent.joinpath("webapp/templates").glob("*.html"):
         used |= set(re.findall(r"\bt\(\s*'([a-z0-9_]+)'", path.read_text(encoding="utf-8")))
-    dynamic = {"svc_"}                               # built in the template as 'svc_' ~ service level
+    dynamic = {"svc_", "issue_"}                               # built in the template as 'svc_' ~ service level
     assert used - dynamic - set(ui_text.EN) == set(), used - dynamic - set(ui_text.EN)
     assert {"greet_morning", "greet_afternoon", "greet_evening", "svc_transcribe", "svc_translate", "svc_dub"} <= set(ui_text.EN)
 
 
 def test_a_missing_key_or_language_falls_back_to_english():
     assert ui_text.translate("fr", "nav_orders") == "Mes commandes"
-    assert ui_text.translate("xx", "nav_orders") == "My orders"
+    assert ui_text.translate("xx", "nav_orders") == "Orders"
     assert ui_text.translate("fr", "no_such_key") == "no_such_key"
     assert ui_text.translate("de", "pay_btn", amount="$5.00") == "$5.00 bezahlen"
     assert ui_text.direction("ar") == "rtl" and ui_text.direction("fr") == "ltr"
@@ -96,7 +96,7 @@ def test_the_switcher_saves_the_choice_for_every_device_and_cannot_be_abused(env
     assert env.client.get("/lang/fr?next=//evil.example", follow_redirects=False).headers["location"] == "/"
     assert env.client.get("/lang/fr", follow_redirects=False).headers["x-robots-tag"] == "noindex, nofollow"
     env.client.get("/lang/en")
-    assert "Dashboard" in env.client.get("/client/home").text
+    assert "Overview" in env.client.get("/client/home").text
 
 
 def test_the_account_menu_lists_every_language(env):

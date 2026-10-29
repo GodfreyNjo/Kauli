@@ -1,54 +1,71 @@
 {% extends "base.html" %}
 {% block title %}Files{% endblock %}
 {% block content %}
-<h1>Files</h1>
-<p class="muted" style="margin-top:0;">Every order's source file and its real deliverables, in one place.</p>
+{% from "_ds.html" import ico, file_ic, status_pill with context %}
+<div class="ds-page" lang="en">
+  <div class="ds-head">
+    <div>
+      <h1>Files</h1>
+      <p>Access and manage all your uploaded files.</p>
+    </div>
+    <div class="ds-head-actions"><a href="/client#order-form" class="ds-btn">{{ ico('upload', 18) }} Upload file</a></div>
+  </div>
 
-{% if not rows %}
-<div class="empty-state">
-  <p>You haven't submitted any projects yet.</p>
-  <a href="/client#order-form" class="btn secondary">+ Submit your first order</a>
+  <section class="ds-card">
+    <div class="ds-tools">
+      <div class="ds-tabs" style="margin:0;" role="group" aria-label="File type">
+        {% for key, label in [('', 'All'), ('audio', 'Audio'), ('video', 'Video'), ('other', 'Others')] %}
+        <a href="/client/files{% if key or q %}?{% if key %}type={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
+           class="{{ 'is-on' if type == key else '' }}"{% if type == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
+        {% endfor %}
+      </div>
+      <form class="ds-search" method="get" action="/client/files" role="search">{{ ico('search', 18) }}
+        <input type="search" name="q" value="{{ q }}" placeholder="Search files..." aria-label="Search files" autocomplete="off">
+        {% if type %}<input type="hidden" name="type" value="{{ type }}">{% endif %}
+      </form>
+    </div>
+
+    {% if not all_count %}
+    <div class="empty-state ds-empty">
+      <p>You haven't submitted any projects yet.</p>
+      <a href="/client#order-form" class="ds-btn">+ Submit your first order</a>
+    </div>
+    {% elif not rows %}
+    <p class="ds-empty">No files match.</p>
+    {% else %}
+    <div class="ds-scroll">
+      <table class="ds-table">
+        <thead><tr><th>Name</th><th class="hide-sm">Type</th><th class="hide-sm">Size</th><th class="hide-sm">Uploaded</th><th>Status</th><th>Downloads</th></tr></thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td><div class="ds-file">{{ file_ic(r['order']['original_filename']) }}<div><a href="/client/orders/{{ r['order']['id'] }}"><strong title="{{ r['order']['original_filename'] }}">{{ r['order']['original_filename'] }}</strong></a>
+              <small>{{ r['order']['source_lang']|upper }}{% if r['order']['target_lang'] != r['order']['source_lang'] %} &rarr; {{ r['order']['target_lang']|upper }}{% endif %}</small></div></div></td>
+            <td class="hide-sm">{{ {'audio': 'Audio', 'video': 'Video'}.get(r['kind'], 'Other') }}</td>
+            <td class="hide-sm num">{% if r['source_size'] %}{{ r['source_size']|filesizeformat }}{% else %}&mdash;{% endif %}</td>
+            <td class="hide-sm num">{{ r['order']['created_at']|int|timestamp_to_date }}</td>
+            <td>{{ status_pill(r['order']['status']) }}</td>
+            <td>
+              <details class="ds-dl">
+                <summary>{% if r['deliverables'] %}{{ r['deliverables']|length + 2 }} files{% else %}Details{% endif %}</summary>
+                <ul>
+                  <li class="muted">{{ r['order']['original_filename'] }}: not re-downloadable once submitted</li>
+                  {% for d in r['deliverables'] %}
+                  <li><a href="/client/orders/{{ r['order']['id'] }}/download/{{ d['kind'] }}" title="Download">{{ d['label'] }} &darr;</a></li>
+                  {% endfor %}
+                  {% if r['deliverables'] %}<li><a href="/client/orders/{{ r['order']['id'] }}#order-downloads">Transcript (.docx, .txt) and more formats on the order page</a></li>{% endif %}
+                  {% if not r['deliverables'] %}
+                  <li class="muted">{% if r['order']['status'] in ('ready_for_delivery', 'delivered') %}Ran on free trial minutes - no downloadable deliverables for a preview.{% else %}Deliverables appear here once this order is ready.{% endif %}</li>
+                  {% endif %}
+                </ul>
+              </details>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
 </div>
-{% else %}
-{% for r in rows %}
-<details class="card collapsible-card"{% if loop.first %} open{% endif %}>
-  <summary>
-    <span class="collapsible-title">{{ r['order']['original_filename'] }}</span>
-    <span class="muted collapsible-count">{{ r['deliverables']|length }} file{{ '' if r['deliverables']|length == 1 else 's' }}</span>
-    <span class="status status-{{ r['order']['status'] }}">{{ r['order']['status']|client_status_label }}</span>
-  </summary>
-  <p style="margin:10px 0 0;"><a href="/client/orders/{{ r['order']['id'] }}">Open this order</a></p>
-  <table style="margin-top:10px;">
-    <thead><tr><th>File</th><th>Type</th><th>Size</th><th></th></tr></thead>
-    <tbody>
-      <tr>
-        <td>{{ r['order']['original_filename'] }}</td>
-        <td class="muted">Source upload</td>
-        <td class="muted">{% if r['source_size'] %}{{ r['source_size']|filesizeformat }}{% else %}&mdash;{% endif %}</td>
-        <td class="muted" style="font-size:0.78rem;">Not re-downloadable once submitted</td>
-      </tr>
-      {% for d in r['deliverables'] %}
-      <tr>
-        <td>{{ d['label'] }}</td>
-        <td class="muted">Deliverable</td>
-        <td class="muted">&mdash;</td>
-        <td><a href="/client/orders/{{ r['order']['id'] }}/download/{{ d['kind'] }}" class="row-action-btn" title="Download">&darr;</a></td>
-      </tr>
-      {% endfor %}
-      {% if not r['deliverables'] %}
-      <tr>
-        <td colspan="4" class="muted" style="font-size:0.85rem;">
-          {% if r['order']['status'] in ('ready_for_delivery', 'delivered') %}
-            Ran on free trial minutes - no downloadable deliverables for a preview.
-          {% else %}
-            Deliverables appear here once this order is ready.
-          {% endif %}
-        </td>
-      </tr>
-      {% endif %}
-    </tbody>
-  </table>
-</details>
-{% endfor %}
-{% endif %}
 {% endblock %}

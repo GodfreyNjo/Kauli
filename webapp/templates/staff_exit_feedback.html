@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Exit feedback{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Why people close their accounts</h1>
+      <p class="muted">What customers tell us when they leave, so it reaches Product, Support and Sales. The survey is optional, so this is a sample, not a count of every closure.</p>
+    </div>
+    <div class="hub-chips" role="group" aria-label="Period">
+      {% for d in (30, 90, 365) %}<a href="/staff/exit-feedback?days={{ d }}" class="{{ 'is-on' if days == d else '' }}">Last {{ d }} days</a>{% endfor %}
+    </div>
+  </div>
+
+  <section class="hub-card">
+    <h2>{{ total }} closure{{ '' if total == 1 else 's' }} in the last {{ days }} days</h2>
+    {% if not total %}<p class="muted">Nothing yet.</p>{% else %}
+    <ul class="ex-bars">
+      {% for reason, n in counts %}
+      <li><span>{{ reasons.get(reason, 'No reason given') }}</span><b>{{ n }}</b><i style="width: {{ (100 * n / total)|round(0)|int }}%"></i></li>
+      {% endfor %}
+    </ul>{% endif %}
+  </section>
+
+  {% if rows %}
+  <section class="hub-card">
+    <h2>In their own words</h2>
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>When</th><th>Customer</th><th>Plan</th><th>Reason</th><th>What they said</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td class="num">{{ when(r['created_at']) }}</td><td>{{ r['email'] }}<small class="ds-sub">{{ r['orders_count'] }} order{{ '' if r['orders_count'] == 1 else 's' }}</small></td>
+            <td>{{ r['plan']|capitalize }}</td><td>{{ reasons.get(r['reason'], '-') }}</td><td>{{ r['detail'] or '-' }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

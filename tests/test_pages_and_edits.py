@@ -15,7 +15,7 @@ def _home(env, query=""):
 
 
 def _rows(html):
-    return len(re.findall(r'class="ch-row"', html))
+    return len(re.findall(r'<tr data-name=', html))
 
 
 def test_the_recent_files_have_numbered_pages_instead_of_view_all(env, wav_bytes):

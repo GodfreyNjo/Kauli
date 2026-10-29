@@ -20,15 +20,19 @@ def test_payment_history_folds_away(env, wav_bytes):
     env.place(wav_bytes)
     env.db.create_payment("p1", "u1", "pro", 6.72, None, "USD", "paystack", order_id=None)
     html = env.client.get("/client/billing").text
-    assert '<details class="card collapsible-card" id="payment-history">' in html and "Payment history" in html
+    assert '<details class="ds-card collapsible-card" id="payment-history" open>' in html and "Payment history" in html
 
 
-def test_each_orders_files_fold_away_and_the_first_is_open(env, wav_bytes):
+def test_the_files_page_is_a_table_with_type_tabs_search_and_each_orders_downloads(env, wav_bytes):
     env.place(wav_bytes)
     env.place(wav_bytes)
     html = env.client.get("/client/files").text
-    assert html.count('<details class="card collapsible-card"') == 2 and html.count("collapsible-card\" open") == 1
-    assert "Open this order" in html
+    assert html.count('<details class="ds-dl">') == 2 and "Upload file" in html and "Access and manage all your uploaded files." in html
+    for column in ("Name", "Type", "Size", "Uploaded", "Status", "Downloads"):
+        assert column in html
+    assert "All <small>2</small>" in html and "Audio <small>2</small>" in html and "Video <small>0</small>" in html
+    assert "clip.wav" in env.client.get("/client/files?type=audio").text and "clip.wav" not in env.client.get("/client/files?type=video").text
+    assert "clip.wav" in env.client.get("/client/files?q=clip").text and "clip.wav" not in env.client.get("/client/files?q=zzz").text
 
 
 def test_the_order_page_top_folds_away_once_the_order_is_ready(env, wav_bytes):

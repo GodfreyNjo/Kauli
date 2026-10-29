@@ -221,7 +221,7 @@ def test_reward_minutes_roll_over_and_only_the_used_part_is_spent(env):
 def test_the_plans_page_shows_usage_choices_and_closing(env):
     page = env.client.get("/client/plans").text
     assert "Pay as you go" in page and "2,500" in page and "6,500" in page and "Subscribe to Pro" in page and "Subscribe to Premium" in page
-    assert 'action="/client/billing/checkout"' in page and 'action="/settings/close-account"' in page and "Close my account" in page
+    assert 'action="/client/billing/checkout"' in page and 'href="/client/close-account"' in page and "close your account" in page
     assert "Instant AI minutes left" in page
     env.db.set_subscription_plan("u1", "pro", 30)
     page = env.client.get("/client/plans").text
@@ -233,7 +233,7 @@ def test_team_members_cannot_change_or_close_the_account(env):
     env.db.get_or_create_user("m1", "member@example.com", "client")
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("m1")), "client_scope_id": "u1"})
     page = env.client.get("/client/plans").text
-    assert "Ask the account owner" in page and "Close my account" not in page and 'action="/client/billing/checkout"' not in page
+    assert "Ask the account owner" in page and "close your account" not in page and 'action="/client/billing/checkout"' not in page
 
 
 # ------------------------------------------------------------------------------------------------ integrations

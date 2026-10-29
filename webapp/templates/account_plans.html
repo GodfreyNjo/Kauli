@@ -5,8 +5,8 @@
 <div class="hub" lang="en">
   <div class="hub-top">
     <div>
-      <h1>Plans &amp; account</h1>
-      <p class="muted">See what you have, compare plans, switch or leave. Payments are processed securely by Paystack.</p>
+      <h1>Choose the right plan for your needs</h1>
+      <p class="muted">Flexible plans for individuals and teams. Payments are processed securely by Paystack.</p>
     </div>
   </div>
   {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
@@ -25,7 +25,20 @@
   </section>
 
   <div class="pl-cards">
-    {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
+    {% for key, p in plans.items() %}
+    {% if key == 'enterprise' and key != current_plan %}
+    <article class="hub-card pl-card">
+      <h3>Enterprise</h3>
+      <p class="pl-price">Custom</p>
+      <ul>
+        <li>A volume rate set for your usage</li>
+        <li>Invoicing and bank transfer</li>
+        <li>Higher limits and priority handling</li>
+        <li>A named contact at Kauli</li>
+      </ul>
+      <a class="btn secondary pl-contact" href="/demo?interest=enterprise">Contact sales</a>
+    </article>
+    {% else %}
     <article class="hub-card pl-card{% if key == current_plan %} is-current{% endif %}">
       <h3>{{ 'Pay as you go' if key == 'free' else p['name'] }}</h3>
       <p class="pl-price">{% if p['price_usd'] %}${{ p['price_usd'] }}<small>/month</small>{% else %}$0{% endif %}</p>
@@ -52,12 +65,7 @@
       {% elif is_owner %}
         <form method="post" action="/client/billing/checkout" class="pl-buy">
           <input type="hidden" name="plan" value="{{ key }}">
-          <label>Billing
-            <select name="interval">
-              <option value="month">Monthly, ${{ p['price_usd'] }}</option>
-              <option value="year">Yearly, ${{ p['price_usd_year'] }}</option>
-            </select>
-          </label>
+          <input type="hidden" name="interval" value="month">
           <label>Pay with
             <select name="provider">
               <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (Paystack)</option>
@@ -69,20 +77,13 @@
         </form>
       {% else %}<p class="muted an-note">Ask the account owner to change the plan.</p>{% endif %}
     </article>
+    {% endif %}
     {% endfor %}
   </div>
   <p class="muted an-note">Need a different arrangement for a team or a newsroom? <a href="mailto:{{ contact_email }}">Email us</a>. See your payments and receipts on <a href="/client/billing">Billing</a>.</p>
 
   {% if is_owner %}
-  <details class="hub-card pl-danger">
-    <summary>Close my account</summary>
-    <p>Closing your account signs you out everywhere and stops it being used. Your orders and payment records are kept for accounting; to have your files deleted as well, request deletion in <a href="/settings?tab=security">Settings</a>.</p>
-    <form method="post" action="/settings/close-account" class="vc-form">
-      <label for="pl-confirm">Type your email ({{ user['email'] }}) to confirm</label>
-      <input type="email" id="pl-confirm" name="confirm_text" autocomplete="off" required>
-      <button type="submit" class="secondary pl-close">Close my account</button>
-    </form>
-  </details>
+  <p class="muted an-note pl-close-link">Not for you any more? You can <a href="/client/close-account">close your account</a> at any time.</p>
   {% endif %}
 </div>
 {% endblock %}

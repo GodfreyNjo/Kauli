@@ -507,15 +507,7 @@
       <p class="muted" style="font-size:0.85rem;">You won't be able to sign in afterward. Your order history
          stays as it is unless you separately request deletion above - closing your account isn't the same
          as deleting your data.</p>
-      <form method="post" action="/settings/close-account">
-        <label>Type your email ({{ user['email'] }}) to confirm
-          <input type="email" name="confirm_text" required placeholder="{{ user['email'] }}">
-        </label>
-        <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
-                onclick="return confirm('Close your Kauli account? You won\'t be able to sign back in.');">
-          Close my account
-        </button>
-      </form>
+      <a class="btn secondary" href="/client/close-account" style="border-color:var(--err); color:var(--err);">Close my account</a>
     </div>
     {% endif %}
   {% endif %}

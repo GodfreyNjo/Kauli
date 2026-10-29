@@ -165,6 +165,9 @@
         <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
         <a href="/staff/blog" class="{{ 'active' if request.url.path.startswith('/staff/blog') and 'audio' not in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
         <a href="/staff/blog-audio" class="{{ 'active' if '/staff/blog-audio' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Blog audio</span></a>
+        <a href="/staff/payment-failures" class="{{ 'active' if '/staff/payment-failures' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Failed payments</span></a>
+        <a href="/staff/winback" class="{{ 'active' if '/staff/winback' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">Win-back</span></a>
+        <a href="/staff/exit-feedback" class="{{ 'active' if '/staff/exit-feedback' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Exit feedback</span></a>
         <a href="/staff/providers" class="{{ 'active' if '/staff/providers' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Providers</span></a>
         <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
         <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
@@ -216,6 +219,14 @@
         <div class="plan-banner" role="status">
           <span><strong>Choose a plan to download your files.</strong> Your orders still process meanwhile.</span>
           <a class="btn" href="/client/billing?choose_plan=1">Choose a plan</a>
+        </div>
+        {% endif %}
+        {% if user is defined and user and user['role'] == 'client' and payment_issue(user) and request.url.path != '/client/billing/update-card' %}
+        {% set pi = payment_issue(user) %}
+        <div class="plan-banner pay-banner" role="status">
+          <span><strong>We had trouble processing your latest payment.</strong> Your plan is still active while we try again; please update your payment method to avoid any interruption.</span>
+          <a class="btn" href="/client/billing/update-card">Update payment method</a>
+          <a class="pay-banner-more" href="/client/billing#payment-problem">Need more time or a cheaper option?</a>
         </div>
         {% endif %}
         {% block content %}{% endblock %}
@@ -693,7 +704,7 @@
       });
     }
   </script>
-  <script src="/static/studio_wave.js?v=1" defer></script>
+  <script src="/static/studio_wave.js?v=2" defer></script>
 {% if user is defined and user and user['role'] == 'client' %}{% include "_assistant.html" %}{% endif %}
 </body>
 </html>

@@ -13,9 +13,9 @@
 {% set privacy_link %}<a href="/privacy">{{ t('lg_privacy') }}</a>{% endset %}
 {% set cookies_link %}<a href="/privacy#cookies">{{ t('lg_cookies') }}</a>{% endset %}
 <div class="auth-shell auth-shell--welcome">
+  <div class="auth-lang auth-lang--top">{{ lang_dropdown('/login?mode=signup' if mode == 'signup' else '/login') }}</div>
   <div class="auth-form-panel">
     <div class="auth-form-inner">
-      <div class="auth-lang">{{ lang_dropdown('/login?mode=signup' if mode == 'signup' else '/login') }}</div>
       <div class="auth-brand">
         <a href="/" aria-label="Kauli - back to home">
           <picture>
@@ -44,11 +44,11 @@
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
             <span class="auth-field-label">{{ t('lg_email') }}</span>
-            <input type="email" name="email" placeholder="you@example.com" required autocomplete="username" autocapitalize="off" spellcheck="false" {% if mode != 'signup' %}autofocus{% endif %}>
+            <span class="auth-input-icon-group auth-has-icon"><svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="m4 7.5 8 6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><input type="email" name="email" placeholder="you@company.com" required autocomplete="username" autocapitalize="off" spellcheck="false" {% if mode != 'signup' %}autofocus{% endif %}></span>
           </label>
           <label class="auth-field">
             <span class="auth-field-label">{{ t('lg_password') }}</span>
-            <span class="auth-input-icon-group">
+            <span class="auth-input-icon-group auth-has-icon"><svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
               <input type="password" name="password" placeholder="{{ t('lg_password') }}" required minlength="6" autocomplete="current-password" class="auth-password-input">
               <button type="button" class="auth-password-toggle" aria-label="Show password" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
@@ -75,11 +75,11 @@
           <input type="hidden" name="next" value="{{ next or '' }}">
           <label class="auth-field">
             <span class="auth-field-label">{{ t('lg_email') }}</span>
-            <input type="email" name="email" value="{{ email or '' }}" placeholder="you@example.com" required autocomplete="email" autocapitalize="off" spellcheck="false" {% if mode == 'signup' %}autofocus{% endif %}>
+            <span class="auth-input-icon-group auth-has-icon"><svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="m4 7.5 8 6 8-6" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><input type="email" name="email" value="{{ email or '' }}" placeholder="you@company.com" required autocomplete="email" autocapitalize="off" spellcheck="false" {% if mode == 'signup' %}autofocus{% endif %}></span>
           </label>
           <label class="auth-field">
             <span class="auth-field-label">{{ t('lg_password') }}</span>
-            <span class="auth-input-icon-group">
+            <span class="auth-input-icon-group auth-has-icon"><svg class="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
               <input type="password" name="password" id="signup-password" placeholder="{{ t('lg_password') }}" required minlength="{{ password_min_length }}" autocomplete="new-password" aria-describedby="signup-password-checklist" class="auth-password-input">
               <button type="button" class="auth-password-toggle" aria-label="Show password" aria-pressed="false">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.7"/></svg>
@@ -113,12 +113,13 @@
       </picture>
     </a>
     <div class="auth-showcase">
-      <h2>{{ t('lg_panel_h') }}</h2>
+      {% set words = t('lg_panel_h').split(' ') %}{% set cut = (words|length / 2)|round(0, 'ceil')|int %}
+      <h2>{{ words[:cut]|join(' ') }}{% if words[cut:] %} <span class="auth-hl">{{ words[cut:]|join(' ') }}</span>{% endif %}</h2>
       <p class="auth-welcome-lede">{{ t('lg_panel_sub', n=free_minutes|int) }}</p>
       <ul class="auth-facts">
-        <li><strong>{{ t('lg_f1_t', n=language_total) }}</strong><span>{{ t('lg_f1_s') }}</span></li>
-        <li><strong>{{ t('lg_f2_t') }}</strong><span>{{ t('lg_f2_s') }}</span></li>
-        <li><strong>{{ t('lg_f3_t', n=free_minutes|int) }}</strong><span>{{ t('lg_f3_s') }}</span></li>
+        <li><span class="auth-fact-ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l9-11h-6.2L13 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span><div><strong>{{ t('lg_f3_t', n=free_minutes|int) }}</strong><span>{{ t('lg_f3_s') }}</span></div></li>
+        <li><span class="auth-fact-ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 5 6v5.5c0 4.4 2.9 8 7 9.5 4.1-1.5 7-5.1 7-9.5V6l-7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div><strong>{{ t('lg_f2_t') }}</strong><span>{{ t('lg_f2_s') }}</span></div></li>
+        <li><span class="auth-fact-ic"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18" stroke="currentColor" stroke-width="1.7"/></svg></span><div><strong>{{ t('lg_f1_t', n=language_total) }}</strong><span>{{ t('lg_f1_s') }}</span></div></li>
       </ul>
     </div>
   </section>
@@ -130,7 +131,7 @@
   // this without a second hidden input or losing the browser's own
   // autofill/paste behavior.
   document.querySelectorAll('.auth-password-toggle').forEach(function (btn) {
-    var input = btn.previousElementSibling;
+    var input = btn.parentNode.querySelector('input');
     btn.addEventListener('click', function () {
       var showing = input.type === 'text';
       input.type = showing ? 'password' : 'text';

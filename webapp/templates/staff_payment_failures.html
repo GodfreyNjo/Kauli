@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Failed payments{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Failed subscription payments</h1>
+      <p class="muted">Paystack retries the card by itself. Customers keep their plan while it does, get a kind email when a payment fails and another if the retry fails too, and the plan is paused (never deleted) only if Paystack gives up.</p>
+    </div>
+  </div>
+  <section class="hub-card">
+    {% if not rows %}<p class="muted">No failed payments.</p>{% else %}
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>Customer</th><th>First failed</th><th>Tries</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td>{{ r['email'] }}</td><td class="num">{{ when(r['first_failed_at']) }}</td><td class="num">{{ r['attempts'] }}</td>
+          <td>{% if not r['resolved_at'] %}Waiting for payment{% elif r['outcome'] == 'paid' %}Paid{% elif r['outcome'] == 'downgraded' %}Moved to Pay as you go{% elif r['outcome'] == 'paused' %}Plan paused{% else %}{{ r['outcome'] }}{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

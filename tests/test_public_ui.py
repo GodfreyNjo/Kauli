@@ -150,7 +150,7 @@ def test_login_is_task_focused_and_accessible(client):
     assert 'autocomplete="username"' in html and 'autocomplete="email"' in html
     assert "Forgot your password?" in html and "Create a free account" in html and "Create free account" in html
     assert 'href="/terms"' in html and 'href="/privacy"' in html
-    assert "Audio to text in minutes" in html and "Human expertise. Global reach." not in html and "What you get" not in html
+    assert re.search(r"Audio to text\s+<span class=\"auth-hl\">in minutes</span>", html) and "Human expertise. Global reach." not in html and "What you get" not in html
     assert "AI Drafted, Human Verified" not in html
     # every input is wrapped in a visible label
     assert html.count('class="auth-field-label"') >= 4

@@ -7,7 +7,7 @@
   "use strict";
   var body = document.body;
   if (!body || !(body.classList.contains("m-public") || body.classList.contains("auth-page"))) return;
-  var HOSTS = ".tk-hero, .m-hero, .hd-hero, .demo-hero, .cta-band, .auth-brand-panel.auth-welcome";
+  var HOSTS = ".tk-hero, .m-hero, .hd-hero, .demo-hero, .cta-band";
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var hosts = [].slice.call(document.querySelectorAll(HOSTS));
   if (!hosts.length) return;
@@ -105,27 +105,4 @@
   }
 
   hosts.forEach(mount);
-
-  // sign-in page: a "live" tag, and the "what you get" points lit one after another
-  var panel = document.querySelector(".auth-welcome");
-  if (panel) {
-    var hud = document.createElement("div");
-    hud.className = "sw-hud";
-    hud.setAttribute("aria-hidden", "true");
-    hud.innerHTML = "<i></i>Studio live";
-    panel.appendChild(hud);
-    var items = [].slice.call(panel.querySelectorAll(".auth-facts li"));
-    if (items.length && !reduce) {
-      var k = 0, paused = false;
-      var light = function () {
-        items.forEach(function (li, i) { li.classList.toggle("is-lit", i === k); });
-        document.dispatchEvent(new Event("sw-pulse"));
-        k = (k + 1) % items.length;
-      };
-      items.forEach(function (li, i) { li.addEventListener("mouseenter", function () { paused = true; k = i; light(); }); });
-      panel.addEventListener("mouseleave", function () { paused = false; });
-      light();
-      setInterval(function () { if (!paused && !document.hidden) light(); }, 3200);
-    }
-  }
 })();

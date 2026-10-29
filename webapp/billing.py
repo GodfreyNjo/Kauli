@@ -626,6 +626,14 @@ def _is_recurring(subscription) -> bool:
         return False
 
 
+def _grace_until(subscription) -> float:
+    """While a renewal payment is failing the plan stays open until this time (see dunning.py)."""
+    try:
+        return subscription["grace_until"] or 0.0
+    except (KeyError, IndexError):
+        return 0.0
+
+
 def effective_plan(user, subscription) -> str:
     """What the user actually gets, not just what's on file - the
     KAULI_TEST_CLIENT_EMAILS allowlist (matching KAULI_STAFF_EMAILS'
@@ -638,7 +646,7 @@ def effective_plan(user, subscription) -> str:
     if subscription["status"] != "active":
         return "free"
     grace = RECURRING_GRACE_DAYS * 86400 if _is_recurring(subscription) else 0
-    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time():
+    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time() and _grace_until(subscription) < time.time():
         return "free"  # lapsed - don't silently keep paid benefits past the period
     return subscription["plan"]
 
@@ -649,7 +657,7 @@ def _plan_in_force(subscription) -> str:
     if subscription is None or subscription["status"] != "active":
         return "free"
     grace = RECURRING_GRACE_DAYS * 86400 if _is_recurring(subscription) else 0
-    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time():
+    if subscription["current_period_end"] and subscription["current_period_end"] + grace < time.time() and _grace_until(subscription) < time.time():
         return "free"
     return subscription["plan"] if subscription["plan"] in PLANS else "free"
 
@@ -842,6 +850,20 @@ def paystack_disable_subscription(subscription_code: str, email_token: str) -> d
         return {"ok": True}
     except Exception as exc:
         return {"ok": False, "error": f"Couldn't reach Paystack: {exc}"}
+
+
+def paystack_manage_link(subscription_code: str) -> str | None:
+    """A secure Paystack page where the customer can change the card behind a subscription. None if Paystack will not give one."""
+    key = _paystack_key()
+    if not key or not subscription_code:
+        return None
+    try:
+        resp = httpx.get(f"https://api.paystack.co/subscription/{subscription_code}/manage/link",
+                         headers={"Authorization": f"Bearer {key}"}, timeout=10)
+        data = resp.json()
+        return (data.get("data") or {}).get("link") if data.get("status") else None
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def paystack_verify(reference: str) -> dict:

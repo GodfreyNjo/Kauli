@@ -453,6 +453,45 @@ CREATE TABLE IF NOT EXISTS upload_audit_log (
     created_at REAL NOT NULL
 );
 
+-- One welcome-back coupon per customer, ever (UNIQUE user_id). id IS the code (RETURN-XXXX-XXXX): single-use, tied to this account only.
+-- Using it starts a free month of `plan` (30 days, no card, lapses by itself).
+CREATE TABLE IF NOT EXISTS winback_offers (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL UNIQUE,
+    email TEXT NOT NULL,
+    segment TEXT NOT NULL,
+    plan TEXT NOT NULL,
+    sent_at REAL NOT NULL,
+    claimed_at REAL,
+    expires_at REAL
+);
+
+-- A failed subscription payment that has not been put right yet (one row per customer, replaced if it happens again later).
+CREATE TABLE IF NOT EXISTS payment_failures (
+    user_id TEXT PRIMARY KEY,
+    email TEXT NOT NULL,
+    first_failed_at REAL NOT NULL,
+    last_failed_at REAL NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 1,
+    reason TEXT,
+    reminder_sent_at REAL,
+    extension_used INTEGER NOT NULL DEFAULT 0,
+    resolved_at REAL,
+    outcome TEXT                                -- 'paid' | 'downgraded' | 'paused'
+);
+
+-- What a customer says when they close their account (optional survey). Read by staff on /staff/exit-feedback.
+CREATE TABLE IF NOT EXISTS account_exit_surveys (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    plan TEXT,
+    reason TEXT,
+    detail TEXT,
+    orders_count INTEGER DEFAULT 0,
+    created_at REAL NOT NULL
+);
+
 -- Real security audit trail - a genuine gap before this: upload_audit_log
 -- above covers file uploads specifically, but nothing recorded WHO logged
 -- in (or failed to), changed a password, or was promoted/demoted/granted
@@ -992,6 +1031,9 @@ def init_db() -> None:
         # One-time minutes earned from referrals. Unlike bonus_minutes (a standing monthly top-up) they are spent once and
         # roll over from month to month until used; get_subscription_current takes what was used out of them at each reset.
         conn.execute("ALTER TABLE subscriptions ADD COLUMN reward_minutes REAL NOT NULL DEFAULT 0")
+    if "grace_until" not in existing_sub_cols:
+        # While a subscription payment is failing the plan stays open until here (see dunning.py), past the normal 3-day grace.
+        conn.execute("ALTER TABLE subscriptions ADD COLUMN grace_until REAL")
     existing_payment_cols = {row["name"] for row in conn.execute("PRAGMA table_info(payments)")}
     if "receipt_path" not in existing_payment_cols:
         # A real uploaded receipt image/PDF for an off-platform (bank

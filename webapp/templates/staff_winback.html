@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Win-back{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Win back quiet customers</h1>
+      <p class="muted">Customers who paid Kauli and then went silent for {{ inactive_days }}+ days, or whose plan ended without renewing, get one personal coupon code, ever: {{ days }} days of the plan they had (Pro if they only paid per order), free. People on free minutes only are never included, nor anyone still paying every month, and anyone who unsubscribed from marketing is skipped.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+
+  <section class="hub-card">
+    <h2>Sending</h2>
+    <p>Automatic daily sending is <strong>{{ 'ON' if autosend else 'OFF' }}</strong>{% if not autosend %}: nothing is emailed unless you press a button below. To turn it on, set <code>KAULI_WINBACK_AUTOSEND=1</code> on the server.{% endif %}
+      {% if not mail_ready %}<br><span class="muted">Email is not configured here, so offers would only show inside customers' accounts.</span>{% endif %}</p>
+    <p class="muted">Codes sent so far: {{ stats['sent'] }} · Used: {{ stats['claimed'] }}</p>
+  </section>
+
+  <section class="hub-card">
+    <div class="hub-top" style="margin:0 0 8px;"><h2>{{ rows|length }} customer{{ '' if rows|length == 1 else 's' }} qualify now</h2>
+      {% if rows %}<form method="post" action="/staff/winback/send" onsubmit="return confirm('Email the free-month code to {{ [rows|length, 25]|min }} customer(s)?');"><button type="submit">Send to {{ [rows|length, 25]|min }}</button></form>{% endif %}</div>
+    {% if not rows %}<p class="muted">Nobody right now.</p>{% else %}
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>Customer</th><th>Why</th><th>Quiet for</th><th>Paid in total</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr><td>{{ r['user']['email'] }}</td><td>{{ labels[r['segment']] }}</td><td class="num">{{ r['quiet_days'] }} days</td><td class="num">${{ '%.2f'|format(r['paid_total']) }}</td>
+          <td><form method="post" action="/staff/winback/send"><input type="hidden" name="user_id" value="{{ r['user']['id'] }}"><button type="submit" class="secondary">Send code</button></form></td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>{% endif %}
+  </section>
+
+  {% if stats['recent'] %}
+  <section class="hub-card">
+    <h2>Codes sent</h2>
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>Sent</th><th>Customer</th><th>Code</th><th>Why</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for o in stats['recent'] %}
+        <tr><td class="num">{{ when(o['sent_at']) }}</td><td>{{ o['email'] }}</td><td><code>{{ o['id'] }}</code></td><td>{{ labels.get(o['segment'], o['segment']) }}</td>
+          <td>{% if o['claimed_at'] %}Used, free month ends {{ when(o['expires_at']) }}{% else %}Not used yet{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

@@ -2,73 +2,98 @@
 {% set translated = true %}
 {% block title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
-{% from "_status_macros.html" import short_status, status_tone with context %}
+{% from "_ds.html" import ico, file_ic, status_pill, svc_cell, langs_cell with context %}
 {% from "_pager.html" import pager %}
 
-<div class="ch">
-  <div class="ch-top">
-    <h1>{{ t(greeting) }}{% set fn = first_name(user) %}{% if fn %}{{ {'zh': '，', 'ja': '、', 'ar': '،'}.get(ui_lang(), ', ') }}{{ fn }}{% endif %}</h1>
+<div class="ds-page">
+  {% if winback_offer %}
+  <div class="ds-card wb-banner"><div><strong>A free month, on us.</strong> Welcome back: 30 days of your plan, free, with your personal code.</div>
+    <a class="ds-btn small" href="/client/winback/{{ winback_offer['id'] }}">Get my free month</a></div>
+  {% endif %}
+  <div class="ds-head">
+    <div>
+      <h1>{{ t(greeting) }}{% set fn = first_name(user) %}{% if fn %}{{ {'zh': '，', 'ja': '、', 'ar': '،'}.get(ui_lang(), ', ') }}{{ fn }}{% endif %}</h1>
+      <p>{{ t('home_sub') }}</p>
+    </div>
     {% if free_minutes_left and free_minutes_left > 0 %}
     {% set free_n %}<b>{{ free_minutes_left|round|int }}</b>{% endset %}
-    <a href="/client#order-form" class="ch-plan">{{ t('free_left', n=free_n) }}</a>
+    <div class="ds-head-actions"><a href="/client#order-form" class="ds-pill info ch-plan">{{ t('free_left', n=free_n) }}</a></div>
     {% endif %}
   </div>
 
-  <div class="ch-actions">
-    <a class="ch-action" href="/client#order-form">
-      <span class="ch-art ch-art-upload" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5M7 10l5-5 5 5M5 19h14"/></svg></span>
-      <strong>{{ t('act_upload_t') }}</strong><small>{{ t('act_upload_s') }}</small>
+  <div class="ds-actions">
+    <a class="ds-action primary" href="/client#order-form">
+      <span class="ds-action-ic">{{ ico('upload', 24) }}</span>
+      <span><strong>{{ t('act_upload_t') }}</strong><small>{{ t('act_upload_s') }}</small></span>
+      <span class="go">{{ ico('arrow', 18) }}</span>
     </a>
-    <a class="ch-action" href="/client?source=youtube#order-form">
-      <span class="ch-art ch-art-link" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
-      <strong>{{ t('act_yt_t') }}</strong><small>{{ t('act_yt_s') }}</small>
+    <a class="ds-action" href="/client?source=youtube#order-form">
+      <span class="ds-action-ic">{{ ico('link', 24) }}</span>
+      <span><strong>{{ t('act_yt_t') }}</strong><small>{{ t('act_yt_s') }}</small></span>
+      <span class="go">{{ ico('arrow', 18) }}</span>
     </a>
-    <a class="ch-action" href="/try">
-      <span class="ch-art ch-art-demo" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9v6M9 6v12M13 4v16M17 8v8M21 11v2"/></svg></span>
-      <strong>{{ t('act_demo_t') }}</strong><small>{{ t('act_demo_s') }}</small>
-    </a>
-    <a class="ch-action" href="/client/billing">
-      <span class="ch-art ch-art-plan" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/></svg></span>
-      <strong>{{ t('act_plan_t') }}</strong><small>{{ t('act_plan_s') }}</small>
+    <a class="ds-action" href="/try">
+      <span class="ds-action-ic">{{ ico('play', 24) }}</span>
+      <span><strong>{{ t('act_demo_t') }}</strong><small>{{ t('act_demo_s') }}</small></span>
+      <span class="go">{{ ico('arrow', 18) }}</span>
     </a>
   </div>
 
-  <div class="ch-pills">
-    <a href="/client"><b>{{ stats['in_progress'] }}</b> {{ t('pill_processing') }}</a>
-    <a href="/client"><b>{{ stats['in_review'] }}</b> {{ t('pill_review') }}</a>
-    <a href="/client" class="{{ 'is-attention' if stats['needs_you'] > 0 else '' }}"><b>{{ stats['needs_you'] }}</b> {{ t('pill_needs') }}</a>
-    <a href="/client" class="is-ok"><b>{{ stats['completed'] }}</b> {{ t('pill_ready') }}</a>
+  <div class="ds-tiles">
+    <a class="ds-tile" href="/client/home?status=in_progress"><span class="ds-tile-ic">{{ ico('clock', 22) }}</span>
+      <span><b>{{ stats['in_progress'] }}</b><strong>{{ t('pill_processing') }}</strong><small>{{ t('tile_processing_h') }}</small></span></a>
+    <a class="ds-tile" href="/client/home?status=in_progress"><span class="ds-tile-ic">{{ ico('doc', 22) }}</span>
+      <span><b>{{ stats['in_review'] }}</b><strong>{{ t('pill_review') }}</strong><small>{{ t('tile_review_h') }}</small></span></a>
+    <a class="ds-tile{{ ' warn' if stats['needs_you'] > 0 else '' }}" href="/client/pending"><span class="ds-tile-ic">{{ ico('alert', 22) }}</span>
+      <span><b>{{ stats['needs_you'] }}</b><strong>{{ t('pill_needs') }}</strong><small>{{ t('tile_needs_h') }}</small></span></a>
+    <a class="ds-tile ok" href="/client/home?status=ready"><span class="ds-tile-ic">{{ ico('check', 22) }}</span>
+      <span><b>{{ stats['completed'] }}</b><strong>{{ t('pill_ready') }}</strong><small>{{ t('tile_ready_h') }}</small></span></a>
   </div>
 
-  <section class="ch-files" aria-labelledby="ch-files-title">
-    <div class="ch-files-head">
+  <section class="ds-card ch-files" aria-labelledby="ch-files-title">
+    <div class="ds-card-head">
       <h2 id="ch-files-title">{{ t('recent_files') }}</h2>
-      <form class="ch-search" method="get" action="/client/home" role="search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-        <input type="search" id="ch-search" name="q" value="{{ q }}" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off"></form>
+      <div class="ds-head-actions">
+        <form class="ds-search ch-search" method="get" action="/client/home" role="search">{{ ico('search', 18) }}
+          <input type="search" id="ch-search" name="q" value="{{ q }}" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off">
+          {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+        </form>
+      </div>
     </div>
-    {% if not recent_orders and q %}
-    <p class="ch-none">{{ t('no_match') }}</p>
+    <div class="ds-tabs" role="group" aria-label="{{ t('col_status') }}">
+      {% for key, label in [('', t('tab_all')), ('in_progress', t('tab_progress')), ('needs_you', t('tab_attention')), ('ready', t('tab_ready'))] %}
+      <a href="/client/home{% if key or q %}?{% if key %}status={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
+         class="{{ 'is-on' if status == key else '' }}"{% if status == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
+      {% endfor %}
+    </div>
+
+    {% if not recent_orders and (q or status) %}
+    <p class="ds-empty ch-none">{{ t('no_match') }}</p>
     {% elif not recent_orders %}
-    <div class="ch-empty">
+    <div class="ds-empty ch-empty">
       <p>{{ t('empty_files') }}</p>
-      <a href="/client#order-form" class="btn cta-olive">{{ t('act_upload_t') }}</a>
+      <a href="/client#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
     </div>
     {% else %}
-    <ul class="ch-list" id="ch-list">
-      {% for o in recent_orders %}
-      <li>
-        <a class="ch-row" href="/client/orders/{{ o['id'] }}" data-name="{{ o['original_filename']|lower }}">
-          <span class="ch-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg></span>
-          <span class="ch-row-main">
-            <strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong>
-            <small>{{ o['created_at']|ts_ui }} &middot; {{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }} &middot; {{ t('svc_' ~ o['service_level']) if o['service_level'] in ('transcribe', 'translate', 'dub') else o['service_level']|replace('_', ' ')|capitalize }}</small>
-          </span>
-          <span class="ch-state ch-{{ status_tone(o['status']) }}">{{ short_status(o['status']) }}</span>
-        </a>
-      </li>
-      {% endfor %}
-    </ul>
-    {{ pager(page, pages, '/client/home', {'q': q}) }}
+    <div class="ds-scroll">
+      <table class="ds-table" id="ch-list">
+        <thead><tr><th>{{ t('col_file') }}</th><th class="hide-sm">{{ t('col_service') }}</th><th class="hide-sm">{{ t('col_langs') }}</th><th class="hide-sm">{{ t('col_updated') }}</th><th>{{ t('col_status') }}</th><th>{{ t('col_actions') }}</th></tr></thead>
+        <tbody>
+          {% for o in recent_orders %}
+          <tr data-name="{{ o['original_filename']|lower }}">
+            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/client/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
+              <small>{{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }}</small></div></div></td>
+            <td class="hide-sm">{{ svc_cell(o) }}</td>
+            <td class="hide-sm">{{ langs_cell(o) }}</td>
+            <td class="hide-sm num">{{ o['created_at']|ts_ui }}</td>
+            <td>{{ status_pill(o['status']) }}</td>
+            <td><a class="ds-act" href="/client/orders/{{ o['id'] }}" aria-label="{{ t('act_open') }}: {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="ds-pager">{{ pager(page, pages, '/client/home', {'q': q, 'status': status}) }}</div>
     {% endif %}
   </section>
 </div>
