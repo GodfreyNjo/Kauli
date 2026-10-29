@@ -44,7 +44,7 @@ CJK_CANDIDATES = [WIN / "msyh.ttc", pathlib.Path("/usr/share/fonts/opentype/noto
 
 # Which demos have a music bed under the voice (scripts/make_demo_music.py).
 MUSIC = demo_content.MUSIC_BEDS
-MUSIC_VOLUME = 0.2
+MUSIC_VOLUME = 0.25
 
 # How each person looks. The gender matches the voice in demo_content.SCENARIOS[...]["cast"] (a test checks that).
 LOOKS = {

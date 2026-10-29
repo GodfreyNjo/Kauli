@@ -66,20 +66,24 @@ MARKETS = {
     # move an account to a real market (db.set_billing_market).
     "legacy": "Existing account pricing",
 }
+# Instant AI costs the same everywhere: one price, for every visitor and every account. Only HUMAN review has two cards: the
+# standard one (near the market rate of the mainstream human services, so it never looks suspiciously cheap) and a lower one
+# that is shown only to visitors in lower-income countries (LOWER_PRICE_COUNTRIES below).
+AI_PRICES = {"transcribe": 0.12, "translate": 0.30, "dub": 0.80}
 PRICE_CARD = {
     # Human-reviewed rows re-set 2026-10-28 to sit just under the mainstream human services (Rev $1.99 and Happy
     # Scribe $2.00 per minute for human transcription; Rev's human translated subtitles start at $6.49) while staying
-    # well above the budget end (GoTranscript ~$1.00, TranscribeMe ~$0.79). Instant AI rows are unchanged. The lower
-    # price market below is unchanged too. Orders already placed keep the rate they were priced at.
+    # well above the budget end (GoTranscript ~$1.00, TranscribeMe ~$0.79). Orders already placed keep the rate they
+    # were priced at.
     "intl": {
-        "transcribe": {"ai": 0.12, "human": 1.79},
-        "translate": {"ai": 0.30, "human": 2.99},
-        "dub": {"ai": 0.80, "human": 3.99},
+        "transcribe": {"ai": AI_PRICES["transcribe"], "human": 1.79},
+        "translate": {"ai": AI_PRICES["translate"], "human": 2.99},
+        "dub": {"ai": AI_PRICES["dub"], "human": 3.99},
     },
     "ea": {
-        "transcribe": {"ai": 0.06, "human": 0.60},
-        "translate": {"ai": 0.15, "human": 0.75},
-        "dub": {"ai": 0.50, "human": 1.20},
+        "transcribe": {"ai": AI_PRICES["transcribe"], "human": 0.60},
+        "translate": {"ai": AI_PRICES["translate"], "human": 0.75},
+        "dub": {"ai": AI_PRICES["dub"], "human": 1.20},
     },
 }
 DEFAULT_MARKET = "intl"
@@ -107,12 +111,12 @@ def market_for_country(country_code: str | None) -> str:
 def rate_for(service_level: str, market: str | None, review_tier: str = "human") -> float:
     """The per-minute rate for one service level in one market/tier. Unknown
     or legacy markets fall back to the original SERVICE_LEVELS rates for the
-    human tier, and to East-Africa AI prices for the AI tier."""
+    human tier, and to the universal Instant AI prices for the AI tier."""
     review_tier = review_tier if review_tier in REVIEW_TIERS else "human"
     if market in PRICE_CARD:
         return PRICE_CARD[market][service_level][review_tier]
     if review_tier == "ai":
-        return PRICE_CARD["ea"][service_level]["ai"]
+        return AI_PRICES[service_level]
     return SERVICE_LEVELS[service_level]["rate_per_min"]
 
 

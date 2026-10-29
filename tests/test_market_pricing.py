@@ -19,15 +19,26 @@ def test_approved_price_card():
     assert billing.rate_for("dub", "intl", "ai") == 0.80
     assert billing.rate_for("transcribe", "intl", "human") == 1.79
     assert billing.rate_for("dub", "intl", "human") == 3.99
-    assert billing.rate_for("transcribe", "ea", "ai") == 0.06
+    assert billing.rate_for("transcribe", "ea", "ai") == 0.12              # Instant AI is the same price everywhere
     assert billing.rate_for("dub", "ea", "human") == 1.20
 
 
-def test_legacy_accounts_keep_old_human_rates_and_get_ea_ai_rates():
+def test_legacy_accounts_keep_old_human_rates_and_get_the_universal_ai_rates():
     for sl, old in (("transcribe", 0.40), ("translate", 0.90), ("dub", 1.50)):
         assert billing.rate_for(sl, "legacy", "human") == old
         assert billing.rate_for(sl, None, "human") == old
-        assert billing.rate_for(sl, "legacy", "ai") == billing.PRICE_CARD["ea"][sl]["ai"]
+        assert billing.rate_for(sl, "legacy", "ai") == billing.AI_PRICES[sl]
+
+
+def test_instant_ai_is_one_price_everywhere_and_only_human_review_has_a_lower_card():
+    for sl in billing.SERVICE_LEVELS:
+        assert {billing.rate_for(sl, m, "ai") for m in ("intl", "ea", "legacy", None)} == {billing.AI_PRICES[sl]}
+        assert billing.rate_for(sl, "ea", "human") < billing.rate_for(sl, "intl", "human")
+    # a US visitor never sees the lower human-review rate, and a visitor in a lower-income country does
+    assert billing.market_for_country("US") == "intl" and billing.market_for_country("CA") == "intl" and billing.market_for_country("GB") == "intl"
+    assert billing.market_for_country("KE") == "ea" and billing.market_for_country("IN") == "ea" and billing.market_for_country("NG") == "ea"
+    for sl in billing.SERVICE_LEVELS:
+        assert billing.rate_for(sl, "intl", "human") >= 1.79
 
 
 def test_unknown_review_tier_is_treated_as_human():

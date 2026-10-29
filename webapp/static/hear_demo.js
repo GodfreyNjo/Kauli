@@ -65,6 +65,10 @@
     var marks = (D.timing || {})[(url || "").split("/").pop()] || [];
     return marks.map(function (m) { return m[1]; });
   }
+  function clipLength(url) {
+    var marks = (D.timing || {})[(url || "").split("/").pop()] || [];
+    return marks.length ? fmt(marks[marks.length - 1][2]) : "";
+  }
   function highlight(el, frac) {
     var spans = el._words || [], n = spans.length, upto = Math.floor(frac * n + 0.0001);
     for (var i = 0; i < n; i++) spans[i].className = i < upto ? "done" : (i === upto ? "now" : "");
@@ -119,9 +123,16 @@
     var inText = toEn ? s.tr[state.lang] : s.en, inLang = toEn ? state.lang : "en";
     var outText = toEn ? s.en : s.tr[state.lang], outLang = toEn ? "en" : state.lang;
     var dubbed = s.service === "dub";
-    $("hd-service").textContent = s.service_label;
+    document.querySelector(".hd").classList.toggle("is-dub", dubbed);
+    $("hd-dubhead").hidden = !dubbed;
+    $("hd-chip-in").textContent = dubbed ? "Original (" + (toEn ? L.name : "English") + ")" : "Original Audio";
+    $("hd-service").textContent = dubbed ? "Dubbed (" + (toEn ? "English" : L.name) + ")" : "Translated Output";
+    $("hd-dur-in").textContent = clipLength(clipFor("in"));
+    $("hd-dur-out").textContent = clipLength(dubbed ? clipFor("out") : clipFor("in"));
     $("hd-headline").textContent = toEn ? (s.headline_en || s.headline) : s.headline;
-    $("hd-in-title").textContent = (toEn ? L.native : "English") + ", as recorded";
+    $("hd-in-title").textContent = s.label + " (" + (toEn ? L.name : "English") + ")";
+    $("hd-out-title").textContent = (toEn ? "English" : L.name) + (dubbed ? " dubbing" : " translation");
+    $("hd-feat-lang").textContent = toEn ? "English" : L.name;
     $("hd-dir-lang").textContent = L.name;
     var names = s.multi ? s.cast : [];
     var startsIn = turnStarts(clipFor("in")), startsOut = turnStarts(dubbed ? clipFor("out") : clipFor("in"));
