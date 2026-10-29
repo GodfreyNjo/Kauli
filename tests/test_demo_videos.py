@@ -112,3 +112,19 @@ def test_the_demo_page_hands_the_cast_and_timing_to_the_player():
     assert interview["multi"] is True and interview["cast"] == ["Speaker 1", "Speaker 2"]
     assert data["scenarios"]["news"]["multi"] is False and "src-interview.mp3" in data["timing"]
     assert "Speaker 1: " in interview["en"] and "hd-spk" in client.get("/static/style.css").text
+
+
+def test_every_demo_file_is_committed_so_it_reaches_the_server():
+    """.gitignore skips *.mp3, so a new clip has to be force-added; a clip that is only on this machine plays nowhere else."""
+    import shutil
+    import subprocess
+    if not shutil.which("git"):
+        return
+    root = Path(__file__).parent.parent
+    listed = subprocess.run(["git", "ls-files", "webapp/static/demo"], cwd=root, capture_output=True, text=True)
+    if listed.returncode != 0:
+        return
+    tracked = {line.rsplit("/", 1)[-1] for line in listed.stdout.splitlines()}
+    wanted = {name for name, *_ in demo_content.all_clips()}
+    missing = sorted(n for n in wanted if (root / "webapp/static/demo" / n).exists() and n not in tracked)
+    assert not missing, f"on disk but not committed (use git add -f): {missing}"
