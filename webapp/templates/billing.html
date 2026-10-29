@@ -175,7 +175,7 @@
       <tr>
         <td data-label="Plan"><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
         <td data-label="Price">{% if p['price_usd'] %}${{ p['price_usd'] }}/mo{% if key in ('pro', 'premium') %}<br><span class="muted" style="font-size:0.78rem;">or ${{ p['price_usd_year'] }}/yr (save {{ billing_saving(p) }}%)</span>{% endif %}{% else %}$0{% endif %}</td>
-        <td data-label="Instant AI minutes a month">{{ p['included_ai_minutes']|int }}</td>
+        <td data-label="Instant AI minutes a month">{{ '{:,}'.format(p['included_ai_minutes']|int) }}{{ hours_suffix(p['included_ai_minutes']) }}</td>
         <td data-label="Discount on the rest">{% if p['discount'] %}{{ (p['discount'] * 100)|round|int }}%{% else %}-{% endif %}</td>
         <td data-label="Translation">{{ 'Priority (Claude)' if p['mt'] == 'claude' else 'Standard' }}</td>
         <td data-label="Video files">{{ '✓' if p['video_deliverables'] else '-' }}</td>

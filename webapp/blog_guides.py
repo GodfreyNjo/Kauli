@@ -201,7 +201,7 @@ def valid(secret, timestamp, body, header):
 <h2>Keeping the cost under control</h2>
 <ul>
 <li>Your first few minutes every month are free, so you can test a lesson end to end.</li>
-<li>Pro includes 2,500 Instant AI minutes a month and Premium includes 6,500, and they cover transcription and translation.</li>
+<li>Pro includes 2,500 Instant AI minutes a month and Premium includes 6,500 (about 108 hours), and they cover transcription and translation.</li>
 <li>Yearly billing costs less than paying monthly.</li>
 <li>Premium also includes burned-in captions and dubbed video files.</li>
 </ul>

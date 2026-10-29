@@ -175,6 +175,11 @@ TRIAL_VERIFICATION_FEE_USD = 1.00
 # provider); the rest of the allowance goes to the low-cost providers (Groq, then AssemblyAI), which is what makes thousands of
 # included minutes affordable. See app._route_asr and tests/test_plans_v2.py for the worst-case cost check.
 PRO_MINUTES, PREMIUM_MINUTES, ENTERPRISE_MINUTES = 2500, 6500, 25000
+
+
+def hours_suffix(minutes: float) -> str:
+    """" (about 108 hours)" after a big minute count, where hours are what people picture; nothing for small ones."""
+    return f" (about {round(minutes / 60):,} hours)" if minutes >= 6000 else ""
 PRO_QUALITY_MINUTES, PREMIUM_QUALITY_MINUTES, ENTERPRISE_QUALITY_MINUTES = 150, 400, 1000
 
 PLANS = {
@@ -199,7 +204,7 @@ PLANS = {
         "name": "Premium", "price_usd": 49, "price_usd_year": 379, "discount": 0.20, "included_ai_minutes": PREMIUM_MINUTES,
         "quality_minutes": PREMIUM_QUALITY_MINUTES,
         "mt": "claude", "video_deliverables": True, "support": "Priority",
-        "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
+        "blurb": f"{PREMIUM_MINUTES:,} Instant AI minutes{hours_suffix(PREMIUM_MINUTES)} every month for transcription and translation, 20% off everything else, burned captions & dubbed video "
                  "included, priority-quality translation and turnaround.",
     },
     # Not self-serve: arranged by hand for heavy users and organisations (custom rate, invoicing, a named contact).

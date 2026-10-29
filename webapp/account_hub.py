@@ -813,7 +813,7 @@ def _kb() -> list[dict]:
         {"k": "time long turnaround fast how long take finish minutes ready", "topic": "support",
          "a": "Instant AI usually finishes in a few minutes for short files and scales with length. Human-reviewed orders take longer; the estimated time is shown before you pay. Open the order to see live progress."},
         {"k": "price pricing cost plans plan pay how much subscription upgrade", "topic": "billing",
-         "a": f"Pay as you go starts with {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes every month. Pro is ${p['pro']['price_usd']}/month with {p['pro']['included_ai_minutes']:,} Instant AI minutes; Premium is ${p['premium']['price_usd']}/month with {p['premium']['included_ai_minutes']:,}. Yearly billing saves about a third. See Plans in the menu to compare or switch."},
+         "a": f"Pay as you go starts with {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes every month. Pro is ${p['pro']['price_usd']}/month with {p['pro']['included_ai_minutes']:,} Instant AI minutes; Premium is ${p['premium']['price_usd']}/month with {p['premium']['included_ai_minutes']:,}{billing.hours_suffix(p['premium']['included_ai_minutes'])}. Yearly billing saves about a third. See Plans in the menu to compare or switch."},
         {"k": "free minutes trial free free-tier signup", "topic": "billing",
          "a": f"Every account gets {billing.FREE_MINUTES_PER_MONTH:.0f} free Instant AI minutes a month, covering transcription and translation. Unused free minutes do not carry over, but minutes you earn from referrals do."},
         {"k": "pay payment card mpesa m-pesa paystack bank transfer methods secure", "topic": "billing",

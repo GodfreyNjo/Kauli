@@ -40,7 +40,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
              "detail": f"${pro['price_usd']}/month: {pro['included_ai_minutes']:.0f} Instant AI minutes every month for "
                        f"transcription and translation, {pro['discount'] * 100:.0f}% off everything else."},
             {"plan": "Premium", "for": for_prem,
-             "detail": f"${prem['price_usd']}/month: {prem['included_ai_minutes']:.0f} Instant AI minutes every month for "
+             "detail": f"${prem['price_usd']}/month: {prem['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(prem['included_ai_minutes'])} every month for "
                        f"transcription and translation, {prem['discount'] * 100:.0f}% off everything else, burned-in captions "
                        "and dubbed video included."},
             {"plan": "Enterprise", "for": for_ent,
@@ -76,7 +76,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Transcript, subtitles or a full dub",
                  "body": f"Pick the deliverable your video needs: a translated transcript to read, SRT or VTT subtitles to upload, or a dubbed track (dubbing is available in {dub_names})."},
                 {"title": "Minutes included on every paid plan",
-                 "body": f"Pro and Premium include {pro['included_ai_minutes']:.0f} and {prem['included_ai_minutes']:.0f} Instant AI minutes a month, and they cover translation as well as transcription."},
+                 "body": f"Pro and Premium include {pro['included_ai_minutes']:.0f} and {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])} Instant AI minutes a month, and they cover translation as well as transcription."},
             ],
             "choose": [
                 {**instant, "name": "Instant AI translation", "best": "Understanding a video, internal sharing, first drafts of subtitles."},
@@ -426,7 +426,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "Consistent terminology",
                  "body": f"Add notes or a style guide and a human editor follows it across lessons. Available in {hr_names}."},
                 {"title": "Minutes included",
-                 "body": f"Pro and Premium include {pro['included_ai_minutes']:.0f} and {prem['included_ai_minutes']:.0f} Instant AI minutes a month for transcription and translation."},
+                 "body": f"Pro and Premium include {pro['included_ai_minutes']:.0f} and {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])} Instant AI minutes a month for transcription and translation."},
             ],
             "choose": [
                 {"name": "Transcripts and subtitles", "best": "Accessibility and searchable lessons.", "get": "Word, text, SRT and VTT for every module."},
@@ -490,7 +490,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"q": "What if our language is not supported by speech recognition?",
                  "a": "Instant AI transcribes 70+ languages. For a language no model covers yet, such as Kikuyu, a human transcriber types the source by ear at a slightly higher per-minute price."},
                 {"q": "Is there a discount for volume?",
-                 "a": f"Pro is ${pro['price_usd']}/month and includes {pro['included_ai_minutes']:.0f} Instant AI minutes for transcription and translation, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:.0f}. For a custom volume rate, talk to us."},
+                 "a": f"Pro is ${pro['price_usd']}/month and includes {pro['included_ai_minutes']:.0f} Instant AI minutes for transcription and translation, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])}. For a custom volume rate, talk to us."},
             ],
             "fit_guide": plans("A pilot with a few recordings.", "Monthly programme reporting.", "Videos with burned captions or dubbed files for screenings.",
                                "A multi-country programme needing invoicing."),
@@ -521,7 +521,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             ],
             "choose": [
                 {"name": "Quality assurance and coaching", "best": "Reviewing more calls with the same team.",
-                 "get": f"Instant AI transcripts with speakers and timestamps in minutes, and {pro['included_ai_minutes']:,.0f} to {prem['included_ai_minutes']:,.0f} minutes a month included on Pro and Premium."},
+                 "get": f"Instant AI transcripts with speakers and timestamps in minutes, and {pro['included_ai_minutes']:,.0f} to {prem['included_ai_minutes']:,.0f} minutes a month{billing.hours_suffix(prem['included_ai_minutes'])} included on Pro and Premium."},
                 {"name": "Multilingual support lines", "best": "Teams that take calls in several languages.",
                  "get": "Transcription in 70+ languages with translation, so reviewers can read every call in one language."},
                 {**human, "name": "Human-reviewed evidence", "best": "Complaints, disputes, compliance checks and anything you may need to show."},
@@ -546,7 +546,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"q": "What about confidentiality?",
                  "a": "We do not share your data with anyone else. Files are kept until you delete them, and you can ask us to delete files or account data at any time. Tell callers that calls are recorded, as the rules where you operate require."},
                 {"q": "How is it priced?",
-                 "a": f"Per audio-minute, shown before you order. Pro is ${pro['price_usd']}/month with {pro['included_ai_minutes']:,.0f} Instant AI minutes, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}, and Enterprise has negotiated volume rates and invoicing."},
+                 "a": f"Per audio-minute, shown before you order. Pro is ${pro['price_usd']}/month with {pro['included_ai_minutes']:,.0f} Instant AI minutes, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])}, and Enterprise has negotiated volume rates and invoicing."},
             ],
             "fit_guide": plans("Trying a handful of calls.", "A small team reviewing calls every month.", "A larger team that also needs translation and video files.",
                                "A call center that needs a negotiated rate, invoicing and an integration."),

@@ -297,6 +297,8 @@ db.replace_blog_text("first 5 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:
 db.replace_blog_text("first 60 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")
 db.replace_blog_text("Pro includes 150 Instant AI minutes a month and Premium includes 400",
                      f"Pro includes {billing.PRO_MINUTES:,} Instant AI minutes a month and Premium includes {billing.PREMIUM_MINUTES:,}")
+db.replace_blog_text("Premium includes 6,500, and they cover",
+                     f"Premium includes {billing.PREMIUM_MINUTES:,}{billing.hours_suffix(billing.PREMIUM_MINUTES)}, and they cover")
 
 IDLE_TIMEOUT_SECONDS = 30 * 60  # log out after 30 minutes of no requests
 
@@ -1392,6 +1394,7 @@ def _first_name(user) -> str:
 
 
 templates.env.globals["first_name"] = _first_name
+templates.env.globals["hours_suffix"] = billing.hours_suffix
 templates.env.globals["billing_saving"] = lambda plan: int(round((1 - plan["price_usd_year"] / (plan["price_usd"] * 12)) * 100)) if plan["price_usd"] else 0
 templates.env.globals["meetings_enabled"] = meeting_bot.configured
 templates.env.globals["bank_ok"] = _bank_transfer_ok
@@ -2537,7 +2540,7 @@ def _llms_text(request: Request, full: bool) -> str:
             plan_lines.append(f"- Free: no card needed, {p['included_ai_minutes']:.0f} Instant AI minutes free every month, then pay as you go.")
         else:
             plan_lines.append(
-                f"- {p['name']}: ${p['price_usd']} a month or ${p['price_usd_year']} a year (yearly), {p['included_ai_minutes']:.0f} Instant AI minutes (transcription and translation) included "
+                f"- {p['name']}: ${p['price_usd']} a month or ${p['price_usd_year']} a year (yearly), {p['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(p['included_ai_minutes'])} (transcription and translation) included "
                 f"every month, {p['discount'] * 100:.0f}% off everything beyond them{', burned captions and dubbed video included' if p['video_deliverables'] else ''}.")
     plan_lines.append("- Enterprise: negotiated volume rate, invoicing and a named account manager. Contact us.")
     meetings = ("Kauli can join Zoom, Google Meet and Microsoft Teams meetings, record them and return a transcript (Pro and Premium plans)."
