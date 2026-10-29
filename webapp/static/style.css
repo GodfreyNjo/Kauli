@@ -5512,3 +5512,19 @@ a.pager-num:hover, a.pager-step:hover { border-color: var(--brand-blue); backgro
 .ig-switch:focus-visible { outline: 3px solid var(--brand-blue, #2f6df6); outline-offset: 2px; }
 .ig-dialog-foot { display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border-subtle); }
 .ig-cancel { background: none; border: 1px solid var(--border-subtle); border-radius: 10px; color: inherit; font: inherit; padding: 0 18px; min-height: 44px; cursor: pointer; }
+
+/* The top of an order page: name and status always, the rest folds away */
+.od-details { margin: 6px 0 4px; }
+.od-details > summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; padding: 6px 14px; min-height: 36px; border: 1px solid var(--border-subtle); border-radius: 999px; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.od-details > summary::-webkit-details-marker { display: none; }
+.od-details > summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform 0.15s; }
+.od-details[open] > summary::after { transform: rotate(-135deg); }
+.od-details > .od-meta { margin: 12px 0 8px; }
+
+/* Under the player: the captions switch beside the hint */
+.order-media-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 10px; }
+.order-media-tools .order-preview-hint { margin: 0; }
+.order-cc-toggle { min-height: 36px; padding: 0 14px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface, #fff); color: inherit; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.order-cc-toggle[aria-pressed="false"] { color: var(--muted); }
+.order-cc-toggle:focus-visible { outline: 3px solid var(--brand-blue, #2f6df6); outline-offset: 2px; }
+.card.od-head, .od-head-card { margin-bottom: 14px; }
