@@ -586,6 +586,44 @@
       {% endif %}
       {% endif %}
     </div>
+    <details class="od-more">
+      <summary>More caption formats</summary>
+      <p class="muted">TTML is the standard behind broadcast and many web and streaming players. SBV is what YouTube's caption uploader reads.</p>
+      <div class="downloads">
+        <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/ttml">Captions (.ttml)</a>
+        <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/sbv">Captions (.sbv)</a>
+      </div>
+    </details>
+    {% if has_video_source %}
+    <details class="od-more" id="captioned-video"{% if caption_looks|selectattr('state')|list %} open{% endif %}>
+      <summary>Captioned video: put the captions into the picture</summary>
+      <p class="muted">Best for social media and anywhere captions must always show. Pick a look and we make a video with the captions built in.</p>
+      {% if has_video_deliverables %}
+      <ul class="cv-list">
+        {% for look in caption_looks %}
+        <li data-captioned="{{ look.state or '' }}">
+          <span class="cv-name">{{ look.label }}</span>
+          {% if look.state == 'ready' %}
+            <a class="btn" href="/client/orders/{{ order['id'] }}/download/captioned_{{ look.key }}">Download video</a>
+          {% elif look.state == 'rendering' %}
+            <span class="muted">Creating it now...</span>
+          {% else %}
+            <form method="post" action="/client/orders/{{ order['id'] }}/captioned-video">
+              <input type="hidden" name="style" value="{{ look.key }}">
+              <button type="submit" class="secondary">{{ 'Try again' if look.state == 'failed' else 'Create' }}</button>
+            </form>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <script>
+        if (document.querySelector('[data-captioned="rendering"]')) { setTimeout(function () { location.reload(); }, 15000); }
+      </script>
+      {% else %}
+      <p class="muted">Captioned videos come with Premium and up, or as an add-on on a new order. <a href="/client/billing?upgrade_for=video">See plans</a></p>
+      {% endif %}
+    </details>
+    {% endif %}
     {% if notion_row %}
     <div class="notion-send" style="margin-top:12px;">
       {% if notion_export and notion_export['page_url'] %}

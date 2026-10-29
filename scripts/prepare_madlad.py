@@ -19,7 +19,7 @@ def main() -> None:
     from huggingface_hub import snapshot_download
     src = snapshot_download(REPO, allow_patterns=["*.json", "spiece.model", "model.safetensors"])
     subprocess.run([sys.executable, "-m", "ctranslate2.converters.transformers", "--model", src, "--output_dir", str(out),
-                    "--quantization", "int8", "--low_cpu_mem_usage", "--force"], check=True)
+                    "--quantization", "int8", "--low_cpu_mem_usage", "--load_as_float16", "--force"], check=True)
     shutil.copy(Path(src) / "spiece.model", out / "spiece.model")
     print(f"ready: {out}")
 

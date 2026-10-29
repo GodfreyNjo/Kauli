@@ -45,7 +45,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server, notion_export  # noqa: E402
-from kauli import timing  # noqa: E402
+from kauli import caption_formats, timing  # noqa: E402
 from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
 from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
@@ -6265,6 +6265,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "subs_ready": (outdir / f"subs_{order['target_lang']}.srt").exists(),
+        "caption_looks": [{"key": k, "label": v, "state": _captioned_state(order, k)} for k, v in CAPTION_LOOKS.items()],
         "receipt": db.get_receipt_for_order(order_id),
         "error": error, "notice": notice,
         "folders": db.list_folders_for_client(user["client_scope_id"]),
@@ -8610,7 +8611,7 @@ def download_deliverable(request: Request, order_id: str, kind: str):
             return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
         plan = billing.effective_plan(user, db.get_subscription(user["client_scope_id"]))
         has_video = billing.PLANS[plan]["video_deliverables"] or db.order_has_addon(order, "video_deliverables")
-        if kind in ("burned", "dubbed") and not has_video:
+        if (kind in ("burned", "dubbed") or kind.startswith("captioned_")) and not has_video:
             return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
         # Real enforcement, not just a hidden UI button - a transcription-
         # only or translation-only order's mt/tts providers are set to
@@ -8626,6 +8627,30 @@ def download_deliverable(request: Request, order_id: str, kind: str):
             return HTMLResponse("This order doesn't include translated subtitles.", status_code=404)
         if kind in ("audio", "burned", "dubbed") and not order_level["tts"]:
             return HTMLResponse("This order doesn't include a dubbed audio/video deliverable.", status_code=404)
+
+    if kind in ("ttml", "sbv"):
+        # Generated on demand: TTML (broadcast and many web players) and SBV (YouTube's uploader). Translated captions when the
+        # order has a translation, otherwise the transcript itself.
+        if order["status"] not in db.TERMINAL_OK_STATUSES and user["role"] == "client":
+            return HTMLResponse("This order isn't ready yet.", status_code=404)
+        job = _load_job(order)
+        if job is None:
+            return HTMLResponse("Not ready yet.", status_code=404)
+        translated = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["mt"]
+        lang = order["target_lang"] if translated else order["source_lang"]
+        stem = re.sub(r"[^A-Za-z0-9._-]+", "_", Path(order["original_filename"] or "captions").stem).strip("_") or "captions"
+        if kind == "ttml":
+            data, media = caption_formats.to_ttml(job, lang=lang, source=not translated), "application/ttml+xml; charset=utf-8"
+        else:
+            data, media = caption_formats.to_sbv(job, source=not translated), "text/plain; charset=utf-8"
+        return Response(content=data, media_type=media, headers={"Content-Disposition": f'attachment; filename="{stem}_{lang}.{kind}"'})
+
+    if kind.startswith("captioned_") and kind[len("captioned_"):] in CAPTION_LOOKS:
+        look = kind[len("captioned_"):]
+        path = _captioned_path(order, look)
+        if not path.exists():
+            return HTMLResponse("Not ready yet.", status_code=404)
+        return FileResponse(str(path), filename=path.name)
 
     if kind in ("txt", "docx"):
         # Generated on demand from the finished job - plain text and Word are
@@ -8747,6 +8772,121 @@ def _maybe_auto_render_video_deliverables(order) -> None:
                 api_log.warning(f"auto video-deliverable render failed for order {order['id']} ({kind}): {exc}")
 
     threading.Thread(target=_run, daemon=True, name=f"video-render-{order['id']}").start()
+
+
+# ------------------------------------------------- captioned video: choose a look ----
+# Beyond one fixed style: the customer picks how burned-in captions look (see kauli/caption_formats.py), including the "social"
+# look where each word lights up as it is spoken. Each look is its own file, made on request in the background.
+CAPTION_LOOKS = caption_formats.STYLES
+_CAPTION_RENDER_SLOT = threading.Semaphore(1)       # one re-encode at a time: the server is shared with everything else
+_RENDER_STALE_SECONDS = 45 * 60
+
+
+def _captioned_path(order, style: str) -> Path:
+    return Path(order["outdir"]) / f"captioned_{style}_{order['target_lang']}.mp4"
+
+
+def _captioned_state(order, style: str) -> str | None:
+    """"ready", "rendering", "failed" or None, from the files the render leaves behind."""
+    out = _captioned_path(order, style)
+    if out.exists():
+        return "ready"
+    marker = out.with_suffix(".rendering")
+    if marker.exists():
+        if time.time() - marker.stat().st_mtime < _RENDER_STALE_SECONDS:
+            return "rendering"
+        marker.unlink(missing_ok=True)                  # the server restarted mid-render: let it be tried again
+        return "failed"
+    return "failed" if out.with_suffix(".failed").exists() else None
+
+
+def _video_size(path: Path) -> tuple[int, int]:
+    try:
+        out = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", str(path)],
+                             capture_output=True, text=True, timeout=60, check=True).stdout.strip()
+        w, h = out.split("x")[:2]
+        return int(w), int(h)
+    except Exception:  # noqa: BLE001 - a size we cannot read just means the standard size
+        return 1280, 720
+
+
+def render_styled_captions(video_path: Path, ass_path: Path, out_path: Path) -> None:
+    escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
+    subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_path), "-vf", f"ass='{escaped}'",
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+         "-movflags", "+faststart", str(out_path)],
+        check=True, timeout=3600)
+
+
+def _render_captioned_video(order, style: str) -> None:
+    """The background job behind "Create captioned video". Leaves captioned_<look>_<lang>.mp4 on success or a .failed note on
+    trouble, and always removes its .rendering marker."""
+    out = _captioned_path(order, style)
+    marker, failed = out.with_suffix(".rendering"), out.with_suffix(".failed")
+    try:
+        with _CAPTION_RENDER_SLOT:
+            outdir = Path(order["outdir"])
+            if is_video_file(order["audio_path"]):
+                video_path = Path(order["audio_path"])
+            elif order["source_youtube_id"]:
+                video_path = fetch_youtube_video(order["source_youtube_id"], outdir / "video_cache")
+            else:
+                raise ValueError("no video source - audio-only upload")
+            job = _load_job(order)
+            if not job or not job.segments:
+                raise FileNotFoundError("the transcript is not ready")
+            width, height = _video_size(video_path)
+            has_translation = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["mt"]
+            ass = out.with_suffix(".ass")
+            ass.write_text(caption_formats.to_ass(job, style, source=not has_translation, width=width, height=height), encoding="utf-8")
+            part = out.with_suffix(".part.mp4")
+            render_styled_captions(video_path, ass, part)
+            part.replace(out)
+            failed.unlink(missing_ok=True)
+    except Exception as exc:  # noqa: BLE001 - recorded for the page, never raised into the thread
+        failed.write_text(str(exc)[:300], encoding="utf-8")
+        api_log.warning(f"captioned video render failed for order {order['id']} ({style}): {exc}")
+    finally:
+        marker.unlink(missing_ok=True)
+
+
+@app.post("/client/orders/{order_id}/captioned-video")
+def client_make_captioned_video(request: Request, order_id: str, style: str = Form("classic")):
+    from urllib.parse import quote_plus
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"]:
+        return HTMLResponse("Order not found.", status_code=404)
+
+    def back(kind: str, message: str):
+        return RedirectResponse(f"/client/orders/{order_id}?{kind}={quote_plus(message)}#captioned-video", status_code=303)
+
+    if order["status"] not in db.TERMINAL_OK_STATUSES:
+        return back("error", "This order is not ready yet.")
+    if not _plan_chosen(user["client_scope_id"]):
+        return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
+    if not (billing.PLANS.get(order["tier"], {}).get("video_deliverables") or db.order_has_addon(order, "video_deliverables")):
+        return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
+    if style not in CAPTION_LOOKS:
+        return back("error", "Choose one of the caption looks.")
+    if not (is_video_file(order["audio_path"]) or order["source_youtube_id"]):
+        return back("error", "This order was submitted as audio only, so there is no video to put captions on.")
+    job = _load_job(order)
+    if not job or not job.segments:
+        return back("error", "The transcript is not ready yet.")
+    state = _captioned_state(order, style)
+    if state == "ready":
+        return back("notice", "That captioned video is already ready.")
+    if state == "rendering":
+        return back("notice", "That captioned video is already being made.")
+    out = _captioned_path(order, style)
+    out.with_suffix(".failed").unlink(missing_ok=True)
+    out.with_suffix(".rendering").write_text(str(time.time()), encoding="utf-8")
+    threading.Thread(target=_render_captioned_video, args=(order, style), daemon=True, name=f"captioned-{order_id}").start()
+    return back("notice", "Creating your captioned video. Longer videos take a few minutes: this page updates by itself.")
 
 
 @app.post("/staff/orders/{order_id}/render/{kind}")

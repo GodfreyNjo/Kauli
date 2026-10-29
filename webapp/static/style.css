@@ -5528,3 +5528,9 @@ a.pager-num:hover, a.pager-step:hover { border-color: var(--brand-blue); backgro
 .order-cc-toggle[aria-pressed="false"] { color: var(--muted); }
 .order-cc-toggle:focus-visible { outline: 3px solid var(--brand-blue, #2f6df6); outline-offset: 2px; }
 .card.od-head, .od-head-card { margin-bottom: 14px; }
+
+/* Captioned video: one row per look */
+.cv-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.cv-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--border-subtle); }
+.cv-list form { margin: 0; }
+.cv-name { font-weight: 600; }
