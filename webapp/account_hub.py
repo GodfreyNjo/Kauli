@@ -492,6 +492,7 @@ def vocabulary_fixer(client_id: str):
         for pattern, term in rules:
             text = pattern.sub(term, text)
         return text
+    fix.terms = [r["term"] for r in rows]            # also handed to the recognizer, so it hears the name right in the first place
     return fix
 
 

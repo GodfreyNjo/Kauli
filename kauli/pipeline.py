@@ -532,6 +532,9 @@ def run(
         log(f"[1/5] Transcribing with {asr} ...")
         job.status = "transcribing"
         asr_provider = get_asr(asr)
+        vocab = getattr(fix_text, "terms", None) if fix_text else None
+        if vocab and hasattr(asr_provider, "set_hints"):
+            asr_provider.set_hints(vocab)            # the customer's own names and terms are also given to the recognizer
         # Optional ElevenLabs extras. Neither can lose an order: if one fails the order carries on without it,
         # the manifest says so, and the web app credits back a paid add-on that was not delivered.
         from .providers import elevenlabs_audio

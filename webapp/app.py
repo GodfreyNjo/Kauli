@@ -586,6 +586,7 @@ def _static_version(filename: str) -> int:
 
 templates.env.globals["static_version"] = _static_version
 templates.env.filters["timestamp_to_str"] = lambda ts: datetime.fromtimestamp(ts).strftime("%b %d, %H:%M")
+templates.env.filters["date_only"] = lambda ts: datetime.fromtimestamp(ts or 0).strftime("%b %d, %Y")
 # Unambiguous long form for formal documents (receipts, invoices) - "Aug 22,
 # 15:48" is fine for an activity feed, not for something someone might file
 # for their own records.

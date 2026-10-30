@@ -79,7 +79,8 @@ class GroqWhisperASR(ASRProvider):
                         self.API, headers={"Authorization": f"Bearer {self.api_key}"},
                         files={"file": ("audio.mp3", fh, "audio/mpeg")},
                         data={"model": self.model, "response_format": "verbose_json", "language": language, "temperature": "0",
-                              "timestamp_granularities[]": ["word", "segment"]},
+                              "timestamp_granularities[]": ["word", "segment"],
+                              **({"prompt": "Names and terms: " + self._hint_text()[:600]} if self.hint_terms else {})},
                         timeout=600.0)
                 if resp.status_code != 200:
                     raise RuntimeError(f"Groq {resp.status_code}: {resp.text[:160]}")
@@ -132,6 +133,9 @@ class AssemblyAIASR(ASRProvider):
             raise RuntimeError(f"AssemblyAI upload {up.status_code}: {up.text[:160]}")
         payload = {"audio_url": up.json()["upload_url"], "language_code": language, "speaker_labels": True,
                    "punctuate": True, "format_text": True}
+        if self.hint_terms:
+            payload["word_boost"] = self.hint_terms
+            payload["boost_param"] = "high"
         if os.environ.get("ASSEMBLYAI_SPEECH_MODEL"):
             payload["speech_model"] = os.environ["ASSEMBLYAI_SPEECH_MODEL"]
         made = httpx.post(f"{self.BASE}/transcript", headers=headers, json=payload, timeout=60.0)
@@ -180,6 +184,8 @@ class ChainASR(ASRProvider):
             last = i == len(self.names) - 1
             try:
                 provider = get_asr(name, local_fallback=False) if name == "transkriptor" and not last else get_asr(name)
+                if self.hint_terms and hasattr(provider, "set_hints"):
+                    provider.set_hints(self.hint_terms)
                 segments = provider.transcribe(audio_path, language=language)
             except LowQualityTranscript as exc:
                 draft = draft or (exc.segments, name)

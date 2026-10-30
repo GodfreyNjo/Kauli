@@ -1,10 +1,11 @@
 {#- The transcript toolbar: share, download, find and replace, shortcuts, and display toggles. Behaviour lives in static/transcript_tools.js. -#}
 <div class="tx-tools" id="tx-tools" data-order-id="{{ order['id'] }}" data-same="{{ '1' if same_language else '0' }}" data-source-media="{{ '1' if source_media_ready else '0' }}" data-editable="{{ '1' if can_edit_transcript else '0' }}">
-  <button type="button" class="tx-tool" data-open="tx-share-dialog"><span aria-hidden="true">&#8599;</span> Share</button>
-  <button type="button" class="tx-tool" data-open="tx-download-dialog"><span aria-hidden="true">&#8681;</span> Download</button>
-  <button type="button" class="tx-tool" data-open="tx-find-panel" id="tx-find-open"><span aria-hidden="true">&#8981;</span> Find &amp; replace</button>
+  <button type="button" class="tx-tool" data-open="tx-share-dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg> Share</button>
+  <button type="button" class="tx-tool" data-open="tx-download-dialog"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg> Download</button>
+  <button type="button" class="tx-tool" data-open="tx-find-panel" id="tx-find-open"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg> Find &amp; replace</button>
+  {% if can_edit_transcript %}<button type="button" class="tx-tool" id="tx-edit"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m4 20 1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/></svg> Edit transcript</button>{% endif %}
   <details class="tx-more">
-    <summary class="tx-tool" aria-label="More transcript options">More</summary>
+    <summary class="tx-tool" aria-label="More transcript options"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg> More</summary>
     <div class="tx-more-menu">
       <label class="tx-switch"><input type="checkbox" id="tx-hide-time"> Hide timestamps</label>
       <label class="tx-switch"><input type="checkbox" id="tx-hide-speaker"> Hide speakers</label>

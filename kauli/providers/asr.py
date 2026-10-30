@@ -13,6 +13,15 @@ from ..models import Segment, Word
 class ASRProvider:
     name = "base"
     cost_per_minute_usd = 0.0
+    hint_terms: list[str] = []
+
+    def set_hints(self, terms) -> None:
+        """Names and terms the customer wants spelled their way (their custom vocabulary). A recognizer that can be told what to listen for
+        uses them; the rest ignore them, and the text is corrected afterwards either way."""
+        self.hint_terms = [str(t).strip() for t in (terms or []) if str(t).strip()][:60]
+
+    def _hint_text(self) -> str:
+        return ", ".join(self.hint_terms)
 
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
         raise NotImplementedError
@@ -69,9 +78,11 @@ class FasterWhisperASR(ASRProvider):
 
     def transcribe(self, audio_path: str, language: str = "sw") -> list[Segment]:
         model = self._load()
+        hints = {"hotwords": self._hint_text()} if self.hint_terms else {}      # tells the model which names and terms to expect
         segments, _info = model.transcribe(
             audio_path,
             language=language,
+            **hints,
             word_timestamps=True,
             vad_filter=True,                       # kills the silence-hallucination problem
             vad_parameters={"min_silence_duration_ms": 400},

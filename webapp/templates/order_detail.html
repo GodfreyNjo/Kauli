@@ -2,13 +2,30 @@
 {% block title %}Order {{ order['id'] }}{% endblock %}
 {% block content %}
 
-<div class="card">
-  <a href="/client" class="breadcrumb">&larr; back to my orders</a>
-  {% if error %}<p class="error">{{ error }}</p>{% endif %}
-  {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
-  <h1>{{ order['original_filename'] }}</h1>
-  <p><span class="status status-{{ order['status'] }}">{{ order['status']|client_status_label }}</span>
-     {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush</span>{% endif %}</p>
+{% set od_done = order['status'] in ['ready_for_delivery', 'delivered'] %}
+{% set od_bad = order['status'] in ['failed', 'dead_letter'] %}
+{% set od_secs = ((order['duration_minutes'] or 0) * 60)|round|int %}
+<div class="od-head">
+  <div class="od-head-main">
+    <a href="/client" class="breadcrumb">&larr; Back to my orders</a>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
+    <h1>{{ order['original_filename'] }}</h1>
+    <p class="od-meta">
+      <span class="od-meta-ic" aria-hidden="true">{% if source_is_video %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3"/></svg>{% else %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 12v0M8 8v8M12 5v14M16 9v6M20 11v2"/></svg>{% endif %}</span>
+      {% if '.' in order['original_filename'] %}<span>{{ order['original_filename'].rsplit('.', 1)[-1]|upper }}</span><i>&middot;</i>{% endif %}
+      {% if od_secs %}<span>{{ '%d:%02d'|format(od_secs // 60, od_secs % 60) }}</span><i>&middot;</i>{% endif %}
+      <span>Uploaded {{ order['created_at']|date_only }}</span>
+      {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush</span>{% endif %}
+    </p>
+  </div>
+  <div class="od-state {{ 'od-state--ok' if od_done else ('od-state--bad' if od_bad else 'od-state--busy') }} status-{{ order['status'] }}" role="status">
+    <span class="od-state-dot" aria-hidden="true"></span>
+    <div>
+      <strong>{{ 'Order ready' if od_done else order['status']|client_status_label }}</strong>
+      <small>{{ 'Your files are ready to download' if od_done else ('Something went wrong. We have been told.' if od_bad else 'This page updates as it moves along.') }}</small>
+    </div>
+  </div>
 </div>
 
 {% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and plan_chosen(user) %}
@@ -76,7 +93,7 @@
       {% if can_export_transcript %}{% include "_transcript_tools.html" %}{% endif %}
       {% if can_edit_transcript %}
       <div class="tx-edit-bar">
-        <button type="button" class="secondary" id="tx-edit">Edit transcript</button>
+        {% if not can_export_transcript %}<button type="button" class="secondary" id="tx-edit">Edit transcript</button>{% endif %}
         <span id="tx-edit-actions" hidden>
           <button type="button" id="tx-save" disabled>Save changes</button>
           <button type="button" class="secondary" id="tx-cancel">Cancel</button>
@@ -128,7 +145,15 @@
       {% endfor %}
       <p class="muted" id="sm-empty"{% if summaries %} hidden{% endif %}>No summary yet. Choose a format and we write it from your transcript, only when you ask.</p>
     </div>
-    <button type="button" class="secondary" id="sm-open">{{ 'Create another summary' if summaries else 'Create summary' }}</button>
+    <div class="sm-actions">
+    <button type="button" class="secondary sm-primary" id="sm-open"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>{{ 'Create another summary' if summaries else 'Create summary' }}</button>
+    {% if can_export_transcript %}
+    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
+      <button type="submit" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6"/></svg>Create AI notes</button>
+      <span class="muted">An editable note with the overview, key points and action items.</span>
+    </form>
+    {% endif %}
+    </div>
     <dialog id="sm-dialog" class="sm-dialog" aria-labelledby="sm-title">
       <div class="sm-box">
         <div class="sm-head">
@@ -145,13 +170,6 @@
         </div>
       </div>
     </dialog>
-    {% if can_export_transcript %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
-      <button type="submit" class="secondary">Create AI notes</button>
-      <span class="muted">An editable note with the overview, key points and action items.</span>
-    </form>
-    {% endif %}
-
     </details>
 
     <details class="ow-fold" data-mobile-closed open>
@@ -159,9 +177,9 @@
     <p class="muted" style="margin-top:0; font-size:0.82rem;">Answers come only from your transcript.</p>
     <div id="ai-chat-log" class="ai-chat-log"></div>
     <form id="ai-ask-form" style="display:flex; gap:8px; margin-top:10px;">
-      <input type="text" id="ai-ask-input" placeholder="Ask a question…" aria-label="Ask a question about this transcript"
+      <input type="text" id="ai-ask-input" placeholder="Ask a question about this video…" aria-label="Ask a question about this transcript"
              maxlength="500" style="flex:1;" required>
-      <button type="submit" class="secondary">Ask</button>
+      <button type="submit" class="ask-send"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 3 10 14M21 3l-7 18-4-7-7-4z"/></svg>Ask</button>
     </form>
     </details>
       </div>
@@ -664,9 +682,9 @@
     {% endif %}
     <a class="btn" href="/client/verify-trial" style="margin-top:14px;">Unlock and download &rarr;</a> <a href="/client/billing?choose_plan=1" style="margin-left:10px;">or see the plans</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
-    <p data-persist class="ok">Ready. Download your files below.</p>
+    <p data-persist class="ok od-ready">Ready. Download your files below.</p>
     {% if (source_media_ready or order['source_youtube_id']) and order['status'] in ('ready_for_delivery', 'delivered') %}
-    <p class="more-from"><a class="ds-btn secondary" href="/client/orders/{{ order['id'] }}/more">Do more with this file &rarr;</a> <span class="muted">Translate it, dub it or have it checked, without uploading again.</span></p>
+    <p class="more-from"><a class="btn more-btn" href="/client/orders/{{ order['id'] }}/more"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M11 14h5M13.5 11.5 16 14l-2.5 2.5"/></svg>Do more with this file <b aria-hidden="true">&rarr;</b></a> <span class="muted">Translate it, dub it or have it checked, without uploading again.</span></p>
     {% endif %}
     {% if csat_due %}
     <form method="post" action="/client/orders/{{ order['id'] }}/rate" class="csat-card">
@@ -703,15 +721,16 @@
       <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Dubbed video</a>
       {% endif %}
       {% endif %}
+      <details class="dl-more">
+        <summary class="btn">More download options</summary>
+        <div class="dl-more-menu">
+          <p class="dl-more-h">More caption formats</p>
+          <p class="muted">TTML is the standard behind broadcast and many web and streaming players. SBV is what YouTube's caption uploader reads.</p>
+          <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/ttml">Captions (.ttml)</a>
+          <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/sbv">Captions (.sbv)</a>
+        </div>
+      </details>
     </div>
-    <details class="od-more">
-      <summary>More caption formats</summary>
-      <p class="muted">TTML is the standard behind broadcast and many web and streaming players. SBV is what YouTube's caption uploader reads.</p>
-      <div class="downloads">
-        <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/ttml">Captions (.ttml)</a>
-        <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/sbv">Captions (.sbv)</a>
-      </div>
-    </details>
     {% if has_video_source %}
     <details class="od-more" id="captioned-video"{% if caption_looks|selectattr('state')|list %} open{% endif %}>
       <summary>Captioned video: put the captions into the picture</summary>
