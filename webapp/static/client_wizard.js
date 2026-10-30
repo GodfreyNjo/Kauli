@@ -30,6 +30,16 @@
   const RESUME_KEY = "kauli_pending_upload";
   let resumedUploadKey = null;
   let uploadTransferActive = false;
+  // What an upload in progress looks like to the rest of the app (the tray that follows it around, persist.js), and what is kept
+  // so that leaving this page never means starting again.
+  const kpUp = (patch) => { if (window.kpUploads) window.kpUploads.set(patch); };
+  const stillHere = (form) => !!form && document.getElementById("order-form") === form;     // they may have moved on while this ran
+  const DRAFT_KEY = "f:" + location.pathname + "#order-form";
+  let pendingStep = null;
+  function clearStaged() {
+    if (window.kpFiles) window.kpFiles.clear("order");
+    if (window.kpDrafts) window.kpDrafts.del(DRAFT_KEY);
+  }
 
   function saveResumableUpload(uploadKey, filename) {
     try {
@@ -116,6 +126,7 @@
 
   function showStep(n) {
     currentStep = n;
+    if (window.kpDrafts) window.kpDrafts.touch($("#order-form"));                    // the step they are on is kept too
     logWizardEvent(String(n));
     $all(".wizard-pane").forEach((p) => { p.hidden = Number(p.dataset.pane) !== n; });
     $all(".wizard-step[data-step]").forEach((s) => {
@@ -273,7 +284,7 @@
       if (!st || st.tone === "bad") {
         const x = document.createElement("button");
         x.type = "button"; x.className = "fq-remove"; x.setAttribute("aria-label", "Remove " + f.name); x.textContent = "\u00d7";
-        x.addEventListener("click", () => { fileState.delete(f); fileQueue = fileQueue.filter((q) => q !== f); syncQueue(); });
+        x.addEventListener("click", () => { fileState.delete(f); fileQueue = fileQueue.filter((q) => q !== f); if (window.kpFiles) window.kpFiles.remove("order", f); syncQueue(); });
         li.appendChild(x);
       }
       list.appendChild(li);
@@ -304,7 +315,7 @@
     });
   }
 
-  function addFiles(list) {
+  function addFiles(list, restored) {
     const incoming = Array.from(list || []);
     if (!incoming.length) return;
     const ytField = $("#youtube-url-input");
@@ -315,6 +326,7 @@
       if (fileQueue.some((q) => q.name === f.name && q.size === f.size && q.lastModified === f.lastModified)) return;
       if (fileQueue.length >= MAX_FILES) { skipped++; return; }
       fileQueue.push(f);
+      if (!restored && window.kpFiles) window.kpFiles.add("order", f);            // kept in the browser, so leaving this page does not lose it
     });
     const note = $("#file-queue-note");
     if (note) note.textContent = skipped ? "You can send up to " + MAX_FILES + " files at once. The rest were left out." : "";
@@ -735,6 +747,43 @@
       progressFill.classList.remove("indeterminate");
     }
 
+    function failUpload(message) {
+      progressLabel.textContent = message;
+      if (submitBtn) submitBtn.disabled = false;
+      kpUp({ active: false, error: message });
+    }
+
+    // Back on this page while an upload started earlier is still running (the person looked at something else and came back):
+    // show where it has got to, and finish the job when it ends.
+    function attachToRunningUpload() {
+      const up = window.kpUploads;
+      if (!up) return;
+      if (!up.active && up.url) {
+        progressWrap.hidden = false;
+        progressLabel.textContent = "Your last upload finished and the order has started. ";
+        const a = document.createElement("a"); a.href = up.url; a.textContent = "Open it";
+        progressLabel.appendChild(a);
+        up.reset();
+        return;
+      }
+      if (!up.active) return;
+      progressWrap.hidden = false;
+      if (submitBtn) submitBtn.disabled = true;
+      const paint = () => {
+        progressFill.style.width = (up.pct || 0) + "%";
+        progressLabel.textContent = (up.label || "Uploading") + (up.pct ? " " + up.pct + "%" : "");
+      };
+      paint();
+      const listener = () => {
+        if (!document.getElementById("order-form")) { up.off(listener); return; }
+        if (up.active) { paint(); return; }
+        up.off(listener);
+        if (up.url) window.location.href = up.url;
+        else { progressLabel.textContent = up.error || "The upload stopped."; if (submitBtn) submitBtn.disabled = false; }
+      };
+      up.on(listener);
+    }
+
     function finalizeOrder(formData, first, auto) {
       startFinalizeSteps(first || "Upload complete", auto !== false);
       const xhr = new XMLHttpRequest();
@@ -761,7 +810,9 @@
         // so the saved upload_key is spent and safe to forget. An error
         // (no redirect) leaves it in place so "Continue with this file"
         // is still there for a genuine retry.
-        if (landedUrl !== "/client") { clearResumableUpload(); logWizardEvent("submitted"); }
+        if (landedUrl !== "/client") { clearResumableUpload(); logWizardEvent("submitted"); clearStaged(); kpUp({ active: false, url: landedUrl }); }
+        else kpUp({ active: false, error: "Your order could not be started." });
+        if (!stillHere(form)) return;               // they moved on: the tray tells them, and the page they are on is left alone
         history.replaceState(null, "", landedUrl);
         document.open();
         document.write(xhr.responseText);
@@ -769,8 +820,7 @@
       };
       xhr.onerror = function () {
         stopFinalizeSteps();
-        progressLabel.textContent = "Something went wrong submitting - please try again.";
-        if (submitBtn) submitBtn.disabled = false;
+        failUpload("Something went wrong submitting - please try again.");
       };
       xhr.send(formData);
     }
@@ -791,8 +841,7 @@
         }
         if (presignXhr.status !== 200 || !data || !data.put_url) {
           uploadTransferActive = false;
-          progressLabel.textContent = (data && data.error) || "Couldn't prepare the upload - please try again.";
-          if (submitBtn) submitBtn.disabled = false;
+          failUpload((data && data.error) || "Couldn't prepare the upload - please try again.");
           return;
         }
         const putXhr = new XMLHttpRequest();
@@ -803,12 +852,12 @@
           const pct = Math.round((ev.loaded / ev.total) * 100);
           progressFill.style.width = pct + "%";
           progressLabel.textContent = "Uploading… " + pct + "%";
+          kpUp({ pct: pct });
         });
         putXhr.onload = function () {
           uploadTransferActive = false;
           if (putXhr.status < 200 || putXhr.status >= 300) {
-            progressLabel.textContent = "Upload failed - please try again.";
-            if (submitBtn) submitBtn.disabled = false;
+            failUpload("Upload failed - please try again.");
             return;
           }
           progressFill.style.width = "100%";
@@ -821,15 +870,13 @@
         };
         putXhr.onerror = function () {
           uploadTransferActive = false;
-          progressLabel.textContent = "Upload failed - please try again.";
-          if (submitBtn) submitBtn.disabled = false;
+          failUpload("Upload failed - please try again.");
         };
         putXhr.send(file);
       };
       presignXhr.onerror = function () {
         uploadTransferActive = false;
-        progressLabel.textContent = "Couldn't prepare the upload - please try again.";
-        if (submitBtn) submitBtn.disabled = false;
+        failUpload("Couldn't prepare the upload - please try again.");
       };
       presignXhr.send(presignBody);
     }
@@ -866,7 +913,11 @@
 
     async function submitBatch() {
       const files = fileQueue.slice();
-      const bar = (done, cur) => { progressFill.style.width = Math.round(((done + cur / 100) / files.length) * 100) + "%"; };
+      const bar = (done, cur) => {
+        const pct = Math.round(((done + cur / 100) / files.length) * 100);
+        progressFill.style.width = pct + "%";
+        kpUp({ pct: pct, label: "Uploading " + files.length + " files" });
+      };
       progressFill.classList.remove("indeterminate");
       let okCount = 0, lastUrl = "";
       const failed = [];
@@ -909,10 +960,14 @@
       }
       if (!failed.length) {
         progressLabel.textContent = okCount + " orders started";
-        window.location.href = okCount === 1 ? lastUrl : "/client/pending";
+        const dest = okCount === 1 ? lastUrl : "/client/pending";
+        clearStaged();
+        kpUp({ active: false, url: dest });
+        if (stillHere(form)) window.location.href = dest;
         return;
       }
       progressLabel.textContent = okCount + " started, " + failed.length + " did not go through. Fix or remove those and press Submit again.";
+      kpUp({ active: false, error: okCount + " started, " + failed.length + " did not go through." });
       fileQueue = failed;
       failed.forEach((f) => { const st = fileState.get(f); if (st) st.tone = "bad"; });
       renderQueue();
@@ -924,6 +979,8 @@
       const youtubeActive = $('#source-switch [data-source="youtube"]').classList.contains("active");
       const usingFile = fileQueue.length > 0 && !youtubeActive;
       const formData = new FormData(form);
+      kpUp({ active: true, label: usingFile ? "Uploading " + (fileQueue.length > 1 ? fileQueue.length + " files" : fileQueue[0].name) : "Starting your order",
+             pct: 0, url: null, error: null });
 
       progressWrap.hidden = false;
       progressFill.classList.remove("indeterminate");
@@ -948,9 +1005,42 @@
     });
 
     offerResumableUploadIfAny();
+    attachToRunningUpload();
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
+  // ------------------------------------------------ where they left off ----
+  // The choices already made and the step they were on come back through persist.js; the files they picked come back from the
+  // browser's own storage, so nothing has to be chosen or uploaded again until they press Submit.
+  function applyPendingStep() {
+    if (!pendingStep || pendingStep < 2) return;
+    const yt = $("#youtube-url-input");
+    const usingYt = yt && yt.value.trim() && $('#source-switch [data-source="youtube"]').classList.contains("active");
+    if (fileQueue.length || resumedUploadKey || usingYt) {
+      const n = Math.min(pendingStep, TOTAL_STEPS);
+      pendingStep = null;
+      showStep(n);
+    }
+  }
+  function registerDraftHooks() {
+    if (!window.kpDrafts) return;
+    window.kpDrafts.hooks["order-form"] = {
+      get: () => ({ step: currentStep }),
+      set: (o) => { pendingStep = o && o.step; applyPendingStep(); },
+    };
+  }
+  function restoreStagedFiles() {
+    if (!window.kpFiles || (window.kpUploads && window.kpUploads.active)) return;
+    window.kpFiles.list("order").then((files) => {
+      if (!files.length || fileQueue.length) return;
+      addFiles(files, true);
+      const note = $("#file-queue-note");
+      if (note) note.textContent = "Your file" + (files.length > 1 ? "s are" : " is") + " still here from before. Nothing is uploaded until you press Submit.";
+      applyPendingStep();
+    });
+  }
+
+  function init() {
+    if (!$("#order-form")) return;
     bindWizardNav();
     bindSourceSwitch();
     bindDropzone();
@@ -958,11 +1048,15 @@
     bindIdempotencyKey();
     bindManualTranscriptionNote();
     bindUploadProgress();
+    registerDraftHooks();
+    restoreStagedFiles();
     showStep(1);
     // the dashboard's "Paste a YouTube link" card lands here with ?source=youtube
     if (new URLSearchParams(window.location.search).get("source") === "youtube") {
       const yt = $('#source-switch [data-source="youtube"]');
       if (yt) yt.click();
     }
-  });
+  }
+  // Run now when the page was swapped in place (the DOMContentLoaded of a page that is already loaded never comes again).
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

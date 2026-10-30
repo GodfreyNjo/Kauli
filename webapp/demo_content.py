@@ -141,7 +141,7 @@ SCENARIOS = {
 LANGUAGES = {
     "es": {"name": "Spanish", "native": "Español", "flag": "flag-es"},
     "de": {"name": "German", "native": "Deutsch", "flag": "flag-de"},
-    "zh": {"name": "Chinese", "native": "中文", "flag": ""},
+    "zh": {"name": "Chinese (Mandarin)", "native": "中文", "flag": ""},
     "sw": {"name": "Swahili", "native": "Kiswahili", "flag": "flag-ke"},
 }
 

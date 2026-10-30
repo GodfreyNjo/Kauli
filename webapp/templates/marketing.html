@@ -149,7 +149,7 @@
     <section class="tk-langs" aria-labelledby="langs-title">
       <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
       <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
-      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Chinese, Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
+      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Chinese (Mandarin), Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
       <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
         {% for copy in (1, 2) %}
         <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>

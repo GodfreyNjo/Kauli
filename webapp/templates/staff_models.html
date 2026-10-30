@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Models and review{% endblock %}
+{% macro provider_table(rows, kind) %}
+{% if not rows %}<p class="muted">No {{ kind }} work in this period.</p>{% else %}
+<div class="ds-scroll"><table class="ds-table">
+  <thead><tr><th>Provider</th><th>Orders</th><th>Minutes</th>{% if kind != 'voice' %}<th>Share</th>{% endif %}<th>Our cost</th>
+    {% if kind != 'voice' %}<th title="How sure the model says it is. Not the same as being right.">Model confidence</th><th title="Share of words the human reviewer left unchanged">Reviewer-kept accuracy</th>{% endif %}
+    <th>Failed</th><th>Took over from another</th></tr></thead>
+  <tbody>
+    {% for r in rows %}
+    <tr>
+      <td>{{ r.label }}</td><td class="num">{{ r.orders }}</td><td class="num">{{ r.minutes }}</td>
+      {% if kind != 'voice' %}<td class="ms-share"><span class="ms-bar"><i style="width: {{ r.share }}%"></i></span> {{ r.share }}%</td>{% endif %}
+      <td class="num">{% if r.cost is not none %}${{ '%.2f'|format(r.cost) }}{% else %}-{% endif %}</td>
+      {% if kind != 'voice' %}
+      <td class="num">{% if r.confidence is not none %}{{ r.confidence }}%{% else %}-{% endif %}</td>
+      <td class="num">{% if r.accuracy is not none %}<strong>{{ r.accuracy }}%</strong> <small class="muted">{{ r.reviewed_words }} words, {{ r.reviewed_orders }} orders</small>{% else %}<span class="muted" title="Needs about {{ s.min_words }} reviewed words">not enough reviewed work yet{% if r.reviewed_words %} ({{ r.reviewed_words }} words){% endif %}</span>{% endif %}</td>
+      {% endif %}
+      <td class="num">{{ r.failed }}</td><td class="num">{{ r.fallbacks }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table></div>{% endif %}
+{% endmacro %}
+{% block content %}
+{% set h = s.human %}
+{% set own = s.own %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Models and review</h1>
+      <p class="muted">What each AI provider (our own models included) and our reviewers have actually handled, and how well. Read from real orders: the provider that ran each step, what it cost, and what a reviewer changed afterwards.</p>
+    </div>
+    <div class="ms-range" role="group" aria-label="Period">
+      {% for d, label in [(7, '7 days'), (30, '30 days'), (90, '90 days'), (365, 'Year')] %}<a href="/staff/models?days={{ d }}" class="{{ 'is-on' if d == days else '' }}">{{ label }}</a>{% endfor %}
+    </div>
+  </div>
+
+  <div class="an-tiles">
+    <div class="hub-card"><span class="muted">Orders</span><strong>{{ s.orders }}</strong><small class="muted">{{ s.instant_ai }} Instant AI, {{ h.orders }} human-reviewed</small></div>
+    <div class="hub-card"><span class="muted">Minutes processed</span><strong>{{ s.minutes }}</strong><small class="muted">last {{ days }} days</small></div>
+    <div class="hub-card"><span class="muted">AI accuracy after review</span><strong>{% if s.ai_accuracy is not none %}{{ s.ai_accuracy }}%{% else %}-{% endif %}</strong><small class="muted">words reviewers left alone</small></div>
+    <div class="hub-card"><span class="muted">Our own models</span><strong>{{ own.asr_share }}%</strong><small class="muted">of transcription minutes, {{ own.mt_share }}% of translation</small></div>
+    <div class="hub-card"><span class="muted">Another provider took over</span><strong>{{ s.fallbacks }}</strong><small class="muted">{{ s.failed }} order{{ '' if s.failed == 1 else 's' }} failed</small></div>
+    <div class="hub-card"><span class="muted">Human review turnaround</span><strong>{% if h.median_hours is not none %}{{ h.median_hours }} h{% else %}-{% endif %}</strong><small class="muted">median{% if h.within_day is not none %}, {{ h.within_day }}% within a day{% endif %}</small></div>
+  </div>
+
+  <section class="hub-card"><h2>Transcription</h2>{{ provider_table(s.asr, 'transcription') }}</section>
+  <section class="hub-card"><h2>Translation</h2>{{ provider_table(s.mt, 'translation') }}</section>
+  <section class="hub-card"><h2>Voices for dubbing</h2>{{ provider_table(s.tts, 'voice') }}
+    <p class="muted">Voices have no accuracy figure here: they are judged by listening, in the editor.</p></section>
+
+  <section class="hub-card">
+    <h2>Our own models</h2>
+    <p class="muted">Measured on real recordings and sentences in each language{% if own.measured %} ({{ own.measured }}){% endif %}. A language goes to our own transcription when its word error rate is at or under {{ '%.0f'|format(own.asr_threshold * 100) }}%, and a translation direction when its chrF score is at or over {{ '%.0f'|format(own.mt_threshold) }}.</p>
+    <div class="an-tiles">
+      <div class="hub-card"><span class="muted">Transcription languages approved</span><strong>{{ own.asr_approved }} of {{ own.asr_total }}</strong><small class="muted">{% if own.model.ready %}model is on this server ({{ own.model.mb }} MB){% elif own.model.downloading %}model is downloading{% else %}model not downloaded yet{% endif %}</small></div>
+      <div class="hub-card"><span class="muted">Translation from English</span><strong>{{ own.mt_from_en }} of {{ own.mt_total }}</strong><small class="muted">languages good enough</small></div>
+      <div class="hub-card"><span class="muted">Translation into English</span><strong>{{ own.mt_to_en }} of {{ own.mt_total }}</strong><small class="muted">languages good enough</small></div>
+    </div>
+    {% if own.asr_best %}
+    <div class="ms-two">
+      <div><h3>Most accurate transcription</h3>
+        <table class="ds-table"><tbody>{% for lang, err in own.asr_best %}<tr><td>{{ lang }}</td><td class="num">{{ '%.1f'|format(err * 100) }}% word errors</td></tr>{% endfor %}</tbody></table></div>
+      {% if own.asr_worst %}<div><h3>Least accurate</h3>
+        <table class="ds-table"><tbody>{% for lang, err in own.asr_worst %}<tr><td>{{ lang }}</td><td class="num">{{ '%.1f'|format(err * 100) }}% word errors</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+    </div>
+    {% else %}<p class="muted">No measurements saved yet. They arrive when the language evaluation finishes (scripts/export_model_quality.py).</p>{% endif %}
+  </section>
+
+  <section class="hub-card">
+    <h2>Human-reviewed work</h2>
+    <div class="an-tiles">
+      <div class="hub-card"><span class="muted">Orders</span><strong>{{ h.orders }}</strong><small class="muted">{{ h.delivered }} delivered, {{ h.in_review }} in review, {{ h.returned }} returned</small></div>
+      <div class="hub-card"><span class="muted">Minutes reviewed</span><strong>{{ h.minutes }}</strong><small class="muted">{{ h.rush }} rush</small></div>
+      <div class="hub-card"><span class="muted">Lines changed by reviewers</span><strong>{% if h.change_rate is not none %}{{ h.change_rate }}%{% else %}-{% endif %}</strong><small class="muted">{{ h.segments_changed }} of {{ h.segments }} lines</small></div>
+      <div class="hub-card"><span class="muted">AI draft accuracy</span><strong>{% if h.ai_accuracy is not none %}{{ h.ai_accuracy }}%{% else %}-{% endif %}</strong><small class="muted">{{ h.reviewed_words }} words compared</small></div>
+      <div class="hub-card"><span class="muted">Customer rating</span><strong>{% if h.csat.get('human') %}{{ h.csat['human'].avg }} / 5{% else %}-{% endif %}</strong><small class="muted">{% if h.csat.get('human') %}{{ h.csat['human'].n }} ratings{% else %}no ratings yet{% endif %}{% if h.csat.get('ai') %}; Instant AI {{ h.csat['ai'].avg }} / 5 ({{ h.csat['ai'].n }}){% endif %}</small></div>
+    </div>
+    {% if h.pairs %}
+    <h3>By language</h3>
+    <div class="ds-scroll"><table class="ds-table"><thead><tr><th>From</th><th>To</th><th>Orders</th><th>Minutes</th><th>AI draft accuracy</th></tr></thead><tbody>
+      {% for p in h.pairs %}<tr><td>{{ p.source }}</td><td>{{ p.target }}</td><td class="num">{{ p.orders }}</td><td class="num">{{ p.minutes }}</td><td class="num">{% if p.accuracy is not none %}{{ p.accuracy }}%{% else %}<span class="muted">not enough yet</span>{% endif %}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endif %}
+    <p class="muted">Accuracy counts a word as right when the reviewer did not change it, so an order approved without edits counts as right. Figures appear once there are about {{ s.min_words }} reviewed words behind them.</p>
+  </section>
+</div>
+{% endblock %}

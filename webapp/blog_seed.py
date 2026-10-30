@@ -387,10 +387,10 @@ POSTS = [
     },
     {
         "slug": "translate-video-chinese-spanish-to-english",
-        "title": "How to Translate a Video From Chinese, Spanish or Any Other Language Into English",
+        "title": "How to Translate a Video From Mandarin Chinese, Spanish or Any Other Language Into English",
         "category": "Transcription Guides",
-        "description": "A practical workflow for translating video from Chinese, Spanish and other languages into English - transcribe, translate, check, and export subtitles.",
-        "body_html": """<p>You have a video in Chinese, Spanish or another language, and you need English you can use.</p>
+        "description": "A practical workflow for translating video from Mandarin Chinese, Spanish and other languages into English - transcribe, translate, check, and export subtitles.",
+        "body_html": """<p>You have a video in Mandarin Chinese, Spanish or another language, and you need English you can use.</p>
 <p>The reliable way is a short pipeline: transcribe in the original language, translate, check, then export subtitles.</p>
 
 <div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
@@ -426,7 +426,7 @@ POSTS = [
 <p>Our guide to <a href="/blog/add-subtitles-to-video-in-another-language">adding subtitles in another language</a> covers the publishing options.</p>
 
 <h2>What we don't do (yet)</h2>
-<p>Dubbing and human review are available for Swahili, Kikuyu and English, not for Chinese, Spanish or the other languages.</p>
+<p>Dubbing and human review are available for Swahili, Kikuyu and English, not for Mandarin Chinese, Spanish or the other languages.</p>
 <p>For those you get transcription and Instant AI translation, with SRT, Word and text downloads.</p>
 
 <p>Ready to try it? Start from the <a href="/solutions/audio-to-text">audio to text</a> page - your first 5 minutes are free.</p>""",

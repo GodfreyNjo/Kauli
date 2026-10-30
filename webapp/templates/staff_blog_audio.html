@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block theme %}dark{% endblock %}
 {% block title %}Blog audio{% endblock %}
-{% block head_extra %}{% if busy %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}
+{% block head_extra %}{% if busy %}<script>window.addEventListener("load", function () { (function again() { setTimeout(function () { (window.kpSoftRefresh ? window.kpSoftRefresh() : Promise.resolve(false)).then(function () { if (document.querySelector("[data-audio-busy]")) again(); }); }, 10000); })(); });</script>{% endif %}{% endblock %}
 {% block content %}
 <div class="hub">
   <div class="hub-top">
@@ -12,7 +12,7 @@
   </div>
   {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
   {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
-  {% if busy %}<p class="hub-flash ok" role="status">Narration in progress. This page refreshes by itself.</p>{% endif %}
+  {% if busy %}<p class="hub-flash ok" role="status" data-audio-busy><span class="kp-spin" aria-hidden="true"></span>Narration in progress. This page updates by itself.</p>{% endif %}
 
   <section class="hub-card">
     <h2>Your ElevenLabs credits</h2>

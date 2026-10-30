@@ -401,7 +401,7 @@
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
             if (!res.ok) { statusEl.textContent = res.d.error || "Could not save."; saveBtn.disabled = false; return; }
-            window.txEditing = false; statusEl.textContent = "Saved"; location.reload();
+            window.txEditing = false; statusEl.textContent = "Saved"; if (window.kpSoftRefresh) { window.kpSoftRefresh().then(function (ok) { if (!ok) location.reload(); }); } else { location.reload(); }
           })
           .catch(function () { statusEl.textContent = "Could not save. Check your connection."; saveBtn.disabled = false; });
       });
@@ -516,11 +516,11 @@
     </details>
 
     <details class="od-more">
-      <summary>Translate this into another language</summary>
-      {% if order['source_youtube_id'] %}
-      <p><a href="/client?reorder_youtube_url=https://www.youtube.com/watch?v={{ order['source_youtube_id'] }}&reorder_source_lang={{ order['source_lang'] }}">Start a new order from this video &rarr;</a> It is fetched fresh and processed as its own order.</p>
+      <summary>Translate or dub this in another language</summary>
+      {% if source_media_ready or order['source_youtube_id'] %}
+      <p><a href="/client/orders/{{ order['id'] }}/more">Do more with this file &rarr;</a> We already have it, so there is nothing to upload again.</p>
       {% else %}
-      <p>Upload the file again on a new order and pick another target language. An uploaded file cannot be reused yet.</p>
+      <p>Upload the file again on a new order and pick another target language.</p>
       {% endif %}
     </details>
   </details>
@@ -581,7 +581,18 @@
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
             .then(function (d) {
               fails = 0;
-              if (d.done) { paint(d); setTimeout(function () { location.reload(); }, 600); return; }
+              if (d.done) {                                       // show the result in place: no reload, nothing flashes
+                paint(d);
+                setTimeout(function () {
+                  window.kpSoftRefresh().then(function (ok) {
+                    if (ok) return;
+                    var sub = document.getElementById('live-sub');
+                    sub.textContent = 'Your order is ready. ';
+                    var a = document.createElement('a'); a.href = location.href; a.textContent = 'Show it'; sub.appendChild(a);
+                  });
+                }, 600);
+                return;
+              }
               paint(d);
               setTimeout(tick, 2500);
             })
@@ -595,7 +606,20 @@
       })();
     </script>
   {% elif order['status'] in ['queued', 'processing'] %}
-    <p class="muted">Your file is being processed. Refresh this page to see where it is.</p>
+    <p class="kp-status" id="od-processing" data-url="/client/orders/{{ order['id'] }}/progress" role="status"><span class="kp-ring is-spinning" aria-hidden="true"><b></b></span><span class="kp-text">Your file is being processed<span class="kp-dots" aria-hidden="true"></span> This page updates by itself.</span></p>
+    <script>
+      (function () {
+        var box = document.getElementById('od-processing'), fails = 0;
+        if (!box) return;
+        function tick() {
+          fetch(box.getAttribute('data-url'), { credentials: 'same-origin', cache: 'no-store' })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+            .then(function (d) { fails = 0; if (d.done) { window.kpSoftRefresh(); return; } setTimeout(tick, 4000); })
+            .catch(function () { fails += 1; setTimeout(tick, Math.min(20000, 4000 * fails)); });
+        }
+        setTimeout(tick, 3000);
+      })();
+    </script>
   {% elif order['status'] == 'awaiting_review' %}
     <p class="muted">First pass is done - one of our team is reviewing it before delivery.</p>
   {% elif order['status'] == 'editor_returned' %}
@@ -641,6 +665,9 @@
     <a class="btn" href="/client/verify-trial" style="margin-top:14px;">Unlock and download &rarr;</a> <a href="/client/billing?choose_plan=1" style="margin-left:10px;">or see the plans</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p data-persist class="ok">Ready. Download your files below.</p>
+    {% if (source_media_ready or order['source_youtube_id']) and order['status'] in ('ready_for_delivery', 'delivered') %}
+    <p class="more-from"><a class="ds-btn secondary" href="/client/orders/{{ order['id'] }}/more">Do more with this file &rarr;</a> <span class="muted">Translate it, dub it or have it checked, without uploading again.</span></p>
+    {% endif %}
     {% if csat_due %}
     <form method="post" action="/client/orders/{{ order['id'] }}/rate" class="csat-card">
       <strong>How easy was it to get this result?</strong>
@@ -697,7 +724,10 @@
           {% if look.state == 'ready' %}
             <a class="btn" href="/client/orders/{{ order['id'] }}/download/captioned_{{ look.key }}">Download video</a>
           {% elif look.state == 'rendering' %}
-            <span class="muted">Creating it now...</span>
+            <span class="kp-status" data-kp-url="/client/orders/{{ order['id'] }}/captioned-video/status?style={{ look.key }}" role="status" aria-live="polite">
+              <span class="kp-ring{{ '' if look.pct is not none else ' is-spinning' }}" style="--p: {{ look.pct or 0 }}" aria-hidden="true"><b>{% if look.pct is not none %}{{ look.pct }}%{% endif %}</b></span>
+              <span class="kp-text">Creating your video<span class="kp-dots" aria-hidden="true"></span></span>
+            </span>
           {% else %}
             <form method="post" action="/client/orders/{{ order['id'] }}/captioned-video">
               <input type="hidden" name="style" value="{{ look.key }}">
@@ -708,7 +738,24 @@
         {% endfor %}
       </ul>
       <script>
-        if (document.querySelector('[data-captioned="rendering"]')) { setTimeout(function () { location.reload(); }, 15000); }
+        (function () {
+          // A real percentage while the video is being made; the new video appears in place the moment it is ready.
+          document.querySelectorAll('.kp-status').forEach(function (box) {
+            var ring = box.querySelector('.kp-ring'), label = ring.querySelector('b'), fails = 0;
+            function tick() {
+              fetch(box.getAttribute('data-kp-url'), { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+                .then(function (d) {
+                  fails = 0;
+                  if (d.state !== 'rendering') { window.kpSoftRefresh(); return; }
+                  if (d.pct != null) { ring.classList.remove('is-spinning'); ring.style.setProperty('--p', d.pct); label.textContent = d.pct + '%'; }
+                  setTimeout(tick, 2500);
+                })
+                .catch(function () { fails += 1; setTimeout(tick, Math.min(15000, 2500 * fails)); });
+            }
+            setTimeout(tick, 1500);
+          });
+        })();
       </script>
       {% else %}
       <p class="muted">Captioned videos come with Premium and up, or as an add-on on a new order. <a href="/client/billing?upgrade_for=video">See plans</a></p>
@@ -728,9 +775,7 @@
     {% endif %}
     {% set dub_notes %}
     {% if has_dub and has_video_deliverables and has_video_source and not burned_ready and not dubbed_ready %}
-    <p class="muted" style="margin-top:8px;">Your captioned/dubbed video file is being generated - this
-       happens automatically once an order's approved, no need to ask. Longer videos take a few minutes;
-       refresh this page shortly.</p>
+    <p class="kp-status" role="status" style="margin-top:8px;"><span class="kp-ring is-spinning" aria-hidden="true"><b></b></span><span class="kp-text">Your captioned/dubbed video file is being generated<span class="kp-dots" aria-hidden="true"></span> This happens automatically, no need to ask. Longer videos take a few minutes, and you can leave this page.</span></p>
     {% elif has_dub and has_video_deliverables and not has_video_source %}
     <p class="muted" style="margin-top:8px;">This order was submitted as audio only, so there's no video
        to burn captions onto or dub - the dubbed audio above is the full deliverable for this one.</p>

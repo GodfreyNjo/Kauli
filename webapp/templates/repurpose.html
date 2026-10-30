@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Do more with this file{% endblock %}
+{% block content %}
+<div class="rp-wrap">
+  <p class="rp-back"><a href="/client/orders/{{ order['id'] }}">&larr; Back to your order</a></p>
+  <h1>Do more with this file</h1>
+  <p class="rp-file"><strong>{{ order['original_filename'] }}</strong> <span class="muted">&middot; {{ '%.1f'|format(order['duration_minutes'] or 0) }} min &middot; {{ language_names.get(order['source_lang'], order['source_lang']) }}</span></p>
+  <p class="muted">We already have your file, so there is nothing to upload again. Pick what you want next and it starts right away.</p>
+
+  {% if not cards %}
+  <p class="rp-empty">There is nothing more to add to this one right now. <a href="/client">Start a new project</a> to order something else.</p>
+  {% endif %}
+
+  <div class="rp-grid">
+    {% for c in cards %}
+    <form method="post" action="/client/orders" class="rp-card">
+      <input type="hidden" name="reuse_order_id" value="{{ order['id'] }}">
+      <input type="hidden" name="source_lang" value="{{ order['source_lang'] }}">
+      <input type="hidden" name="service_level" value="{{ c.level }}">
+      <input type="hidden" name="review_tier" value="{{ c.tier }}">
+      <input type="hidden" name="idempotency_key" value="more-{{ key_prefix }}-{{ c.key }}">
+      {% if not c.languages %}<input type="hidden" name="target_lang" value="{{ order['target_lang'] }}">{% endif %}
+      <h2>{{ c.title }}</h2>
+      <p class="muted">{{ c.blurb }}</p>
+      {% if c.languages %}
+      <label class="rp-lang"><span>Into</span>
+        <select name="target_lang" aria-label="Target language">
+          {% for code, name in c.languages %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      {% endif %}
+      <div class="rp-foot">
+        <span class="rp-price">{% if c.included %}Included in your plan{% elif c.usd <= 0 %}Free{% else %}About ${{ '%.2f'|format(c.usd) }}{% endif %}</span>
+        <button type="submit" class="ds-btn">{{ c.button }}</button>
+      </div>
+    </form>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

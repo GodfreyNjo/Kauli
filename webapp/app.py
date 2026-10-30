@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -1646,7 +1646,7 @@ def _review_extra_languages() -> set[str]:
 
 def _human_review_language_list() -> str:
     """"Swahili, Kikuyu and English", plus Chinese, German and Spanish once those are switched on."""
-    short = {"zh": "Chinese", "de": "German", "es": "Spanish"}
+    short = {"zh": "Chinese (Mandarin)", "de": "German", "es": "Spanish"}
     names = ["Swahili", "Kikuyu", "English"] + [short[c] for c in _EXTRA_REVIEW_CANDIDATES if c in _review_extra_languages()]
     return ", ".join(names[:-1]) + " and " + names[-1]
 
@@ -1656,7 +1656,7 @@ _HR_NAMES = _human_review_language_list()   # "Swahili, Kikuyu, English, Chinese
 
 def _dub_language_list() -> str:
     """Where dubbing works today: the Studio languages (English and Swahili, plus Chinese, German and Spanish once on)."""
-    names = {"en": "English", "sw": "Swahili", "zh": "Chinese", "de": "German", "es": "Spanish"}
+    names = {"en": "English", "sw": "Swahili", "zh": "Chinese (Mandarin)", "de": "German", "es": "Spanish"}
     got = [names[c] for c in ["en", "sw"] + [c for c in _EXTRA_REVIEW_CANDIDATES if c in _review_extra_languages()]]
     return ", ".join(got[:-1]) + " and " + got[-1]
 
@@ -5590,6 +5590,7 @@ def create_order(
     voice_clone_consent: str = Form(""),
     rush: str = Form(""),
     review_tier: str = Form(""),
+    reuse_order_id: str = Form(""),
 ):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -5791,7 +5792,29 @@ def create_order(
     content_safety_flagged, content_safety_detail = False, None
     youtube_url = youtube_url.strip()
     youtube_video_id = None
-    if youtube_url:
+    # "Do more with this file": a new order made from a file the client already sent us, with no second upload (see repurpose.py).
+    # A video that came from YouTube is simply fetched again; an uploaded file is linked from the earlier order's folder.
+    reuse_src = None
+    reuse_order_id = reuse_order_id if isinstance(reuse_order_id, str) else ""        # the API and meeting code call this directly, without the form field
+    if reuse_order_id.strip() and not youtube_url and not (audio is not None and audio.filename) and not upload_key.strip():
+        reuse_src = db.get_order(reuse_order_id.strip())
+        if not reuse_src or reuse_src["client_id"] != user["client_scope_id"]:
+            return _client_dashboard_error(request, user, "We could not find that earlier order. Upload the file again to continue.", form_values=form_values)
+        if reuse_src["source_youtube_id"]:
+            youtube_url, reuse_src = f"https://www.youtube.com/watch?v={reuse_src['source_youtube_id']}", None
+        elif not reuse_src["audio_path"] or not Path(reuse_src["audio_path"]).is_file():
+            return _client_dashboard_error(request, user, "That file is no longer stored. Upload it again to continue.", form_values=form_values)
+    if reuse_src is not None:
+        order_upload_dir.mkdir(parents=True, exist_ok=True)
+        audio_path = order_upload_dir / Path(reuse_src["audio_path"]).name
+        try:
+            os.link(reuse_src["audio_path"], audio_path)                         # no second copy on disk
+        except OSError:
+            shutil.copy2(reuse_src["audio_path"], audio_path)
+        original_filename = reuse_src["original_filename"]
+        content_safety_flagged = bool(reuse_src["content_safety_flagged"])       # it was scanned when it first arrived
+        content_safety_detail = "carried over from an earlier order" if content_safety_flagged else None
+    elif youtube_url:
         try:
             audio_path, original_filename, youtube_video_id = _download_youtube(youtube_url, order_upload_dir)
         except Exception as exc:
@@ -6391,7 +6414,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "burned_ready": (outdir / f"burned_captions_{order['target_lang']}.mp4").exists(),
         "dubbed_ready": (outdir / f"dubbed_video_{order['target_lang']}.mp4").exists(),
         "subs_ready": (outdir / f"subs_{order['target_lang']}.srt").exists(),
-        "caption_looks": [{"key": k, "label": v, "state": _captioned_state(order, k)} for k, v in CAPTION_LOOKS.items()],
+        "caption_looks": [{"key": k, "label": v, "state": _captioned_state(order, k), "pct": _captioned_progress(order, k)} for k, v in CAPTION_LOOKS.items()],
         "summaries": [{"template_id": r["template_id"], "name": summary_templates.get(r["template_id"])["name"],
                        "html": order_ai_assist.render_summary_html(r["body"]), "when": datetime.fromtimestamp(r["created_at"]).strftime("%b %d, %H:%M")}
                       for r in db.list_order_summaries(order_id)],
@@ -8965,13 +8988,44 @@ def _video_size(path: Path) -> tuple[int, int]:
         return 1280, 720
 
 
-def render_styled_captions(video_path: Path, ass_path: Path, out_path: Path) -> None:
+def _video_seconds(path: Path) -> float:
+    try:
+        return float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                                    capture_output=True, text=True, timeout=60, check=True).stdout.strip() or 0)
+    except Exception:  # noqa: BLE001 - without a length there is simply no percentage
+        return 0.0
+
+
+def render_styled_captions(video_path: Path, ass_path: Path, out_path: Path, progress=None) -> None:
+    """Burn the captions in. progress(percent) is called as ffmpeg reports how far it has got, so the page can show a real percentage."""
     escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_path), "-vf", f"ass='{escaped}'",
-         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
-         "-movflags", "+faststart", str(out_path)],
-        check=True, timeout=3600)
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_path), "-vf", f"ass='{escaped}'",
+           "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "160k",
+           "-movflags", "+faststart", str(out_path)]
+    total = _video_seconds(video_path) if progress else 0.0
+    if not (progress and total > 0):
+        subprocess.run(cmd, check=True, timeout=3600)
+        return
+    proc = subprocess.Popen(cmd[:1] + ["-progress", "pipe:1", "-nostats"] + cmd[1:], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        for line in proc.stdout:
+            if line.startswith("out_time_us=") or line.startswith("out_time_ms="):           # both are microseconds in practice
+                try:
+                    progress(min(99, int(float(line.split("=", 1)[1]) / 1_000_000 / total * 100)))
+                except ValueError:
+                    pass
+        if proc.wait(timeout=3600) != 0:
+            raise subprocess.CalledProcessError(proc.returncode, "ffmpeg", stderr=proc.stderr.read())
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+
+
+def _captioned_progress(order, style: str) -> int | None:
+    try:
+        return int(_captioned_path(order, style).with_suffix(".progress").read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
 
 
 def _render_captioned_video(order, style: str) -> None:
@@ -8998,7 +9052,8 @@ def _render_captioned_video(order, style: str) -> None:
             ass = out.with_suffix(".ass")
             ass.write_text(caption_formats.to_ass(job, style, source=not has_translation, width=width, height=height), encoding="utf-8")
             part = out.with_suffix(".part.mp4")
-            render_styled_captions(video_path, ass, part)
+            progress_file = out.with_suffix(".progress")
+            render_styled_captions(video_path, ass, part, progress=lambda pct: progress_file.write_text(str(pct), encoding="utf-8"))
             part.replace(out)
             failed.unlink(missing_ok=True)
     except Exception as exc:  # noqa: BLE001 - recorded for the page, never raised into the thread
@@ -9006,6 +9061,21 @@ def _render_captioned_video(order, style: str) -> None:
         api_log.warning(f"captioned video render failed for order {order['id']} ({style}): {exc}")
     finally:
         marker.unlink(missing_ok=True)
+        out.with_suffix(".progress").unlink(missing_ok=True)
+
+
+@app.get("/client/orders/{order_id}/captioned-video/status")
+def client_captioned_video_status(request: Request, order_id: str, style: str = "classic"):
+    """The page asks this every few seconds while a captioned video is being made: {state, pct}."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "sign in"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order or order["client_id"] != user["client_scope_id"] or style not in CAPTION_LOOKS:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    state = _captioned_state(order, style)
+    return JSONResponse({"state": state, "pct": _captioned_progress(order, style) if state == "rendering" else (100 if state == "ready" else None)},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.post("/client/orders/{order_id}/captioned-video")
@@ -11208,5 +11278,7 @@ winback.register(sys.modules[__name__])
 dunning.register(sys.modules[__name__])
 engagement.register(sys.modules[__name__])
 onboarding.register(sys.modules[__name__])
+repurpose.register(sys.modules[__name__])
+model_stats.register(sys.modules[__name__])
 calendar_feed.register(sys.modules[__name__])        # calendar links and sending Kauli to meetings        # import from Google Drive, OneDrive and Dropbox          # narrated blog posts and the podcast feed
 blog_audio.mark_stale_jobs_failed()         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant

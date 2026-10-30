@@ -6275,3 +6275,44 @@ main:has(.sa-page) { max-width: none; margin: 18px 0 0; padding: 0 clamp(14px, 2
   .auth-shell--welcome .auth-switch { margin-top: 6px; }
   .auth-shell--welcome .auth-consent { font-size: 0.68rem; margin-top: 4px; }
 }
+
+/* Do more with this file: new services on a file that is already here */
+.rp-wrap { max-width: 860px; margin: 28px auto; padding: 0 16px; }
+.rp-back { margin: 0 0 8px; font-size: 0.9rem; } .rp-wrap h1 { margin: 0 0 6px; } .rp-file { margin: 0 0 4px; }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; margin-top: 18px; }
+.rp-card { display: grid; gap: 8px; align-content: start; padding: 18px; border: 1px solid #dbe5f5; border-radius: 16px; background: #fff; box-shadow: 0 14px 30px -24px rgba(8, 56, 120, 0.5); }
+.rp-card h2 { margin: 0; font-size: 1.05rem; } .rp-card p { margin: 0; font-size: 0.9rem; }
+.rp-lang { display: grid; gap: 4px; font-size: 0.82rem; color: #4a5a72; } .rp-lang select { margin: 0; }
+.rp-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; } .rp-price { font-weight: 700; color: #0b2447; }
+.more-from { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+
+/* Progress you can see: a ring with a real percentage, a spinner when the length is not known, and buttons that show they are working */
+.kp-status { display: inline-flex; align-items: center; gap: 10px; color: #3e4e66; font-size: 0.9rem; }
+.kp-ring { --p: 0; position: relative; display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; flex: none;
+  background: conic-gradient(#1769d3 calc(var(--p) * 1%), #dfe8f6 0); transition: background 0.4s ease; }
+.kp-ring::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #fff; }
+.kp-ring b { position: relative; font-size: 0.62rem; font-weight: 700; color: #0b2447; }
+.kp-ring.is-spinning { background: conic-gradient(from 0deg, #1769d3 0 25%, #dfe8f6 0); animation: kp-turn 0.9s linear infinite; }
+.kp-dots::after { content: ""; animation: kp-dots 1.4s steps(4, end) infinite; }
+.kp-spin { display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; vertical-align: -0.15em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: kp-turn 0.7s linear infinite; }
+button.is-busy, .ds-btn.is-busy { opacity: 0.8; cursor: progress; }
+@keyframes kp-turn { to { transform: rotate(360deg); } }
+@keyframes kp-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75%, 100% { content: "..."; } }
+@media (prefers-reduced-motion: reduce) { .kp-ring.is-spinning, .kp-spin { animation-duration: 2.4s; } .kp-dots::after { animation: none; content: "..."; } }
+
+/* Work that is kept: the bar that says so, and the tray that follows an upload around the app */
+.kp-restore { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 8px 12px; border: 1px solid #cfe0f7; border-radius: 10px; background: #f1f7ff; color: #1b3a63; font-size: 0.86rem; }
+.kp-restore button { margin: 0; padding: 2px 8px; border: none; background: none; color: #1769d3; font: inherit; text-decoration: underline; cursor: pointer; min-height: 0; }
+.kp-restore .kp-restore-x { margin-left: auto; text-decoration: none; font-size: 1.1rem; line-height: 1; color: #5b6f8c; }
+.kp-tray { position: fixed; right: 18px; bottom: 18px; z-index: 60; display: flex; align-items: center; gap: 10px; max-width: min(360px, calc(100vw - 36px)); padding: 10px 14px 10px 10px;
+  border: 1px solid #dbe5f5; border-radius: 14px; background: #fff; color: #0b2447; box-shadow: 0 18px 40px -18px rgba(8, 40, 72, 0.5); font-size: 0.88rem; }
+.kp-tray[hidden] { display: none; } .kp-tray-text { min-width: 0; overflow-wrap: anywhere; } .kp-tray a { color: #1769d3; font-weight: 600; }
+.kp-tray-x { margin: 0 0 0 4px; padding: 0 4px; border: none; background: none; color: #5b6f8c; font-size: 1.2rem; line-height: 1; cursor: pointer; min-height: 0; }
+@media (max-width: 600px) { .kp-tray { left: 12px; right: 12px; bottom: 12px; max-width: none; } }
+
+/* Models and review (staff) */
+.ms-range { display: flex; gap: 4px; padding: 3px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; align-self: flex-start; }
+.ms-range a { padding: 4px 12px; border-radius: 999px; font-size: 0.82rem; color: inherit; text-decoration: none; opacity: 0.75; } .ms-range a.is-on { background: #1769d3; color: #fff; opacity: 1; }
+.ms-share { white-space: nowrap; } .ms-bar { display: inline-block; width: 70px; height: 7px; margin-right: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); vertical-align: middle; overflow: hidden; }
+.ms-bar i { display: block; height: 100%; background: #4f9bf5; }
+.ms-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 8px; }

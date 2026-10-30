@@ -81,7 +81,7 @@ def test_the_page_lists_each_look_with_its_state(env, wav_bytes):
     marker.write_text("x")
     html = env.client.get(f"/client/orders/{order['id']}").text
     assert 'id="captioned-video"' in html and "More caption formats" in html
-    assert 'data-captioned="ready"' in html and 'data-captioned="rendering"' in html and "Creating it now" in html
+    assert 'data-captioned="ready"' in html and 'data-captioned="rendering"' in html and "Creating your video" in html
     assert f"/download/captioned_box" in html and "words light up as they are spoken" in html
     again = env.client.post(f"/client/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
     assert "already+being+made" in again.headers["location"]

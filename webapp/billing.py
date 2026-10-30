@@ -347,12 +347,12 @@ ADDONS = {
     # Studio's recognition: ElevenLabs Scribe v2 (excellent English, high-accuracy Swahili) with speaker labels
     # and word timings, instead of our standard recogniser. Scribe costs about $0.0037 a minute, so this is priced
     # for its value rather than its cost; the margin guard below still applies.
-    # Human review by an outside language specialist for Chinese, German and Spanish (beyond Swahili, Kikuyu and
+    # Human review by an outside language specialist for Chinese (Mandarin), German and Spanish (beyond Swahili, Kikuyu and
     # English, whose reviewers the human-reviewed rate already covers). A STARTING PROPOSAL: it is only offered
     # when base human rate + this add-on clears the cost floor below, so it cannot be sold under your contractor
     # cost. Set KAULI_EXTRA_REVIEW_COST_PER_MIN to the real contractor cost per audio-minute.
     "review_extra": {
-        "name": "Review by a language specialist (Chinese, German, Spanish)",
+        "name": "Review by a language specialist (Mandarin Chinese, German, Spanish)",
         "rate_per_min": 1.20,
         "included_in": (),
     },

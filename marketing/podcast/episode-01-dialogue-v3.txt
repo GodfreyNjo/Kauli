@@ -1,0 +1,303 @@
+AMARA: Okay, so, I'm going to read you a line from a transcript someone sent me last week. Ready?
+
+DAN: Always.
+
+AMARA: "The committee approved the budget for the new clinic in Nye Robbie." Nye Robbie.
+
+DAN: [laughs] Nairobi.
+
+AMARA: Nairobi! The speaker said Nairobi, perfectly clearly, and the software heard "Nye Robbie". And that's a *small* one. In the same transcript, "we lost forty clients" became "we lost fourteen clients".
+
+DAN: And that's the one that gets you in trouble.
+
+AMARA: That's the one that gets you in trouble. So today: why transcripts go wrong, every single way they go wrong, and what you can do about each one, as a pro would.
+
+AMARA: Welcome to Kauli Guides. I'm Amara.
+
+DAN: And I'm Dan.
+
+AMARA: This is the show for people who turn spoken words into text, subtitles, other languages and sometimes whole new voices. If you've ever uploaded a recording, waited, and then spent an hour fixing what came back, this episode is for you.
+
+DAN: And if you've ever paid for something called "unlimited" and then found out what unlimited meant.
+
+AMARA: [laughs] We'll get there. Here's the plan. About twenty-three minutes, six parts. First, why transcripts disappoint, and the one idea that explains nearly everything. Second, fixing the problem before you even press record. Third, names, jargon, and who said what. Fourth, subtitles that people can actually read. Fifth, translation and dubbing without embarrassing yourself. And sixth, the honest conversation: when AI is enough, when you want a human, and what it should cost.
+
+DAN: And there's a cheat sheet at the end. If you only have two minutes, skip to that.
+
+AMARA: But then you'd miss the Nairobi story.
+
+DAN: You've told the Nairobi story.
+
+AMARA: I've told the first half.
+
+AMARA: So, Dan. Why are transcripts wrong? And please don't say "because AI is bad", because it isn't. It's honestly impressive now.
+
+DAN: It is impressive, and that's actually part of the problem. Here's the one idea. A transcription system doesn't *listen* the way you do. It makes the best guess about what sounds it heard, based on patterns it learned from enormous amounts of speech. When the audio is clean, the language is common, and the words are everyday words, the best guess is almost always right.
+
+AMARA: And when it isn't?
+
+DAN: The guesses get shakier, and they get shakier in a specific direction. They drift toward what's *common*, not what's *correct*. So "Nairobi" sounds a bit like something it has seen more often. A rare surname becomes a common word. A technical term becomes a normal phrase that sounds close.
+
+AMARA: So the errors aren't random.
+
+DAN: They're plausible. That's what makes them dangerous. A typo you spot immediately. A plausible wrong word reads smoothly, and your eye slides right past it.
+
+AMARA: Which is how "forty" becomes "fourteen" and nobody notices until the quote is in print.
+
+DAN: Right. So let me give you the quick list of what pushes a transcript off the rails, and then we'll spend the rest of the episode on each one. Number one, bad audio: noise, echo, a mic too far away. Number two, overlapping speakers. Number three, names and specialist words. Number four, accents, dialects and languages the system has seen less of. Number five, a mix of languages in one conversation. Number six, text that's right but *formatted* wrong, so subtitles are unreadable. And seven, the translation step, which can quietly add its own errors on top.
+
+AMARA: Seven. That's a lot of ways to go wrong.
+
+DAN: It is, and the good news is that most of them are fixable, and the most effective fixes are boring and cheap.
+
+AMARA: Boring and cheap. My favourite category.
+
+DAN: Mine too. One more thing before we go on, though. Everyone asks, "how accurate is it?" And honest answer: it depends almost entirely on the recording. Any company that gives you one big number for everything is telling you about its best day. So the better question is, "how accurate will it be on *my* file?"
+
+AMARA: And how do I find that out?
+
+DAN: Try it on one real file. Not a demo clip, your actual file, with your actual background noise. Most tools give you some free minutes, so use them for exactly that.
+
+AMARA: Okay, this is the part I think people skip, because by the time they're thinking about transcription, the recording is already made.
+
+DAN: Exactly. So if you remember one thing from this episode, make it this: the cheapest accuracy you will ever buy is a better recording. You can't fix it later, you can only *guess* later.
+
+AMARA: Give me the rules. Real ones.
+
+DAN: Rule one, distance. Get the microphone close. A hand-width or two from the mouth, not across the table. A phone held near someone's chin beats an expensive microphone across the room.
+
+AMARA: Because the voice is louder than the room.
+
+DAN: Exactly. Louder voice, quieter room, easier guess. Rule two, the room itself. Hard walls bounce sound around, and that echo smears the words. Soft things help: curtains, a sofa, a rug, even a duvet over a chair. If you're recording an interview, sit on the carpeted side of the room.
+
+AMARA: I've literally recorded in a wardrobe.
+
+DAN: A wardrobe is a genuinely good studio. Rule three, noise. Turn off the fridge if you can, close the window, put the phone on silent. And here's a trick: record ten seconds of silence at the start. It gives you a sample of the room, and a human editor, or a noise-cleaning step, can use it.
+
+AMARA: Ten seconds of nothing. Got it. What about when there's more than one person?
+
+DAN: Best case, one mic per person, each on their own track. If you can't, at least don't let people talk over each other. A quick habit: ask people to finish their sentence before you answer. It sounds stiff, but the transcript, and the listener, will thank you.
+
+AMARA: Dan, I interrupt people constantly.
+
+DAN: [laughs] I know. I've edited you.
+
+AMARA: Fair. What about the file itself? People ask me, "should I compress it before I upload?"
+
+DAN: No. Upload the original. Every time a file gets squashed to be smaller, you lose little bits of detail the system could have used. Use the highest-quality version you have. If the file is huge, use a service that handles big uploads, rather than shrinking it yourself.
+
+AMARA: And if the recording's already made and it's bad?
+
+DAN: Then you have three options. Option one, clean up the audio first, take out hiss and hum. Many tools do that now. Option two, accept the AI draft and plan for more proofreading time. Option three, and this is where the money question comes in, put a human on it. A person can use context. They know that a clinic in a city is probably "Nairobi", even if the audio is muddy.
+
+AMARA: Context. That's the thing the machine doesn't have.
+
+DAN: It has some, but a person has *a lot more*. And we'll come back to when that's worth paying for.
+
+AMARA: Quick recap, in one breath. Close mic, soft room, quiet, silence at the start, one voice at a time, original file.
+
+DAN: Perfect. That alone fixes more transcripts than any software setting.
+
+AMARA: Okay. Let's talk about my least favourite part of proofreading. Names.
+
+DAN: Names are the number one thing that gets mangled, and there's a simple reason: a name is rare by definition. The system has probably never seen that exact spelling attached to that exact sound.
+
+AMARA: So how do you stop it?
+
+DAN: Two habits. One, make a short word list before you start. Names of people and places, brand names, acronyms, product terms. Even ten words. Some tools let you give them that list in advance, so they favour those spellings. If your tool doesn't, you keep the list yourself and do a find-and-replace at the end.
+
+AMARA: Find-and-replace. Not glamorous.
+
+DAN: Not glamorous, extremely effective. Two, say the name clearly, once, on the recording. If you're the one interviewing, just ask, "could you spell your name for the recording?" It feels a little formal, but it saves you.
+
+AMARA: Okay, numbers.
+
+DAN: Numbers deserve their own warning label. Forty and fourteen, fifteen and fifty, a thousand and a million. If a number matters, a date, a price, a dosage, a quote, check it against the audio. Every time.
+
+AMARA: Even when the transcript looks great.
+
+DAN: *Especially* when it looks great. That's the plausible-error problem again.
+
+AMARA: Now, speakers. "Who said what." I get a lot of questions about this.
+
+DAN: It's a big one, because without speaker labels, an interview is a wall of text. Readers can't follow it. And you can't quote anyone safely.
+
+AMARA: So how do you get good labels?
+
+DAN: The system works out that there are different voices from the sound, and groups them. It works best when the voices are quite different, when each person speaks in reasonably long turns, and when nobody talks over anyone. It struggles with two similar voices, with lots of quick back-and-forth, and with a room full of people.
+
+AMARA: So that's another reason for the one-voice-at-a-time habit.
+
+DAN: Exactly. And one more thing to know. The machine can tell you "Speaker 1" and "Speaker 2". It can't know that Speaker 1 is Dr. Mwangi. You need to rename them. Do that once, at the top, and then check the places where the speakers change quickly, because that's where the labels slip.
+
+AMARA: What about people who don't speak the way the training data speaks? Accents, dialects, languages with less data.
+
+DAN: This one matters a lot, and it's where I'd be most honest. For widely spoken languages with lots of recorded speech, AI transcription is very good. For languages with less data, or strong regional accents, or people switching between two languages mid-sentence, the quality drops, and it can drop a lot.
+
+AMARA: Code-switching. Where someone says half the sentence in English and half in Swahili.
+
+DAN: Right. It's completely natural for the speaker, and a real challenge for the system, because it has to decide, word by word, which language it's hearing. If you can, tell it the main language up front, and expect to proofread the switch points.
+
+AMARA: And for those cases, that's when a human is worth it?
+
+DAN: For many of them, yes. A person who speaks the language, and knows the region, catches things a machine can't. We'll talk about that choice in a few minutes.
+
+AMARA: Now a different pain. Someone has the words right. The transcript's perfect. And then they turn it into subtitles and it looks terrible.
+
+DAN: Subtitles are their own craft. A transcript is for reading at your own speed. A subtitle is read at the *video's* speed, while you're also watching the picture. Completely different job.
+
+AMARA: What goes wrong?
+
+DAN: Four things. Too much text at once. Lines that break in awkward places. Subtitles that flash by too fast. And subtitles that sit on top of something important.
+
+AMARA: Let's take them one at a time.
+
+DAN: Too much text. A good rule of thumb: about forty characters a line, two lines at most. If you're showing more than that, people are reading instead of watching. And for languages like Chinese or Japanese, the limits are shorter, because each character carries more.
+
+AMARA: And the awkward breaks?
+
+DAN: Break at natural places. Don't split a name across two lines, don't leave "the" alone at the end of a line. Read it out loud. If it sounds odd when you pause at the break, move the break.
+
+AMARA: Timing?
+
+DAN: Each subtitle needs to stay on screen long enough to read, roughly one to seven seconds, depending on how much there is. And it should appear when the person starts speaking, not before and not much after.
+
+AMARA: And the fourth. On top of something important.
+
+DAN: This one drives me crazy. Burned-in captions that cover a speaker's name tag, a chart, a phone number on screen. The caption sits at the bottom out of habit, and the video already has text down there.
+
+AMARA: Which is, I hear, exactly the kind of thing that we ran into.
+
+DAN: We did, and it's part of why some tools now check for text already on the screen, and move the captions to the top for those moments. If your tool doesn't do that, check your video by eye for any moment with text near the bottom.
+
+AMARA: There's also the question of what file to ask for.
+
+DAN: Yes. A separate subtitle file, usually SRT or VTT, lets viewers turn captions on and off, lets platforms like YouTube index the words, and lets you change the text later without re-editing the video. Burned-in, sometimes called open captions, is baked into the picture, so it shows everywhere, including places that don't support subtitle files, like many social feeds.
+
+AMARA: So, both?
+
+DAN: Often both. File for YouTube and your own site, burned-in version for social.
+
+AMARA: And one more: accessibility. A lot of people need captions.
+
+DAN: A lot. Deaf and hard-of-hearing viewers, people watching on mute on a bus, people in a second language. Good captions are one of those rare things that help everybody. And for some organisations there are legal requirements as well, so if that's you, check what applies where you work.
+
+AMARA: Okay, the glamorous bit. You've got a good transcript, and now you want it in another language. And maybe in another *voice*.
+
+DAN: The most important rule is almost always ignored: translate from the corrected transcript, not from the raw one.
+
+AMARA: Why?
+
+DAN: Because errors travel. If the transcript says "Nye Robbie", the translation will cheerfully translate "Nye Robbie". If it says "fourteen", you get "fourteen" in every language you add. So fix once, in the original, then translate. One correction fixes all your languages.
+
+AMARA: That's actually a huge time saver.
+
+DAN: It's the biggest one in the whole workflow. Second thing: machine translation is much better than it was, but it's still weakest on idioms, humour, formal and informal address, and anything culturally specific. "Break a leg" does not survive.
+
+AMARA: [laughs] I've seen it translated literally. It was upsetting.
+
+DAN: So what do you do? For content where tone matters, an ad, a speech, a course, have a fluent speaker review the translation, at least the opening and the key sentences. And for anything high-stakes, legal, medical, official, a person should check all of it.
+
+AMARA: What about length? I've noticed that translations come out longer or shorter.
+
+DAN: Yes, and for subtitles that matters, because the text has to fit the time. For dubbing, it matters even more. If the English takes five seconds and the translated sentence takes eight, you have two choices: speed the voice up until it sounds frantic, or rewrite the line shorter. A good process rewrites.
+
+AMARA: Let's talk about dubbing then. Because AI voices have got surprisingly good.
+
+DAN: They have. The best ones now sound natural, with proper rhythm and emotion. A year or two ago they sounded like a satnav. Now, for a lot of content, explainers, training, interviews, you can produce a dub that people are happy to listen to.
+
+AMARA: But there are issues.
+
+DAN: Three. One, timing, which we just covered. Two, multiple speakers. If there are two or three people talking, each should keep a consistent voice, otherwise listeners get lost. Three, and this is the serious one: consent.
+
+AMARA: Voice cloning.
+
+DAN: Right. It's technically possible to make a synthetic voice that sounds like a specific person. Do it only with that person's clear permission, and only to say what they actually said, translated. Never to put words in someone's mouth. Responsible tools ask you to confirm you have the rights, and you should treat that as a real commitment, not a checkbox.
+
+AMARA: And be open that it's an AI voice.
+
+DAN: Yes. Audiences are fine with AI voices when you tell them. They're not fine when they feel tricked.
+
+AMARA: Like in this episode.
+
+DAN: Like in this episode. We'll say it properly at the end.
+
+AMARA: Okay. The question everyone actually has. Do I need a human, or is AI enough?
+
+DAN: Let me give you a decision rule I'd use myself. Ask two questions. First, what happens if there's a mistake? Second, who sees it?
+
+AMARA: Go on.
+
+DAN: If it's notes for yourself, a rough draft, a way to search your own recordings, AI alone is the right answer. Fast, cheap, good enough. If it's going to be published under your name, quoted, used in a legal or medical setting, handed to a funder, or shown to a big audience, add a human check. Even if the AI is excellent, you want a person to sign off on the names, the numbers, and the meaning.
+
+AMARA: So it's not "AI versus human". It's AI first, human where it counts.
+
+DAN: Exactly. That's the efficient way. Let the machine do the first draft in minutes, and spend human attention only where it pays.
+
+AMARA: Now, cost, because people have been burned.
+
+DAN: There are a few traps. One, "unlimited" plans with fair-use limits buried in the terms. Two, minimum charges, so a thirty-second clip costs as much as a five-minute one. Three, subscriptions you need to cancel before a renewal date. Four, per-feature extras: speaker labels cost extra, subtitles cost extra, every language costs extra. Before you commit, work out the total price for one *real* file, with everything you need. Not the headline per-minute number.
+
+AMARA: And look for pay-as-you-go, so you're not locked in.
+
+DAN: Yes. If you only have a few hours a month, pay as you go will nearly always beat a big subscription. If you're doing dozens of hours, a plan that includes minutes can make sense. Just do the sum.
+
+AMARA: And privacy. Because people upload interviews, meetings, sensitive things.
+
+DAN: Three questions to ask any service. Where does my file go and who can access it? How long is it kept, and can I delete it? And is my content used for anything other than delivering my work? If the answers aren't clear, in writing, that's your answer.
+
+AMARA: So, Dan. We make a thing for this.
+
+DAN: We do.
+
+AMARA: Let me say this properly, because I'm not going to pretend I'm a neutral party. I work on Kauli. So that's the disclosure. Now, what is it, and what is it *not*?
+
+DAN: Kauli turns audio and video into transcripts, subtitles, translations, and dubs. The fast option is called Instant AI. It covers more than seventy languages, and it comes back in minutes. It's clearly machine-made, so it's a draft you check, and for clean audio it's very good. Every month you get some free minutes of Instant AI transcription, thirty at the moment, so you can test it on your own file before you spend a cent.
+
+AMARA: And the human bit?
+
+DAN: For selected languages, English, Swahili, Kikuyu, Mandarin Chinese, German and Spanish, you can add human review. An editor checks the work against your audio before it's marked ready. That's the one for anything with your name on it.
+
+AMARA: What I like, and this is genuinely a thing people ask for, is that if you want a translation or a dub afterwards, you can do it from the same file. You don't upload it again.
+
+DAN: Right. The file's already there, so you choose the next service, and it starts. And the captions check for on-screen text, like we talked about, and move out of the way.
+
+AMARA: And it's pay as you go, per minute, with plans if you do a lot.
+
+DAN: And no surprises, that's the aim. Is it right for everybody? No. If you need a language it doesn't cover, or a legal-grade certified translation, you should use a specialist for that. But for creators, teams, researchers, and anyone drowning in recordings, it's what we built to make this whole process less painful.
+
+AMARA: So that's our bit. The link is in the show notes. And now, before we run out of time, the cheat sheet.
+
+AMARA: Ten points. Ready? You can screenshot the show notes, but here they are.
+
+DAN: One. Record close, quiet and soft, with silence at the start.
+
+AMARA: Two. One voice at a time, and upload the original file.
+
+DAN: Three. Make a word list of names and terms, and check numbers against the audio.
+
+AMARA: Four. Tell the tool the main language, and expect to proofread language switches.
+
+DAN: Five. Rename speakers once, and check the fast back-and-forth bits.
+
+AMARA: Six. Subtitles: about forty characters a line, two lines at most, long enough to read, and clear of text already on screen.
+
+DAN: Seven. Fix the transcript first, *then* translate.
+
+AMARA: Eight. Dubbing needs rewriting for length, consistent voices, and real consent.
+
+DAN: Nine. AI first, human where it counts, and price a real file, not a headline.
+
+AMARA: And ten. Ask where your files go, how long they stay, and what they're used for.
+
+AMARA: That's Kauli Guides, episode one. If it helped, share it with the one person you know who's drowning in recordings.
+
+DAN: And a quick note on honesty, since we've been banging on about it. This episode is voiced with AI voices, both of us. The script is written by people who actually do this work, and we think telling you is the right thing to do.
+
+AMARA: Questions, or a pain point we missed? Tell us at hello@kauli-forgemedia.com. We'll cover the best ones.
+
+DAN: Next time: how to turn one long recording into a week of content.
+
+AMARA: Until then, check your numbers.
+
+DAN: Always check your numbers.

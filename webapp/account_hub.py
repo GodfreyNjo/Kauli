@@ -825,7 +825,7 @@ def _kb() -> list[dict]:
         {"k": "youtube link url video fetch bot sign in", "topic": "support",
          "a": "You can paste a YouTube link instead of uploading. If YouTube refuses the download, upload the video file itself (a screen recording or the original works) and it will be transcribed the same way. We are working on making links more reliable."},
         {"k": "language languages support which supported translate translation", "topic": "product",
-         "a": "Kauli transcribes and translates a wide range of languages, including English, Swahili, Spanish, French, German, Portuguese, Arabic, Hindi, Chinese, Japanese and Korean. The language list appears when you start an order."},
+         "a": "Kauli transcribes and translates a wide range of languages, including English, Swahili, Spanish, French, German, Portuguese, Arabic, Hindi, Chinese (Mandarin and Cantonese), Japanese and Korean. The language list appears when you start an order."},
         {"k": "accuracy accurate how good quality percent human review", "topic": "product",
          "a": "Instant AI is fast and very good on clear audio. For critical work choose Human review: a person checks and corrects the transcript, and we can reach up to 99% accuracy."},
         {"k": "time long turnaround fast how long take finish minutes ready", "topic": "support",

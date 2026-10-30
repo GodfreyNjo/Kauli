@@ -23,7 +23,7 @@ def test_each_file_becomes_its_own_order_and_failures_are_kept_for_a_retry():
     assert "async function submitBatch" in JS and "MAX_FILES = 10" in JS
     assert JS.count('"/client/orders/presign-upload"') == 2          # the single-file path and the batch path
     assert 'fd.set("idempotency_key"' in JS                           # a fresh key per file, so none is treated as a duplicate
-    assert 'window.location.href = okCount === 1 ? lastUrl : "/client/pending"' in JS
+    assert 'okCount === 1 ? lastUrl : "/client/pending"' in JS and "window.location.href = dest" in JS
     assert "fileQueue = failed" in JS and "Fix or remove those and press Submit again" in JS
 
 

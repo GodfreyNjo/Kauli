@@ -43,7 +43,7 @@ def test_the_order_page_top_folds_away_once_the_order_is_ready(env, wav_bytes):
     assert "open" not in top.split(">")[0] and "Order details" in top                         # folded by default when ready
     assert html.index("<h1>") < html.index('class="od-details"') and "Your order is ready" in html.lower() or "ready" in html.lower()
     inside = html.split('class="od-details"')[1]
-    assert "order-progress" in inside and "Translate this into another language" in inside and "Your formatting instructions" in inside
+    assert "order-progress" in inside and "Translate or dub this in another language" in inside and "Your formatting instructions" in inside
     env.db.update_order_status(order["id"], "processing")
     assert '<details class="od-details" open>' in env.client.get(f"/client/orders/{order['id']}").text   # still running: progress stays in view
 

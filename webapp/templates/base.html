@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% if user is defined and user %}<meta name="kp-user" content="{{ user['id'] }}">{% endif %}
   <script>
     // Runs before paint: a saved user override beats the page's own
     // default theme. Without this the page would flash its default
@@ -170,6 +171,7 @@
         <a href="/staff/winback" class="{{ 'active' if '/staff/winback' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">Win-back</span></a>
         <a href="/staff/exit-feedback" class="{{ 'active' if '/staff/exit-feedback' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Exit feedback</span></a>
         <a href="/staff/providers" class="{{ 'active' if '/staff/providers' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Providers</span></a>
+        <a href="/staff/models" class="{{ 'active' if '/staff/models' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Models and review</span></a>
         <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
         <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
         <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">Handbook</span></a>
@@ -707,6 +709,9 @@
   </script>
   <script src="/static/studio_wave.js?v=2" defer></script>
   <script src="/static/flash.js?v=1" defer></script>
+  <script src="/static/busy.js?v=1" defer></script>
+  <script src="/static/softswap.js?v=2" defer></script>
+  <script src="/static/persist.js?v=1" defer></script>
 {% if user is defined and user and user['role'] == 'client' %}{% include "_assistant.html" %}{% endif %}
 </body>
 </html>

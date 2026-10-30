@@ -7,7 +7,7 @@ the dashboard and the legal pages stay in English.
 Honesty rules baked into every string: Instant AI is described as AI-generated
 and not reviewed by a person; transcription covers {n} languages, but
 translation is between the supported languages, dubbing is for Swahili, Kikuyu and English, and human review
-is for Swahili, Kikuyu, English, Chinese, German and Spanish;
+is for Swahili, Kikuyu, English, Chinese (Mandarin), German and Spanish;
 free minutes need a one-time $1 card check that is credited back.
 
 These were written by an AI and have NOT been reviewed by a native speaker
@@ -46,7 +46,7 @@ KEYS = [
 STRINGS = {
     "en": {
         "title": "AI transcription in {n} languages - from ${t} per minute | Kauli",
-        "desc": "Transcribe audio and video in {n} languages in minutes, from ${t} per minute. Optional human review for Swahili, Kikuyu, English, Chinese, German and Spanish. Pay as you go.",
+        "desc": "Transcribe audio and video in {n} languages in minutes, from ${t} per minute. Optional human review for Swahili, Kikuyu, English, Chinese (Mandarin), German and Spanish. Pay as you go.",
         "kicker": "Instant AI · optional human review",
         "h1": "Turn audio and video into text in {n} languages",
         "sub": "Transcripts, subtitles, translation and dubbing in minutes, from ${t} per audio-minute. Need it checked by a person? Add human review.",
@@ -62,10 +62,10 @@ STRINGS = {
         "ai_3": "AI-generated - not reviewed by a person",
         "hu_h": "Human-reviewed",
         "hu_p": "From ${ht}/min for transcription. ${htr} with translation, ${hd} for a full dub.",
-        "hu_1": "A real reviewer checks the AI draft against the audio", "hu_2": "For Swahili, Kikuyu, English, Chinese, German and Spanish",
+        "hu_1": "A real reviewer checks the AI draft against the audio", "hu_2": "For Swahili, Kikuyu, English, Chinese (Mandarin), German and Spanish",
         "hu_3": "For subtitles and anything with your name on it",
         "langs_h": "Transcribe in {n} languages",
-        "langs_p": "Instant AI transcription covers all of these, and Instant AI translation works between all of them except Kikuyu. Dubbing and human review are available for Swahili, Kikuyu and English. Human review also covers Chinese, German and Spanish.",
+        "langs_p": "Instant AI transcription covers all of these, and Instant AI translation works between all of them except Kikuyu. Dubbing and human review are available for Swahili, Kikuyu and English. Human review also covers Chinese (Mandarin), German and Spanish.",
         "how_h": "How it works",
         "s1_h": "Upload or paste a link", "s1_p": "Drop an audio or video file, or paste a YouTube link.",
         "s2_h": "Choose your language and speed", "s2_p": "Pick the spoken language, then Instant AI or Human-reviewed.",
@@ -74,12 +74,12 @@ STRINGS = {
         "price_p": "No subscription. Pay only for the minutes you process. Prices in USD per audio-minute.",
         "th_service": "Service", "th_ai": "Instant AI", "th_human": "Human-reviewed",
         "sv_t": "Transcription only", "sv_tr": "Transcription + translation", "sv_d": "Full dub",
-        "price_note": "Instant AI translation works between all languages except Kikuyu. Dubbing and human review are for Swahili, Kikuyu and English. Human review also covers Chinese, German and Spanish.",
+        "price_note": "Instant AI translation works between all languages except Kikuyu. Dubbing and human review are for Swahili, Kikuyu and English. Human review also covers Chinese (Mandarin), German and Spanish.",
         "faq_h": "Questions",
         "q1": "Which languages do you support?",
-        "a1": "Instant AI transcribes {n} languages and translates between all of them except Kikuyu. Dubbing and human review are available for Swahili, Kikuyu and English. Human review also covers Chinese, German and Spanish.",
+        "a1": "Instant AI transcribes {n} languages and translates between all of them except Kikuyu. Dubbing and human review are available for Swahili, Kikuyu and English. Human review also covers Chinese (Mandarin), German and Spanish.",
         "q2": "Is the transcript reviewed by a person?",
-        "a2": "Not on Instant AI - it is machine-generated and labelled that way. Human review is available for Swahili, Kikuyu, English, Chinese, German and Spanish.",
+        "a2": "Not on Instant AI - it is machine-generated and labelled that way. Human review is available for Swahili, Kikuyu, English, Chinese (Mandarin), German and Spanish.",
         "q3": "How much does it cost?",
         "a3": "Instant AI transcription starts at ${t} per audio-minute. Your first {free} minutes are free.",
         "q4": "What can I upload?",
