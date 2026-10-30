@@ -1879,7 +1879,7 @@ solution_pages.refresh(SOLUTION_PAGES, _HR_NAMES)
 SOLUTION_PAGES = {k: SOLUTION_PAGES[k] for k in (
     "ngos", "youtubers", "media-broadcast", "e-learning", "voice-over", "captioning", "video-translation", "audio-to-text",
     "youtube-video-to-text", "podcast-transcription", "interview-transcription", "video-transcription", "video-dubbing",
-    "video-localization", "call-centers")}
+    "video-localization", "call-centers", "accessibility-compliance")}
 
 
 @app.get("/solutions/{slug}", response_class=HTMLResponse)

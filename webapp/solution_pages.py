@@ -21,7 +21,7 @@ QUALITY = "Human-reviewed orders reach up to 99% accuracy"
 # The demo (/try?use=...) that shows each service best: a scenario with the same kind of people and content.
 DEMO_FOR = {
     "ngos": "field", "youtubers": "video", "media-broadcast": "news", "e-learning": "course", "voice-over": "video",
-    "captioning": "news", "video-translation": "video", "video-transcription": "meeting", "video-dubbing": "video",
+    "accessibility-compliance": "course", "captioning": "news", "video-translation": "video", "video-transcription": "meeting", "video-dubbing": "video",
     "video-localization": "video", "audio-to-text": "meeting", "youtube-video-to-text": "video",
     "podcast-transcription": "podcast", "interview-transcription": "interview", "call-centers": "call",
 }
@@ -150,6 +150,69 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             ],
             "fit_guide": plans("Captioning an occasional video.", "A steady stream of videos each month.",
                                "Burned-in captions and dubbed video files included.", "A team or network captioning at volume."),
+        },
+        # ------------------------------------------------------------------ accessibility and compliance
+        "accessibility-compliance": {
+            "title": "Captions and Transcripts for ADA and WCAG Accessibility",
+            "meta_description": "Accurate captions and transcripts for schools, universities, public agencies and businesses meeting ADA and WCAG video requirements. Human review, SRT, VTT and TTML files, per-minute pricing.",
+            "kicker": "Accessibility and compliance",
+            "h1": "Captions and transcripts your accessibility team can stand behind",
+            "intro": "Accessible video starts with accurate captions and a transcript for every recording. Kauli produces both in minutes, "
+                     "and a dedicated editor checks them against the audio when they will be published, audited or relied on. "
+                     "Built for universities, schools, public agencies, nonprofits and the businesses that serve them.",
+            "why_heading": "Built for the people who have to prove it",
+            "points": [
+                {"title": "Captions for prerecorded video",
+                 "body": "WCAG 2.1 Level AA asks for captions on prerecorded video with sound (success criterion 1.2.2). Kauli gives you synchronized captions as SRT, VTT, TTML or SBV files, or burned into the picture."},
+                {"title": "A transcript for every recording",
+                 "body": "Word and text transcripts with timestamps, ready to publish next to audio-only and video content as a text alternative."},
+                {"title": "Human review where accuracy counts",
+                 "body": f"On a Human-reviewed order a dedicated editor checks every line against your audio, for up to 99% accuracy. Available in {hr_names}. Instant AI is machine-generated and labelled that way, so use it for drafts."},
+                {"title": "Captions that stay out of the way",
+                 "body": "When the video already shows text, such as a name or a slide, captions move to the top of the picture for that moment so nothing is covered."},
+                {"title": "Names, terms and speakers done right",
+                 "body": "Add your people, places and terms to a custom vocabulary, and have speakers labelled on human-reviewed orders."},
+                {"title": "Easy to buy and to repeat",
+                 "body": "Pay per minute, add minutes with a plan, or ask about Enterprise for invoicing, a dedicated account manager and a negotiated volume rate."},
+            ],
+            "choose": [
+                {**instant, "name": "Instant AI captions", "best": "Internal recordings and drafts that a person will check before anyone relies on them."},
+                {**human, "name": "Human-reviewed captions", "best": "Course videos, public meetings, published media and anything an auditor or a student with a disability will rely on."},
+                {"name": "Transcripts", "best": "Audio-only content, podcasts, recorded meetings and as a companion to video.",
+                 "get": "A timestamped Word or text transcript with the same accuracy options as the captions."},
+            ],
+            "demo": "video",
+            "guides": ["captions-vs-subtitles-vs-transcripts", "srt-vs-vtt-which-subtitle-format-to-use", "ai-vs-human-transcription-which-do-you-need"],
+            "cta_heading": "Check a sample with your accessibility team",
+            "cta_body": f"Upload a real recording, review the result with the people who will sign it off, and add human review to what will be published. Your first {free:.0f} minutes every month are free.",
+            "related": ["captioning", "e-learning", "video-transcription"],
+            "tour": {"mode": "upload", "filename": "lecture_recording.mp4"},
+            "faq": [
+                {"q": "Do captions from Kauli make us compliant?",
+                 "a": "Captions are one requirement among several. Accessible video can also need audio description where the pictures carry information, "
+                      "an accessible player and an accessible page. Kauli provides accurate captions and transcripts. Whether your whole site or course meets a "
+                      "standard is for you and your counsel to decide, and we are not a law firm."},
+                {"q": "Which rules ask for captions?",
+                 "a": "It depends on who you are. Requirements can come from the Americans with Disabilities Act (Title II for state and local governments, public schools "
+                      "and public universities, Title III for many businesses), Section 508 for federal agencies, Section 504 for organizations that receive federal funding, "
+                      "and state laws. The US Department of Justice's Title II web rule points to WCAG 2.1 Level AA with compliance dates that depend on the size of the "
+                      "entity, so check the current dates with your counsel."},
+                {"q": "Are Instant AI captions accurate enough?",
+                 "a": f"Instant AI is machine-generated and labelled as not reviewed by a person. It is very good on clear audio and is a fast first draft. {QUALITY}, "
+                      "because a dedicated editor checks the work against the audio, so choose human review for captions people will rely on."},
+                {"q": "Which caption formats do you deliver?",
+                 "a": "SRT, VTT, TTML and SBV caption files, Word and text transcripts, and captions burned into the video. You can also push captions to your YouTube channel."},
+                {"q": "Do you provide audio description or live captions?",
+                 "a": "Not today. Kauli captions and transcribes recordings. If you need audio description for prerecorded video or live captioning for events, "
+                      "use a specialist for those and keep Kauli for your recorded captions and transcripts."},
+                {"q": "Do you have a VPAT or accessibility conformance report?",
+                 "a": "We are preparing one for the Kauli web app. Contact us and we will tell you where it stands and answer your procurement questions."},
+                {"q": "How do we buy?",
+                 "a": f"Order one file and pay per minute, choose a plan with minutes included, or talk to us about Enterprise for invoicing and a dedicated account manager. "
+                      f"The first {free:.0f} Instant AI transcription minutes every month are free, so you can test on your own recordings."},
+            ],
+            "fit_guide": plans("Testing captions on one recording.", "A department captioning a steady stream of lectures or videos.",
+                               "Teams that need burned-in captions and dubbed video files too.", "Institutions and agencies captioning at volume, needing invoicing and an account manager."),
         },
         # ------------------------------------------------------------------ dubbing
         "video-dubbing": {
