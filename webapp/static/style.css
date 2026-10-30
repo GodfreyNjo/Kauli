@@ -6227,3 +6227,51 @@ main:has(.sa-page) { max-width: none; margin: 18px 0 0; padding: 0 clamp(14px, 2
 .sa-onb { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 10px 0; }
 .sa-onb > div { padding: 10px 12px; border: 1px solid #e6edf7; border-radius: 12px; display: grid; gap: 2px; font-size: 0.76rem; color: #6b7b94; } .sa-onb strong { font-size: 1.25rem; color: #0b2447; }
 @media (max-width: 800px) { .sa-onb { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Sign-in tidy-up: the eye sits in the middle of the password field, the language switch is a small pill that stays legible over the photo
+   and clear of the card, and the card tightens on short or zoomed windows so nothing is cut off. */
+.auth-shell--welcome .auth-password-toggle { margin: 0; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; min-height: 0; }
+.auth-shell--welcome .auth-password-toggle svg { width: 18px; height: 18px; }
+.auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { margin: 0; }
+.auth-lang--top .lang-switch summary {
+  gap: 6px; padding: 4px 2px; font-size: 0.78rem; font-weight: 500; line-height: 1.2; color: #fff; background: none; border: none; border-radius: 6px;
+  text-shadow: 0 1px 6px rgba(0, 10, 30, 0.6);
+}
+.auth-lang--top .lang-switch summary:hover { background: none; opacity: 0.85; }
+.auth-lang--top .lang-switch summary svg { width: 14px; height: 14px; flex: none; }
+.auth-lang--top .lang-switch summary::after { content: ""; width: 6px; height: 6px; margin: -3px 0 0 2px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(45deg); }
+.auth-lang--top .lang-switch[open] summary::after { transform: rotate(-135deg); margin-top: 3px; }
+@media (min-width: 901px) {
+  .auth-lang--top { top: 12px; }
+  .auth-shell--welcome .auth-form-panel { padding-top: 46px; }
+}
+@media (min-width: 901px) and (max-height: 820px) {
+  .auth-shell--welcome .auth-form-inner { padding-top: 16px; padding-bottom: 14px; }
+  .auth-shell--welcome .auth-brand-logo { height: 30px; }
+  .auth-shell--welcome h1 { font-size: 1.45rem; }
+  .auth-shell--welcome .auth-sub { margin-bottom: 8px; font-size: 0.88rem; }
+  .auth-shell--welcome .auth-google-btn { padding: 9px; margin-bottom: 8px; }
+  .auth-shell--welcome .auth-divider { margin-bottom: 8px; }
+  .auth-shell--welcome .auth-field { margin-bottom: 8px; }
+  .auth-shell--welcome .auth-field-label { margin-bottom: 4px; font-size: 0.88rem; }
+  .auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: 9px; padding-bottom: 9px; }
+  .auth-shell--welcome button[type="submit"] { padding: 10px; }
+  .auth-shell--welcome .auth-consent { font-size: 0.72rem; line-height: 1.35; margin-top: 6px; }
+  .auth-shell--welcome .auth-switch { margin-top: 8px; }
+}
+@media (min-width: 901px) and (max-height: 700px) {
+  .auth-shell--welcome .auth-form-panel { padding-top: 34px; padding-bottom: 8px; }
+  .auth-shell--welcome .auth-form-inner { padding-top: 12px; padding-bottom: 10px; }
+  .auth-shell--welcome .auth-brand { margin-bottom: 4px; }
+  .auth-shell--welcome .auth-brand-logo { height: 26px; }
+  .auth-shell--welcome h1 { font-size: 1.25rem; margin-bottom: 0; }
+  .auth-shell--welcome .auth-sub { display: none; }
+  .auth-shell--welcome .auth-google-btn { padding: 7px; margin-bottom: 6px; }
+  .auth-shell--welcome .auth-divider { margin-bottom: 6px; }
+  .auth-shell--welcome .auth-field { margin-bottom: 6px; }
+  .auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: 7px; padding-bottom: 7px; }
+  .auth-shell--welcome .auth-forgot { margin-bottom: 6px; }
+  .auth-shell--welcome button[type="submit"] { padding: 8px; }
+  .auth-shell--welcome .auth-switch { margin-top: 6px; }
+  .auth-shell--welcome .auth-consent { font-size: 0.68rem; margin-top: 4px; }
+}
