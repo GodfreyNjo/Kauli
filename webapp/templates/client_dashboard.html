@@ -12,78 +12,6 @@
     <div class="ds-head-actions"><a href="#order-form" class="ds-btn" id="new-project-btn">+ New project</a></div>
   </div>
 
-  <section class="ds-card" id="my-orders">
-  {% if not order_list.all_count %}
-    <div class="empty-state ds-empty">
-      <p>You haven't submitted any projects yet.</p>
-      <a href="#order-form" class="ds-btn" onclick="var dz = document.getElementById('dropzone'); if (dz) dz.focus();">+ Submit your first order</a>
-    </div>
-  {% else %}
-    <div class="ds-tabs filter-tabs" id="order-status-filter">
-      {% for key, label in [('', 'All'), ('processing', 'Processing'), ('in_review', 'In review'), ('needs_you', 'Needs attention'), ('ready', 'Completed')] %}
-      <a href="/client?{% if key %}status={{ key }}&amp;{% endif %}{% if order_list.folder %}folder={{ order_list.folder|urlencode }}&amp;{% endif %}{% if order_list.q %}q={{ order_list.q|urlencode }}{% endif %}#my-orders"
-         class="{{ 'is-on active' if order_list.status == key else '' }}"{% if order_list.status == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ order_list.counts[key] }}</small></a>
-      {% endfor %}
-    </div>
-    <div class="ds-tools">
-      <form method="get" action="/client#my-orders" class="ds-search ol-search" role="search">{{ ico('search', 18) }}
-        <input type="search" id="order-search" name="q" value="{{ order_list.q }}" placeholder="Search by file name, order ID or service..." aria-label="Search your orders">
-        {% if order_list.status %}<input type="hidden" name="status" value="{{ order_list.status }}">{% endif %}
-        {% if order_list.folder %}<input type="hidden" name="folder" value="{{ order_list.folder }}">{% endif %}
-      </form>
-      {% if folders %}
-      <div class="ds-tabs filter-tabs" id="folder-filter" style="margin:0;">
-        <a href="/client{% if order_list.status %}?status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if not order_list.folder else '' }}">All folders</a>
-        {% for f in folders %}
-        <a href="/client?folder={{ f|urlencode }}{% if order_list.status %}&amp;status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if order_list.folder == f else '' }}">{{ f }}</a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </div>
-
-    {% if not orders %}
-    <p class="ds-empty ol-none">No orders match. <a href="/client#my-orders">Show all</a></p>
-    {% else %}
-    <div class="ds-scroll ol-wrap">
-    <table class="orders-table orders-compact">
-      <thead>
-        <tr><th class="hide-sm">Order ID</th><th>File / Project</th><th>Service</th><th class="hide-sm">Language</th><th>Status</th><th class="hide-sm">Updated</th><th><span class="sr-only">Open</span></th></tr>
-      </thead>
-      <tbody>
-      {% for o in orders %}
-      <tr class="order-row" data-status="{{ o['status'] }}">
-        <td class="hide-sm num">#{{ o['id'][:6]|upper }}</td>
-        <td class="ol-name">
-          <div class="ds-file">{{ file_ic(o['original_filename']) }}<div>
-            <a href="/client/orders/{{ o['id'] }}" class="order-table-name" title="{{ o['original_filename'] }}"><strong>{{ o['original_filename'] }}</strong></a>
-            {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
-            <small>{% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['duration_minutes']|round(1) }} min</small>
-          </div></div>
-        </td>
-        <td class="ol-service">
-          {% if o['service_level'] %}{{ {'transcribe': 'Transcription', 'translate': 'Translation', 'dub': 'Dubbing'}.get(o['service_level'], o['service_level']|capitalize) }}{% else %}<span class="muted">Analysing</span>{% endif %}
-          <small class="ds-sub">{{ 'Human' if o['review_tier'] in ('human', 'studio') else 'AI' }}</small>
-        </td>
-        <td class="hide-sm ds-langs"><b>{{ o['source_lang']|upper }}{% if o['target_lang'] != o['source_lang'] %} &rarr; {{ o['target_lang']|upper }}{% endif %}</b></td>
-        <td class="ol-status">
-          {% if o['status'] == 'pending_payment' %}
-            <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
-          {% else %}
-            {{ status_pill(o['status']) }}
-          {% endif %}
-          {% if o['difficulty_surcharge_status'] == 'pending_approval' %}<a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Extra charge</a>{% endif %}
-        </td>
-        <td class="hide-sm num ol-date">{{ o['created_at']|int|short_date }}</td>
-        <td class="ol-go"><a href="/client/orders/{{ o['id'] }}" class="ds-act row-action-btn" title="Open" aria-label="Open {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    </div>
-    <div class="ds-pager">{{ pager(order_list.page, order_list.pages, "/client", order_list.params) }}</div>
-    {% endif %}
-  {% endif %}
-  </section>
 
 <div class="card ds-card wizard-card" id="new-project">
   <h2 class="wizard-title">Start a new project</h2>
@@ -400,12 +328,12 @@
       </label>
       <p class="muted" style="margin-top:-8px;">Optional. Groups related orders and adds a filter to your list.</p>
 
-      <label class="checkbox">
+      <label class="checkbox" id="speaker-label-field">
         <input type="checkbox" name="instr_speaker_ids" value="1" {% if form_values.get('instr_speaker_ids') %}checked{% endif %}>
         Label speakers in the transcript (e.g. "NARRATOR:", "SPEAKER 1:")
       </label>
 
-      <p class="muted" id="ai-clean-note" hidden style="margin-top:14px;">Instant AI gives a clean read. To choose how exact the transcript is, or to give instructions to an editor, choose Human review.</p>
+      <p class="muted" id="ai-clean-note" hidden style="margin-top:14px;">Instant AI gives a clean read. To choose how exact the transcript is, to label speakers, or to give instructions to an editor, choose Human review.</p>
       <fieldset class="tiers" id="verbatim-fieldset" style="margin-top:14px;">
         <legend>How exact should the transcript be?</legend>
         <label class="tier-option">
@@ -487,6 +415,79 @@
     </div>
   </form>
 </div>
+
+  <section class="ds-card ds-below" id="my-orders">
+  {% if not order_list.all_count %}
+    <div class="empty-state ds-empty">
+      <p>You haven't submitted any projects yet.</p>
+      <a href="#order-form" class="ds-btn" onclick="var dz = document.getElementById('dropzone'); if (dz) dz.focus();">+ Submit your first order</a>
+    </div>
+  {% else %}
+    <div class="ds-tabs filter-tabs" id="order-status-filter">
+      {% for key, label in [('', 'All'), ('processing', 'Processing'), ('in_review', 'In review'), ('needs_you', 'Needs attention'), ('ready', 'Completed')] %}
+      <a href="/client?{% if key %}status={{ key }}&amp;{% endif %}{% if order_list.folder %}folder={{ order_list.folder|urlencode }}&amp;{% endif %}{% if order_list.q %}q={{ order_list.q|urlencode }}{% endif %}#my-orders"
+         class="{{ 'is-on active' if order_list.status == key else '' }}"{% if order_list.status == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ order_list.counts[key] }}</small></a>
+      {% endfor %}
+    </div>
+    <div class="ds-tools">
+      <form method="get" action="/client#my-orders" class="ds-search ol-search" role="search">{{ ico('search', 18) }}
+        <input type="search" id="order-search" name="q" value="{{ order_list.q }}" placeholder="Search by file name, order ID or service..." aria-label="Search your orders">
+        {% if order_list.status %}<input type="hidden" name="status" value="{{ order_list.status }}">{% endif %}
+        {% if order_list.folder %}<input type="hidden" name="folder" value="{{ order_list.folder }}">{% endif %}
+      </form>
+      {% if folders %}
+      <div class="ds-tabs filter-tabs" id="folder-filter" style="margin:0;">
+        <a href="/client{% if order_list.status %}?status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if not order_list.folder else '' }}">All folders</a>
+        {% for f in folders %}
+        <a href="/client?folder={{ f|urlencode }}{% if order_list.status %}&amp;status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if order_list.folder == f else '' }}">{{ f }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if not orders %}
+    <p class="ds-empty ol-none">No orders match. <a href="/client#my-orders">Show all</a></p>
+    {% else %}
+    <div class="ds-scroll ol-wrap">
+    <table class="orders-table orders-compact">
+      <thead>
+        <tr><th class="hide-sm">Order ID</th><th>File / Project</th><th>Service</th><th class="hide-sm">Language</th><th>Status</th><th class="hide-sm">Updated</th><th><span class="sr-only">Open</span></th></tr>
+      </thead>
+      <tbody>
+      {% for o in orders %}
+      <tr class="order-row" data-status="{{ o['status'] }}">
+        <td class="hide-sm num">#{{ o['id'][:6]|upper }}</td>
+        <td class="ol-name">
+          <div class="ds-file">{{ file_ic(o['original_filename']) }}<div>
+            <a href="/client/orders/{{ o['id'] }}" class="order-table-name" title="{{ o['original_filename'] }}"><strong>{{ o['original_filename'] }}</strong></a>
+            {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
+            <small>{% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['duration_minutes']|round(1) }} min</small>
+          </div></div>
+        </td>
+        <td class="ol-service">
+          {% if o['service_level'] %}{{ {'transcribe': 'Transcription', 'translate': 'Translation', 'dub': 'Dubbing'}.get(o['service_level'], o['service_level']|capitalize) }}{% else %}<span class="muted">Analysing</span>{% endif %}
+          <small class="ds-sub">{{ 'Human' if o['review_tier'] in ('human', 'studio') else 'AI' }}</small>
+        </td>
+        <td class="hide-sm ds-langs"><b>{{ o['source_lang']|upper }}{% if o['target_lang'] != o['source_lang'] %} &rarr; {{ o['target_lang']|upper }}{% endif %}</b></td>
+        <td class="ol-status">
+          {% if o['status'] == 'pending_payment' %}
+            <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
+          {% else %}
+            {{ status_pill(o['status']) }}
+          {% endif %}
+          {% if o['difficulty_surcharge_status'] == 'pending_approval' %}<a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Extra charge</a>{% endif %}
+        </td>
+        <td class="hide-sm num ol-date">{{ o['created_at']|int|short_date }}</td>
+        <td class="ol-go"><a href="/client/orders/{{ o['id'] }}" class="ds-act row-action-btn" title="Open" aria-label="Open {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <div class="ds-pager">{{ pager(order_list.page, order_list.pages, "/client", order_list.params) }}</div>
+    {% endif %}
+  {% endif %}
+  </section>
 
 <script src="/static/cloud_import.js?v={{ static_version('cloud_import.js') }}" defer></script>
 <script src="/static/client_wizard.js?v={{ static_version('client_wizard.js') }}"></script>

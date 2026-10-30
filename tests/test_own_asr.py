@@ -94,23 +94,30 @@ def test_models_are_kept_on_the_persistent_volume(monkeypatch, tmp_path):
 
 
 # ------------------------------------------------------------------------------------------------ routing
-def test_our_own_model_leads_only_where_switched_on_and_reliable(env, monkeypatch):
+def test_our_own_model_leads_instant_ai_where_it_was_measured_accurate(env, monkeypatch):
     route = env.app._route_asr
     monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "k")
     monkeypatch.delenv("KAULI_CHEAP_ASR", raising=False)
-    monkeypatch.setattr(env.app, "cheap_providers_configured", lambda: ["groq-whisper"])
     monkeypatch.delenv("KAULI_OWN_ASR", raising=False)
-    off = route("transkriptor", source_lang="en", free_covered=False)
-    assert "own" not in off.split(":")[-1].split(",")                                               # off by default: nothing changes
-    monkeypatch.setenv("KAULI_OWN_ASR", "on")
-    assert route("transkriptor", source_lang="en", free_covered=False) == "chain:own,transkriptor,groq-whisper"
+    monkeypatch.delenv("KAULI_OWN_ASR_LANGUAGES", raising=False)
+    monkeypatch.setattr(env.app, "cheap_providers_configured", lambda: ["groq-whisper"])
+    # on by default for Instant AI and free minutes (free_covered): our own model, then the low-cost provider, then Transkriptor
     assert route("transkriptor", source_lang="en", free_covered=True) == "chain:own,groq-whisper,transkriptor"
-    assert route("transkriptor", source_lang="sw", free_covered=False) == off.replace("en", "sw")    # Swahili stays with the providers built for it
+    # human-reviewed and other paid orders keep Transkriptor first
+    assert route("transkriptor", source_lang="en", free_covered=False) == "chain:transkriptor,groq-whisper,faster-whisper"
+    # languages it was not measured accurate in, and Swahili, stay with the providers built for them
     assert "own" not in route("transkriptor", source_lang="sw", free_covered=True)
+    assert "own" not in route("transkriptor", source_lang="ru", free_covered=True)
+    # a long file goes to the fast cloud providers: our server would take too long
+    assert "own" in route("transkriptor", source_lang="en", free_covered=True, minutes=10)
+    assert "own" not in route("transkriptor", source_lang="en", free_covered=True, minutes=45)
     monkeypatch.setenv("KAULI_OWN_ASR_LANGUAGES", "en,sw")
-    assert route("transkriptor", source_lang="sw", free_covered=False).startswith("chain:own,")
+    assert route("transkriptor", source_lang="sw", free_covered=True).startswith("chain:own,")
+    monkeypatch.delenv("KAULI_OWN_ASR_LANGUAGES")
     monkeypatch.setattr(env.app, "cheap_providers_configured", lambda: [])
     assert route("faster-whisper", source_lang="en", free_covered=True) == "chain:own"
+    monkeypatch.setenv("KAULI_OWN_ASR", "off")
+    assert "own" not in route("transkriptor", source_lang="en", free_covered=True)
 
 
 def test_the_failover_view_lists_it(env, wav_bytes, monkeypatch):

@@ -42,7 +42,7 @@
   {% endif %}
 
   {% if order['difficulty_surcharge_status'] != 'pending_approval' %}
-    <p class="ok">Nothing pending here - <a href="/client/orders/{{ order['id'] }}">view your order</a>.</p>
+    <p data-persist class="ok">Nothing pending here - <a href="/client/orders/{{ order['id'] }}">view your order</a>.</p>
   {% else %}
     <div class="modal-warning" style="margin-bottom:18px;">
       This order needed additional work beyond what was originally covered: <strong>{{ reason_label }}</strong>.

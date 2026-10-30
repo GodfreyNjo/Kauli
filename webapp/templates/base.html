@@ -165,6 +165,7 @@
         <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
         <a href="/staff/blog" class="{{ 'active' if request.url.path.startswith('/staff/blog') and 'audio' not in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
         <a href="/staff/blog-audio" class="{{ 'active' if '/staff/blog-audio' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Blog audio</span></a>
+        <a href="/staff/engagement" class="{{ 'active' if '/staff/engagement' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">Engagement</span></a>
         <a href="/staff/payment-failures" class="{{ 'active' if '/staff/payment-failures' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Failed payments</span></a>
         <a href="/staff/winback" class="{{ 'active' if '/staff/winback' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">Win-back</span></a>
         <a href="/staff/exit-feedback" class="{{ 'active' if '/staff/exit-feedback' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Exit feedback</span></a>
@@ -217,8 +218,8 @@
         {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user)
               and request.url.path not in ['/client/billing', '/client/verify-trial'] %}
         <div class="plan-banner" role="status">
-          <span><strong>Choose a plan to download your files.</strong> Your orders still process meanwhile.</span>
-          <a class="btn" href="/client/billing?choose_plan=1">Choose a plan</a>
+          <span><strong>Unlock your files in one step.</strong> You can read the start of your results now; a quick $1 card check, credited straight back to your wallet, unlocks the rest. <a href="/client/billing?choose_plan=1">See plans</a></span>
+          <a class="btn" href="/client/verify-trial">Unlock now</a>
         </div>
         {% endif %}
         {% if user is defined and user and user['role'] == 'client' and payment_issue(user) and request.url.path != '/client/billing/update-card' %}
@@ -295,8 +296,8 @@
   <div class="modal-overlay" id="idle-timeout-modal" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="idle-timeout-title">
       <h2 id="idle-timeout-title">Still there?</h2>
-      <p>You'll be signed out in <strong id="idle-timeout-countdown">5:00</strong> due to inactivity - anything
-         you haven't saved could be lost.</p>
+      <p>You will be signed out in <strong id="idle-timeout-countdown">5:00</strong> because of inactivity. Anything
+         you have not saved could be lost.</p>
       <div style="display:flex; gap:10px; margin-top:16px;">
         <button type="button" class="btn" id="idle-timeout-stay">Stay signed in</button>
         <a href="/logout" class="btn secondary">Sign out now</a>
@@ -705,6 +706,7 @@
     }
   </script>
   <script src="/static/studio_wave.js?v=2" defer></script>
+  <script src="/static/flash.js?v=1" defer></script>
 {% if user is defined and user and user['role'] == 'client' %}{% include "_assistant.html" %}{% endif %}
 </body>
 </html>

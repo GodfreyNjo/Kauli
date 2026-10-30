@@ -497,6 +497,46 @@ CREATE TABLE IF NOT EXISTS app_flags (
     updated_at REAL
 );
 
+-- Our own cookie-free page views (see site_analytics.py): a visitor is a daily-rotating hash, never a cookie, an address or a person.
+CREATE TABLE IF NOT EXISTS site_hits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts REAL NOT NULL,
+    day TEXT NOT NULL,
+    visitor TEXT NOT NULL,
+    session TEXT NOT NULL,
+    user_id TEXT,
+    path TEXT NOT NULL,
+    is_landing INTEGER NOT NULL DEFAULT 0,
+    channel TEXT,
+    source TEXT,
+    medium TEXT,
+    country TEXT,
+    device TEXT,
+    browser TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_site_hits_day ON site_hits(day);
+CREATE INDEX IF NOT EXISTS idx_site_hits_visitor ON site_hits(visitor, ts);
+CREATE INDEX IF NOT EXISTS idx_site_hits_user ON site_hits(user_id, ts);
+
+-- Every nudge sent to a customer to bring them back or help them use more of Kauli (see engagement.py), so nobody is nudged too often.
+CREATE TABLE IF NOT EXISTS engagement_messages (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    sent_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_engagement_user ON engagement_messages(user_id, sent_at);
+
+-- The two-click satisfaction question after a customer's first, third and sixth result (see onboarding.py).
+CREATE TABLE IF NOT EXISTS csat_responses (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    order_id TEXT NOT NULL UNIQUE,
+    score INTEGER NOT NULL,
+    comment TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL
+);
+
 -- What a customer says when they close their account (optional survey). Read by staff on /staff/exit-feedback.
 CREATE TABLE IF NOT EXISTS account_exit_surveys (
     id TEXT PRIMARY KEY,
@@ -1041,6 +1081,9 @@ def init_db() -> None:
         # The short code in this person's invite link (/r/<code>). Made on first use (see account_hub.referral_code_for).
         conn.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_referral_code ON users(referral_code)")
+    if "signup_channel" not in existing_user_cols:
+        # Where this customer came from when they signed up (site_analytics.attribute_signup), for the acquisition and CAC numbers.
+        conn.execute("ALTER TABLE users ADD COLUMN signup_channel TEXT")
     if "referred_by" not in existing_user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN referred_by TEXT")
     existing_sub_cols = {row["name"] for row in conn.execute("PRAGMA table_info(subscriptions)")}
@@ -5322,5 +5365,12 @@ def set_flag(key: str, value: str, by: str | None = None) -> None:
     conn.execute("INSERT INTO app_flags (key, value, updated_by, updated_at) VALUES (?, ?, ?, ?) "
                  "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_by = excluded.updated_by, updated_at = excluded.updated_at",
                  (key, value, by, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def set_signup_channel(user_id: str, channel: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET signup_channel = ? WHERE id = ? AND signup_channel IS NULL", (channel, user_id))
     conn.commit()
     conn.close()

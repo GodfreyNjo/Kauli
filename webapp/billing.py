@@ -53,7 +53,7 @@ SERVICE_LEVELS = {
 # (human-verified Swahili<->English subtitles) would have no price at all.
 REVIEW_TIERS = {
     "ai": {"name": "Instant AI", "human_reviewed": False,
-           "blurb": "Ready in minutes. AI-generated - not reviewed by a person."},
+           "blurb": "Ready in minutes. Accurate AI transcription and translation."},
     "human": {"name": "Human-reviewed", "human_reviewed": True,
               "blurb": "AI draft, then a real reviewer checks and signs it off before delivery."},
 }
@@ -126,7 +126,10 @@ def price_card_for(market: str | None) -> dict:
 
 
 # A new account's very first upload, when it is this short, always gets Transkriptor: it is the first impression of our quality.
-FIRST_ORDER_QUALITY_MINUTES = 5.0
+# A new customer's first order is processed and delivered without any payment, whatever its length up to this: they read the first part of the
+# transcript, and one quick step (the $1 card check, credited straight back to their wallet) unlocks the rest and everything else on the platform.
+FIRST_ORDER_FREE_MAX_MINUTES = 120.0
+FIRST_ORDER_QUALITY_MINUTES = 0.0     # was 5: a new account's first short upload used to go to Transkriptor. Free minutes now use our own models first.
 FREE_MINUTES_PER_MONTH = 30.0  # monthly free allowance - Instant AI transcription only. Served by the low-cost providers (see app._route_asr), so it costs cents
 
 # The free allowance only ever buys transcription - not translation, not a

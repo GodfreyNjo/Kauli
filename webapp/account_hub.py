@@ -20,6 +20,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
+from . import site_analytics as analytics_engine
 from . import assistant_core, billing, blog_audio, cloud_import, connections, db, ga_events, ga_reports, mailer, order_ai_assist, rate_limit, transcript_export
 
 router = APIRouter()
@@ -1258,11 +1259,27 @@ def site_analytics(request: Request, days: int = 28, refresh: int = 0):
         line = _line_chart([(_fmt_day(r["date"]), r["activeUsers"]) for r in ga["daily"]])
     internal = internal_site_stats(days)
     return A.templates.TemplateResponse(request, "staff_site_analytics.html", {
-        "user": user, "theme": "dark", "days": days, "configured": ga_reports.configured(), "error": error, "ga": ga, "tiles": tiles, "line": line,
+        "dash": analytics_engine.dashboard(days), "an": analytics_engine, "user": user, "theme": "light", "days": days, "configured": ga_reports.configured(), "error": error, "ga": ga, "tiles": tiles, "line": line,
         "insights": ga_reports.insights(ga) if ga else [], "funnel": ga_reports.funnel(ga) if ga else [], "internal": internal,
         "internal_line": _line_chart([(d[5:], n) for d, n in internal["orders_by_day"]]) if len(internal["orders_by_day"]) > 1 else "",
         "property": ga_reports.property_id(), "measurement_id": ga_events.measurement_id(),
         "fetched": datetime.fromtimestamp(ga["fetched_at"]).strftime("%b %d, %H:%M") if ga else None})
+
+
+@router.post("/staff/analytics/ad-spend")
+def set_ad_spend(request: Request, spend: str = Form("")):
+    """What is spent on ads in a month, so the dashboard can work out the cost of winning a customer from the paid channels."""
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    try:
+        value = float(spend.strip().lstrip("$").replace(",", "") or 0)
+    except ValueError:
+        value = -1.0
+    if not (0 <= value <= 10_000_000):
+        return RedirectResponse("/staff/analytics", status_code=303)
+    db.set_flag("ad_spend_usd_month", str(value), by=user["id"])
+    return RedirectResponse("/staff/analytics", status_code=303)
 
 
 # ================================================================================================ RESOURCES

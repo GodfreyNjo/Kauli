@@ -40,11 +40,12 @@ NAMES = {
 }
 
 # The providers staff can switch on and off, by step. Each one that is off is passed over everywhere: new orders, automatic switching and
-# the failed-order switch. (ElevenLabs is not in the list: its premium voice and Studio tier are products customers pay for.)
+# the failed-order switch. ElevenLabs is the realistic-voice provider: turning it off takes away the premium voice, the automatic realistic
+# voice on Premium dubs and the Studio tier (customers are never offered what cannot be delivered), and the standard voices carry on.
 TOGGLEABLE = {
     "asr": ["transkriptor", "groq-whisper", "assemblyai", "own"],
     "mt": ["lara", "azure-translate", "madlad", "claude", "aws-translate"],
-    "tts": ["piper", "azure"],
+    "tts": ["piper", "azure", "elevenlabs"],
 }
 STEP_TITLES = {"asr": "Turning speech into text", "mt": "Translating", "tts": "Voices for dubbing"}
 # What each provider costs us per audio-minute, in US dollars. Where the provider publishes a price it is filled in (an estimate: real bills depend
@@ -52,7 +53,7 @@ STEP_TITLES = {"asr": "Turning speech into text", "mt": "Translating", "tts": "V
 COST_DEFAULTS = {
     "transkriptor": None, "groq-whisper": 0.0019, "assemblyai": 0.0025, "own": 0.0, "faster-whisper": 0.0, "elevenlabs-scribe": 0.0037,
     "lara": None, "azure-translate": 0.010, "claude": None, "aws-translate": 0.015, "madlad": 0.0, "local": 0.0,
-    "piper": 0.0, "azure": 0.016, "elevenlabs": 0.072,
+    "piper": 0.0, "azure": 0.016, "elevenlabs": None,      # ElevenLabs: worked out from its published price, see cost_per_min
 }
 MODES = {
     "saver": ("Spend less", "The cheap providers go first for any order in the widely spoken languages, with Transkriptor behind them if they fail. "
@@ -91,6 +92,9 @@ def cost_per_min(name: str) -> float | None:
     row = _settings().get(name)
     if row is not None and row["cost_per_min"] is not None:
         return float(row["cost_per_min"])
+    if name == "elevenlabs":
+        from . import billing
+        return billing.premium_voice_unit_cost_usd()           # its characters per audio-minute at its list price, with retries allowed for
     return COST_DEFAULTS.get(name)
 
 
@@ -128,7 +132,47 @@ def cost_estimates() -> list[dict]:
         out.append({"level": level, "price": price, "route": [NAMES.get(n, n or "none") for n in route.values()],
                     "cost": total if known else None, "known": known,
                     "margin": ((price - total) / price * 100) if known and price else None})
+    # the realistic voice: sold as an add-on, included on Premium, so its own margin is worth seeing
+    voice_cost = cost_per_min("elevenlabs")
+    add_on = billing.ADDONS["premium_voice"]["rate_per_min"]
+    out.append({"level": "premium_voice", "price": add_on, "route": [NAMES["elevenlabs"]], "cost": voice_cost, "known": voice_cost is not None,
+                "margin": ((add_on - voice_cost) / add_on * 100) if voice_cost is not None and add_on else None})
     return out
+
+
+def own_model_status() -> dict:
+    """Whether our own transcription model is on this server's disk yet (it downloads itself on first use, about half a gigabyte)."""
+    try:
+        from kauli.providers.asr import OwnASR
+        root = Path(OwnASR.model_root())
+        files = [f for f in root.rglob("model.bin")] if root.exists() else []
+        size = sum(f.stat().st_size for f in files) // 1_000_000
+    except Exception:  # noqa: BLE001
+        files, size = [], 0
+    return {"ready": bool(files), "mb": size, "downloading": _warming.is_set()}
+
+
+import threading  # noqa: E402
+
+_warming = threading.Event()
+
+
+def warm_own_model() -> bool:
+    """Download and load our own transcription model now, in the background, so the first customer does not wait for it."""
+    if _warming.is_set():
+        return False
+    _warming.set()
+
+    def run():
+        try:
+            from kauli.providers.asr import OwnASR
+            OwnASR()._load()
+        except Exception:  # noqa: BLE001 - the page shows whether it arrived
+            pass
+        finally:
+            _warming.clear()
+    threading.Thread(target=run, daemon=True, name="own-asr-warmup").start()
+    return True
 
 
 def switchboard() -> list[dict]:
@@ -141,7 +185,8 @@ def switchboard() -> list[dict]:
             d = detail.get(name, {})
             rows.append({"name": name, "label": NAMES.get(name, name), "connected": bool(configured(name)), "enabled": is_enabled(name),
                          "paused": is_paused(name), "detail": d.get("detail", ""), "low": d.get("low", False),
-                         "cost": cost_per_min(name), "default_cost": COST_DEFAULTS.get(name),
+                         "cost": cost_per_min(name), "default_cost": COST_DEFAULTS.get(name) if name != "elevenlabs" else cost_per_min(name),
+                         "model": own_model_status() if name == "own" else None,
                          "custom_cost": (_settings().get(name) is not None and _settings()[name]["cost_per_min"] is not None)})
         steps.append({"kind": kind, "title": STEP_TITLES[kind], "rows": rows})
     return steps

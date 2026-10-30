@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from xml.sax.saxutils import escape
 
+from .screen_text import is_top
 from .subtitles import build_cues
 
 STYLES = {"classic": "Classic", "social": "Social: words light up as they are spoken", "box": "Bold on a dark box"}
@@ -37,15 +38,23 @@ def to_sbv(job, source: bool = False) -> str:
 
 
 def to_ttml(job, lang: str = "en", source: bool = False) -> str:
-    paras = []
+    ranges = getattr(job, "top_ranges", None)
+    paras, any_top = [], False
     for s, e, text in build_cues(job, source):
         body = "<br/>".join(escape(line) for line in text.split("\n"))
-        paras.append(f'      <p begin="{_clock(s)}" end="{_clock(e)}" style="s1">{body}</p>')
+        top = is_top(s, e, ranges)
+        any_top = any_top or top
+        region = (' region="rTop"' if top else ' region="rBottom"') if ranges else ""
+        paras.append(f'      <p begin="{_clock(s)}" end="{_clock(e)}" style="s1"{region}>{body}</p>')
+    layout = ('    <layout>\n'
+              '      <region xml:id="rBottom" tts:origin="10% 68%" tts:extent="80% 27%" tts:displayAlign="after" tts:textAlign="center"/>\n'
+              '      <region xml:id="rTop" tts:origin="10% 5%" tts:extent="80% 27%" tts:displayAlign="before" tts:textAlign="center"/>\n'
+              '    </layout>\n') if ranges else ""
     return ('<?xml version="1.0" encoding="UTF-8"?>\n'
             f'<tt xml:lang="{escape(lang)}" xmlns="http://www.w3.org/ns/ttml" xmlns:tts="http://www.w3.org/ns/ttml#styling">\n'
             '  <head>\n    <styling>\n'
             '      <style xml:id="s1" tts:color="white" tts:textAlign="center" tts:fontSize="100%" tts:textOutline="black 1px"/>\n'
-            '    </styling>\n  </head>\n  <body>\n    <div>\n' + "\n".join(paras) + "\n    </div>\n  </body>\n</tt>\n")
+            '    </styling>\n' + layout + '  </head>\n  <body>\n    <div>\n' + "\n".join(paras) + "\n    </div>\n  </body>\n</tt>\n")
 
 
 # ---------------------------------------------------------------------------------------------------- styled captions (ASS)
@@ -100,15 +109,22 @@ def to_ass(job, style: str = "classic", source: bool = False, width: int = 1280,
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, "
         "StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\n"
         f"Style: Default,Arial,{size},{look['primary']},{look['secondary']},{look['outline']},{look['back']},{look['bold']},0,0,0,"
-        f"100,100,0,0,{look['border']},{max(round(h * look['outline_w'], 1), 0.5)},{look['shadow']},2,{side},{side},{round(h * look['margin_v'])},1\n\n"
-        "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
+        f"100,100,0,0,{look['border']},{max(round(h * look['outline_w'], 1), 0.5)},{look['shadow']},2,{side},{side},{round(h * look['margin_v'])},1\n"
+        + (
+            # the same look at the top of the picture, for the moments the video has its own text or a graphic at the bottom
+            f"Style: Top,Arial,{size},{look['primary']},{look['secondary']},{look['outline']},{look['back']},{look['bold']},0,0,0,"
+            f"100,100,0,0,{look['border']},{max(round(h * look['outline_w'], 1), 0.5)},{look['shadow']},8,{side},{side},{round(h * 0.05)},1\n"
+            if getattr(job, "top_ranges", None) else "")
+        + "\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
     lines = []
+    ranges = getattr(job, "top_ranges", None)
     for s, e, text in build_cues(job, source):
+        place = "Top" if is_top(s, e, ranges) else "Default"
         if style == "social":
             body = "{\\fad(80,60)}" + _karaoke(text, e - s)
         else:
             body = _clean(text).replace("\n", "\\N")
         if body:
-            lines.append(f"Dialogue: 0,{_ass_time(s)},{_ass_time(e)},Default,,0,0,0,,{body}")
+            lines.append(f"Dialogue: 0,{_ass_time(s)},{_ass_time(e)},{place},,0,0,0,,{body}")
     return head + "\n".join(lines) + "\n"

@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import asyncio
 import functools
 import json
 import os
@@ -53,7 +54,9 @@ from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning  # noqa: E402
+from kauli.providers import own_quality  # noqa: E402
+from kauli import screen_text  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -434,6 +437,16 @@ async def add_trace_id(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Trace-Id"] = trace_id
     _seo_headers(request, response)
+    try:                                        # our own cookie-free page view counter (site_analytics.py); never in the way of a page
+        _ua = request.headers.get("user-agent", "")
+        if site_analytics.should_count(request.method, request.url.path, response.status_code, response.headers.get("content-type", ""), _ua,
+                                       request.headers.get("dnt") == "1" or request.headers.get("sec-gpc") == "1"):
+            _session = request.scope.get("session") or {}
+            asyncio.get_running_loop().run_in_executor(
+                None, site_analytics.record_hit, request.url.path, request.url.query, request.headers.get("referer", ""),
+                request.headers.get("host", ""), rate_limit.client_ip(request), _ua, request.headers.get("cf-ipcountry"), _session.get("user_id"))
+    except Exception:  # noqa: BLE001
+        pass
     api_log.info("request", extra={
         "trace_id": trace_id, "method": request.method, "path": request.url.path,
         "status_code": response.status_code, "duration_ms": round((time.time() - started) * 1000, 1),
@@ -905,12 +918,25 @@ def _resolve_role_and_admin(email: str) -> tuple[str, bool]:
     return "client", False
 
 
+def _top_ranges(order):
+    """When the captions of this order move to the top of the picture: while the video has its own text or a graphic at the bottom (found
+    once per video, see kauli/screen_text.py), or all the time when the customer said the video already has burned-in captions."""
+    try:
+        if order["instr_existing_subs"] in ("match_existing", "flag_discrepancy"):
+            return [(0, 10 ** 9)]
+        return screen_text.cached(order["outdir"]) or None
+    except Exception:  # noqa: BLE001 - captions simply stay at the bottom
+        return None
+
+
 def _load_job(order) -> Job | None:
     manifest_path = Path(order["outdir"]) / "manifest.json"
     if not manifest_path.exists():
         return None
     try:
-        return Job.load(str(manifest_path))
+        job = Job.load(str(manifest_path))
+        job.top_ranges = _top_ranges(order)            # not part of the saved manifest: it is read from screen_text.json each time
+        return job
     except Exception:
         return None
 
@@ -1504,7 +1530,11 @@ def _lara_configured() -> bool:
     return bool(os.environ.get("LARA_ACCESS_KEY_ID") and os.environ.get("LARA_ACCESS_KEY_SECRET"))
 
 
-def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str) -> tuple[str | None, str | None]:
+OWN_MT_MAX_MINUTES = float(os.environ.get("KAULI_OWN_MT_MAX_MINUTES") or 15)       # our own model translates a few seconds a sentence: short files only
+OWN_ASR_MAX_MINUTES = float(os.environ.get("KAULI_OWN_ASR_MAX_MINUTES") or 20)
+
+
+def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str, minutes: float = 0.0) -> tuple[str | None, str | None]:
     """(mt provider name, None) or (None, user-facing error). Lara first
     (the chosen engine); a priority plan's Claude upgrade, the Kikuyu
     Claude-first rule, and the original local/Azure fallbacks are kept for
@@ -1523,6 +1553,9 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str)
                       "in the meantime.")
     if (plan_mt == "claude" and review_tier == "ai" and provider_health.usable("claude") and not provider_health.is_paused("claude")):
         return "claude", None  # Premium and Enterprise: high-quality translation, given automatically (Lara takes over if Claude is down or off)
+    if (review_tier == "ai" and minutes <= OWN_MT_MAX_MINUTES and own_quality.mt_ok(source_lang, target_lang)
+            and provider_health.madlad_ok(source_lang, target_lang) and not provider_health.is_paused("madlad")):
+        return "madlad", None  # Instant AI: our own translation model goes first where it was measured good; the paid engines are behind it
     if review_tier == "ai" and lara_ok:
         return "lara", None
     if plan_mt == "claude" and provider_health.is_enabled("claude"):
@@ -2699,7 +2732,7 @@ def status_page(request: Request):
 def _elevenlabs_configured() -> bool:
     """Premium voice is offered only while there is a key AND the add-on price still clears the
     margin floor at the current ElevenLabs cost - it is never sold at a loss."""
-    return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.premium_voice_margin_ok()
+    return bool(os.environ.get("ELEVENLABS_API_KEY")) and billing.premium_voice_margin_ok() and provider_health.is_enabled("elevenlabs")
 
 
 def _studio_languages() -> set[str]:
@@ -3166,6 +3199,7 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
             _notify_internal_new_signup(user, base_url=str(request.base_url))
             _capture_signup_ip_intel(user["id"], request)
             account_hub.record_referral(user, request.cookies.get("kauli_ref"))
+            site_analytics.attribute_signup(user["id"], rate_limit.client_ip(request), request.headers.get("user-agent", ""))
             # Price card for this account: US/international vs East Africa,
             # from Cloudflare's visitor-country header (absent when hit
             # directly -> the international card). Fixed from here on; only
@@ -3207,7 +3241,7 @@ def login_form(request: Request, mode: str = "signin", notice: str | None = None
     elif notice == "password_reset":
         display_notice = "Your password has been reset - sign in with your new password."
     elif notice == "session_expired":
-        display_notice = "You were signed out after a while inactive - sign back in to continue."
+        display_notice = "You were signed out after a period of inactivity. Please sign in again to continue."
     return templates.TemplateResponse(request, "login.html", {
         "error": error, "notice": display_notice, "mode": "signup" if mode == "signup" else "signin",
         "next": _safe_next(next) if next else "",
@@ -5151,6 +5185,7 @@ def client_home(request: Request, page: int = 1, q: str = "", status: str = ""):
         "free_minutes_left": billing.free_minutes_remaining(db.get_subscription_current(user["client_scope_id"])),
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
         "winback_offer": winback.open_offer(user["id"]) if user["client_scope_id"] == user["id"] else None,
+        "next_step": engagement.next_step(user["id"]) if user["client_scope_id"] == user["id"] else None,
     })
 
 
@@ -5232,7 +5267,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
         "service_levels": billing.SERVICE_LEVELS,
         "review_tiers": billing.REVIEW_TIERS,
         "price_card": billing.price_card_for(db.get_billing_market(user["client_scope_id"])),
-        "default_review_tier": ("human" if db.get_billing_market(user["client_scope_id"]) == "legacy" else "ai"),
+        "default_review_tier": "ai",          # Instant AI is the default for every account (older ones used to open on Human review, so their orders waited for staff)
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
@@ -5289,7 +5324,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
         "service_levels": billing.SERVICE_LEVELS,
         "review_tiers": billing.REVIEW_TIERS,
         "price_card": billing.price_card_for(db.get_billing_market(user["client_scope_id"])),
-        "default_review_tier": ("human" if db.get_billing_market(user["client_scope_id"]) == "legacy" else "ai"),
+        "default_review_tier": "ai",          # Instant AI is the default for every account (older ones used to open on Human review, so their orders waited for staff)
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
         "wallet_credits": db.wallet_credits_remaining(user["client_scope_id"]),
         "rush_surcharge_pct": billing.RUSH_SURCHARGE_PCT,
@@ -5730,6 +5765,8 @@ def create_order(
         # These are instructions for a human editor; an Instant AI order has none, so whatever the form carried is dropped.
         instr_verbatim_level, instr_existing_subs, instr_no_audio, instr_wrong_language, instr_instrumental_only = "clean_read", "ignore", "tag", "tag", "tag"
         instr_transcribe_lyrics, instr_use_italics = "", ""
+        if not idempotency_key.startswith("meeting-"):      # the meeting notetaker identifies its own speakers; a customer cannot ask for labels
+            instr_speaker_ids = ""                  # speaker labels (NARRATOR:, SPEAKER 1:) are an editor's work: Instant AI never gets them
     if instr_existing_subs not in db.EXISTING_SUBS_OPTIONS:
         instr_existing_subs = "ignore"
     if instr_no_audio not in db.CONTENT_HANDLING_OPTIONS:
@@ -5865,7 +5902,7 @@ def create_order(
         # local/Azure guards (a Swahili-to-English-only local model must never
         # be fed another direction - confirmed live to produce nonsense)
         # kept as fallbacks for when Lara isn't connected.
-        mt, mt_error = _pick_mt(source_lang, target_lang, plan_mt, review_tier)
+        mt, mt_error = _pick_mt(source_lang, target_lang, plan_mt, review_tier, minutes=minutes)
         if mt_error:
             return _client_dashboard_error(request, user, mt_error, form_values=form_values)
     # Real bug this fixes: this used to be tts = "piper" if level["tts"]
@@ -5939,6 +5976,13 @@ def create_order(
     cost = billing.order_cost_usd(minutes, service_level, plan, free_minutes_for_this_order,
                                    addons=addons, wallet_credits_available=reserved_credits, rush=is_rush,
                                    market=billing_market, review_tier=review_tier)
+    # A new customer's first Instant AI order is never held for payment: it is processed and delivered, they read the first part of the
+    # transcript, and the one-time $1 card check (credited back to their wallet) unlocks the rest. What it would have cost is kept in the
+    # breakdown. After this first order, anything beyond the free minutes is pay as you go as usual.
+    if (cost["total_usd"] > 0 and review_tier == "ai" and not studio and service_level in ("transcribe", "translate")
+            and minutes <= min(billing.FIRST_ORDER_FREE_MAX_MINUTES, onboarding.first_order_cap(db.get_user(user["client_scope_id"])))
+            and not _plan_chosen(user["client_scope_id"]) and not db.list_orders_for_client(user["client_scope_id"])):
+        cost = {**cost, "first_order_courtesy_usd": cost["total_usd"], "total_usd": 0.0}
     # order_cost_usd silently drops any addon the plan already includes -
     # reflect that back so we never store/charge for one that didn't apply.
     applied_addons = [line["key"] for line in cost["addons"]]
@@ -5965,7 +6009,11 @@ def create_order(
     used_before = (subscription["minutes_used_this_period"] or 0.0) if subscription else 0.0
     bulk_allowance = (plan != "free" and review_tier == "ai" and cost["free_minutes_applied"] > 0 and cost["billable_minutes"] <= 0
                       and not studio and used_before + minutes > billing.PLANS[plan].get("quality_minutes", 0))
-    asr = _route_asr(asr, source_lang=source_lang, free_covered=(free_covered and not first_impression) or bulk_allowance)
+    # Instant AI (free minutes included) goes to our own model first where it is accurate, then the low-cost providers (Groq, AssemblyAI),
+    # with Transkriptor behind them; human-reviewed orders keep Transkriptor first.
+    instant_ai = review_tier == "ai" and not studio
+    asr = _route_asr(asr, source_lang=source_lang, free_covered=(free_covered and not first_impression) or bulk_allowance or instant_ai,
+                     minutes=minutes)
 
     db.create_order(
         order_id=order_id,
@@ -6176,21 +6224,23 @@ CHEAP_ASR_LANGUAGES = {"en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "tr
 OWN_ASR_DEFAULT_LANGUAGES = "en,es,fr,de,pt,it,nl"
 
 
-def _own_asr_first(source_lang: str) -> bool:
-    """Our own transcription model goes first for the languages it is reliable in, once switched on (KAULI_OWN_ASR=on). The languages are
-    KAULI_OWN_ASR_LANGUAGES; Swahili and the rest stay with the providers built for them until the model is proven there."""
-    if os.environ.get("KAULI_OWN_ASR", "").lower() not in ("on", "1", "true", "yes") or not provider_health.is_enabled("own"):
+def _own_asr_first(source_lang: str, minutes: float = 0.0) -> bool:
+    """Our own transcription model goes first for the languages it was measured accurate in (kauli/providers/own_model_quality.json), on short
+    and medium files. It is on unless KAULI_OWN_ASR=off or staff turned it off on the Providers page; KAULI_OWN_ASR_LANGUAGES overrides the
+    measured list. Swahili and the rest stay with the providers built for them until the model is proven there."""
+    if os.environ.get("KAULI_OWN_ASR", "").lower() in ("off", "0", "false", "no") or not provider_health.is_enabled("own"):
         return False
-    langs = {x.strip() for x in os.environ.get("KAULI_OWN_ASR_LANGUAGES", OWN_ASR_DEFAULT_LANGUAGES).split(",") if x.strip()}
-    return source_lang in langs
+    raw = os.environ.get("KAULI_OWN_ASR_LANGUAGES")
+    langs = {x.strip() for x in raw.split(",") if x.strip()} if raw else own_quality.asr_languages()
+    return source_lang in langs and minutes <= OWN_ASR_MAX_MINUTES
 
 
-def _route_asr(default_asr: str, *, source_lang: str, free_covered: bool) -> str:
+def _route_asr(default_asr: str, *, source_lang: str, free_covered: bool, minutes: float = 0.0) -> str:
     """Which transcription provider (or chain of them) an order uses: see _route_asr_outside, with our own model in front where it is
     reliable. If our own model is not confident about a recording the chain hands it to the next provider; if every other provider
     fails, our own draft is delivered rather than lost."""
     outside = _route_asr_outside(default_asr, source_lang=source_lang, free_covered=free_covered)
-    if not _own_asr_first(source_lang) or default_asr not in ("transkriptor", "faster-whisper"):
+    if not free_covered or not _own_asr_first(source_lang, minutes) or default_asr not in ("transkriptor", "faster-whisper"):
         return outside
     parts = outside[len("chain:"):].split(",") if outside.startswith("chain:") else [outside]
     parts = [p for p in parts if p not in ("faster-whisper", "own")]        # our own model is the local one now
@@ -6352,6 +6402,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "progress_steps": _order_progress_steps(order["status"], order["review_tier"]),
         "live": _processing_state(order, _ui_lang(request, user)) if order["status"] in ("queued", "processing") else None,
         "caption_cues": _caption_cues(job),
+        "csat_due": order["status"] in ("ready_for_delivery", "delivered") and onboarding.csat_due(order["client_id"], order["id"]),
         "can_edit_transcript": order["review_tier"] == "ai" and order["status"] in db.TERMINAL_OK_STATUSES,
         "can_export_transcript": bool(job) and _deliverable_denied_reason(order, "txt") is None,
         "same_language": order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"],
@@ -7364,6 +7415,14 @@ def paystack_callback(request: Request, payment_id: str, reference: str | None =
     dest = f"/client/orders/{payment['order_id']}" if payment and payment["order_id"] else "/client/billing"
     if result.get("status") == "success" and payment:
         _activate_payment(payment, result.get("reference", payment_id), base_url=str(request.base_url))
+        try:
+            unlocking = json.loads(payment["meta"] or "{}").get("kind") == "trial_verification"
+        except (ValueError, TypeError):
+            unlocking = False
+        if unlocking:                                         # the one-time unlock: straight back to what they were reading, now in full
+            latest = next(iter(db.list_orders_for_client(payment["user_id"])), None)
+            return RedirectResponse((f"/client/orders/{latest['id']}" if latest else "/client/home")
+                                    + "?notice=You%27re+all+set.+Everything+is+unlocked%2C+and+your+%241+is+in+your+wallet.", status_code=303)
         return RedirectResponse(f"{dest}?notice=Payment+confirmed.", status_code=303)
     return RedirectResponse(f"{dest}?error=Payment+wasn%27t+confirmed+yet+-+give+it+a+minute+and+check+again.",
                              status_code=303)
@@ -8932,6 +8991,8 @@ def _render_captioned_video(order, style: str) -> None:
             job = _load_job(order)
             if not job or not job.segments:
                 raise FileNotFoundError("the transcript is not ready")
+            if getattr(job, "top_ranges", None) is None:                              # not looked at yet: find the video's own text and graphics, so the captions keep clear of them
+                job.top_ranges = screen_text.analyse(str(video_path), outdir) or None
             width, height = _video_size(video_path)
             has_translation = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])["mt"]
             ass = out.with_suffix(".ass")
@@ -10060,6 +10121,17 @@ def _provider_log(user, detail: str) -> None:
     db.log_security_event("provider_setting_changed", user_id=user["id"], email=user["email"], detail=detail)
 
 
+@app.post("/staff/providers/download-own-model")
+def staff_download_own_model(request: Request):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    started = provider_health.warm_own_model()
+    _provider_log(user, "download own transcription model")
+    return RedirectResponse("/staff/providers?notice=" + quote("Downloading our transcription model in the background. Refresh in a few minutes." if started
+                                                                 else "It is already downloading."), status_code=303)
+
+
 @app.post("/staff/providers/mode")
 def staff_provider_mode(request: Request, mode: str = Form("")):
     user = current_user(request)
@@ -11089,6 +11161,10 @@ ACTIVATION_NUDGE_THRESHOLD_HOURS = 72.0
 
 
 def _activation_nudge_sweep_once() -> None:
+    try:
+        onboarding.alert_stuck_first_orders()              # a new customer's first order that is not moving: staff hear about it the same day
+    except Exception as exc:  # noqa: BLE001
+        api_log.warning("stuck first order alert failed", extra={"error": str(exc)})
     base_url = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or "https://kauli-forgemedia.com"
     for client in db.clients_needing_activation_nudge(threshold_hours=ACTIVATION_NUDGE_THRESHOLD_HOURS):
         _send_activation_nudge(client, base_url)
@@ -11115,6 +11191,8 @@ def _winback_loop() -> None:
             _base = os.environ.get("KAULI_PUBLIC_BASE_URL", "").rstrip("/") or "https://kauli-forgemedia.com"
             winback.sweep_once(_base)
             dunning.expire_backstop()
+            site_analytics.prune()
+            engagement.sweep_once(_base)
         except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the loop forever
             api_log.warning("winback sweep failed", extra={"error": str(exc)})
 
@@ -11128,5 +11206,7 @@ connections.register(sys.modules[__name__])
 account_closure.register(sys.modules[__name__])
 winback.register(sys.modules[__name__])
 dunning.register(sys.modules[__name__])
+engagement.register(sys.modules[__name__])
+onboarding.register(sys.modules[__name__])
 calendar_feed.register(sys.modules[__name__])        # calendar links and sending Kauli to meetings        # import from Google Drive, OneDrive and Dropbox          # narrated blog posts and the podcast feed
 blog_audio.mark_stale_jobs_failed()         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant

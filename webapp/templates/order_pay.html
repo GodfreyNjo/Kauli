@@ -48,7 +48,7 @@
   {% endif %}
 
   {% if order['status'] != 'pending_payment' %}
-    <div class="pay-card"><p class="ok" style="margin:0;">{{ t('pay_paid') }} <a href="/client/orders/{{ order['id'] }}">{{ t('view') }}</a></p></div>
+    <div class="pay-card"><p data-persist class="ok" style="margin:0;">{{ t('pay_paid') }} <a href="/client/orders/{{ order['id'] }}">{{ t('view') }}</a></p></div>
   {% else %}
   <div class="pay-grid">
     <section class="pay-card pay-summary" aria-labelledby="pay-file">

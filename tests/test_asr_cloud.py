@@ -165,6 +165,7 @@ def test_the_free_allowance_costs_cents_on_the_low_cost_providers():
 # ------------------------------------------------------------------------------------------------ routing
 def test_the_routing_rules(env):
     route = env.app._route_asr
+    env.monkeypatch.setenv("KAULI_OWN_ASR", "off")                                                           # our own model has its own tests
     env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
     assert route("transkriptor", source_lang="en", free_covered=True) == "transkriptor"                       # no low-cost key: unchanged
     env.monkeypatch.setenv("GROQ_API_KEY", "g")
@@ -181,29 +182,38 @@ def test_the_routing_rules(env):
     assert route("faster-whisper", source_lang="en", free_covered=True) == "faster-whisper"
 
 
-def test_a_new_accounts_first_short_upload_gets_transkriptor_then_the_free_minutes_go_to_the_low_cost_providers(env, wav_bytes):
+def test_instant_ai_goes_to_the_low_cost_providers_first_from_the_very_first_upload(env, wav_bytes):
+    env.monkeypatch.setenv("KAULI_OWN_ASR", "off")                                                           # our own model has its own tests
     env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
     env.monkeypatch.setenv("GROQ_API_KEY", "g")
     env.monkeypatch.setenv("ASSEMBLYAI_API_KEY", "a")
     first = env.order_from(env.place(wav_bytes, source_lang="en"))
-    assert first["asr"] == "chain:transkriptor,groq-whisper,assemblyai,faster-whisper"           # the quality showcase
-    second = env.order_from(env.place(wav_bytes, source_lang="en"))
-    assert second["asr"] == "chain:groq-whisper,assemblyai,transkriptor,faster-whisper"           # free minutes after that
+    assert first["asr"] == "chain:groq-whisper,assemblyai,transkriptor,faster-whisper"           # no special first upload any more
+    assert env.order_from(env.place(wav_bytes, source_lang="en"))["asr"] == first["asr"]
     swahili = env.order_from(env.place(wav_bytes, source_lang="sw"))
     assert swahili["asr"].startswith("chain:transkriptor,")                                       # the languages we are known for
     env.monkeypatch.setenv("KAULI_CHEAP_ASR", "off")
     assert env.order_from(env.place(wav_bytes, source_lang="en"))["asr"] == "transkriptor"
 
 
-def test_everyone_who_pays_stays_on_transkriptor_first(env, wav_bytes):
+def test_human_reviewed_orders_keep_transkriptor_first_and_instant_ai_on_a_plan_goes_to_the_low_cost_providers(env, wav_bytes):
+    env.monkeypatch.setenv("KAULI_OWN_ASR", "off")
     env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
     env.monkeypatch.setenv("GROQ_API_KEY", "g")
     env.db.set_subscription_plan("u1", "pro", 30)
-    env.order_from(env.place(wav_bytes, source_lang="en"))                                        # use up their first-order showcase
-    paid = env.order_from(env.place(wav_bytes, source_lang="en"))
-    assert paid["asr"] == "chain:transkriptor,groq-whisper,faster-whisper"
+    assert env.order_from(env.place(wav_bytes, source_lang="en"))["asr"] == "chain:groq-whisper,transkriptor,faster-whisper"
     human = env.order_from(env.place(wav_bytes, source_lang="en", review_tier="human"))
     assert human["asr"].startswith("chain:transkriptor,")
+
+
+def test_instant_ai_orders_start_with_our_own_model_where_it_is_accurate(env, wav_bytes):
+    env.monkeypatch.delenv("KAULI_OWN_ASR", raising=False)
+    env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
+    env.monkeypatch.setenv("GROQ_API_KEY", "g")
+    english = env.order_from(env.place(wav_bytes, source_lang="en"))
+    assert english["asr"] == "chain:own,groq-whisper,transkriptor"
+    assert env.order_from(env.place(wav_bytes, source_lang="sw"))["asr"].startswith("chain:transkriptor,")
+    assert env.order_from(env.place(wav_bytes, source_lang="en", review_tier="human"))["asr"].startswith("chain:transkriptor,")
 
 
 def test_the_manifest_records_which_provider_really_ran():
@@ -212,20 +222,3 @@ def test_the_manifest_records_which_provider_really_ran():
     from kauli import pipeline
     src = Path(pipeline.__file__).read_text(encoding="utf-8")
     assert 'getattr(asr_provider, "used_name", None)' in src and 'job.providers["asr"] = ran' in src
-
-
-def test_a_paid_plans_quality_minutes_come_first_and_the_rest_of_the_allowance_goes_to_the_low_cost_providers(env, wav_bytes):
-    env.monkeypatch.setenv("TRANSKRIPTOR_API_KEY", "t")
-    env.monkeypatch.setenv("GROQ_API_KEY", "g")
-    env.db.set_subscription_plan("u1", "pro", 30)
-    env.order_from(env.place(wav_bytes, source_lang="en"))                                        # first-order showcase
-    early = env.order_from(env.place(wav_bytes, source_lang="en"))
-    assert early["asr"].startswith("chain:transkriptor,")                                         # inside the plan's quality minutes
-    conn = env.db.get_conn()
-    conn.execute("UPDATE subscriptions SET minutes_used_this_period = ? WHERE user_id = 'u1'", (env.app.billing.PLANS["pro"]["quality_minutes"] + 1,))
-    conn.commit()
-    conn.close()
-    bulk = env.order_from(env.place(wav_bytes, source_lang="en"))
-    assert bulk["asr"] == "chain:groq-whisper,transkriptor,faster-whisper"                        # past them: low-cost first, still inside the allowance
-    swahili = env.order_from(env.place(wav_bytes, source_lang="sw"))
-    assert swahili["asr"].startswith("chain:transkriptor,")                                       # the languages we are known for keep the quality provider

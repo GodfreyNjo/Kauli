@@ -253,7 +253,7 @@ def test_client_pages_render_with_both_tiers_and_the_upsell_buttons(env, wav_byt
     env.db.update_order_status(paid["id"], "ready_for_delivery")
     page = env.client.get(f"/client/orders/{paid['id']}")
     assert page.status_code == 200
-    assert "Instant AI" in page.text and "not reviewed by a person" in page.text
+    assert "Instant AI" in page.text and "not reviewed by a person" not in page.text
     assert "Add human review" in page.text and "Transcript (.docx)" in page.text
     assert "human-verified" not in page.text.lower()
 
@@ -277,11 +277,10 @@ def test_client_pages_render_with_both_tiers_and_the_upsell_buttons(env, wav_byt
     assert billing_page.status_code == 200 and "Instant AI" in billing_page.text
 
 
-def test_legacy_accounts_default_to_human_review_and_new_ones_to_instant_ai(env):
+def test_every_account_opens_on_instant_ai_so_orders_ship_by_themselves(env):
     import re
-    env.db.set_billing_market("u1", "legacy")
-    legacy = env.client.get("/client").text
-    assert re.search(r'name="review_tier" value="human"\s+checked', legacy)
-    env.db.set_billing_market("u1", "intl")
-    fresh = env.client.get("/client").text
-    assert re.search(r'name="review_tier" value="ai"\s+checked', fresh)
+    for market in ("legacy", "ea", "intl"):                                          # older accounts used to open on Human review: their orders waited for staff
+        env.db.set_billing_market("u1", market)
+        page = env.client.get("/client").text
+        assert re.search(r'name="review_tier" value="ai"\s+checked', page), market
+        assert not re.search(r'name="review_tier" value="human"\s+checked', page), market

@@ -244,7 +244,7 @@ def _run(env, order, providers):
 def test_the_worker_passes_the_studio_options_to_the_pipeline(studio, monkeypatch):
     plain = studio.order_from(studio.place(studio.wav))
     assert _run(studio, plain, {})[0]["clean_audio"] is False and _run(studio, plain, {})[0]["label_speakers"] is False
-    cleaned = studio.order_from(studio.place(studio.wav, addon_audio_cleanup="1", instr_speaker_ids="1"))
+    cleaned = studio.order_from(studio.place(studio.wav, addon_audio_cleanup="1", instr_speaker_ids="1", review_tier="human"))     # labels are for human-reviewed orders
     call = _run(studio, cleaned, {"audio_cleanup": "elevenlabs"})[0]
     assert call["clean_audio"] is True and call["label_speakers"] is True
     monkeypatch.setenv("KAULI_SPEAKER_LABELS", "0")                                  # the kill switch

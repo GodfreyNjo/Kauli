@@ -6,6 +6,10 @@
 {% from "_pager.html" import pager %}
 
 <div class="ds-page">
+  {% if next_step and not winback_offer %}
+  <div class="ds-card wb-banner ns-card"><div><strong>{{ next_step.title }}</strong> {{ next_step.text }}</div>
+    <a class="ds-btn small" href="{{ next_step.url }}">{{ next_step.cta }}</a></div>
+  {% endif %}
   {% if winback_offer %}
   <div class="ds-card wb-banner"><div><strong>A free month, on us.</strong> Welcome back: 30 days of your plan, free, with your personal code.</div>
     <a class="ds-btn small" href="/client/winback/{{ winback_offer['id'] }}">Get my free month</a></div>

@@ -47,7 +47,7 @@ def test_order_page_and_banner_tell_the_user_what_to_do(env, wav_bytes):
     order = _ready_order(env, wav_bytes)
     _unchoose(env)
     page = env.client.get(f"/client/orders/{order['id']}").text
-    assert "Choose a plan to download" in page and "download/docx" not in page
+    assert "Unlock and download" in page and "download/docx" not in page
     assert "plan-banner" in page                                   # the global notice
     assert "plan-banner" not in env.client.get("/client/billing").text
     env.db.set_plan_chosen("u1")
@@ -87,7 +87,7 @@ def test_choosing_free_without_a_verified_card_goes_to_the_credited_one_dollar_s
     assert r.status_code == 303 and r.headers["location"] == "/client/verify-trial"
     assert not env.db.get_user("u1")["plan_chosen_at"]
     page = env.client.get("/client/verify-trial").text
-    assert "Choose the Free plan" in page and "$1.00" in page and "credited" in page
+    assert "Get started for free" in page and "$1.00" in page and "credited" in page
 
 
 def test_the_card_confirmation_payment_unlocks_downloads_and_credits_the_dollar(env):
@@ -179,7 +179,7 @@ def test_order_page_never_sends_the_hidden_text_before_a_plan_is_chosen(env, wav
     page = env.client.get(f"/client/orders/{order['id']}").text
     assert "The harvest started early" in page and "transcript-teaser" in page
     assert "Quetzal" not in page and "Zebra herds" not in page and "abundant" not in page   # not in the HTML at all
-    assert "is hidden" in page and "Choose the Free plan" in page
+    assert "is hidden" in page and "Unlock now" in page
     assert "one-time $1 card confirmation" in page and "credited straight back" in page
 
 

@@ -20,6 +20,7 @@ import math
 import re
 
 from .models import Job
+from .screen_text import is_top
 
 MAX_CAPTION_DISPLAY_MS = 6000
 MAX_LINES = 2
@@ -156,18 +157,24 @@ def build_cues(job: Job, source: bool = False) -> list[tuple[int, int, str]]:
 
 
 def cue_dicts(job: Job, source: bool = False) -> list[dict]:
-    """The same captions for the live preview in the browser."""
-    return [{"s": s, "e": e, "t": t} for s, e, t in build_cues(job, source)]
+    """The same captions for the live preview in the browser. A caption marked "top" moves to the top of the picture while the video has
+    its own text or a graphic at the bottom (see kauli/screen_text.py)."""
+    ranges = getattr(job, "top_ranges", None)
+    return [{"s": s, "e": e, "t": t, "top": is_top(s, e, ranges)} for s, e, t in build_cues(job, source)]
 
 
 def to_srt(job: Job, source: bool = False) -> str:
     return "\n".join(f"{i}\n{_ts(s)} --> {_ts(e)}\n{text}\n" for i, (s, e, text) in enumerate(build_cues(job, source), start=1))
 
 
+VTT_TOP = " line:8% position:50% align:center"          # the top of the picture, clear of a lower-third
+
+
 def to_vtt(job: Job, source: bool = False) -> str:
     out = ["WEBVTT", ""]
+    ranges = getattr(job, "top_ranges", None)
     for s, e, text in build_cues(job, source):
-        out.append(f"{_ts(s, '.')} --> {_ts(e, '.')}")
+        out.append(f"{_ts(s, '.')} --> {_ts(e, '.')}{VTT_TOP if is_top(s, e, ranges) else ''}")
         out.append(text)
         out.append("")
     return "\n".join(out)

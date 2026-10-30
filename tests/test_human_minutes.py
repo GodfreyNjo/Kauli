@@ -101,3 +101,77 @@ def test_the_pages_show_the_human_minutes(env):
     assert "5 human-reviewed minutes" in home and "15 human-reviewed minutes" in home
     js = (Path(__file__).parent.parent / "webapp/static/client_wizard.js").read_text(encoding="utf-8")
     assert "humanIncludedEligible" in js and "dataset.humanMinutes" in js
+
+
+def test_instant_ai_orders_cannot_ask_for_speaker_labels_but_human_review_can(env, wav_bytes):
+    ai = env.order_from(env.place(wav_bytes, review_tier="ai", instr_speaker_ids="1"))
+    assert ai["instr_speaker_ids"] == 0                                                     # labels like NARRATOR: are an editor's work
+    human = env.order_from(env.place(wav_bytes, review_tier="human", instr_speaker_ids="1"))
+    assert human["instr_speaker_ids"] == 1
+    meeting = env.order_from(env.place(wav_bytes, review_tier="ai", instr_speaker_ids="1", idempotency_key="meeting-abc"))
+    assert meeting["instr_speaker_ids"] == 1                                                # the meeting notetaker identifies its own speakers
+    page = env.client.get("/client").text
+    assert 'id="speaker-label-field"' in page and "to label speakers" in page
+    js = (Path(__file__).parent.parent / "webapp/static/client_wizard.js").read_text(encoding="utf-8")
+    assert "speaker-label-field" in js
+
+
+def test_flash_messages_fade_away_but_lasting_facts_stay(env):
+    js = env.client.get("/static/flash.js").text
+    assert "7000" in js and "data-persist" in js and "mouseenter" in js and 'searchParams.has(k)' in js
+    page = env.client.get("/client").text
+    assert "/static/flash.js" in page
+    root = Path(__file__).parent.parent / "webapp/templates"
+    for name, text in (("order_detail.html", "Ready. Download your files below."), ("order_detail.html", "Something went wrong on our end"),
+                       ("staff_review.html", "Pipeline failed:")):
+        src = (root / name).read_text(encoding="utf-8")
+        line = next(l for l in src.splitlines() if text in l)
+        assert "data-persist" in line, (name, text)                                         # a failed order's explanation never disappears
+    # the order of the Orders page: start a new project first, the earlier orders below it
+    assert page.index('id="new-project"') < page.index('id="my-orders"')
+
+
+# ---------------------------------------------------------------------------------------- a new customer's first order
+def _fresh(env):
+    conn = env.db.get_conn()
+    conn.execute("DELETE FROM orders WHERE client_id = 'u1'")
+    conn.execute("UPDATE users SET plan_chosen_at = NULL, trial_verified_at = NULL WHERE id = 'u1'")
+    conn.commit()
+    conn.close()
+
+
+def test_a_new_customers_first_order_is_processed_even_when_it_goes_past_the_free_minutes(env, wav_bytes, monkeypatch):
+    _fresh(env)
+    monkeypatch.setattr(env.app, "probe_duration_minutes", lambda path: 79.8)                  # the 80-minute file in the report: $5.98 beyond the free minutes
+    first = env.order_from(env.place(wav_bytes))
+    assert first["status"] != "pending_payment" and first["cost_usd"] == 0 and env.submitted == [first["id"]]
+    assert '"first_order_courtesy_usd": 5.98' in first["cost_breakdown_json"] or '"first_order_courtesy_usd": 5.97' in first["cost_breakdown_json"]
+
+
+def test_only_the_first_order_is_free_and_only_for_short_enough_instant_ai(env, wav_bytes, monkeypatch):
+    _fresh(env)
+    monkeypatch.setattr(env.app, "probe_duration_minutes", lambda path: 79.8)
+    env.order_from(env.place(wav_bytes))
+    second = env.order_from(env.place(wav_bytes))
+    assert second["status"] == "pending_payment" and second["cost_usd"] > 0                   # after that it is pay as you go
+    _fresh(env)
+    assert env.order_from(env.place(wav_bytes, review_tier="human"))["status"] == "pending_payment"        # human review is not part of it
+    _fresh(env)
+    monkeypatch.setattr(env.app, "probe_duration_minutes", lambda path: 300.0)
+    assert env.order_from(env.place(wav_bytes))["status"] == "pending_payment"               # a very long file is not either
+    _fresh(env)
+    env.db.set_plan_chosen("u1")
+    monkeypatch.setattr(env.app, "probe_duration_minutes", lambda path: 79.8)
+    assert env.order_from(env.place(wav_bytes))["status"] == "pending_payment"               # someone who already chose a plan is not "new"
+
+
+def test_unlocking_is_one_simple_step_with_the_new_wording(env, wav_bytes):
+    _fresh(env)
+    env.monkeypatch.setattr(env.app.billing, "paystack_configured", lambda: True)
+    page = env.client.get("/client/verify-trial").text
+    for text in ("Get started for free", "Add a card to unlock your free downloads.", "card check", "back immediately", "Start downloading",
+                 "Confirm card and start free", "Prefer a paid plan?", "See plans"):
+        assert text in page, text
+    home = env.client.get("/client/home").text
+    assert "Unlock your files in one step" in home and 'href="/client/verify-trial"' in home and "Unlock now" in home
+    assert "not reviewed by a person" not in env.client.get("/client").text

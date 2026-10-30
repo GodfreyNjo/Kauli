@@ -425,7 +425,8 @@
     if (extrasBox && selected && selected.value === "dub" && !extrasBox.dataset.shown) { extrasBox.open = true; extrasBox.dataset.shown = "1"; }
     // How exact the transcript is, and the other advanced options, are instructions for a human editor. Instant AI has none, so they
     // are hidden for it (the server ignores them too) and shown again when Human review is chosen.
-    ["verbatim-fieldset", "verbatim-note", "advanced-settings"].forEach((id) => { const el = $("#" + id); if (el) el.hidden = isAiTier; });
+    ["verbatim-fieldset", "verbatim-note", "advanced-settings", "speaker-label-field"].forEach((id) => { const el = $("#" + id); if (el) el.hidden = isAiTier; });
+    if (isAiTier) { const spk = $('input[name="instr_speaker_ids"]'); if (spk) spk.checked = false; }     // speaker labels are an editor's work
     const cleanNote = $("#ai-clean-note");
     if (cleanNote) cleanNote.hidden = !isAiTier;
     if (isAiTier) { const clean = $('input[name="instr_verbatim_level"][value="clean_read"]'); if (clean) clean.checked = true; }

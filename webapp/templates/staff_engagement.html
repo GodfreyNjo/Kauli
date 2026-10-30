@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Customer engagement{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top">
+    <div>
+      <h1>Customer engagement</h1>
+      <p class="muted">Every customer account, new or long-standing, read from what it really does. Each customer sees a "next step" card in their account; the emails below are sent only when you press a button{% if not autosend %} (automatic sending is <strong>off</strong>: set <code>KAULI_ENGAGE_AUTOSEND=1</code> to switch it on){% else %} (automatic daily sending is <strong>on</strong>){% endif %}. Nobody is emailed more than once every {{ gap }} days, and nobody who unsubscribed.</p>
+    </div>
+  </div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if not mail_ready %}<p class="muted">Email is not configured here, so nudges would only show as the in-account card.</p>{% endif %}
+
+  <div class="an-tiles">
+    {% for key, info in states.items() %}
+    <div class="hub-card"><span class="muted">{{ info[0] }}</span><strong>{{ s.counts[key] }}</strong><small class="muted">{{ info[1] }}</small></div>
+    {% endfor %}
+    <div class="hub-card"><span class="muted">Doing fine</span><strong>{{ s.healthy }}</strong><small class="muted">of {{ s.total }} customers</small></div>
+  </div>
+
+  <section class="hub-card">
+    <h2>New customers whose first order needs a hand</h2>
+    {% if not stuck %}<p class="muted">None: every new customer's first order is moving.</p>{% else %}
+    <div class="ds-scroll"><table class="ds-table"><thead><tr><th>Customer</th><th>First order</th><th>Waiting</th><th></th></tr></thead><tbody>
+      {% for i in stuck %}<tr><td>{{ i.email }}</td><td>{{ i.status|replace('_', ' ') }}</td><td class="num">{{ i.hours }} h</td><td><a href="/staff/orders/{{ i.order_id }}">Open</a></td></tr>{% endfor %}
+    </tbody></table></div>{% endif %}
+    <p class="muted">Time to first result: {% if ttfv.median is not none %}median {{ '%.0f'|format(ttfv.median) }} minutes{% else %}no results yet{% endif %}; {{ '%.0f'|format(ttfv.share_within_day) }}% of new customers got one within a day. Satisfaction: {% if csat.avg %}{{ csat.avg }} / 5 from {{ csat.n }} ratings{% else %}no ratings yet{% endif %}.</p>
+    {% for r in csat.recent %}<p class="muted">&ldquo;{{ r.comment }}&rdquo; ({{ r.score }}/5)</p>{% endfor %}
+  </section>
+
+  <section class="hub-card">
+    <div class="hub-top" style="margin:0 0 8px;"><h2>{{ s.due }} can be nudged now</h2>
+      {% if s.due %}<form method="post" action="/staff/engagement/send" onsubmit="return confirm('Email a nudge to {{ [s.due, 25]|min }} customer(s)?');"><button type="submit">Send to {{ [s.due, 25]|min }}</button></form>{% endif %}</div>
+    {% if not rows %}<p class="muted">Every customer is doing fine.</p>{% else %}
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>Customer</th><th>State</th><th>Quiet for</th><th>Orders</th><th>Last nudge</th><th></th></tr></thead>
+      <tbody>
+        {% for c in rows %}
+        <tr><td>{{ c.user['email'] }}</td><td>{{ states[c.state][0] }}</td><td class="num">{{ (c.quiet ~ ' days') if c.quiet is not none else 'never' }}</td><td class="num">{{ c.orders }}</td>
+          <td>{% set last = (c.nudges.values()|map(attribute=1)|list|max) if c.nudges else none %}{{ when(last) if last else '-' }}</td>
+          <td>{% if can(c) %}<form method="post" action="/staff/engagement/send"><input type="hidden" name="user_id" value="{{ c.id }}"><button type="submit" class="secondary">Send nudge</button></form>{% else %}<span class="muted">waiting</span>{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>{% endif %}
+  </section>
+</div>
+{% endblock %}

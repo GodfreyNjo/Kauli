@@ -28,7 +28,7 @@
       <thead><tr><th>Service</th><th>Providers in use</th><th>We charge</th><th>Our cost</th><th>Margin</th></tr></thead>
       <tbody>
         {% for e in estimates %}
-        <tr><td>{{ {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'}[e.level] }}</td>
+        <tr><td>{{ {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing', 'premium_voice': 'Realistic voice (add-on, included on Premium)'}[e.level] }}</td>
             <td>{{ e.route|join(' + ') }}</td><td class="num">${{ '%.2f'|format(e.price) }}</td>
             <td class="num">{% if e.known %}${{ '%.4f'|format(e.cost) }}{% else %}<span class="pf-low">not known</span>{% endif %}</td>
             <td class="num">{% if e.margin is not none %}{{ '%.0f'|format(e.margin) }}%{% else %}-{% endif %}</td></tr>
@@ -56,7 +56,10 @@
           </form>
           <small class="muted">{% if r.custom_cost %}your figure{% elif r.default_cost is not none %}estimate{% else %}enter yours{% endif %}</small>
         </td>
-        <td class="{{ 'pf-low' if r.low else '' }}">{{ r.detail or '-' }}</td>
+        <td class="{{ 'pf-low' if r.low else '' }}">{% if r.model %}
+            {% if r.model.ready %}Model on this server ({{ r.model.mb }} MB){% elif r.model.downloading %}Downloading...{% else %}Not downloaded yet. It downloads itself on the first order, or now:
+              <form method="post" action="/staff/providers/download-own-model" style="display:inline;"><button type="submit" class="secondary">Download now</button></form>{% endif %}
+          {% else %}{{ r.detail or '-' }}{% endif %}</td>
         <td>
           <form method="post" action="/staff/providers/set">
             <input type="hidden" name="name" value="{{ r.name }}"><input type="hidden" name="action" value="{{ 'off' if r.enabled else 'on' }}">

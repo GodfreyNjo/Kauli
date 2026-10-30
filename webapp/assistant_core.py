@@ -82,7 +82,7 @@ _SERVICE = {"transcribe": "transcription", "translate": "translation", "dub": "d
 
 
 def _tier(order) -> str:
-    return "Instant AI (not reviewed by a person)" if order["review_tier"] == "ai" else "Human-reviewed"
+    return "Instant AI" if order["review_tier"] == "ai" else "Human-reviewed"
 
 
 def _date(ts) -> str:

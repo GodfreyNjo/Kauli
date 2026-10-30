@@ -162,7 +162,7 @@ def test_the_editor_instructions_are_hidden_for_instant_ai_and_ignored_by_the_se
     for needle in ('id="verbatim-fieldset"', 'id="advanced-settings"', 'id="ai-clean-note"', 'id="verbatim-note"'):
         assert needle in page, needle
     js = env.client.get("/static/client_wizard.js").text
-    assert '["verbatim-fieldset", "verbatim-note", "advanced-settings"]' in js and "el.hidden = isAiTier" in js
+    assert '["verbatim-fieldset", "verbatim-note", "advanced-settings", "speaker-label-field"]' in js and "el.hidden = isAiTier" in js
     order = env.order_from(env.place(wav_bytes, review_tier="ai", instr_verbatim_level="verbatim", instr_existing_subs="match_existing",
                                      instr_no_audio="return", instr_transcribe_lyrics="1", instr_use_italics="1", instr_notes="keep this note"))
     row = env.db.get_order(order["id"])

@@ -25,6 +25,8 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from kauli.pipeline import run as kauli_run  # noqa: E402
 from kauli.models import Job  # noqa: E402
+from kauli import screen_text  # noqa: E402
+from kauli.subtitles import to_vtt  # noqa: E402
 from . import account_hub, db, logging_setup, mailer, notifications, provider_health  # noqa: E402
 
 log = logging_setup.get_logger("worker")
@@ -152,6 +154,31 @@ def _auto_switch_provider(order_id: str, exc: Exception) -> None:
         log.warning("automatic provider switch failed", extra={"job_id": order_id}, exc_info=True)
 
 
+_VIDEO_SUFFIXES = {".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"}
+
+
+def _look_for_screen_text(order) -> None:
+    """For a video: find the stretches where it has its own text or a graphic at the bottom, beside the order, never in front of it, then
+    redo the positioned caption file so the captions keep clear of them (see kauli/screen_text.py)."""
+    try:
+        path = order["audio_path"] or ""
+        if Path(path).suffix.lower() not in _VIDEO_SUFFIXES or not Path(path).exists():
+            return
+        outdir, lang = order["outdir"], order["target_lang"]
+
+        def rewrite(ranges):
+            vtt = Path(outdir) / f"subs_{lang}.vtt"
+            if not ranges or not vtt.exists():
+                return
+            from kauli.models import Job as _Job
+            job = _Job.load(str(Path(outdir) / "manifest.json"))
+            job.top_ranges = ranges
+            vtt.write_text(to_vtt(job), encoding="utf-8")
+        screen_text.analyse_in_background(path, outdir, then=rewrite)
+    except Exception:  # noqa: BLE001 - captions simply stay at the bottom
+        log.warning("screen text analysis not started", extra={"job_id": order["id"]}, exc_info=True)
+
+
 def _run_job(order_id: str, is_retry: bool = False) -> None:
     order = db.get_order(order_id)
     if not order:
@@ -224,6 +251,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
                                          "final_status": final_status, "flagged_count": job.flagged_count,
                                          "ai_cost_usd": job.cost_usd})
         order = db.get_order(order_id)  # re-fetch: status/ai_cost above are now current
+        _look_for_screen_text(order)
         if is_instant_ai:
             notify_client_order_ready(order)
             if ai_order_ready_hook:

@@ -82,7 +82,7 @@
   </div>
 
   {% if order['status'] == 'dead_letter' %}
-    <p class="error">Failed {{ order['retry_count'] }} times and gave up automatically: {{ order['error'] }}</p>
+    <p data-persist class="error">Failed {{ order['retry_count'] }} times and gave up automatically: {{ order['error'] }}</p>
     <p class="muted" style="margin-top:-8px;">Worth checking the file itself before retrying - if it's
        genuinely corrupt or malicious, retrying just burns time the same way again.</p>
     {{ provider_panel(provider_failure) }}
@@ -90,7 +90,7 @@
       <button type="submit" class="secondary">Retry processing</button>
     </form>
   {% elif order['status'] == 'failed' %}
-    <p class="error">Pipeline failed: {{ order['error'] }}</p>
+    <p data-persist class="error">Pipeline failed: {{ order['error'] }}</p>
     {{ provider_panel(provider_failure) }}
   {% elif not job %}
     <p class="muted">Still processing - nothing to review yet.</p>
@@ -110,7 +110,7 @@
       </form>
     </div>
     {% elif order['difficulty_surcharge_status'] == 'approved' %}
-    <p class="ok">Additional charge (${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} -
+    <p data-persist class="ok">Additional charge (${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} -
        {{ extra_charge_reasons.get(order['difficulty_surcharge_reason'], 'extra work') }}) paid.</p>
     {% elif order['difficulty_surcharge_status'] == 'waived' %}
     <p class="muted">An additional charge was proposed and then waived - no charge applied.</p>
@@ -170,7 +170,7 @@
       >Approve &amp; mark ready for delivery</button>
     </form>
     {% else %}
-      <p class="ok">Approved - client can download.</p>
+      <p data-persist class="ok">Approved - client can download.</p>
     {% endif %}
   {% endif %}
 </div>
