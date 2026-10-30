@@ -125,6 +125,25 @@
   </section>
 </div>
 <script>
+  // The card keeps its normal spacing; when the window is too short for it, it is scaled down evenly so the whole card fits
+  // (no scrolling to reach the button and nothing squeezed together).
+  (function kpFitCard() {
+    var card = document.querySelector('.auth-shell--welcome .auth-form-inner');
+    if (!card) return;
+    function fit() {
+      card.style.zoom = '';
+      if (window.innerWidth < 901) return;
+      var room = window.innerHeight - 76;                   // the language switch above, a little air below
+      var h = card.offsetHeight;
+      var z = Math.max(0.7, Math.min(1, room / h));
+      if (z < 0.999) card.style.zoom = String(z);
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-show]')) setTimeout(fit, 0); });
+  })();
+
   // Show/hide toggle on every password field on this page (sign-in and
   // sign-up each have their own) - a real, tested pattern, not decorative:
   // toggling type between "password"/"text" is the standard way to do

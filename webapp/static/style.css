@@ -6245,36 +6245,6 @@ main:has(.sa-page) { max-width: none; margin: 18px 0 0; padding: 0 clamp(14px, 2
   .auth-lang--top { top: 12px; }
   .auth-shell--welcome .auth-form-panel { padding-top: 46px; }
 }
-@media (min-width: 901px) and (max-height: 820px) {
-  .auth-shell--welcome .auth-form-inner { padding-top: 16px; padding-bottom: 14px; }
-  .auth-shell--welcome .auth-brand-logo { height: 30px; }
-  .auth-shell--welcome h1 { font-size: 1.45rem; }
-  .auth-shell--welcome .auth-sub { margin-bottom: 8px; font-size: 0.88rem; }
-  .auth-shell--welcome .auth-google-btn { padding: 9px; margin-bottom: 8px; }
-  .auth-shell--welcome .auth-divider { margin-bottom: 8px; }
-  .auth-shell--welcome .auth-field { margin-bottom: 8px; }
-  .auth-shell--welcome .auth-field-label { margin-bottom: 4px; font-size: 0.88rem; }
-  .auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: 9px; padding-bottom: 9px; }
-  .auth-shell--welcome button[type="submit"] { padding: 10px; }
-  .auth-shell--welcome .auth-consent { font-size: 0.72rem; line-height: 1.35; margin-top: 6px; }
-  .auth-shell--welcome .auth-switch { margin-top: 8px; }
-}
-@media (min-width: 901px) and (max-height: 700px) {
-  .auth-shell--welcome .auth-form-panel { padding-top: 34px; padding-bottom: 8px; }
-  .auth-shell--welcome .auth-form-inner { padding-top: 12px; padding-bottom: 10px; }
-  .auth-shell--welcome .auth-brand { margin-bottom: 4px; }
-  .auth-shell--welcome .auth-brand-logo { height: 26px; }
-  .auth-shell--welcome h1 { font-size: 1.25rem; margin-bottom: 0; }
-  .auth-shell--welcome .auth-sub { display: none; }
-  .auth-shell--welcome .auth-google-btn { padding: 7px; margin-bottom: 6px; }
-  .auth-shell--welcome .auth-divider { margin-bottom: 6px; }
-  .auth-shell--welcome .auth-field { margin-bottom: 6px; }
-  .auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: 7px; padding-bottom: 7px; }
-  .auth-shell--welcome .auth-forgot { margin-bottom: 6px; }
-  .auth-shell--welcome button[type="submit"] { padding: 8px; }
-  .auth-shell--welcome .auth-switch { margin-top: 6px; }
-  .auth-shell--welcome .auth-consent { font-size: 0.68rem; margin-top: 4px; }
-}
 
 /* Do more with this file: new services on a file that is already here */
 .rp-wrap { max-width: 860px; margin: 28px auto; padding: 0 16px; }
@@ -6316,3 +6286,22 @@ button.is-busy, .ds-btn.is-busy { opacity: 0.8; cursor: progress; }
 .ms-share { white-space: nowrap; } .ms-bar { display: inline-block; width: 70px; height: 7px; margin-right: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.14); vertical-align: middle; overflow: hidden; }
 .ms-bar i { display: block; height: 100%; background: #4f9bf5; }
 .ms-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 8px; }
+
+/* The sign-in card keeps its normal spacing at every window height; when the window is short it is scaled down evenly (login.html) */
+@media (min-width: 901px) { .auth-shell--welcome .auth-form-inner { transform-origin: center; } }
+@media (min-width: 901px) {
+  .auth-shell--welcome .auth-form-inner { padding: 36px 44px 30px; }
+  .auth-shell--welcome .auth-brand { margin-bottom: 22px; }
+  .auth-shell--welcome .auth-brand-logo { height: 42px; }
+  .auth-shell--welcome h1 { font-size: 1.9rem; }
+  .auth-shell--welcome .auth-sub { margin: 0 0 20px; font-size: 0.95rem; display: block; }
+  .auth-shell--welcome .auth-google-btn { padding: 14px; margin-bottom: 18px; }
+  .auth-shell--welcome .auth-divider { margin-bottom: 18px; }
+  .auth-shell--welcome .auth-field { margin-bottom: 18px; }
+  .auth-shell--welcome .auth-field-label { margin-bottom: 8px; }
+  .auth-shell--welcome input[type="email"], .auth-shell--welcome input[type="password"], .auth-shell--welcome input[type="text"] { padding-top: 14px; padding-bottom: 14px; }
+  .auth-shell--welcome .auth-forgot { margin: -2px 0 20px; }
+  .auth-shell--welcome button[type="submit"] { padding: 15px; }
+  .auth-shell--welcome .auth-switch { margin-top: 18px; }
+  .auth-shell--welcome .auth-consent { margin-top: 16px; font-size: 0.8rem; }
+}
