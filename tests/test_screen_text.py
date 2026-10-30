@@ -153,6 +153,7 @@ def test_the_order_page_hands_the_ranges_to_the_player(env, wav_bytes):
     assert 'classList.toggle("is-top"' in page
     css = env.client.get("/static/style.css").text
     assert ".order-media-wrap .order-caption-overlay.is-top" in css and "max(11%, 60px)" in css           # clear of the player's own controls too
+    assert "bottom: 5%; transition: top" in css                                                      # and low, out of the picture, until the controls show
 
 
 def test_a_customer_who_says_the_video_already_has_captions_gets_theirs_at_the_top_all_the_time(env, wav_bytes):

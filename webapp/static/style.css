@@ -6197,8 +6197,10 @@ main:has(.sa-page) { max-width: none; margin: 18px 0 0; padding: 0 clamp(14px, 2
   .sa-grid > .sa-col:nth-child(1), .sa-grid > .sa-col:nth-child(2), .sa-grid > .sa-insights, .sa-grid > .sa-revenue { grid-column: 1; grid-row: auto; }
 }
 
-/* captions keep clear of the player's own controls, and move to the top while the video has its own text or a graphic at the bottom */
-.order-media-wrap .order-caption-overlay { bottom: max(11%, 60px); transition: top 0.15s ease, bottom 0.15s ease; }
+/* captions sit low, where they always were; they lift clear of the player's controls only while the controls are showing (hover), and
+   move to the top while the video has its own text or a graphic at the bottom */
+.order-media-wrap .order-caption-overlay { bottom: 5%; transition: top 0.15s ease, bottom 0.15s ease; }
+.order-media-wrap:hover .order-caption-overlay, .order-media-wrap:focus-within .order-caption-overlay { bottom: max(11%, 60px); }
 .order-media-wrap .order-caption-overlay.is-top { bottom: auto; top: 7%; }
 
 /* Free plan: one calm step to unlock everything */
