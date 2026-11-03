@@ -118,7 +118,9 @@ def test_instant_ai_orders_cannot_ask_for_speaker_labels_but_human_review_can(en
 
 def test_flash_messages_fade_away_but_lasting_facts_stay(env):
     js = env.client.get("/static/flash.js").text
-    assert "7000" in js and "data-persist" in js and "mouseenter" in js and 'searchParams.has(k)' in js
+    assert "data-persist" in js and "mouseenter" in js and 'searchParams.has(k)' in js
+    # accessibility: notices fade (and wait while hovered or focused), errors stay until dismissed, every message has a dismiss button and is announced
+    assert "SHOW_MS = 10000" in js and "errors stay until dismissed" in js and "flash-x" in js and "kpAnnounce" in js
     page = env.client.get("/client").text
     assert "/static/flash.js" in page
     root = Path(__file__).parent.parent / "webapp/templates"

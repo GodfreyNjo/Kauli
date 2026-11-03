@@ -133,9 +133,10 @@
     function fit() {
       card.style.zoom = '';
       if (window.innerWidth < 901) return;
+      if (window.innerHeight < 700) return;                // a short window is usually the person's own zoom: keep their size, the page scrolls
       var room = window.innerHeight - 76;                   // the language switch above, a little air below
       var h = card.offsetHeight;
-      var z = Math.max(0.7, Math.min(1, room / h));
+      var z = Math.max(0.85, Math.min(1, room / h));
       if (z < 0.999) card.style.zoom = String(z);
     }
     fit();

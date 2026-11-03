@@ -903,6 +903,13 @@
     var phone = window.matchMedia("(max-width: 860px)").matches;
     var box = document.querySelector(".order-workspace-transcript");
     if (!box) return;
+    if (!phone) {                                   // on a desktop the two cards are always open: their titles are plain headings, not toggles
+      [].forEach.call(document.querySelectorAll("details.ow-fold > summary.ow-h"), function (sm) {
+        sm.setAttribute("tabindex", "-1");
+        sm.addEventListener("click", function (e) { e.preventDefault(); });
+        sm.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") e.preventDefault(); });
+      });
+    }
     if (phone) {
       [].forEach.call(document.querySelectorAll("details.ow-fold[data-mobile-closed]"), function (d) { d.open = false; });
       if (document.getElementById("tx-source-toggle")) box.classList.add("tx-hide-source");

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% from "_lang_switch.html" import lang_menu with context %}
-<html lang="{% block html_lang %}{% if translated %}{{ page_lang() }}{% else %}en{% endif %}{% endblock %}"{% block html_dir %}{% if translated and page_dir() == 'rtl' %} dir="rtl"{% endif %}{% endblock %} data-theme="{% block theme %}light{% endblock %}" data-theme-locked="{% block theme_locked %}{% endblock %}">
+<html lang="{% block html_lang %}{% if translated %}{{ page_lang() }}{% else %}en{% endif %}{% endblock %}"{% block html_dir %}{% if translated and page_dir() == 'rtl' %} dir="rtl"{% endif %}{% endblock %} data-theme="{% block theme %}light{% endblock %}" data-theme-locked="{% block theme_locked %}{% if not (user is defined and user) %}1{% endif %}{% endblock %}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

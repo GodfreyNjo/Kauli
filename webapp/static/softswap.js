@@ -18,6 +18,7 @@
   }
   function swap(cur, fresh, title, top) {
     var y = top ? 0 : window.scrollY;
+    var hadFocus = cur.contains(document.activeElement) && document.activeElement !== cur && document.activeElement !== document.body;
     cur.style.transition = "opacity 0.15s ease"; cur.style.opacity = "0.6";
     window.setTimeout(function () {
       cur.innerHTML = fresh.innerHTML;
@@ -25,6 +26,14 @@
       if (title) document.title = title;
       window.scrollTo(0, y);
       cur.style.opacity = "";
+      // Screen reader and keyboard users: a new page puts focus on its main heading and says what it is; an update of the same page
+      // says so without stealing focus, unless the focused element was replaced (then focus goes to the heading, never to nowhere).
+      if (top || hadFocus) {
+        var heading = cur.querySelector("h1") || cur;
+        if (!heading.hasAttribute("tabindex")) heading.setAttribute("tabindex", "-1");
+        heading.focus({ preventScroll: true });
+      }
+      if (window.kpAnnounce) window.kpAnnounce(top ? (title || document.title) : "This page has been updated");
       document.dispatchEvent(new CustomEvent("kp:softnav"));
       window.setTimeout(function () { cur.style.transition = ""; }, 200);
     }, 150);
