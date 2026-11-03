@@ -6462,3 +6462,9 @@ html[data-theme="dark"] :focus-visible { outline-color: #9ecbff; box-shadow: 0 0
 
 html[data-theme="dark"] .ds-head h1, html[data-theme="dark"] .ds-head h2 { color: var(--heading-ink); }
 html[data-theme="dark"] .rp-lang { color: var(--muted); }
+
+/* Sign-in and create-account: the card's panel never shows a scrollbar line beside the card (it still scrolls by wheel, touch and keyboard);
+   these pages are designed light, so browsers' forced dark modes are asked to leave them alone */
+.auth-shell--welcome .auth-form-panel { scrollbar-width: none; -ms-overflow-style: none; }
+.auth-shell--welcome .auth-form-panel::-webkit-scrollbar { display: none; width: 0; height: 0; }
+html[data-theme-locked="1"] { color-scheme: light; }

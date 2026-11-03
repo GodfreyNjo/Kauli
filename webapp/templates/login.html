@@ -6,6 +6,7 @@
 {% block body_class %}auth-page{% endblock %}
 {% block title %}{{ t('lg_signin') }} / {{ t('lg_create') }}{% endblock %}
 {% block head_extra %}
+<meta name="color-scheme" content="light">
 <meta name="description" content="Sign in to Kauli to manage your transcription, subtitle, translation and dubbing projects and download your files, or create an account.">
 {% endblock %}
 {% block content %}
@@ -141,6 +142,8 @@
     }
     fit();
     window.addEventListener('resize', fit);
+    // the password rules open and close, and the sign-up form is taller than sign-in: fit again after each change
+    ['focusin', 'input', 'transitionend'].forEach(function (ev) { card.addEventListener(ev, function () { setTimeout(fit, ev === 'transitionend' ? 0 : 420); }); });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
     document.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('[data-show]')) setTimeout(fit, 0); });
   })();
