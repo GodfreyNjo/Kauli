@@ -660,23 +660,13 @@ def rewards_page(request: Request):
 
 
 # ================================================================================================ PLANS
-@router.get("/client/plans", response_class=HTMLResponse)
-def plans_page(request: Request, notice: str | None = None, error: str | None = None):
+@router.get("/client/plans")
+def plans_page(request: Request):
+    """Billing and Plans are one page now: the plans are on the billing page."""
     user = _client(request)
     if not user:
         return _to_login(request)
-    sub = db.get_subscription_current(user["client_scope_id"])
-    plan = billing.effective_plan(user, sub)
-    allowance = billing.plan_included_minutes(plan) + ((sub["bonus_minutes"] or 0.0) if sub else 0.0) + (billing._reward_minutes(sub) if sub else 0.0)
-    used = (sub["minutes_used_this_period"] or 0.0) if sub else 0.0
-    ends = sub["current_period_end"] if sub and plan != "free" else None
-    resets = (sub["period_started_at"] + db.PERIOD_SECONDS) if sub and sub["period_started_at"] else None
-    return _render(request, "account_plans.html", user, plans=billing.PLANS, current_plan=plan, subscription=sub,
-                   recurring=bool(sub and billing._is_recurring(sub)), allowance=allowance, used=used, remaining=max(0.0, allowance - used),
-                   ends=datetime.fromtimestamp(ends).strftime("%b %d, %Y") if ends else None,
-                   resets=datetime.fromtimestamp(resets).strftime("%b %d") if resets else None,
-                   is_owner=_owner(user), paystack_configured=billing.paystack_configured(), mpesa_configured=billing.mpesa_configured(),
-                   notice=notice, error=error)
+    return RedirectResponse("/client/billing#change-plan", status_code=303)
 
 
 # ================================================================================================ WORKSPACE

@@ -19,6 +19,7 @@ def _finished(env, wav, **place):
     job.segments = [Segment(segment_id="s1", index=0, start_ms=0, end_ms=2000, source_transcript="Hello there", spoken="Hello there"),
                     Segment(segment_id="s2", index=1, start_ms=2000, end_ms=4000, source_transcript="Second line", spoken="Second line")]
     job.save(outdir / "manifest.json")
+    env.db.set_order_free_preview(order["id"], False)               # an order that has been paid for (free minutes alone never unlock one)
     return env.db.get_order(order["id"])
 
 

@@ -94,17 +94,18 @@
     </div>
   </section>
 
-  {% if page.choose %}
+  {% if choose %}
   <section class="m-section" id="choose">
     <div class="m-inner">
       <h2 class="m-h2">Choose what fits</h2>
       <p class="m-lede">Every job is different. Here is what each option gets you, so you can pick the one that fits yours.</p>
       <div class="m-choose-grid">
-        {% for c in page.choose %}
+        {% for c in choose %}
         <div class="m-choose-card">
           <h3>{{ c.name }}</h3>
           <p class="m-choose-best"><strong>Best for:</strong> {{ c.best }}</p>
-          <p>{{ c.get }}</p>
+          <p>{{ c['get'] }}</p>
+          {% if c.guide %}<a class="m-choose-guide" href="/blog/{{ c.guide.slug }}">Read the guide: {{ c.guide.title }} &rarr;</a>{% endif %}
         </div>
         {% endfor %}
       </div>

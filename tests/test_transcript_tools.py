@@ -68,11 +68,11 @@ def test_bad_formats_and_foreign_orders_are_refused(env, wav_bytes):
     assert _export(env, order, format="txt").status_code == 401
     env.monkeypatch.setattr(env.app, "current_user", mine)
     conn = env.db.get_conn()
-    conn.execute("UPDATE users SET plan_chosen_at = NULL WHERE id = 'u1'")
+    conn.execute("UPDATE orders SET is_free_preview = 1, duration_minutes = 10 WHERE id = ?", (order["id"],))
     conn.commit()
     conn.close()
     r = _export(env, order, format="txt")
-    assert r.status_code == 403 and "Choose a plan" in r.json()["error"]
+    assert r.status_code == 403 and "Subscribe to the Free plan" in r.json()["error"]
 
 
 def test_a_script_the_pdf_cannot_draw_says_so_instead_of_failing(env, wav_bytes):

@@ -8,7 +8,7 @@ Honesty rules baked into every string: Instant AI is described as AI-generated
 and not reviewed by a person; transcription covers {n} languages, but
 translation is between the supported languages, dubbing is for Swahili, Kikuyu and English, and human review
 is for Swahili, Kikuyu, English, Chinese (Mandarin), German and Spanish;
-free minutes need a one-time $1 card check that is credited back.
+free minutes are used straight away and a plan (the Free plan costs nothing) unlocks downloads.
 
 These were written by an AI and have NOT been reviewed by a native speaker
 yet. Each page says so (mt_note) - have a native speaker review the language

@@ -122,7 +122,7 @@ def _ready(env, wav_bytes, n):
     for i in range(n):
         o = env.order_from(env.place(wav_bytes))
         conn = env.db.get_conn()
-        conn.execute("UPDATE orders SET status = 'ready_for_delivery', created_at = ?, status_changed_at = ? WHERE id = ?", (time.time() + i, time.time() + i, o["id"]))
+        conn.execute("UPDATE orders SET status = 'ready_for_delivery', is_free_preview = 0, created_at = ?, status_changed_at = ? WHERE id = ?", (time.time() + i, time.time() + i, o["id"]))
         conn.commit()
         conn.close()
         ids.append(o["id"])

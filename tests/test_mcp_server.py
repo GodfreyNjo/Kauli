@@ -136,7 +136,7 @@ def test_transcript_is_refused_until_a_plan_is_chosen_and_for_unpaid_orders(api,
     assert "isn't ready" in call(api, "kauli_get_transcript", order_id=free["id"])["content"][0]["text"]
     api.db.update_order_status(free["id"], "ready_for_delivery")
     res = call(api, "kauli_get_transcript", order_id=free["id"])
-    assert res["isError"] is True and "Choose a plan" in res["content"][0]["text"]
+    assert res["isError"] is True and "Subscribe to the Free plan" in res["content"][0]["text"]
     held = payload(call(api, "kauli_create_order", url="https://youtu.be/abc123XYZ00", source_lang="en",
                         review_tier="human"))
     assert "waiting for payment" in call(api, "kauli_get_transcript", order_id=held["id"])["content"][0]["text"]

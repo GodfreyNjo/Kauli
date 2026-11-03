@@ -135,8 +135,11 @@ def test_links_appear_once_the_plan_is_chosen(api, wav_bytes):
     before = api.client.get(f"/api/v1/orders/{order_id}", headers=headers).json()
     assert before["ready"] and before["deliverables"] == {} and before["plan_required"] is True
     api.db.set_plan_chosen("u1")
+    still = api.client.get(f"/api/v1/orders/{order_id}", headers=headers).json()
+    assert still["plan_required"] is True and still["deliverables"] == {}        # free minutes cover reading only: the order must be paid for
+    api.db.set_order_free_preview(order_id, False)
     after = api.client.get(f"/api/v1/orders/{order_id}", headers=headers).json()
-    assert "txt" in after["deliverables"] and "plan_required" not in after       # free-minute results are downloadable
+    assert "txt" in after["deliverables"] and "plan_required" not in after
 
 
 def test_staff_keys_cannot_create_client_orders(api, wav_bytes):

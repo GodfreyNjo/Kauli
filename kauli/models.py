@@ -40,6 +40,29 @@ def split_off_speaker_tag(text: str) -> tuple[str | None, str]:
     return m.group(1), text[m.end():]
 
 
+def label_speakers(pairs: list[tuple[str | None, str]]) -> list[tuple[str, str, str]]:
+    """What a reader should see for each (speaker_id, text) line: (name, text without the name tag, the tag that was removed).
+
+    A name the human editor typed at the start of a line ("AMARA: Okay, so...") is the speaker, and the machine label (SPK_1)
+    is not shown beside it. When a recogniser label has been named on any line, its other lines carry that name too, as long
+    as the editor used only one name for it. A line nobody named keeps its own label."""
+    parsed = []
+    names: dict[str, set[str]] = {}
+    for sid, text in pairs:
+        tag, rest = split_off_speaker_tag(text or "")
+        name = tag[:-1].strip() if tag else ""
+        parsed.append((sid or "", name, rest, tag or ""))
+        if name and sid:
+            names.setdefault(sid, set()).add(name)
+    out = []
+    for sid, name, rest, tag in parsed:
+        if not name:
+            only = names.get(sid, set())
+            name = next(iter(only)) if len(only) == 1 else sid
+        out.append((name, rest, tag))
+    return out
+
+
 @dataclass
 class Word:
     text: str
@@ -65,6 +88,11 @@ class Segment:
     # _find_gaps/_build_source_cells already render an empty segment's
     # full span as one gap-cell - no editor changes needed for this.
     segment_type: str = "speech"
+    # Whether Ereri's editor put a paragraph break right BEFORE this segment's first word, in step 1 (the source text) and in step 2
+    # (the English). A break inside a segment lives in the saved text itself ("\n\n"), but the break that starts a segment has no
+    # earlier word in the same text to follow, so it needs its own flag or it is lost the moment the editor saves and reloads.
+    para_start_source: bool = False
+    para_start_target: bool = False
 
     # --- source (ASR) ---
     source_language: str = "sw"

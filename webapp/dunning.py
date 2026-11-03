@@ -128,7 +128,7 @@ def finish(user, base_url: str) -> None:
     _send(user, "Your Kauli plan is paused, and your files are safe",
           ["We could not take your last payment, so your plan is paused. Nothing has been deleted: your account, projects and files are all still here, and you can still use your 30 free Instant AI minutes every month.",
            "Whenever it suits you, pick your plan again with one click and carry on exactly where you were. We are here when you are ready."],
-          base_url, "Restart my plan", f"{base_url}/client/plans")
+          base_url, "Restart my plan", f"{base_url}/client/billing#change-plan")
 
 
 def expire_backstop(now: float | None = None) -> int:

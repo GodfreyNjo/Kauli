@@ -47,7 +47,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server, notion_export  # noqa: E402
 from kauli import caption_formats, timing  # noqa: E402
-from kauli.models import Job, Word, split_off_speaker_tag  # noqa: E402
+from kauli.models import Job, Word, label_speakers, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
 from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -1092,6 +1092,8 @@ def _build_source_cells(seg) -> list[dict]:
     """
     if seg.source_edited_transcript:
         tokens = _tokenize_with_speaker_tag(seg.source_edited_transcript)
+        if tokens and getattr(seg, "para_start_source", False):
+            tokens[0]["para_start"] = True
         total_chars = sum(len(tok["text"]) for tok in tokens) or 1
         duration = max(1, seg.end_ms - seg.start_ms)
         cells = []
@@ -1110,6 +1112,8 @@ def _build_source_cells(seg) -> list[dict]:
              "confidence": w.confidence}
             for w in seg.words
         ]
+        if cells and getattr(seg, "para_start_source", False):
+            cells[0]["para_start"] = True
     # Real gap cells either way - a source correction session is exactly
     # where a sound tag like [Muziki Wacheza] gets noticed first.
     cells += [{"type": "gap", "start_ms": g0, "end_ms": g1} for g0, g1 in _find_gaps(seg)]
@@ -1127,6 +1131,8 @@ def _build_target_cells(seg) -> list[dict]:
     start empty - an editor can type a sound tag like [MUSIC] into one.
     """
     tokens = _tokenize_with_speaker_tag(seg.final_text)
+    if tokens and getattr(seg, "para_start_target", False):
+        tokens[0]["para_start"] = True
     total_chars = sum(len(tok["text"]) for tok in tokens) or 1
     duration = max(1, seg.end_ms - seg.start_ms)
     cells = []
@@ -1904,9 +1910,14 @@ def solution_page(request: Request, slug: str):
         post = db.get_blog_post_by_slug(g, published_only=True)
         if post:
             guides.append({"slug": g, "title": post["title"], "description": post["description"]})
+    choose = []
+    for option in page.get("choose", []):
+        slug_for = solution_pages.guide_slug_for(option, slug)
+        post = db.get_blog_post_by_slug(slug_for, published_only=True) if slug_for else None
+        choose.append({**option, "guide": {"slug": slug_for, "title": post["title"]} if post else None})
     return templates.TemplateResponse(request, "solution_page.html",
         {**_marketing_context(home="/", market=_display_market(request)), "page": page, "related_pages": related_pages,
-         "guides": guides})
+         "guides": guides, "choose": choose})
 
 
 def _display_market(request: Request) -> str:
@@ -2192,7 +2203,7 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
 
 # Same real personal inbox worker.py's own CONTACT_EMAIL constant uses
 # for this exact purpose (that module can't import this one - circular -
-# so it keeps its own copy) - internal ops alerts go to Godfrey directly,
+# so it keeps its own copy) - internal ops alerts go to the owner address directly,
 # never the public hello@ support alias these functions are announcing
 # activity ABOUT, not activity sent TO.
 INTERNAL_NOTIFY_EMAIL = "kahunyurogodfrey@gmail.com"
@@ -3589,7 +3600,7 @@ def push_captions_to_youtube(request: Request, order_id: str):
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
-    if not _plan_chosen(user["client_scope_id"]):
+    if _order_locked(order):
         return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Choose a plan to unlock downloads and publishing.')}", status_code=303)
     if not order["source_youtube_id"]:
         return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('This order was not sourced from a YouTube video.')}", status_code=303)
@@ -3845,8 +3856,8 @@ def _notion_push_order(order, base_url: str) -> tuple[bool, str]:
         return False, "Notion isn't connected."
     if order["status"] not in db.TERMINAL_OK_STATUSES:
         return False, "This order isn't ready yet."
-    if not _plan_chosen(order["client_id"]):
-        return False, "Choose a plan to send results to Notion."
+    if _order_locked(order):
+        return False, "Unlock this order to send it to Notion."
     token = _notion_decrypt(row["token_enc"])
     if not token:
         return False, "Reconnect Notion in Settings: the saved token can't be read."
@@ -3980,7 +3991,7 @@ def _teams_order_ready_message(request, order, include_links: bool) -> dict:
         [("File", order["original_filename"] or order["id"]),
          ("Service", _SLACK_SERVICE_LABELS.get(order["service_level"] or "transcribe", "Order")),
          ("Languages", langs), ("Order", order["id"])],
-        None if _plan_chosen(order["client_id"]) else "Choose a plan in Kauli to unlock downloads.", actions)
+        None if not _order_locked(order) else "Unlock this order in Kauli to download it.", actions)
 
 
 def _notify_teams_order_ready(request, order) -> None:
@@ -4402,7 +4413,7 @@ def staff_handbook(request: Request):
     """The whole-system reference, distinct from /staff/guide (which is
     Ereri-editing-mechanics only) - what a brand new contractor needs to
     understand roles, the real order lifecycle, billing, and common
-    troubleshooting without having to ask Godfrey every time. Written for
+    troubleshooting without having to ask the team every time. Written for
     "a staff member who just joined us," per the actual real request that
     created this page - not a generic onboarding template."""
     user = current_user(request)
@@ -4440,7 +4451,7 @@ def staff_resources_technical_overview(request: Request):
     same content as the one published as a Claude artifact but hosted
     here too so access never depends on that artifact's own sharing
     settings - every staff login can always reach it, not just whoever
-    Godfrey has personally shared the artifact link with."""
+    the team has personally shared the artifact link with."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -4903,10 +4914,9 @@ def client_files(request: Request, type: str = "", q: str = ""):
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
     rows = []
-    plan_ok = _plan_chosen(user["client_scope_id"])
     for o in db.list_orders_for_client(user["client_scope_id"]):
         deliverables = []
-        if o["status"] in ("ready_for_delivery", "delivered") and plan_ok:
+        if o["status"] in ("ready_for_delivery", "delivered") and not _order_locked(o):
             outdir = Path(o["outdir"]) if o["outdir"] else None
             deliverables = [
                 {"kind": "audio", "label": "Dubbed audio (.wav)"},
@@ -5390,7 +5400,7 @@ def record_feedback(request: Request, context: str, user_id: str, rating: str):
         )
     return HTMLResponse(
         "<div style=\"font-family:sans-serif; max-width:480px; margin:80px auto; text-align:center;\">"
-        "<h1>Thanks for the feedback</h1><p>The founder reads every one of these personally.</p></div>"
+        "<h1>Thanks for the feedback</h1><p>The team reads every one of these personally.</p></div>"
     )
 
 
@@ -5865,6 +5875,11 @@ def create_order(
             "Couldn't read that file's duration - it may not be a valid audio/video file.",
             form_values=form_values)
 
+    # Nothing is transcribed twice: if this account already received a transcript of this same file (the "Do more with this file" button,
+    # the same file sent again, or the same YouTube video), whatever is ordered now starts from that delivered transcript, with the
+    # customer's own corrections, and goes straight to the new work (see transcript_reuse.py).
+    source_sha = transcript_reuse.file_sha256(audio_path) if not youtube_video_id else None
+    reuse_from = transcript_reuse.pick(user["client_scope_id"], source_lang, explicit=reuse_src, sha256=source_sha, youtube_id=youtube_video_id)
     if wants_audio_cleanup and not _audio_cleanup_capacity_ok(minutes):
         return _client_dashboard_error(
             request, user, "Audio clean-up is at capacity right now. Continue without it, or try again later.",
@@ -5967,10 +5982,9 @@ def create_order(
         # (The free trial only ever buys the INSTANT AI tier now - it's
         # "see the AI transcription quality for yourself", and it must not
         # cost us a human reviewer's time.)
-        # No card check before ordering any more: free minutes can be used
-        # straight away, and the card confirmation (billing.
-        # TRIAL_VERIFICATION_FEE_USD, credited back) happens when the client
-        # chooses the Free plan - which is what unlocks downloads.
+        # No card check: free minutes can be used straight away, and subscribing
+        # to the Free plan (pay as you go, which charges for the order being
+        # opened) is what unlocks downloads and editing.
         free_cap = billing.plan_included_minutes(plan) + (
             (subscription["bonus_minutes"] or 0.0) + billing._reward_minutes(subscription) if subscription else 0.0)
         free_minutes_for_this_order = db.reserve_free_minutes(user["client_scope_id"], minutes, free_cap)
@@ -5982,7 +5996,7 @@ def create_order(
     if billing.human_allowance_covers(plan, service_level, review_tier):
         human_included = db.reserve_human_minutes(user["client_scope_id"], minutes, billing.plan_human_minutes(plan))
         free_minutes_for_this_order = human_included
-    # Rush = Godfrey manually jumping the review queue - meaningless for an
+    # Rush = the team manually jumping the review queue - meaningless for an
     # instant AI order, which has no queue.
     is_rush = bool(rush) and review_tier == "human"
     # Same double-spend concern as free minutes above, for prepaid credits:
@@ -6001,7 +6015,7 @@ def create_order(
                                    addons=addons, wallet_credits_available=reserved_credits, rush=is_rush,
                                    market=billing_market, review_tier=review_tier)
     # A new customer's first Instant AI order is never held for payment: it is processed and delivered, they read the first part of the
-    # transcript, and the one-time $1 card check (credited back to their wallet) unlocks the rest. What it would have cost is kept in the
+    # transcript, and subscribing to the Free plan (pay as you go, charged for that order) unlocks the rest. What it would have cost is kept in the
     # breakdown. After this first order, anything beyond the free minutes is pay as you go as usual.
     if (cost["total_usd"] > 0 and review_tier == "ai" and not studio and service_level in ("transcribe", "translate")
             and minutes <= min(billing.FIRST_ORDER_FREE_MAX_MINUTES, onboarding.first_order_cap(db.get_user(user["client_scope_id"])))
@@ -6016,8 +6030,8 @@ def create_order(
     # the surcharge alone (see billing.order_cost_usd) already makes
     # total_usd > 0, but spelled out here too for clarity.
     cost["human_minutes_included"] = round(human_included, 2)
-    is_free_preview = (cost["free_minutes_applied"] > 0 and cost["credits_applied"] <= 0 and review_tier == "ai"
-                        and cost["total_usd"] <= 0 and not is_rush)
+    is_free_preview = ((cost["free_minutes_applied"] > 0 or bool(cost.get("first_order_courtesy_usd")))
+                        and cost["credits_applied"] <= 0 and review_tier == "ai" and cost["total_usd"] <= 0 and not is_rush)
 
     # Free-allowance orders (the free plan, fully covered, Instant AI) go to the low-cost providers; everyone who pays keeps Transkriptor.
     free_covered = (plan == "free" and review_tier == "ai" and cost["free_minutes_applied"] > 0
@@ -6038,6 +6052,8 @@ def create_order(
     instant_ai = review_tier == "ai" and not studio
     asr = _route_asr(asr, source_lang=source_lang, free_covered=(free_covered and not first_impression) or bulk_allowance or instant_ai,
                      minutes=minutes)
+    if reuse_from is not None:
+        asr = "stub"                                  # no speech recognition will run: the earlier transcript is used
 
     db.create_order(
         order_id=order_id,
@@ -6049,6 +6065,8 @@ def create_order(
         folder_name=folder_name.strip() or None,
         wants_human_voice_over=wants_human_voice_over,
     )
+    if reuse_from is not None or source_sha:
+        db.set_order_reuse(order_id, reuse_from["id"] if reuse_from is not None else None, source_sha)
     if wants_premium_voice:
         db.set_dub_voice(order_id, f"elevenlabs:{premium_voice_id}", job_status=None)
     if youtube_video_id:
@@ -6183,8 +6201,8 @@ def client_edit_transcript(request: Request, order_id: str, body: dict = Body(..
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"error": "not found"}, status_code=404)
-    if not _plan_chosen(user["client_scope_id"]):
-        return JSONResponse({"error": "Choose a plan to edit your transcript."}, status_code=403)
+    if _order_locked(order):
+        return JSONResponse({"error": "Subscribe to the Free plan (pay as you go), or unlock this order, to edit your transcript."}, status_code=403)
     if order["review_tier"] != "ai":
         return JSONResponse({"error": "This transcript was checked by a person, so changes go through a revision request."}, status_code=403)
     if order["status"] not in db.TERMINAL_OK_STATUSES:
@@ -6229,6 +6247,16 @@ def client_edit_transcript(request: Request, order_id: str, body: dict = Body(..
         db.set_order_ai_summary(order_id, "")               # the summaries are written again, on request, from the corrected text
         db.clear_order_summaries(order_id)
     return JSONResponse({"ok": True, "changed": changed}, headers={"Cache-Control": "no-store"})
+
+
+def _speaker_lines(job) -> dict:
+    """Per speech line, what the customer reads: the speaker's name and the text without the name typed at its start. The name an
+    editor added replaces the recogniser's SPK_n label; the stored text is untouched (the dubbing step still reads the tag)."""
+    segs = [s for s in (getattr(job, "segments", None) or []) if getattr(s, "segment_type", "speech") == "speech"]
+    src = label_speakers([(s.speaker_id, s.source_final_text) for s in segs])
+    tgt = label_speakers([(s.speaker_id, s.final_text) for s in segs])
+    return {s.segment_id: {"speaker": a[0] or b[0], "source": a[1], "source_tag": a[2], "target": b[1], "target_tag": b[2]}
+            for s, a, b in zip(segs, src, tgt)}
 
 
 def _caption_cues(job) -> list[dict]:
@@ -6427,6 +6455,9 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "live": _processing_state(order, _ui_lang(request, user)) if order["status"] in ("queued", "processing") else None,
         "caption_cues": _caption_cues(job),
         "csat_due": order["status"] in ("ready_for_delivery", "delivered") and onboarding.csat_due(order["client_id"], order["id"]),
+        "order_locked": _order_locked(order), "plan_subscribed": _plan_chosen(order["client_id"]),
+        "free_plan_charge": _free_plan_charge(order["client_id"], order["id"]) if _order_locked(order) else None,
+        "speaker_lines": _speaker_lines(job),
         "can_edit_transcript": order["review_tier"] == "ai" and order["status"] in db.TERMINAL_OK_STATUSES,
         "can_export_transcript": bool(job) and _deliverable_denied_reason(order, "txt") is None,
         "same_language": order["service_level"] == "transcribe" or order["source_lang"] == order["target_lang"],
@@ -6436,7 +6467,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "paystack_configured": billing.paystack_configured(),
         "transcript_teaser": (_transcript_teaser(job, order["id"])
                               if job and order["status"] in db.TERMINAL_OK_STATUSES
-                              and not _plan_chosen(user["client_scope_id"]) else None),
+                              and _order_locked(order) else None),
         "notion_row": db.get_client_notion(user["client_scope_id"]),
         "notion_export": db.get_notion_export(order["id"]),
     })
@@ -6521,8 +6552,8 @@ def client_order_ai_summary(request: Request, order_id: str, template: str = For
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
-    if not _plan_chosen(user["client_scope_id"]):
-        return JSONResponse({"ok": False, "error": "Choose a plan to use this - the Free plan is enough."},
+    if _order_locked(order):
+        return JSONResponse({"ok": False, "error": "Unlock this order to use this: subscribe to the Free plan (pay as you go) or pay for the order."},
                              status_code=403)
     chosen = summary_templates.get(template)
     saved = next((r for r in db.list_order_summaries(order_id) if r["template_id"] == chosen["id"]), None)
@@ -6562,8 +6593,8 @@ async def client_order_ai_ask(request: Request, order_id: str):
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return JSONResponse({"ok": False, "error": "Order not found."}, status_code=404)
-    if not _plan_chosen(user["client_scope_id"]):
-        return JSONResponse({"ok": False, "error": "Choose a plan to use this - the Free plan is enough."},
+    if _order_locked(order):
+        return JSONResponse({"ok": False, "error": "Unlock this order to use this: subscribe to the Free plan (pay as you go) or pay for the order."},
                              status_code=403)
     allowed, retry_after = rate_limit.check(f"ai-ask:{user['client_scope_id']}", limit=20, window_s=600)
     if not allowed:
@@ -6751,7 +6782,8 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     )
     return templates.TemplateResponse(request, "billing.html", {
         "user": user, "plans": billing.PLANS, "current_plan": plan,
-        "plan_is_chosen": _plan_chosen(user["client_scope_id"]), "choose_plan": choose_plan,
+        "plan_is_chosen": _plan_chosen(user["client_scope_id"]), "choose_plan": choose_plan, "addons": billing.ADDONS,
+        "free_plan_charge": None if _plan_chosen(user["client_scope_id"]) else _free_plan_charge(user["client_scope_id"]),
         "subscription": subscription, "is_test_account": is_test_account,
         "payments": payments, "receipts_by_payment": receipts_by_payment,
         "total_spent_usd": client_stats["total_spent_usd"], "outstanding_usd": outstanding_usd,
@@ -6794,10 +6826,47 @@ def billing_cancel_subscription(request: Request):
         status_code=303)
 
 
+def _order_locked(order) -> bool:
+    """True while an order's results can be read but not downloaded or edited: the account has not subscribed to the Free plan (pay as you
+    go) yet, or the order was made with free minutes on the Free plan and has not been paid for. Free minutes cover processing and reading
+    only. Orders made under a paid plan are never locked by this."""
+    if not _plan_chosen(order["client_id"]):
+        return True
+    return bool(order["is_free_preview"]) and (order["tier"] or "free") == "free" and _unlock_price(order) > 0
+
+
+def _unlock_price(order) -> float:
+    """What it costs to unlock an order made with free minutes: its full cost at pay-as-you-go prices, as if no free minutes had been used."""
+    try:
+        cost = json.loads(order["cost_breakdown_json"]) if order["cost_breakdown_json"] else {}
+    except (json.JSONDecodeError, TypeError):
+        cost = {}
+    addons = [line["key"] for line in (cost.get("addons") or []) if isinstance(line, dict) and line.get("key")]
+    try:
+        full = billing.order_cost_usd(float(order["duration_minutes"] or 0.0), order["service_level"] or "transcribe", "free", 0.0, addons=addons,
+                                      market=order["billing_market"], review_tier=order["review_tier"] or "ai")
+        return round(float(full["total_usd"]), 2)
+    except Exception:  # noqa: BLE001 - never block a page on a price that cannot be worked out
+        return round(float(cost.get("first_order_courtesy_usd") or 0.0), 2)
+
+
+def _free_plan_charge(client_id: str, order_id: str | None = None) -> dict | None:
+    """What opening a locked order costs: its full pay-as-you-go price (see _unlock_price). For a new account this is what subscribing to the
+    Free plan charges; once that payment succeeds the account is on the Free plan. None when there is no locked finished order."""
+    orders = [o for o in db.list_orders_for_client(client_id) if o["status"] in db.TERMINAL_OK_STATUSES and _order_locked(o)]
+    if order_id:
+        orders = [o for o in orders if o["id"] == order_id] or orders
+    if not orders:
+        return None
+    order = orders[0]
+    return {"order_id": order["id"], "name": order["original_filename"], "order": order, "amount": _unlock_price(order)}
+
+
 @app.post("/client/billing/choose-free")
-def billing_choose_free(request: Request):
-    """Choosing the Free plan. Needs the card confirmation (the credited $1)
-    once per account; if that is already done it just records the choice."""
+def billing_choose_free(request: Request, order_id: str = Form(""), phone: str = Form("")):
+    """Subscribing to the Free plan (pay as you go). The cost of the order being opened is worked out and charged; once that payment
+    succeeds the account is on the Free plan and downloads and editing open (any real payment marks the plan as chosen, see
+    _activate_payment). If the free minutes already cover the order there is nothing to charge and it opens straight away."""
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
@@ -6805,40 +6874,23 @@ def billing_choose_free(request: Request):
         return RedirectResponse("/client/billing?error=Only+the+account+owner+can+choose+the+plan.", status_code=303)
     if user["plan_chosen_at"]:
         return RedirectResponse("/client/billing", status_code=303)
-    if user["trial_verified_at"]:
-        db.set_plan_chosen(user["id"])
-        return RedirectResponse("/client/billing?notice=You%27re+on+the+Free+plan.+Downloads+are+unlocked.", status_code=303)
-    return RedirectResponse("/client/verify-trial", status_code=303)
+    charge = _free_plan_charge(user["id"], order_id or None)
+    if charge and charge["amount"] > 0:
+        if not billing.paystack_configured():
+            return RedirectResponse("/client/billing?error=Payment+isn%27t+configured+yet+-+contact+us.", status_code=303)
+        order = charge["order"]
+        back = f"/client/orders/{order['id']}"
+        return _checkout(request, user, "paystack", order["tier"], charge["amount"], order["id"], phone, back, back, payment_kind="preview_unlock")
+    db.set_plan_chosen(user["id"])
+    if charge:
+        db.set_order_free_preview(charge["order_id"], False)                  # nothing to pay for this order: it opens
+    return RedirectResponse("/client/billing?notice=You%27re+on+the+Free+plan+%28pay+as+you+go%29.+Downloads+and+editing+are+unlocked.", status_code=303)
 
 
-@app.get("/client/verify-trial", response_class=HTMLResponse)
-def client_verify_trial(request: Request, error: str | None = None):
-    user = current_user(request)
-    if not user or user["role"] != "client":
-        return RedirectResponse("/login")
-    if user["trial_verified_at"]:
-        return RedirectResponse("/client", status_code=303)
-    return templates.TemplateResponse(request, "verify_trial.html", {
-        "user": user, "error": error, "fee_usd": billing.TRIAL_VERIFICATION_FEE_USD,
-        "paystack_configured": billing.paystack_configured(),
-    })
-
-
-@app.post("/client/verify-trial/pay")
-def client_verify_trial_pay(request: Request):
-    user = current_user(request)
-    if not user or user["role"] != "client":
-        return RedirectResponse("/login")
-    if user["trial_verified_at"]:
-        return RedirectResponse("/client", status_code=303)
-    # Paystack only - M-Pesa (MPESA_ENV) is still sandbox on the real
-    # server, so a real client's real phone number would just fail
-    # against it. See billing.TRIAL_VERIFICATION_FEE_USD's own comment.
-    if not billing.paystack_configured():
-        return RedirectResponse("/client/verify-trial?error=Payment+isn%27t+configured+yet+-+contact+us.",
-                                 status_code=303)
-    return _checkout(request, user, "paystack", "trial_verification", billing.TRIAL_VERIFICATION_FEE_USD,
-                      None, "", "/client/billing", "/client/verify-trial", payment_kind="trial_verification")
+@app.get("/client/verify-trial")
+def client_verify_trial_retired():
+    """The $1 card confirmation no longer exists; old links and emails land where a plan is chosen."""
+    return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
 
 
 @app.post("/client/billing/wallet")
@@ -7017,8 +7069,7 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         db.add_wallet_credits(payment["user_id"], credits)
         description = f"Prepaid credits top-up - {credits:.0f} credits"
     elif payment_kind == "trial_verification":
-        # The $1 becomes real wallet credit, not a fee - see
-        # billing.TRIAL_VERIFICATION_FEE_USD's own comment. Same
+        # A $1 verification charge made before that step was retired becomes real wallet credit, not a fee. Same
         # add_wallet_credits call a real top-up uses, so it shows up and
         # spends exactly the same way on their next real order.
         db.add_wallet_credits(payment["user_id"], billing.usd_to_credits(payment["amount_usd"]))
@@ -7278,8 +7329,9 @@ def _order_upsell_prices(order) -> dict:
     if not cost or order["review_tier"] != "ai" or order["status"] not in db.TERMINAL_OK_STATUSES:
         return prices
     if order["is_free_preview"]:
-        # Free-minute results download once a plan is chosen: nothing to unlock,
-        # and no human-review upsell priced against a free order.
+        # Free minutes cover processing and reading only: downloading or editing the result means paying for the order, at its full
+        # pay-as-you-go price. No human-review upsell is priced against an order that has not been paid for.
+        prices["unlock"] = (_unlock_price(order) or None) if (order["tier"] or "free") == "free" else None
         return prices
     else:
         market = order["billing_market"] or "legacy"
@@ -8163,8 +8215,8 @@ def _deliverable_denied_reason(order, kind: str) -> str | None:
     a signature alone is never enough to serve something never bought."""
     if order["status"] not in db.TERMINAL_OK_STATUSES:
         return "This order isn't ready yet."
-    if not _plan_chosen(order["client_id"]):
-        return "Choose a plan to download your files."
+    if _order_locked(order):
+        return "Subscribe to the Free plan (pay as you go), or unlock this order, to download your files."
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     if kind in ("srt", "vtt") and not order_level["mt"]:
         return "This order doesn't include translated subtitles."
@@ -8255,7 +8307,7 @@ def _order_to_api_dict(request: Request, order) -> dict:
     if order["status"] == "pending_payment":
         out["payment_required"] = True
         out["payment_url"] = f"{str(request.base_url).rstrip('/')}/client/orders/{order['id']}/pay"
-    if not _plan_chosen(order["client_id"]):
+    if _order_locked(order):
         out["plan_required"] = True
         out["choose_plan_url"] = f"{str(request.base_url).rstrip('/')}/client/billing?choose_plan=1"
     return out
@@ -8550,9 +8602,9 @@ def _slack_order_ready_message(request, order, include_links: bool) -> dict:
             {"type": "mrkdwn", "text": f"*Languages*\n{_slack_escape(langs)}"},
             {"type": "mrkdwn", "text": f"*Order*\n{order['id']}"}]},
     ]
-    if not _plan_chosen(order["client_id"]):
+    if _order_locked(order):
         blocks.append({"type": "context", "elements": [{"type": "mrkdwn", "text":
-            "Choose a plan in Kauli to unlock downloads."}]})
+            "Unlock this order in Kauli to download it."}]})
     blocks.append({"type": "actions", "elements": buttons})
     return {"text": f"Your Kauli order is ready: {order['original_filename'] or order['id']}", "blocks": blocks}
 
@@ -8783,9 +8835,9 @@ def download_deliverable(request: Request, order_id: str, kind: str):
             return RedirectResponse(f"/client/orders/{order_id}/pay", status_code=303)
         if order["difficulty_surcharge_status"] == "pending_approval":
             return RedirectResponse(f"/client/orders/{order_id}/difficulty-surcharge", status_code=303)
-        if not _plan_chosen(user["client_scope_id"]):
-            # Nothing downloads until a plan is chosen - the Free plan (card
-            # confirmation, credited back) is enough, and covers results
+        if _order_locked(order):
+            # Nothing downloads until a plan is chosen - the Free plan (pay as
+            # you go: it charges for the order being opened) is enough, and covers results
             # made with the free monthly minutes.
             return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
         plan = billing.effective_plan(user, db.get_subscription(user["client_scope_id"]))
@@ -9094,8 +9146,8 @@ def client_make_captioned_video(request: Request, order_id: str, style: str = Fo
 
     if order["status"] not in db.TERMINAL_OK_STATUSES:
         return back("error", "This order is not ready yet.")
-    if not _plan_chosen(user["client_scope_id"]):
-        return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
+    if _order_locked(order):
+        return RedirectResponse("/client/billing?choose_plan=1" if not _plan_chosen(user["client_scope_id"]) else f"/client/orders/{order_id}", status_code=303)
     if not (billing.PLANS.get(order["tier"], {}).get("video_deliverables") or db.order_has_addon(order, "video_deliverables")):
         return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
     if style not in CAPTION_LOOKS:
@@ -10458,6 +10510,7 @@ def editor_save_segment(request: Request, order_id: str, segment_id: str,
     if seg is None:
         return JSONResponse({"error": "segment not found"}, status_code=404)
 
+    seg.para_start_target = bool(body.get("para_start"))              # a paragraph break right before this segment's first word
     _apply_segment_edit(order, job, seg, body.get("text", ""), bool(body.get("resynthesize")))
     return JSONResponse({
         "ok": True,
@@ -10575,6 +10628,7 @@ def editor_save_source(request: Request, order_id: str, segment_id: str, body: d
     text = body.get("text", "").strip()
     changed = (text or None) != seg.source_final_text
     seg.source_edited_transcript = text or None
+    seg.para_start_source = bool(body.get("para_start"))              # a paragraph break right before this segment's first word
     auto_retranslated = False
     retranslate_error = None
     if changed:

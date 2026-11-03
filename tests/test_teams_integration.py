@@ -122,15 +122,15 @@ def test_download_buttons_only_when_opted_in_and_downloads_are_unlocked(teams):
     assert [a["title"] for a in _actions(teams.sent[-1]["json"])] == ["Open order"]
 
 
-def test_before_a_plan_is_chosen_the_card_says_so(teams):
+def test_an_order_still_to_be_paid_for_says_so_on_the_card(teams):
     order = _order(teams)
     conn = teams.db.get_conn()
-    conn.execute("UPDATE users SET plan_chosen_at = NULL WHERE id = 'u1'")
+    conn.execute("UPDATE orders SET is_free_preview = 1, duration_minutes = 10 WHERE id = ?", (order["id"],))
     conn.commit()
     teams.client.post("/settings/teams", data={"url": GOOD, "include_links": "1"})
     _fire(teams, teams.db.get_order(order["id"]))
     body = teams.sent[-1]["json"]["attachments"][0]["content"]["body"]
-    assert any("Choose a plan" in b.get("text", "") for b in body)
+    assert any("Unlock this order" in b.get("text", "") for b in body)
     assert [a["title"] for a in _actions(teams.sent[-1]["json"])] == ["Open order"]    # no download links yet
 
 

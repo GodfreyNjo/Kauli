@@ -13,6 +13,8 @@ import io
 import zipfile
 from xml.sax.saxutils import escape
 
+from kauli.models import label_speakers
+
 
 def _clock(ms: int) -> str:
     total = max(0, int(ms // 1000))
@@ -24,7 +26,7 @@ def _clock(ms: int) -> str:
 def rows(job, side: str = "source") -> list[dict]:
     """One dict per speech segment: start/end in ms, the speaker and the text of the chosen side. "source" is what was said
     (a human correction wins); "target" is the translation."""
-    out = []
+    picked = []
     for seg in getattr(job, "segments", []) or []:
         if getattr(seg, "segment_type", "speech") != "speech":
             continue
@@ -33,8 +35,11 @@ def rows(job, side: str = "source") -> list[dict]:
         else:
             text = (getattr(seg, "source_final_text", "") or getattr(seg, "source_transcript", "") or "").strip()
         if text:
-            out.append({"start": seg.start_ms, "end": getattr(seg, "end_ms", seg.start_ms), "speaker": getattr(seg, "speaker_id", None) or "", "text": text})
-    return out
+            picked.append((seg, text))
+    # a name the editor typed replaces the SPK_n label, so a line never reads "SPK_1  AMARA: ..."
+    labelled = label_speakers([(getattr(seg, "speaker_id", None), text) for seg, text in picked])
+    return [{"start": seg.start_ms, "end": getattr(seg, "end_ms", seg.start_ms), "speaker": name, "text": rest.strip() or text}
+            for (seg, text), (name, rest, _tag) in zip(picked, labelled)]
 
 
 def paragraphs(job, timestamps: bool = True, speakers: bool = True, split: str = "line", side: str = "source") -> list[str]:

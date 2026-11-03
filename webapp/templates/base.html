@@ -196,7 +196,6 @@
         {% if meetings_enabled() %}<a href="/client/meetings" class="{{ 'active' if request.url.path == '/client/meetings' else '' }}">{{ nav_icon('mic') }}<span class="label">{{ t('nav_meetings') }}</span></a>{% endif %}
         <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">{{ t('nav_files') }}</span></a>
         <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">{{ t('nav_billing') }}</span></a>
-        <a href="/client/plans" class="{{ 'active' if '/client/plans' in request.url.path else '' }}">{{ nav_icon('shield') }}<span class="label">{{ t('nav_plans') }}</span></a>
         <div class="sidebar-divider"></div>
         <a href="/client/notes" class="{{ 'active' if '/client/notes' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">{{ t('nav_notes') }}</span></a>
         <a href="/client/analytics" class="{{ 'active' if '/client/analytics' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">{{ t('nav_analytics') }}</span></a>
@@ -218,10 +217,10 @@
     <div class="app-main">
       <main id="main-content" tabindex="-1">
         {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user)
-              and request.url.path not in ['/client/billing', '/client/verify-trial'] %}
+              and request.url.path not in ['/client/billing'] %}
         <div class="plan-banner" role="status">
-          <span><strong>Unlock your files in one step.</strong> You can read the start of your results now; a quick $1 card check, credited straight back to your wallet, unlocks the rest. <a href="/client/billing?choose_plan=1">See plans</a></span>
-          <a class="btn" href="/client/verify-trial">Unlock now</a>
+          <span><strong>Subscribe to the Free plan (pay as you go) to download and edit your files.</strong> You can read the start of your results now. <a href="/client/billing?choose_plan=1">See how it works</a></span>
+          <a class="btn" href="/client/billing?choose_plan=1">Subscribe to the Free plan</a>
         </div>
         {% endif %}
         {% if user is defined and user and user['role'] == 'client' and payment_issue(user) and request.url.path != '/client/billing/update-card' %}
@@ -708,7 +707,8 @@
     }
   </script>
   <script src="/static/studio_wave.js?v=2" defer></script>
-  <script src="/static/flash.js?v=1" defer></script>
+  <script src="/static/toast.js?v=1" defer></script>
+  <script src="/static/flash.js?v=2" defer></script>
   <script src="/static/busy.js?v=1" defer></script>
   <script src="/static/softswap.js?v=2" defer></script>
   <script src="/static/persist.js?v=1" defer></script>

@@ -93,6 +93,7 @@ def test_a_refusal_from_slack_is_reported(slack):
 
 def test_order_ready_posts_a_message_without_download_links_by_default(slack):
     order = _order(slack)
+    slack.db.set_order_free_preview(order["id"], False)                              # paid for, so nothing is locked
     slack.client.post("/settings/slack", data={"url": GOOD})
     _fire(slack, slack.db.get_order(order["id"]))
     assert len(slack.sent) == 1 and slack.sent[0]["url"] == GOOD
@@ -104,11 +105,11 @@ def test_order_ready_posts_a_message_without_download_links_by_default(slack):
     assert not any(b["type"] == "context" for b in msg["blocks"])                   # plan already chosen: no note
     slack.db.get_conn().close()
     conn = slack.db.get_conn()
-    conn.execute("UPDATE users SET plan_chosen_at = NULL WHERE id = 'u1'")
+    conn.execute("UPDATE orders SET is_free_preview = 1, duration_minutes = 10 WHERE id = ?", (order["id"],))     # made with free minutes: still to be paid for
     conn.commit()
     _fire(slack, slack.db.get_order(order["id"]))
     notes = [b for b in slack.sent[-1]["json"]["blocks"] if b["type"] == "context"]
-    assert notes and "Choose a plan" in notes[0]["elements"][0]["text"]
+    assert notes and "Unlock this order" in notes[0]["elements"][0]["text"]
 
 
 def test_download_buttons_only_for_a_paid_ready_order_and_only_if_opted_in(slack):

@@ -4,7 +4,7 @@ The idea: friction should land on the people who might abuse the service, not on
 score from signals we already have; the score decides how generous the first order is:
 
     low risk     the first Instant AI order is processed and delivered free, up to 120 minutes (the customer reads the start of it; the
-                 one-time $1 card check, credited back to their wallet, unlocks the rest)
+                 choosing a plan, which costs nothing for the Free plan, unlocks the rest)
     medium risk  the same, up to 45 minutes
     high risk    no free first order: they use the normal free minutes and pay as you go like anyone else (nothing is blocked)
 

@@ -50,14 +50,14 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "Quick question about {company}'s Swahili content",
             "email_body": (
                 "Hi there,\n\n"
-                "I run Kauli, a Nairobi-based localization service - we turn Swahili/Kikuyu video "
+                "We run Kauli, a Nairobi-based localization service - we turn Swahili/Kikuyu video "
                 "and audio into English (and back), AI-drafted then verified word-by-word by a real "
                 "human editor before anything ships.\n\n"
-                "I noticed {company} does real field/program work, and organizations like yours often "
+                "We noticed {company} does real field/program work, and organizations like yours often "
                 "need English versions of Swahili reports for funders or international partners. "
-                "I'm curious - how are you currently handling that, if at all?\n\n"
+                "We're curious - how are you currently handling that, if at all?\n\n"
                 "No pitch here, genuinely just asking.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Open with the same question as the email - how do they currently handle Swahili-to-English content for funders/partners?",
@@ -67,7 +67,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Close by offering the free 2-minute sample - only if the conversation naturally gets there.",
             ],
             "text_message": (
-                "Hi, I'm Godfrey from Kauli - we localize Swahili video/audio to English for Kenyan "
+                "Hi, this is the Kauli team - we localize Swahili video/audio to English for Kenyan "
                 "orgs. Quick q: how does {company} currently handle English versions of Swahili field "
                 "reports for funders? Not pitching, just curious about your workflow."
             ),
@@ -78,11 +78,11 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Hi again,\n\n"
                 "Following up on my last note - here's a concrete, zero-risk way to see if this is "
                 "useful for {company}: send me a 2-minute clip (a field report, training video, "
-                "anything real) and I'll return a human-verified English subtitle file within 24 "
+                "anything real) and We'll return a human-verified English subtitle file within 24 "
                 "hours. Free, no card, no commitment.\n\n"
                 "If the quality holds up, we can talk about your real volume. If it doesn't, you've "
                 "lost nothing.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Reiterate the free-sample offer in one sentence - a real 2-minute clip, 24-hour turnaround, human-verified, no cost.",
@@ -92,7 +92,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
             ],
             "text_message": (
                 "Still happy to do that free 2-minute sample for {company} whenever you have a clip "
-                "handy - just send it over and I'll have a human-verified English version back to you "
+                "handy - just send it over and We'll have a human-verified English version back to you "
                 "within 24 hours."
             ),
         },
@@ -107,7 +107,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "traditional agency quotes.\n\n"
                 "Worth a 15-minute call to talk through your actual reporting calendar and volume? "
                 "Happy to work around your schedule.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "This IS the consultation call - come with their real sample already delivered and referenced by name/topic.",
@@ -130,18 +130,18 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "you described. No expiry pressure, just want to make sure it's still useful and answer "
                 "anything that's come up since we talked.\n\n"
                 "If you're ready, the fastest path is just uploading your next real clip at "
-                "kauli-forgemedia.com and I'll personally keep an eye on it.\n\n"
-                "Godfrey"
+                "kauli-forgemedia.com and We'll personally keep an eye on it.\n\n"
+                "The Kauli team"
             ),
             "call_points": [
                 "Reference the specific quote/numbers already sent - don't re-pitch from scratch.",
                 "Ask directly what's still in the way of a yes - budget approval, a competing quote, timing.",
                 "If it's budget: remind them the free sample already proved the quality, so the real question is just volume/cost, which is flexible.",
                 "If it's a genuine 'not now': ask permission to check back in 60 days rather than letting the lead go cold silently.",
-                "Get a real next step booked before ending the call, even if it's just 'I'll follow up Friday'.",
+                "Get a real next step booked before ending the call, even if it's just 'We'll follow up Friday'.",
             ],
             "text_message": (
-                "Just sent {company}'s quote over email - let me know if anything's unclear or if it'd "
+                "Just sent {company}'s quote over email - let us know if anything's unclear or if it'd "
                 "help to jump on a quick call to close out any questions."
             ),
         },
@@ -151,14 +151,14 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "How does {company} handle English versions of vernacular content?",
             "email_body": (
                 "Hi there,\n\n"
-                "I run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video to English "
+                "We run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video to English "
                 "(and back), AI-drafted then verified word-by-word by a real human editor before "
                 "delivery.\n\n"
-                "I'm curious how {company} currently handles English subtitles or dubs for content "
+                "We're curious how {company} currently handles English subtitles or dubs for content "
                 "that needs to travel beyond a Swahili/vernacular-speaking audience - syndication, "
                 "international distribution, YouTube, that kind of thing. Genuinely just asking, not "
                 "pitching yet.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask for the producer or content/digital manager by name if you don't have one yet - the person who decides on subtitling/localization vendors, not general reception.",
@@ -167,7 +167,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Don't mention price unless asked - the differentiator at this stage is speed + human verification, not cost.",
             ],
             "text_message": (
-                "Hi, I'm Godfrey from Kauli - we do Swahili/Kikuyu-to-English localization for video. "
+                "Hi, this is the Kauli team - we do Swahili/Kikuyu-to-English localization for video. "
                 "Quick q for {company}: how do you currently handle English subtitles for content that "
                 "needs to reach beyond a local audience?"
             ),
@@ -177,11 +177,11 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_body": (
                 "Hi again,\n\n"
                 "Concrete way to see if this is useful for {company}: send me a real 2-minute clip - a "
-                "news segment, a feature, anything - and I'll return a human-verified English subtitle "
+                "news segment, a feature, anything - and We'll return a human-verified English subtitle "
                 "file within 24 hours. Free, no commitment.\n\n"
                 "If it's fast and clean enough for your workflow, let's talk about a real volume "
                 "arrangement. If not, no harm done.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Push for a real clip during the call if possible - broadcast teams move fast, so momentum matters.",
@@ -202,7 +202,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "alone), and turnaround in hours for standard content, faster for rush jobs.\n\n"
                 "Worth 15 minutes to talk through your actual content calendar and volume? Happy to "
                 "work around a newsroom schedule.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask about real volume: how many minutes of content per week/month would realistically need this?",
@@ -223,8 +223,8 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Following up with a real quote based on what we discussed. No pressure - just want to "
                 "confirm it's still useful and answer anything new that's come up.\n\n"
                 "Fastest path if you're ready: upload your next real clip at kauli-forgemedia.com and "
-                "I'll personally keep an eye on it.\n\n"
-                "Godfrey"
+                "We'll personally keep an eye on it.\n\n"
+                "The Kauli team"
             ),
             "call_points": [
                 "Reference the specific quote already sent.",
@@ -244,12 +244,12 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "How does {company} handle Swahili content for internal/external comms?",
             "email_body": (
                 "Hi there,\n\n"
-                "I run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and audio to "
+                "We run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and audio to "
                 "English (and back), AI-drafted then verified word-by-word by a real human editor.\n\n"
-                "I'm curious how {company} currently handles English versions of Swahili training "
+                "We're curious how {company} currently handles English versions of Swahili training "
                 "videos, product content, or stakeholder communications, if that comes up. Not "
                 "pitching yet, genuinely asking about your workflow.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask for Marketing or Communications, not a general switchboard.",
@@ -258,7 +258,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Don't pitch price yet - the hook here is speed and consistency vs. an ad-hoc freelancer.",
             ],
             "text_message": (
-                "Hi, I'm Godfrey from Kauli - Swahili/Kikuyu-to-English video localization. Curious how "
+                "Hi, this is the Kauli team - Swahili/Kikuyu-to-English video localization. Curious how "
                 "{company} currently handles this for training or comms content, if it comes up."
             ),
         },
@@ -267,9 +267,9 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_body": (
                 "Hi again,\n\n"
                 "Zero-risk way to check the fit: send a real 2-minute clip (training video, internal "
-                "update, anything) and I'll return a human-verified English version within 24 hours. "
+                "update, anything) and We'll return a human-verified English version within 24 hours. "
                 "Free, no commitment.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Offer the free sample concretely - 2 minutes, 24 hours, human-verified, free.",
@@ -285,7 +285,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Now that you've seen the sample - transparent per-minute pricing, a human editor on "
                 "every order, and turnaround in hours. Worth 15 minutes to talk through your real "
                 "volume (training library, recurring comms, etc.)?\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask about recurring vs. one-off needs - a training library or investor-update cadence is a real repeat-revenue signal.",
@@ -301,7 +301,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Hi,\n\n"
                 "Following up with a real quote based on our conversation. Happy to adjust the "
                 "structure (per-project, monthly retainer) to whatever fits your budgeting cycle.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Reference the specific quote already sent.",
@@ -309,7 +309,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Offer whatever documentation their procurement process needs (formal quote, references, a services agreement).",
                 "If genuinely not now: ask permission to check back in 60-90 days, matching a corporate budget cycle.",
             ],
-            "text_message": "Sent {company}'s quote over email - let me know if it'd help to jump on a call to close out any procurement questions.",
+            "text_message": "Sent {company}'s quote over email - let us know if it'd help to jump on a call to close out any procurement questions.",
         },
     ],
     "education": [
@@ -317,12 +317,12 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "How does {company} localize course content into English?",
             "email_body": (
                 "Hi there,\n\n"
-                "I run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and audio to "
+                "We run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and audio to "
                 "English (and back), AI-drafted then verified word-by-word by a real human editor.\n\n"
-                "I'm curious how {company} currently handles English versions of Swahili course "
+                "We're curious how {company} currently handles English versions of Swahili course "
                 "content or lecture recordings, if that's ever come up - for international students, "
                 "accreditation, or just accessibility. Not pitching yet, genuinely asking.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask for the e-learning/ODeL (Open, Distance & e-Learning) office, or whoever runs the LMS, not general admissions.",
@@ -331,7 +331,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Ask about scale: how many courses/hours of content exist or get added per term.",
             ],
             "text_message": (
-                "Hi, I'm Godfrey from Kauli - Swahili/Kikuyu-to-English video localization, also useful "
+                "Hi, this is the Kauli team - Swahili/Kikuyu-to-English video localization, also useful "
                 "for accessibility/captioning. Curious how {company} handles this for course content."
             ),
         },
@@ -339,9 +339,9 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "A free 2-minute sample on a real lecture clip",
             "email_body": (
                 "Hi again,\n\n"
-                "Zero-risk way to see the fit: send a real 2-minute lecture/course clip and I'll return "
+                "Zero-risk way to see the fit: send a real 2-minute lecture/course clip and We'll return "
                 "a human-verified English subtitle file within 24 hours. Free, no commitment.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Offer the free sample concretely.",
@@ -357,7 +357,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Now that you've seen the sample - transparent per-minute pricing, a human editor on "
                 "every order, real turnaround times. Worth 15 minutes to talk through a real course "
                 "library or term-by-term volume?\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask about real scale - how many courses, how many hours per term.",
@@ -373,7 +373,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Hi,\n\n"
                 "Following up with a real quote based on our conversation - happy to structure it "
                 "around your term/semester calendar.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Reference the specific quote already sent.",
@@ -389,12 +389,12 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "Loved your channel - quick question",
             "email_body": (
                 "Hi,\n\n"
-                "I run Kauli - we localize Swahili/Kikuyu video into English (and back), AI-drafted "
+                "We run Kauli - we localize Swahili/Kikuyu video into English (and back), AI-drafted "
                 "then verified by a real human editor before delivery.\n\n"
-                "I came across {company}'s content and think an English version could genuinely grow "
+                "We came across {company}'s content and think an English version could genuinely grow "
                 "your reach to a bigger audience. Is that something you've thought about, or run into "
                 "friction with before?\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "This is almost always a DM/text/comment first, not a cold call - lead with genuine, specific appreciation for their actual content.",
@@ -402,7 +402,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Don't pitch price yet - the hook is reach (a bigger, English-speaking audience) not cost savings.",
             ],
             "text_message": (
-                "Hey! Really enjoyed your last video - I run Kauli, we do Swahili-to-English "
+                "Hey! Really enjoyed your last video - We run Kauli, we do Swahili-to-English "
                 "localization for creators. Ever thought about an English version to grow your reach?"
             ),
         },
@@ -410,9 +410,9 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_subject": "Free sample on your next upload",
             "email_body": (
                 "Hi again,\n\n"
-                "Here's a no-risk way to test it: send me your next video (or a recent one) and I'll "
+                "Here's a no-risk way to test it: send me your next video (or a recent one) and We'll "
                 "return a human-verified English subtitle file within 24 hours, free.\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Offer the free sample - one real video, 24-hour turnaround, free.",
@@ -427,7 +427,7 @@ PLAYBOOKS: dict[str, list[dict]] = {
                 "Hope the sample landed well! Per-video pricing is simple and per-minute - most "
                 "creators your size land in the $X-Y range per video. Want to talk through making this "
                 "a regular part of your upload routine?\n\n"
-                "Godfrey"
+                "The Kauli team"
             ),
             "call_points": [
                 "Ask about upload frequency - weekly/monthly cadence tells you real recurring revenue potential.",
@@ -441,14 +441,14 @@ PLAYBOOKS: dict[str, list[dict]] = {
             "email_body": (
                 "Hi,\n\n"
                 "No pressure at all - whenever you're ready, just upload your next clip at "
-                "kauli-forgemedia.com and I'll personally keep an eye on it.\n\n"
-                "Godfrey"
+                "kauli-forgemedia.com and We'll personally keep an eye on it.\n\n"
+                "The Kauli team"
             ),
             "call_points": [
                 "Keep this one light - individuals rarely need a hard close, just a low-friction reminder.",
                 "Ask directly if anything's still unclear about pricing or the process.",
             ],
-            "text_message": "No rush - whenever you're ready, just upload your next clip and I'll take it from there.",
+            "text_message": "No rush - whenever you're ready, just upload your next clip and We'll take it from there.",
         },
     ],
 }
@@ -460,23 +460,23 @@ _GENERIC = [
     {
         "email_subject": "Quick question about {company}'s Swahili/Kikuyu content",
         "email_body": (
-            "Hi there,\n\nI run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and "
+            "Hi there,\n\nWe run Kauli, a Nairobi-based localization service - Swahili/Kikuyu video and "
             "audio to English (and back), AI-drafted then verified by a real human editor before "
             "delivery.\n\nCurious how {company} currently handles this, if it comes up at all - not "
-            "pitching, genuinely asking.\n\nGodfrey"
+            "pitching, genuinely asking.\n\nThe Kauli team"
         ),
         "call_points": [
             "Open with the same real question - how do they currently handle Swahili/Kikuyu-to-English content, if ever?",
             "Listen for a real need before pitching anything.",
             "If there's no real fit, thank them and close - don't force it.",
         ],
-        "text_message": "Hi, I'm Godfrey from Kauli - Swahili/Kikuyu-to-English video localization. Curious how {company} currently handles this, if it comes up. Not pitching, just asking.",
+        "text_message": "Hi, this is the Kauli team - Swahili/Kikuyu-to-English video localization. Curious how {company} currently handles this, if it comes up. Not pitching, just asking.",
     },
     {
         "email_subject": "A free 2-minute sample",
         "email_body": (
-            "Hi again,\n\nZero-risk way to see if this is useful: send a real 2-minute clip and I'll "
-            "return a human-verified English version within 24 hours. Free, no commitment.\n\nGodfrey"
+            "Hi again,\n\nZero-risk way to see if this is useful: send a real 2-minute clip and We'll "
+            "return a human-verified English version within 24 hours. Free, no commitment.\n\nThe Kauli team"
         ),
         "call_points": ["Offer the free sample.", "Push for a real clip during the call if possible.", "Set the real 24-hour expectation and hit it."],
         "text_message": "Still happy to run a free 2-minute sample for {company} - 24-hour turnaround, human-verified.",
@@ -485,7 +485,7 @@ _GENERIC = [
         "email_subject": "What real volume looks like for {company}",
         "email_body": (
             "Hi,\n\nNow that you've seen the sample - transparent per-minute pricing, a human editor on "
-            "every order, fast turnaround. Worth 15 minutes to talk through real volume?\n\nGodfrey"
+            "every order, fast turnaround. Worth 15 minutes to talk through real volume?\n\nThe Kauli team"
         ),
         "call_points": ["Ask about real volume and cadence.", "Walk through pricing transparently.", "Get a concrete next step booked."],
         "text_message": "Glad the sample landed well! Want to grab 15 minutes to talk through volume for {company}?",
@@ -494,7 +494,7 @@ _GENERIC = [
         "email_subject": "Your quote for {company}",
         "email_body": (
             "Hi,\n\nFollowing up with a real quote based on our conversation. Fastest path if ready: "
-            "upload your next clip at kauli-forgemedia.com.\n\nGodfrey"
+            "upload your next clip at kauli-forgemedia.com.\n\nThe Kauli team"
         ),
         "call_points": ["Reference the quote already sent.", "Ask what's still in the way.", "Get a concrete next step or a real 60-day check-back."],
         "text_message": "Sent {company}'s quote over email - happy to hop on a call to close out any questions.",

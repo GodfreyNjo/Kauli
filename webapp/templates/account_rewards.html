@@ -40,7 +40,7 @@
   document.getElementById("rw-copy").addEventListener("click", function () {
     var i = document.getElementById("rw-link"), m = document.getElementById("rw-msg");
     (navigator.clipboard ? navigator.clipboard.writeText(i.value) : Promise.reject())
-      .then(function () { m.textContent = "Link copied."; }).catch(function () { i.select(); m.textContent = "Press Ctrl+C to copy."; });
+      .then(function () { m.textContent = "Link copied."; if (window.kpToast) kpToast("Link copied to the clipboard.", "success"); }).catch(function () { i.select(); m.textContent = "Press Ctrl+C to copy."; if (window.kpToast) kpToast("Press Ctrl+C to copy the link.", "warning"); });
   });
 </script>
 {% endblock %}

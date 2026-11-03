@@ -22,6 +22,7 @@ def _job():
 def _ready_order(env, wav_bytes, video=True, entitled=True):
     order = env.order_from(env.place(wav_bytes, source_lang="sw", target_lang="en", service_level="translate", review_tier="ai"))
     env.db.update_order_status(order["id"], "ready_for_delivery")
+    env.db.set_order_free_preview(order["id"], False)
     if entitled:
         conn = env.db.get_conn()
         conn.execute("UPDATE orders SET addons = ? WHERE id = ?", (json.dumps(["video_deliverables"]), order["id"]))
@@ -45,6 +46,7 @@ def test_ttml_and_sbv_download_as_translated_captions(env, wav_bytes):
 def test_a_transcription_only_order_gets_its_transcript_as_ttml(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, source_lang="sw", service_level="transcribe", review_tier="ai"))
     env.db.update_order_status(order["id"], "ready_for_delivery")
+    env.db.set_order_free_preview(order["id"], False)
     env.monkeypatch.setattr(env.app, "_plan_chosen", lambda client_id: True)
     env.monkeypatch.setattr(env.app, "_load_job", lambda o: _job())
     ttml = env.client.get(f"/client/orders/{order['id']}/download/ttml").text

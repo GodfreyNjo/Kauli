@@ -17,7 +17,7 @@ def _as_user(env, user_id, email, role="client"):
 
 
 # ------------------------------------------------------------------------------------------------ pages and navigation
-PAGES = ["/client/notes", "/client/analytics", "/client/workspace", "/client/vocabulary", "/client/rewards", "/client/plans", "/client/integrations", "/client/resources"]
+PAGES = ["/client/notes", "/client/analytics", "/client/workspace", "/client/vocabulary", "/client/rewards", "/client/integrations", "/client/resources"]
 
 
 def test_every_account_page_opens_and_the_menu_links_to_them(env):
@@ -40,7 +40,7 @@ def test_signed_out_visitors_are_sent_to_log_in(env):
 def test_the_menu_is_translated_for_other_languages(env):
     from webapp import ui_text
     for lang in ui_text.LANGS:
-        for key in ("nav_notes", "nav_analytics", "nav_workspace", "nav_vocabulary", "nav_integrations", "nav_rewards", "nav_plans", "nav_resources"):
+        for key in ("nav_notes", "nav_analytics", "nav_workspace", "nav_vocabulary", "nav_integrations", "nav_rewards", "nav_resources"):
             assert ui_text.translate(lang, key) != key
 
 
@@ -219,12 +219,12 @@ def test_reward_minutes_roll_over_and_only_the_used_part_is_spent(env):
 
 # ------------------------------------------------------------------------------------------------ plans
 def test_the_plans_page_shows_usage_choices_and_closing(env):
-    page = env.client.get("/client/plans").text
+    page = env.client.get("/client/billing").text
     assert "Pay as you go" in page and "2,500" in page and "6,500" in page and "Subscribe to Pro" in page and "Subscribe to Premium" in page
     assert 'action="/client/billing/checkout"' in page and 'href="/client/close-account"' in page and "close your account" in page
-    assert "Instant AI minutes left" in page
+    assert "Included minutes left" in page
     env.db.set_subscription_plan("u1", "pro", 30)
-    page = env.client.get("/client/plans").text
+    page = env.client.get("/client/billing").text
     assert "Your plan" in page and "Switch to Premium" in page and "2,500" in page
     assert "does not renew by itself" in page                                                   # no auto-renewing subscription behind it
 
@@ -232,7 +232,7 @@ def test_the_plans_page_shows_usage_choices_and_closing(env):
 def test_team_members_cannot_change_or_close_the_account(env):
     env.db.get_or_create_user("m1", "member@example.com", "client")
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("m1")), "client_scope_id": "u1"})
-    page = env.client.get("/client/plans").text
+    page = env.client.get("/client/billing").text
     assert "Ask the account owner" in page and "close your account" not in page and 'action="/client/billing/checkout"' not in page
 
 
@@ -347,3 +347,33 @@ def test_the_transcript_can_be_opened_as_an_editable_note(env, wav_bytes):
     assert r.status_code == 303
     page = env.client.get(r.headers["location"]).text
     assert "Transcript: clip.wav" in page and "<p>Hello there</p>" in page and "<p>Second line</p>" in page
+
+
+def test_billing_and_plans_are_one_page_matching_the_website(env):
+    nav = env.client.get("/client/home").text
+    assert 'href="/client/billing"' in nav and 'href="/client/plans"' not in nav and "Billing and plans" in nav
+    moved = env.client.get("/client/plans", follow_redirects=False)
+    assert moved.status_code == 303 and moved.headers["location"] == "/client/billing#change-plan"
+    page = env.client.get("/client/billing").text
+    for text in ("Billing and plans", "Pay as you go", "For occasional projects", "For steady, smaller projects", "Best for regular premium work",
+                 "For premium work, small or in bulk", "For heavy users and organisations", "All benefits in Free", "All benefits in Pro included",
+                 "All benefits in Pro and Premium", "Anything beyond that is the standard per-minute price", "Downloads and delivery unlocked",
+                 "Dedicated account manager", "Managed billing and invoicing"):
+        assert text in page or text.replace(" included", "") in page, text
+    for slug_text in (f"${env.app.billing.PLANS['pro']['price_usd']}", f"${env.app.billing.PLANS['premium']['price_usd']}"):
+        assert slug_text in page                                  # the same prices as the website's plan cards
+
+
+def test_every_plan_line_on_the_website_is_on_the_account_page_too(env):
+    real = env.app.current_user
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
+    site = env.client.get("/").text
+    env.monkeypatch.setattr(env.app, "current_user", real)
+    import re
+    from html import unescape
+    bullets = [unescape(re.sub(r"<[^>]+>", "", m)).strip() for m in re.findall(r'<li>(.*?)</li>', site.split('id="pz-plans"', 1)[1].split("</section>", 1)[0], flags=re.S)]
+    assert len(bullets) >= 15
+    page = unescape(re.sub(r"<[^>]+>", "", env.client.get("/client/billing").text))
+    page = re.sub(r"\s+", " ", page)
+    for line in bullets:
+        assert re.sub(r"\s+", " ", line) in page, line

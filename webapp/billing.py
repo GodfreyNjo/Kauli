@@ -127,7 +127,7 @@ def price_card_for(market: str | None) -> dict:
 
 # A new account's very first upload, when it is this short, always gets Transkriptor: it is the first impression of our quality.
 # A new customer's first order is processed and delivered without any payment, whatever its length up to this: they read the first part of the
-# transcript, and one quick step (the $1 card check, credited straight back to their wallet) unlocks the rest and everything else on the platform.
+# transcript, and choosing a plan (the Free plan costs nothing) unlocks the rest and everything else on the platform.
 FIRST_ORDER_FREE_MAX_MINUTES = 120.0
 FIRST_ORDER_QUALITY_MINUTES = 0.0     # was 5: a new account's first short upload used to go to Transkriptor. Free minutes now use our own models first.
 FREE_MINUTES_PER_MONTH = 30.0  # monthly free allowance - Instant AI transcription only. Served by the low-cost providers (see app._route_asr), so it costs cents
@@ -157,19 +157,6 @@ def allowance_covers(plan: str, service_level: str, review_tier: str) -> bool:
 # finished transcript on screen; the rest is hidden (see app.py's
 # _transcript_teaser). Choosing the Free plan - which costs nothing - shows it all.
 TRANSCRIPT_TEASER_VISIBLE_FRACTION = 0.4
-
-# A real $1 Paystack charge, required once before a client's FIRST free
-# minute is ever spent (see app.py's create_order gate) - confirms a real
-# card, not a throwaway signup farming the free allowance every month
-# from a fresh account. Not a fee: the $1 becomes real wallet credit the
-# moment it's paid (see app.py's _activate_payment "trial_verification"
-# branch), automatically applied to whatever real order they submit
-# next, the same wallet-credit mechanism a real top-up already uses.
-# Paystack only, not M-Pesa - MPESA_ENV is still "sandbox" on the real
-# server (confirmed live), so a real client's real phone number would
-# just fail against it; Paystack is the one provider actually confirmed
-# live (PAYSTACK_LIVE_MODE=true, a real sk_live_ key present).
-TRIAL_VERIFICATION_FEE_USD = 1.00
 
 # A monthly subscription layered ON TOP of per-minute usage - not an
 # alternative to it. It buys a discount on the per-minute rates above, plus
@@ -483,7 +470,7 @@ def studio_extras_per_min(service_level: str) -> float:
 
 
 # Rush processing: a client-chosen surcharge on a single order in exchange
-# for real, manual priority in the review queue - Godfrey picking it up and
+# for real, manual priority in the review queue - the team picking it up and
 # working it first, not a faster pipeline (there's still one operator and
 # one background worker thread, see worker.py). Previously left
 # undecided/declined (see tat.py's older docstring) since there was no real

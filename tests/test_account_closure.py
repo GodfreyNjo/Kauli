@@ -101,5 +101,5 @@ def test_staff_see_what_leavers_said_and_clients_do_not(env):
 
 
 def test_the_plans_page_and_settings_link_to_the_close_page(env):
-    assert 'href="/client/close-account"' in env.client.get("/client/plans").text
+    assert 'href="/client/close-account"' in env.client.get("/client/billing").text
     assert 'href="/client/close-account"' in env.client.get("/settings?tab=security").text

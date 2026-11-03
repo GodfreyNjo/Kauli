@@ -153,6 +153,7 @@ def _connect(env, **extra):
 def _ready(env):
     order = env.order_from(env.place(env.wav))
     env.db.update_order_status(order["id"], "ready_for_delivery")
+    env.db.set_order_free_preview(order["id"], False)
     return env.db.get_order(order["id"])
 
 
@@ -225,7 +226,7 @@ def test_nothing_is_sent_before_a_plan_is_chosen(notion):
     _fire(notion, order)
     assert notion.fake.created() == []
     r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
-    assert "Choose+a+plan" in r.headers["location"] and notion.fake.created() == []
+    assert "Unlock+this+order" in r.headers["location"] and notion.fake.created() == []
 
 
 def test_auto_send_off_means_manual_only(notion):

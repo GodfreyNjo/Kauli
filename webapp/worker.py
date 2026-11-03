@@ -27,7 +27,7 @@ from kauli.pipeline import run as kauli_run  # noqa: E402
 from kauli.models import Job  # noqa: E402
 from kauli import screen_text  # noqa: E402
 from kauli.subtitles import to_vtt  # noqa: E402
-from . import account_hub, db, logging_setup, mailer, notifications, provider_health  # noqa: E402
+from . import account_hub, db, logging_setup, mailer, notifications, provider_health, transcript_reuse  # noqa: E402
 
 log = logging_setup.get_logger("worker")
 
@@ -187,6 +187,14 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
     db.update_order_status(order_id, "processing")
     db.set_processing_stage(order_id, "prepare")
     log.info("job started", extra={"job_id": order_id, "user_id": order["client_id"], "is_retry": is_retry})
+    resume = is_retry
+    if not is_retry and "reuse_of" in order.keys() and order["reuse_of"]:
+        try:
+            if transcript_reuse.seed_manifest(order):          # start from the transcript already delivered: no second round of recognition
+                resume = True
+                log.info("transcript reused", extra={"job_id": order_id, "from_order": order["reuse_of"]})
+        except Exception:  # noqa: BLE001 - if the earlier transcript cannot be used, the order simply runs in full
+            log.warning("transcript reuse failed, running in full", extra={"job_id": order_id}, exc_info=True)
     try:
         kauli_run(
             audio_path=order["audio_path"],
@@ -214,7 +222,7 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
             # retry (never the original attempt) tells kauli.pipeline.run
             # to reuse whatever real work is already in that manifest,
             # per segment - see that function's own docstring.
-            resume=is_retry,
+            resume=resume,
             on_stage=lambda key: db.set_processing_stage(order_id, key),
             fix_text=account_hub.vocabulary_fixer(order["client_id"]),
         )

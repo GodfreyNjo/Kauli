@@ -26,7 +26,7 @@
             <strong>You only pay for what you use.</strong>
             <p>Pay as you go has no monthly fee, and your first 30 Instant AI minutes every month are free. Instant AI is our lowest-priced service; human review is only added when you choose it.
               {% if facts.paid %}You do not have to close your account to stop paying: moving to Pay as you go keeps everything and costs nothing a month.{% else %}You are already on Pay as you go, so there is no monthly fee to stop.{% endif %}</p>
-            <div class="cl-actions"><a class="ds-btn small" href="/client/plans">See plans</a>
+            <div class="cl-actions"><a class="ds-btn small" href="/client/billing#change-plan">See plans</a>
               {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small ghost" formaction="/client/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>{% endif %}</div>
           </div>
           <div class="cl-panel" data-for="missing_feature" hidden>

@@ -36,6 +36,7 @@
     });
     nodes.forEach(function (el, i) {
       var isError = el.classList.contains("error");
+      el.classList.add("flash-on");
       if (!el.getAttribute("role")) el.setAttribute("role", isError ? "alert" : "status");
       var text = el.textContent.trim();
       window.setTimeout(function () { window.kpAnnounce(text, isError); }, 250 + i * 50);

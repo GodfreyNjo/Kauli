@@ -654,7 +654,7 @@ CREATE TABLE IF NOT EXISTS client_webhooks (
     FOREIGN KEY (client_id) REFERENCES users(id)
 );
 
--- A real, visible log of every webhook attempt - so a client (or Godfrey,
+-- A real, visible log of every webhook attempt - so a client (or the team,
 -- debugging on their behalf) can see whether a delivery actually happened
 -- rather than just hoping. One attempt per event, no retry queue yet (see
 -- app.py's _fire_client_webhook docstring) - ok is 0/1, status_code is NULL
@@ -1399,6 +1399,12 @@ def init_db() -> None:
         # above; also what gates the client-facing "Call us" phone option
         # on a rush order that's actually in trouble (see order_detail.html).
         conn.execute("ALTER TABLE orders ADD COLUMN is_rush INTEGER NOT NULL DEFAULT 0")
+    if "reuse_of" not in existing_order_cols:
+        # The earlier order whose delivered transcript this order started from (see transcript_reuse.py)
+        conn.execute("ALTER TABLE orders ADD COLUMN reuse_of TEXT")
+    if "source_sha256" not in existing_order_cols:
+        # Fingerprint of the file sent, so the same file sent again is recognised and its transcript reused
+        conn.execute("ALTER TABLE orders ADD COLUMN source_sha256 TEXT")
     if "status_changed_at" not in existing_order_cols:
         # When the order LAST actually changed status, not just any field -
         # set alongside status in every one of the few places that assign
@@ -4900,7 +4906,7 @@ def client_funnel_stats(days: int = 30):
     ).fetchone()[0]
     trial_verified = conn.execute(
         f"""SELECT COUNT(*) FROM users
-            WHERE role = 'client' AND created_at >= ? AND trial_verified_at IS NOT NULL
+            WHERE role = 'client' AND created_at >= ? AND plan_chosen_at IS NOT NULL
               AND {team_member_filter}""",
         (cutoff,),
     ).fetchone()[0]
@@ -5372,5 +5378,12 @@ def set_flag(key: str, value: str, by: str | None = None) -> None:
 def set_signup_channel(user_id: str, channel: str) -> None:
     conn = get_conn()
     conn.execute("UPDATE users SET signup_channel = ? WHERE id = ? AND signup_channel IS NULL", (channel, user_id))
+    conn.commit()
+    conn.close()
+
+
+def set_order_reuse(order_id: str, reuse_of: str | None, source_sha256: str | None) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE orders SET reuse_of = ?, source_sha256 = ? WHERE id = ?", (reuse_of, source_sha256, order_id))
     conn.commit()
     conn.close()

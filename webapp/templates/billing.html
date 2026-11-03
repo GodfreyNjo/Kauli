@@ -1,20 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Billing{% endblock %}
+{% block title %}Billing and plans{% endblock %}
 {% block content %}
 {% from "_ds.html" import ico with context %}
+{% macro plan_action(key, p) %}
+  {% set is_owner = user['client_scope_id'] == user['id'] %}
+  {% if key == current_plan %}
+    <span class="plan-active-pill">&#10003; Your plan</span>
+    {% if recurring and is_owner %}
+    <form method="post" action="/client/billing/cancel-subscription" style="margin-top:6px;"
+          onsubmit="return confirm('Stop auto-renewal? You keep this plan until the period you paid for ends.');">
+      <button type="submit" class="secondary">Cancel auto-renewal</button>
+    </form>
+    {% elif is_owner %}<p class="muted an-note">This plan does not renew by itself. After it ends you move to Pay as you go.</p>{% endif %}
+  {% elif is_owner %}
+    <form method="post" action="/client/billing/checkout" class="pl-buy">
+      <input type="hidden" name="plan" value="{{ key }}">
+      <input type="hidden" name="interval" value="month">
+      <label>Pay with
+        <select name="provider">
+          <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
+          {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
+          {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
+        </select>
+      </label>
+      {% if mpesa_ok(request, user) %}<label>M-Pesa phone (if applicable)<input type="tel" name="phone" placeholder="2547XXXXXXXX"></label>{% endif %}
+      <button type="submit">{{ 'Switch to' if current_plan != 'free' else 'Subscribe to' }} {{ p['name'] }}</button>
+    </form>
+  {% else %}<p class="muted an-note">Ask the account owner to change the plan.</p>{% endif %}
+{% endmacro %}
+
 <div class="ds-page" lang="en">
 <div class="ds-head">
   <div>
-    <h1>Billing</h1>
-    <p>View your invoices and payment history.</p>
+    <h1>Billing and plans</h1>
+    <p>Your plan, payments and receipts in one place.</p>
   </div>
 </div>
 {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 {% if not plan_is_chosen %}
   <div class="modal-warning" role="status">
-    <strong>Choose a plan to download your files.</strong> Your orders still process meanwhile. The Free plan
-    needs a quick card confirmation: a $1 charge that is credited straight back to your account.
+    <strong>Subscribe to the Free plan (pay as you go) to download and edit your files.</strong> Your orders still process meanwhile.
+    {% if free_plan_charge and free_plan_charge['amount'] > 0 %}We charge ${{ '%.2f'|format(free_plan_charge['amount']) }} for the order you are opening ({{ free_plan_charge['name'] }}),
+    and your plan starts as soon as it is paid.{% else %}There is no charge for your order so far.{% endif %}
   </div>
 {% endif %}
 {% if is_test_account %}
@@ -26,7 +54,7 @@
   <section class="ds-card" aria-labelledby="bp-title">
     <div class="ds-card-head"><h2 id="bp-title">Current plan</h2>
       <a href="#change-plan" class="ds-btn small">{% if current_plan == 'free' %}Upgrade plan{% else %}Change plan{% endif %}</a></div>
-    <p class="ds-plan-name plan-value">{{ plans[current_plan]['name'] }}{% if plans[current_plan]['price_usd'] %} <small>${{ plans[current_plan]['price_usd'] }}/month</small>{% endif %}</p>
+    <p class="ds-plan-name plan-value">{{ 'Pay as you go' if current_plan == 'free' else plans[current_plan]['name'] }}{% if plans[current_plan]['price_usd'] %} <small>${{ plans[current_plan]['price_usd'] }}/month</small>{% endif %}</p>
     <p class="muted" style="margin:6px 0 14px;">{{ '{:,}'.format(plans[current_plan]['included_ai_minutes']|int) }} Instant AI minutes{{ hours_suffix(plans[current_plan]['included_ai_minutes']) }} a month for transcription and translation.</p>
     <div class="billing-snapshot-cell">
       <span class="billing-snapshot-label">Included minutes left</span>
@@ -67,70 +95,84 @@
   </section>
 </div>
 
-<div class="ds-card" id="change-plan" style="padding:0; overflow-x:auto;">
-  <div class="ds-card-head" style="padding:20px 22px 0;"><h2>Change plan</h2></div>
-  <table class="plans-table">
-    <thead><tr>
-      <th>Plan</th><th>Price</th><th>Instant AI minutes / month<br><span class="muted" style="font-weight:400;font-size:0.76rem;">transcription + translation</span></th><th>Human-reviewed minutes / month</th><th>Translation</th>
-      <th>Video deliverables</th><th>Support</th><th>Choose</th>
-    </tr></thead>
-    <tbody>
-      {% for key, p in plans.items() if key != 'enterprise' or key == current_plan %}
-      <tr>
-        <td data-label="Plan"><strong>{{ 'Pay as you go' if key == 'free' else p['name'] }}</strong></td>
-        <td data-label="Price">{% if p['price_usd'] %}${{ p['price_usd'] }}/mo{% else %}$0{% endif %}</td>
-        <td data-label="Instant AI minutes a month">{{ '{:,}'.format(p['included_ai_minutes']|int) }}{{ hours_suffix(p['included_ai_minutes']) }}</td>
-        <td data-label="Human-reviewed minutes a month">{{ p['included_human_minutes']|int if p['included_human_minutes'] else '-' }}</td>
-        <td data-label="Translation">{{ 'Priority' if p['mt'] == 'claude' else 'Standard' }}</td>
-        <td data-label="Video files">{{ '✓' if p['video_deliverables'] else '-' }}</td>
-        <td data-label="Support">{{ p['support'] }}</td>
-        <td>
-          {% if key == 'free' and not plan_is_chosen %}
-            <form method="post" action="/client/billing/choose-free">
-              <button type="submit">Choose Pay as you go</button>
-            </form>
-          {% elif key == current_plan %}
-            <span class="plan-active-pill">✓ Active</span>
-            {% if recurring and key != 'free' %}
-            <form method="post" action="/client/billing/cancel-subscription" style="margin-top:6px;"
-                  onsubmit="return confirm('Stop auto-renewal? You keep this plan until the period you paid for ends.');">
-              <button type="submit" class="secondary" style="border:1px solid var(--border); background:none; font-size:0.78rem;">Cancel auto-renewal</button>
-            </form>
-            {% endif %}
-          {% elif key == 'free' %}
-            -
-          {% elif key == 'enterprise' %}
-            <form method="post" action="/client/billing/checkout">
-              <input type="hidden" name="plan" value="enterprise">
-              <input type="hidden" name="provider" value="bank">
-              <button type="submit" class="secondary" style="border:1px solid var(--border); background:none;">Contact us</button>
-            </form>
-          {% else %}
-            <details style="display:inline-block;">
-              <summary class="btn secondary" style="cursor:pointer; display:inline-block;">Upgrade to {{ p['name'] }}</summary>
-              <form method="post" action="/client/billing/checkout" style="margin-top:8px; min-width:220px;">
-                <input type="hidden" name="plan" value="{{ key }}">
-                <input type="hidden" name="interval" value="month">
-                <label style="font-size:0.78rem;">Pay with
-                  <select name="provider">
-                    <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>{{ 'Card, M-Pesa or Airtel Money' if mpesa_ok(request, user) else 'Card' }} (via Paystack)</option>
-                    {% if mpesa_ok(request, user) %}<option value="mpesa" {% if not mpesa_configured %}disabled{% endif %}>M-Pesa direct (no card needed)</option>{% endif %}
-                    {% if bank_ok(user) %}<option value="bank">Bank transfer</option>{% endif %}
-                  </select>
-                </label>
-                {% if mpesa_ok(request, user) %}<label style="font-size:0.78rem;">M-Pesa phone (if applicable)
-                  <input type="tel" name="phone" placeholder="2547XXXXXXXX">
-                </label>{% endif %}
-                <button type="submit">Subscribe</button>
-              </form>
-            </details>
-          {% endif %}
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+<section class="pl-section" id="change-plan" aria-labelledby="pl-h">
+  <h2 id="pl-h">Plans</h2>
+  <p class="muted pl-sub">Commit once and Instant AI minutes, for both transcription and translation, are included every month. Anything beyond them is the same standard per-minute price for everyone, shown before you order.</p>
+  {% set pro = plans['pro'] %}{% set prem = plans['premium'] %}{% set is_owner = user['client_scope_id'] == user['id'] %}
+  <div class="pl-cards">
+    <article class="hub-card pl-card{% if current_plan == 'free' and plan_is_chosen %} is-current{% endif %}">
+      <h3>Pay as you go</h3>
+      <p class="pl-for">For occasional projects</p>
+      <p class="pl-price">$0<small>/month</small></p>
+      <ul>
+        <li><strong>Pay only for what you use</strong>, per audio-minute, shown before you order</li>
+        <li>Instant AI from <strong>${{ '%.2f'|format(price_card['transcribe']['ai']) }}/min</strong> for transcription, <strong>${{ '%.2f'|format(price_card['translate']['ai']) }}/min</strong> with translation, <strong>${{ '%.2f'|format(price_card['dub']['ai']) }}/min</strong> for full dubbing</li>
+        <li>Human review from <strong>${{ '%.2f'|format(price_card['transcribe']['human']) }}/min</strong> in selected languages</li>
+        <li>Your first <strong>{{ free_minutes_base|int }} minutes</strong> of Instant AI transcription are free every month, to process and read. Downloading or editing a result means paying for that order</li>
+        <li>No lock-in: a subscription is optional</li>
+      </ul>
+      {% if not plan_is_chosen %}
+        <form method="post" action="/client/billing/choose-free">
+          {% if free_plan_charge %}<input type="hidden" name="order_id" value="{{ free_plan_charge['order_id'] }}">{% endif %}
+          <button type="submit">Subscribe to the Free plan{% if free_plan_charge and free_plan_charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(free_plan_charge['amount']) }}{% endif %}</button>
+        </form>
+      {% elif current_plan == 'free' %}
+        <span class="plan-active-pill">&#10003; Your plan</span>
+      {% else %}
+        <p class="muted an-note">Cancel auto-renewal on your plan to move here at the end of the period.</p>
+      {% endif %}
+    </article>
+
+    <article class="hub-card pl-card{% if current_plan == 'pro' %} is-current{% endif %}">
+      <h3>{{ pro['name'] }}</h3>
+      <p class="pl-for">For steady, smaller projects</p>
+      <p class="pl-price">${{ pro['price_usd'] }}<small>/ month</small></p>
+      <ul>
+        <li><strong>All benefits in Free</strong> included</li>
+        <li><strong>{{ '{:,}'.format(pro['included_ai_minutes']|int) }} Instant AI minutes</strong> included every month, for both transcription and translation</li>
+        <li><strong>{{ pro['included_human_minutes']|int }} human-reviewed minutes</strong> included every month</li>
+        <li>Anything beyond that is the standard per-minute price</li>
+        <li>Downloads and delivery unlocked</li>
+        {% if meetings_enabled() %}<li>Kauli can join your meetings</li>{% endif %}
+        <li>Email support</li>
+      </ul>
+      {{ plan_action('pro', pro) }}
+    </article>
+
+    <article class="hub-card pl-card featured{% if current_plan == 'premium' %} is-current{% endif %}">
+      <span class="pl-flag">Best for regular premium work</span>
+      <h3>{{ prem['name'] }}</h3>
+      <p class="pl-for">For premium work, small or in bulk</p>
+      <p class="pl-price">${{ prem['price_usd'] }}<small>/ month</small></p>
+      <ul>
+        <li><strong>All benefits in Pro</strong> included</li>
+        <li><strong>{{ '{:,}'.format(prem['included_ai_minutes']|int) }} Instant AI minutes{{ hours_suffix(prem['included_ai_minutes']) }}</strong> included every month, for both transcription and translation</li>
+        <li><strong>{{ prem['included_human_minutes']|int }} human-reviewed minutes</strong> included every month</li>
+        <li>Anything beyond that is the standard per-minute price</li>
+        <li>Burned-in captions and dubbed video included (worth +${{ '%.2f'|format(addons['video_deliverables']['rate_per_min']) }}/min)</li>
+        <li>Faster turnaround</li>
+        <li>Realistic voices and high-quality translations, allocated to your orders automatically</li>
+      </ul>
+      {{ plan_action('premium', prem) }}
+    </article>
+
+    <article class="hub-card pl-card{% if current_plan == 'enterprise' %} is-current{% endif %}">
+      <h3>Enterprise</h3>
+      <p class="pl-for">For heavy users and organisations</p>
+      <p class="pl-price">Custom</p>
+      <ul>
+        <li><strong>All benefits in Pro and Premium</strong> included</li>
+        <li>A volume rate set for your usage</li>
+        <li>Managed billing and invoicing</li>
+        <li>Higher limits and priority handling</li>
+        <li>Dedicated account manager</li>
+      </ul>
+      {% if current_plan == 'enterprise' %}<span class="plan-active-pill">&#10003; Your plan</span>{% else %}<a class="btn secondary" href="/demo?interest=enterprise">Talk to us</a>{% endif %}
+    </article>
+  </div>
+  <p class="muted an-note">Included minutes are Instant AI transcription and renew every month.{% if meetings_enabled() %} Kauli can also join your meetings and use the same minutes.{% endif %} Need a different arrangement for a team or a newsroom? <a href="mailto:{{ contact_email }}">Email us</a>.</p>
+  {% if is_owner %}<p class="muted an-note pl-close-link">Not for you any more? You can <a href="/client/close-account">close your account</a> at any time.</p>{% endif %}
+</section>
 
 <div class="card">
   <h2>Usage rates (charged per order, beyond your free minutes)</h2>

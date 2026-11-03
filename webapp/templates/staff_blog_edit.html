@@ -164,7 +164,7 @@
       btn.addEventListener('click', function () {
         var el = document.getElementById(btn.dataset.copyTarget);
         el.select();
-        navigator.clipboard && navigator.clipboard.writeText(el.value);
+        navigator.clipboard && navigator.clipboard.writeText(el.value).then(function () { if (window.kpToast) kpToast("Copied to the clipboard.", "success"); });
       });
     });
 

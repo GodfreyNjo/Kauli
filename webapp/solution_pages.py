@@ -666,3 +666,44 @@ def refresh(pages: dict, hr_names: str) -> None:
     for slug, demo in DEMO_FOR.items():
         if slug in pages:
             pages[slug]["demo"] = demo
+
+
+# Which blog guide helps someone weighing this option. Matched on the option's own words, so a new option finds its guide without
+# being wired up by hand; an option with no fitting guide (nothing is guessed) simply has no link.
+_GUIDE_RULES = (
+    (("translated titles",), "translate-youtube-titles-descriptions-and-captions"),
+    (("translat", "subtitle"), "add-subtitles-to-video-in-another-language"),
+    (("subtitles in new languages",), "add-subtitles-to-video-in-another-language"),
+    (("translat", "caption"), "add-subtitles-to-video-in-another-language"),
+    (("translat",), "translate-video-chinese-spanish-to-english"),
+    (("burned",), "srt-vs-vtt-which-subtitle-format-to-use"),
+    (("send kauli to the call",), "record-meetings-and-interviews-with-ai-post-processing"),
+    (("quality assurance",), "call-center-transcription-quality-assurance-and-integrations"),
+    (("multilingual support",), "call-center-transcription-quality-assurance-and-integrations"),
+    (("automatic publishing",), "podcast-transcripts-to-your-website-with-webhooks"),
+    (("integrated pipeline",), "podcast-transcripts-to-your-website-with-webhooks"),
+    (("field recordings",), "ngos-and-civil-society-transcription-and-translation"),
+    (("human",), "ai-vs-human-transcription-which-do-you-need"),
+    (("captions only",), "captions-vs-subtitles-vs-transcripts"),
+    (("transcripts and subtitles",), "captions-vs-subtitles-vs-transcripts"),
+    (("subtitles",), "captions-vs-subtitles-vs-transcripts"),
+    (("instant ai",), "how-does-ai-transcription-work"),
+    (("transcript",), "how-does-ai-transcription-work"),
+)
+_DUB_GUIDE_BY_PAGE = {"e-learning": "course-creators-accurate-transcripts-and-fast-localization", "ngos": "ngos-and-civil-society-transcription-and-translation",
+                      "media-broadcast": "media-and-broadcast-partner-with-kauli-fast-turnarounds"}
+
+
+def guide_slug_for(option: dict, page_slug: str = "") -> str | None:
+    """The slug of the blog guide that fits this option on this page, or None."""
+    name = (option.get("name") or "").lower()
+    both = f"{name} {(option.get('best') or '').lower()}"
+    for words, slug in _GUIDE_RULES:
+        if all(w in name for w in words):
+            return slug
+    if any(w in name for w in ("dub", "voice")):
+        return _DUB_GUIDE_BY_PAGE.get(page_slug)
+    for words, slug in _GUIDE_RULES:
+        if all(w in both for w in words) and words[0] in ("human", "translat"):
+            return slug
+    return None

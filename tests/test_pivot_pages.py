@@ -103,3 +103,34 @@ def test_published_guides_show_on_their_pages_and_in_the_sitemap(env):
         assert f"/blog/{g['slug']}" in sitemap
         post = env.client.get(f"/blog/{g['slug']}")
         assert post.status_code == 200 and g["title"].split(":")[0][:20] in post.text
+
+
+def test_every_option_card_shows_its_description_and_links_to_a_relevant_guide(env):
+    from html import escape
+    from webapp import solution_pages
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
+    for guide_slug in {g for _, g in solution_pages._GUIDE_RULES} | set(solution_pages._DUB_GUIDE_BY_PAGE.values()):
+        if not env.db.get_blog_post_by_slug(guide_slug, published_only=True):
+            env.db.create_blog_post(slug=guide_slug, title="Guide " + guide_slug, description="d", body_html="<p>x</p>", author_id="u1",
+                                    status="published", category="Transcription Guides")
+    linked = 0
+    for slug, page in env.app.SOLUTION_PAGES.items():
+        html = env.client.get(f"/solutions/{slug}").text
+        assert "built-in method" not in html and "dict object at" not in html, slug              # a card never prints a Python object
+        for option in page["choose"]:
+            assert escape(option["get"], quote=False) in html or escape(option["get"]) in html, (slug, option["name"])
+            guide = solution_pages.guide_slug_for(option, slug)
+            if guide and f'href="/blog/{guide}"' in html:
+                linked += 1
+    assert linked >= 20                                                                         # most cards open a guide on the same subject
+
+
+def test_guides_are_matched_on_what_the_option_is_about():
+    g = lambda name, page="": __import__("webapp.solution_pages", fromlist=["x"]).guide_slug_for({"name": name, "best": ""}, page)
+    assert g("Translated subtitles") == "add-subtitles-to-video-in-another-language"
+    assert g("Human-reviewed captions") == "ai-vs-human-transcription-which-do-you-need"
+    assert g("Burned-in captions") == "srt-vs-vtt-which-subtitle-format-to-use"
+    assert g("Dubbed lessons", "e-learning") == "course-creators-accurate-transcripts-and-fast-localization"
+    assert g("Dubbed lessons", "voice-over") is None                                             # nothing is guessed when no guide fits
+    assert g("Transcripts and subtitles") == "captions-vs-subtitles-vs-transcripts"
+    assert g("Automatic publishing") == "podcast-transcripts-to-your-website-with-webhooks"

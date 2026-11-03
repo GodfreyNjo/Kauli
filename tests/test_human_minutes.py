@@ -92,9 +92,9 @@ def test_human_minutes_renew_with_the_period_and_cannot_be_double_spent(env):
 
 def test_the_pages_show_the_human_minutes(env):
     _plan(env, "pro")
-    assert "human-reviewed minutes" in env.client.get("/client/plans").text
+    assert "human-reviewed minutes" in env.client.get("/client/billing").text
     billing_page = env.client.get("/client/billing").text
-    assert "Human-reviewed minutes left" in billing_page and "Human-reviewed minutes / month" in billing_page
+    assert "Human-reviewed minutes left" in billing_page and "human-reviewed minutes</strong> included every month" in billing_page
     assert 'data-human-minutes="5.0"' in env.client.get("/client").text
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)                  # a visitor sees the public pricing
     home = env.client.get("/").text
@@ -167,13 +167,9 @@ def test_only_the_first_order_is_free_and_only_for_short_enough_instant_ai(env, 
     assert env.order_from(env.place(wav_bytes))["status"] == "pending_payment"               # someone who already chose a plan is not "new"
 
 
-def test_unlocking_is_one_simple_step_with_the_new_wording(env, wav_bytes):
+def test_unlocking_is_choosing_a_plan_with_no_card_step(env, wav_bytes):
     _fresh(env)
-    env.monkeypatch.setattr(env.app.billing, "paystack_configured", lambda: True)
-    page = env.client.get("/client/verify-trial").text
-    for text in ("Get started for free", "Add a card to unlock your free downloads.", "card check", "back immediately", "Start downloading",
-                 "Confirm card and start free", "Prefer a paid plan?", "See plans"):
-        assert text in page, text
     home = env.client.get("/client/home").text
-    assert "Unlock your files in one step" in home and 'href="/client/verify-trial"' in home and "Unlock now" in home
+    assert "Subscribe to the Free plan (pay as you go) to download and edit your files" in home and 'href="/client/billing?choose_plan=1"' in home
+    assert "/client/verify-trial" not in home and "$1" not in home
     assert "not reviewed by a person" not in env.client.get("/client").text

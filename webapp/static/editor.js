@@ -524,9 +524,17 @@
     scheduleAutosave(segmentId);
   }
 
+  // cellsText joins a break with "\n\n" only BETWEEN two words of the same segment, so a break before the segment's very first word
+  // would be lost on save. It travels as its own flag instead.
+  function segmentStartsParagraph(container, segmentId) {
+    const first = $all(".wordcell, .gapcell", container).find((c) => c.dataset.segmentId === segmentId && c.textContent.trim());
+    return !!first && first.dataset.paraStart === "true";
+  }
+
   async function saveSegment(segmentId, step, resynthesize) {
     const flow = step === "source" ? $("#flow-source") : $("#flow-target");
     const text = cellsText(flow, segmentId);
+    const paraStart = segmentStartsParagraph(flow, segmentId);
     updateGlobalSaveState("saving");
     try {
       let res, data;
@@ -534,7 +542,7 @@
         res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/source`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, para_start: paraStart }),
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "save failed");
@@ -552,7 +560,7 @@
         res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/save`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, resynthesize: !!resynthesize }),
+          body: JSON.stringify({ text, resynthesize: !!resynthesize, para_start: paraStart }),
         });
         data = await res.json();
         if (!res.ok) throw new Error(data.error || "save failed");
@@ -783,7 +791,9 @@
   // typed or inserted this way still gets merged into its own cell and
   // kept out of the spoken audio automatically (server-side pattern
   // detection, not anything macro-specific) - see insertMacroAtCursor.
-  function emptyMacro() { return { text: "" }; }
+  // A macro can also start a new paragraph: set for a speaker tag ("AMARA:"), the tag then opens its own paragraph.
+  function emptyMacro() { return { text: "", para: false }; }
+  const SPEAKER_MACRO_RE = /^[A-Z][A-Za-z'.\- ]{0,40}:\s*$/;
 
   function loadMacros() {
     try {
@@ -794,7 +804,7 @@
         // older macro object that also carried paragraphBreak/speaker
         // flags, both collapse to just the text.
         macros = Array.isArray(parsed)
-          ? parsed.map((m) => ({ text: typeof m === "string" ? m : (m.text || "") }))
+          ? parsed.map((m) => ({ text: typeof m === "string" ? m : (m.text || ""), para: !!(m && typeof m === "object" && m.para) }))
           : null;
       }
     } catch (e) { /* corrupt/blocked storage - just use defaults */ }
@@ -805,6 +815,7 @@
   function persistMacros() {
     macros = $all(".macro-row").map((row) => ({
       text: row.querySelector(".macro-input").value,
+      para: row.querySelector(".macro-para").checked,
     }));
     try { localStorage.setItem(macroStorageKey(), JSON.stringify(macros)); } catch (e) { /* ignore */ }
     const state = $("#macro-save-state");
@@ -833,9 +844,18 @@
       row.className = "macro-row";
       row.innerHTML =
         `<kbd>Macro ${i + 1}</kbd><span class="macro-key-hint">${label}</span>` +
-        `<input type="text" class="macro-input" placeholder="e.g. RIGATHI GACHAGUA: or [MUSIC PLAYING]">`;
-      row.querySelector(".macro-input").value = macro.text || "";
-      row.querySelector(".macro-input").addEventListener("input", scheduleMacroSave);
+        `<input type="text" class="macro-input" placeholder="e.g. RIGATHI GACHAGUA: or [MUSIC PLAYING]">` +
+        `<label class="macro-para-label" title="Insert this macro at the start of a new paragraph"><input type="checkbox" class="macro-para"> New paragraph</label>`;
+      const input = row.querySelector(".macro-input"), para = row.querySelector(".macro-para");
+      input.value = macro.text || "";
+      para.checked = !!macro.para;
+      para.dataset.touched = macro.para ? "1" : "";
+      para.addEventListener("change", () => { para.dataset.touched = "1"; scheduleMacroSave(); });
+      input.addEventListener("input", () => {
+        // a speaker name is the usual reason for a paragraph, so it is ticked for you until you choose otherwise
+        if (!para.dataset.touched && SPEAKER_MACRO_RE.test(input.value.trim())) para.checked = true;
+        scheduleMacroSave();
+      });
       body.appendChild(row);
     });
   }
@@ -873,6 +893,7 @@
   function insertMacroAtCursor(cell, macro) {
     if (!macro || !macro.text) return;
     document.execCommand("insertText", false, macro.text);
+    if (macro.para && cell.classList.contains("wordcell") && cell.dataset.paraStart !== "true") insertParagraphBreak(cell);
   }
 
   // -------------------------------------------------------- paragraphs ----
@@ -1780,6 +1801,12 @@
           return;
         }
         if (e.altKey && e.key === "Backspace") {
+          e.preventDefault();
+          removeParagraphBreak(active);
+          return;
+        }
+        // Shift+Backspace removes the paragraph break before this word. In any other cell it is the ordinary Backspace.
+        if (e.shiftKey && !e.ctrlKey && !e.altKey && e.key === "Backspace" && active.dataset.paraStart === "true") {
           e.preventDefault();
           removeParagraphBreak(active);
           return;

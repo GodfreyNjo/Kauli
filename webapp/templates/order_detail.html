@@ -1,6 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Order {{ order['id'] }}{% endblock %}
 {% block content %}
+{% macro free_plan_form(charge, order_id, subscribed) %}
+{% if subscribed %}
+<form method="post" action="/client/orders/{{ order_id }}/unlock" class="free-plan-form">
+  <input type="hidden" name="provider" value="paystack">
+  <button type="submit" class="btn">Unlock this order{% if charge and charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(charge['amount']) }}{% endif %}</button>
+</form>
+{% else %}
+<form method="post" action="/client/billing/choose-free" class="free-plan-form">
+  <input type="hidden" name="order_id" value="{{ order_id }}">
+  <button type="submit" class="btn">Subscribe to the Free plan{% if charge and charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(charge['amount']) }} for this order{% endif %}</button>
+</form>
+{% endif %}
+{% endmacro %}
 
 {% set od_done = order['status'] in ['ready_for_delivery', 'delivered'] %}
 {% set od_bad = order['status'] in ['failed', 'dead_letter'] %}
@@ -16,6 +29,7 @@
       {% if '.' in order['original_filename'] %}<span>{{ order['original_filename'].rsplit('.', 1)[-1]|upper }}</span><i>&middot;</i>{% endif %}
       {% if od_secs %}<span>{{ '%d:%02d'|format(od_secs // 60, od_secs % 60) }}</span><i>&middot;</i>{% endif %}
       <span>Uploaded {{ order['created_at']|date_only }}</span>
+      {% if order['reuse_of'] %}<i>&middot;</i><span>Built from your <a href="/client/orders/{{ order['reuse_of'] }}">earlier transcript</a></span>{% endif %}
       {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush</span>{% endif %}
     </p>
   </div>
@@ -28,7 +42,7 @@
   </div>
 </div>
 
-{% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and plan_chosen(user) %}
+{% if job and job.segments and order['status'] in ['ready_for_delivery', 'delivered'] and not order_locked %}
 <div class="card">
   <script type="application/json" id="order-cues">{{ caption_cues|tojson }}</script>
   <div class="order-workspace-grid">
@@ -107,17 +121,18 @@
           <tbody>
             {% for seg in job.segments %}
             {% if seg.segment_type == 'speech' %}
+            {% set sl = speaker_lines.get(seg.segment_id) or {'speaker': seg.speaker_id, 'source': seg.source_final_text, 'target': seg.final_text, 'source_tag': '', 'target_tag': ''} %}
             <tr data-segment-id="{{ seg.segment_id }}" data-start-ms="{{ seg.start_ms }}" data-end-ms="{{ seg.end_ms }}" data-target-text="{{ seg.final_text }}">
               <td class="muted" style="font-size:0.76rem; white-space:nowrap;">
                 <span class="tx-time">{{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}</span>
-                {% if seg.speaker_id %}<br class="tx-speaker"><span class="meta-pill tx-speaker" style="font-size:0.66rem;">{{ seg.speaker_id }}</span>{% endif %}
+                {% if sl.speaker %}<br class="tx-speaker"><span class="meta-pill tx-speaker" style="font-size:0.66rem;">{{ sl.speaker }}</span>{% endif %}
                 {% if seg.edited_text or seg.source_edited_transcript %}<br><span class="meta-pill tx-edited" style="font-size:0.66rem;">edited</span>{% endif %}
               </td>
               {% if same_language %}
-              <td lang="{{ order['source_lang'] }}" data-edit="source" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+              <td lang="{{ order['source_lang'] }}" data-edit="source" data-tag="{{ sl.target_tag }}" style="font-size:0.85rem;">{{ sl.target }}</td>
               {% else %}
-              <td lang="{{ order['source_lang'] }}" data-edit="source" style="font-size:0.85rem;">{{ seg.source_final_text }}</td>
-              <td lang="{{ order['target_lang'] }}" data-edit="target" style="font-size:0.85rem;">{{ seg.final_text }}</td>
+              <td lang="{{ order['source_lang'] }}" data-edit="source" data-tag="{{ sl.source_tag }}" style="font-size:0.85rem;">{{ sl.source }}</td>
+              <td lang="{{ order['target_lang'] }}" data-edit="target" data-tag="{{ sl.target_tag }}" style="font-size:0.85rem;">{{ sl.target }}</td>
               {% endif %}
             </tr>
             {% endif %}
@@ -202,7 +217,7 @@
         b.setAttribute("data-bound", "1");
         b.addEventListener("click", function () {
           var text = b.parentNode.querySelector(".sm-body").innerText;
-          if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { b.textContent = "Copied"; setTimeout(function () { b.textContent = "Copy"; }, 1500); });
+          if (navigator.clipboard) navigator.clipboard.writeText(text).then(function () { b.textContent = "Copied"; if (window.kpToast) kpToast("Copied to the clipboard.", "success"); setTimeout(function () { b.textContent = "Copy"; }, 1500); }, function () { if (window.kpToast) kpToast("Could not copy. Select the text and press Ctrl+C.", "error"); });
         });
       });
     }
@@ -409,7 +424,7 @@
         [].forEach.call(document.querySelectorAll("#order-transcript-table tr[data-segment-id]"), function (row) {
           var e = { segment_id: row.dataset.segmentId }, any = false;
           [].forEach.call(row.querySelectorAll("td[data-edit]"), function (c) {
-            if (plain(c) !== c.dataset.orig) { e[c.dataset.edit] = plain(c); any = true; }
+            if (plain(c) !== c.dataset.orig) { e[c.dataset.edit] = (c.dataset.tag ? c.dataset.tag + " " : "") + plain(c); any = true; }
           });
           if (any) edits.push(e);
         });
@@ -418,8 +433,8 @@
               headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edits: edits }) })
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
-            if (!res.ok) { statusEl.textContent = res.d.error || "Could not save."; saveBtn.disabled = false; return; }
-            window.txEditing = false; statusEl.textContent = "Saved"; if (window.kpSoftRefresh) { window.kpSoftRefresh().then(function (ok) { if (!ok) location.reload(); }); } else { location.reload(); }
+            if (!res.ok) { statusEl.textContent = res.d.error || "Could not save."; if (window.kpToast) kpToast(res.d.error || "Could not save.", "error"); saveBtn.disabled = false; return; }
+            window.txEditing = false; statusEl.textContent = "Saved"; if (window.kpToast) kpToast("Transcript saved.", "success"); if (window.kpSoftRefresh) { window.kpSoftRefresh().then(function (ok) { if (!ok) location.reload(); }); } else { location.reload(); }
           })
           .catch(function () { statusEl.textContent = "Could not save. Check your connection."; saveBtn.disabled = false; });
       });
@@ -661,9 +676,11 @@
       ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} charge applies before it unlocks.
     </div>
     <a class="btn" href="/client/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px;">Review &amp; pay charge →</a>
-  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and not plan_chosen(user) %}
+  {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order_locked %}
     <div class="modal-warning">
-      Your results are ready. Unlock them in one step: a quick $1 card check, credited straight back to your wallet, and everything opens.
+      Your results are ready to read. Free minutes cover processing and reading only, so downloading and editing need this order to be paid for.
+      {% if not plan_subscribed %}Subscribe to the Free plan (pay as you go){% else %}Unlock this order{% endif %}
+      {% if free_plan_charge and free_plan_charge['amount'] > 0 %}and we charge ${{ '%.2f'|format(free_plan_charge['amount']) }} for it at pay-as-you-go prices{% if not plan_subscribed %}; your plan starts as soon as it is paid{% endif %}.{% else %}to continue.{% endif %}
     </div>
     {% if transcript_teaser and (transcript_teaser.visible or transcript_teaser.hidden) %}
     <div class="card transcript-teaser">
@@ -673,14 +690,14 @@
         <div class="teaser-hidden" aria-hidden="true">{% for p in transcript_teaser.hidden %}<p>{{ p }}</p>{% endfor %}</div>
         <div class="teaser-lock">
           <p><strong>The last {{ transcript_teaser.hidden_pct }}% of your transcript is hidden.</strong><br>
-             It unlocks with a one-time $1 card confirmation, which is credited straight back to your account.</p>
-          <a class="btn" href="/client/verify-trial">Unlock now</a>
+             {% if not plan_subscribed %}Subscribe to the Free plan (pay as you go){% else %}Unlock this order{% endif %} to see it all.</p>
+          {{ free_plan_form(free_plan_charge, order['id'], plan_subscribed) }}
         </div>
       </div>
       {% endif %}
     </div>
     {% endif %}
-    <a class="btn" href="/client/verify-trial" style="margin-top:14px;">Unlock and download &rarr;</a> <a href="/client/billing?choose_plan=1" style="margin-left:10px;">or see the plans</a>
+    <div style="margin-top:14px;">{{ free_plan_form(free_plan_charge, order['id'], plan_subscribed) }}</div>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p data-persist class="ok od-ready">Ready. Download your files below.</p>
     {% if (source_media_ready or order['source_youtube_id']) and order['status'] in ('ready_for_delivery', 'delivered') %}
@@ -835,7 +852,7 @@
   {% endif %}
 </div>
 
-{% if job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] and plan_chosen(user) %}
+{% if job and job.segments and order['status'] in ['awaiting_review', 'editor_returned', 'returned_to_client'] and not order_locked %}
 <details class="card">
   <summary><h2 style="display:inline;">Transcript ({{ job.segments|length }} segment{{ '' if job.segments|length == 1 else 's' }})</h2></summary>
   <p class="muted" style="font-size:0.82rem;">Read-only preview of what our team is working from - not an

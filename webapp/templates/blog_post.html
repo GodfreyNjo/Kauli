@@ -108,9 +108,9 @@
       {% endif %}
       <div>
         <div class="m-author-name">{{ author_name }}</div>
-        <div class="m-author-role">{{ 'Founder' if author and author['is_admin'] else 'Team' }}, Forge Media Services</div>
-        <p class="m-author-bio">Godfrey leads digital accessibility at Kauli, ensuring media localization
-           accuracy and compliance for diverse audiences.</p>
+        <div class="m-author-role">Team, Forge Media Services</div>
+        <p class="m-author-bio">The Kauli team works on digital accessibility, helping media localization
+           stay accurate and accessible to diverse audiences.</p>
       </div>
     </div>
 
@@ -172,6 +172,7 @@
       var url = btn.getAttribute('data-copy-url');
       function showCopied() {
         btn.textContent = 'Copied!';
+        if (window.kpToast) kpToast('Link copied to the clipboard.', 'success');
         btn.classList.add('copied');
         setTimeout(function () { btn.textContent = defaultLabel; btn.classList.remove('copied'); }, 1800);
       }

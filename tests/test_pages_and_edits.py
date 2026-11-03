@@ -146,7 +146,7 @@ def test_only_the_owner_signed_in_with_a_plan_can_edit(env, wav_bytes):
     conn.commit()
     conn.close()
     r = _edit(env, order, [{"segment_id": "s1", "source": "x"}])
-    assert r.status_code == 403 and "Choose a plan" in r.json()["error"]
+    assert r.status_code == 403 and "unlock this order" in r.json()["error"]
 
 
 def test_the_page_script_edits_only_changed_lines_and_never_pastes_formatting(env, wav_bytes):

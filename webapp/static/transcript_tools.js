@@ -73,7 +73,10 @@
              "speakers=" + ($("tx-opt-speaker").checked ? "1" : "0")];
     return "/client/orders/" + orderId + "/export?" + q.join("&");
   }
-  function say(el, text) { el.textContent = text || ""; }
+  function say(el, text, kind) {
+    el.textContent = text || "";
+    if (text && window.kpToast && kind) window.kpToast(text, kind);                // the result of an action is also shown as a clear, coloured message
+  }
   $("tx-dl-go").addEventListener("click", function () {
     var fmt = radio("tx-fmt"), msg = $("tx-dl-msg"), go = $("tx-dl-go");
     go.disabled = true; say(msg, "Preparing...");
@@ -81,7 +84,7 @@
       if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || "Could not prepare that file."); });
       if (fmt === "clip") {
         return r.text().then(function (text) {
-          return navigator.clipboard.writeText(text).then(function () { say(msg, "Copied to the clipboard."); });
+          return navigator.clipboard.writeText(text).then(function () { say(msg, "Copied to the clipboard.", "success"); });
         });
       }
       var name = ((r.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/) || [])[1] || "transcript";
@@ -95,9 +98,9 @@
           m.href = "/client/orders/" + orderId + "/download/source"; m.download = "";
           document.body.appendChild(m); m.click(); m.remove();
         }
-        say(msg, "Downloaded " + name);
+        say(msg, "Downloaded " + name, "success");
       });
-    }).catch(function (e) { say(msg, e.message || "Could not download. Check your connection."); })
+    }).catch(function (e) { say(msg, e.message || "Could not download. Check your connection.", "error"); })
       .then(function () { go.disabled = false; });
   });
 
@@ -112,23 +115,23 @@
     var msg = $("tx-share-msg"); say(msg, "");
     post("create").then(function (d) {
       $("tx-share-url").value = d.url; $("tx-share-wa").href = d.whatsapp;
-    }).catch(function (e) { $("tx-share-url").value = ""; say(msg, e.message); });
+    }).catch(function (e) { $("tx-share-url").value = ""; say(msg, e.message, "error"); });
   }
   $("tx-share-copy").addEventListener("click", function () {
     var u = $("tx-share-url").value; if (!u) return;
-    (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function () { say($("tx-share-msg"), "Link copied."); })
-      .catch(function () { $("tx-share-url").select(); say($("tx-share-msg"), "Press Ctrl+C to copy."); });
+    (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(function () { say($("tx-share-msg"), "Link copied.", "success"); })
+      .catch(function () { $("tx-share-url").select(); say($("tx-share-msg"), "Press Ctrl+C to copy.", "warning"); });
   });
   $("tx-share-send").addEventListener("click", function () {
     var to = $("tx-share-email").value.trim(), msg = $("tx-share-msg");
-    if (!to) { say(msg, "Enter an email address."); return; }
+    if (!to) { say(msg, "Enter an email address.", "warning"); return; }
     say(msg, "Sending...");
-    post("email", { to: to }).then(function () { say(msg, "Sent to " + to + "."); $("tx-share-email").value = ""; })
-      .catch(function (e) { say(msg, e.message); });
+    post("email", { to: to }).then(function () { say(msg, "Sent to " + to + ".", "success"); $("tx-share-email").value = ""; })
+      .catch(function (e) { say(msg, e.message, "error"); });
   });
   $("tx-share-stop").addEventListener("click", function () {
-    post("revoke").then(function () { $("tx-share-url").value = "Sharing is off."; $("tx-share-wa").removeAttribute("href"); say($("tx-share-msg"), "The link no longer works."); })
-      .catch(function (e) { say($("tx-share-msg"), e.message); });
+    post("revoke").then(function () { $("tx-share-url").value = "Sharing is off."; $("tx-share-wa").removeAttribute("href"); say($("tx-share-msg"), "The link no longer works.", "info"); })
+      .catch(function (e) { say($("tx-share-msg"), e.message, "error"); });
   });
 
   // ---- find and replace

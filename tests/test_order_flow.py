@@ -197,11 +197,15 @@ def _payment(env, order, kind, amount):
     return env.db.get_payment(pid)
 
 
-def test_free_minute_results_have_nothing_to_unlock_or_upgrade(env, wav_bytes):
+def test_free_minute_results_unlock_at_their_full_price_and_have_no_upgrade(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes))
-    env.db.update_order_status(order["id"], "ready_for_delivery")
-    prices = env.app._order_upsell_prices(env.db.get_order(order["id"]))
-    assert prices == {"unlock": None, "upgrade": None}        # downloadable once a plan is chosen
+    conn = env.db.get_conn()
+    conn.execute("UPDATE orders SET status = 'ready_for_delivery', duration_minutes = 10 WHERE id = ?", (order["id"],))
+    conn.commit()
+    conn.close()
+    row = env.db.get_order(order["id"])
+    prices = env.app._order_upsell_prices(row)
+    assert prices["upgrade"] is None and prices["unlock"] and prices["unlock"] == env.app._unlock_price(row) > 0      # free minutes never unlock a download
 
 
 def test_upgrade_to_human_review_charges_the_difference_and_queues_review(env, wav_bytes):
@@ -257,11 +261,14 @@ def test_client_pages_render_with_both_tiers_and_the_upsell_buttons(env, wav_byt
     assert "Add human review" in page.text and "Transcript (.docx)" in page.text
     assert "human-verified" not in page.text.lower()
 
-    # a free-minutes order downloads like any other once the plan is chosen (no more "unlock")
+    # a free-minutes order can be read but not downloaded until it is paid for
     free = env.order_from(env.place(wav_bytes))
-    env.db.update_order_status(free["id"], "ready_for_delivery")
+    conn = env.db.get_conn()
+    conn.execute("UPDATE orders SET status = 'ready_for_delivery', duration_minutes = 10 WHERE id = ?", (free["id"],))
+    conn.commit()
+    conn.close()
     page = env.client.get(f"/client/orders/{free['id']}")
-    assert page.status_code == 200 and "Transcript (.docx)" in page.text and "Unlock this transcript" not in page.text
+    assert page.status_code == 200 and "Transcript (.docx)" not in page.text and "Unlock this order" in page.text
 
     # a human-reviewed order never shows the Instant AI banner or upsells
     human = env.order_from(env.place(wav_bytes, review_tier="human"))

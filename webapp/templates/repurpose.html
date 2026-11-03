@@ -5,7 +5,7 @@
   <p class="rp-back"><a href="/client/orders/{{ order['id'] }}">&larr; Back to your order</a></p>
   <h1>Do more with this file</h1>
   <p class="rp-file"><strong>{{ order['original_filename'] }}</strong> <span class="muted">&middot; {{ '%.1f'|format(order['duration_minutes'] or 0) }} min &middot; {{ language_names.get(order['source_lang'], order['source_lang']) }}</span></p>
-  <p class="muted">We already have your file, so there is nothing to upload again. Pick what you want next and it starts right away.</p>
+  <p class="muted">We already have your file and your transcript, so there is nothing to upload or transcribe again. Pick what you want next and it starts from the transcript you received, including any corrections you made.</p>
 
   {% if not cards %}
   <p class="rp-empty">There is nothing more to add to this one right now. <a href="/client">Start a new project</a> to order something else.</p>
