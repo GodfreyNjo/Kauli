@@ -3,9 +3,26 @@
 {% block content %}
 <div class="rp-wrap">
   <p class="rp-back"><a href="/client/orders/{{ order['id'] }}">&larr; Back to your order</a></p>
-  <h1>Do more with this file</h1>
-  <p class="rp-file"><strong>{{ order['original_filename'] }}</strong> <span class="muted">&middot; {{ '%.1f'|format(order['duration_minutes'] or 0) }} min &middot; {{ language_names.get(order['source_lang'], order['source_lang']) }}</span></p>
-  <p class="muted">We already have your file and your transcript, so there is nothing to upload or transcribe again. Pick what you want next and it starts from the transcript you received, including any corrections you made.</p>
+  <header class="rp-head">
+    <h1>Do more with this file</h1>
+    <p class="rp-file"><strong>{{ order['original_filename'] }}</strong>
+      <span class="rp-chip">{{ '%.1f'|format(order['duration_minutes'] or 0) }} min</span>
+      <span class="rp-chip">{{ language_names.get(order['source_lang'], order['source_lang']) }}</span></p>
+    <p class="muted rp-lead">Your file and transcript are already here, so there is nothing to upload or transcribe again. Pick what you want next and it starts from the transcript you received, including any corrections you made.</p>
+  </header>
+
+  <section class="rp-plan" aria-label="Your plan">
+    <div class="rp-plan-main">
+      <span class="rp-plan-label">Your plan</span>
+      <strong>{{ plan.name }}</strong>
+    </div>
+    <ul class="rp-plan-stats">
+      {% if plan.paid or plan.ai_left %}<li><b>{{ '{:,.0f}'.format(plan.ai_left) }}</b><span>of {{ '{:,}'.format(plan.ai_total) }} Instant AI minutes left this month{% if not plan.covers_translation %} (transcription only){% endif %}</span></li>{% endif %}
+      {% if plan.human_left is not none %}<li><b>{{ '{:,.0f}'.format(plan.human_left) }}</b><span>of {{ plan.human_total }} human-reviewed minutes left</span></li>{% endif %}
+      {% if plan.credit_usd %}<li><b>${{ '%.2f'|format(plan.credit_usd) }}</b><span>prepaid credit</span></li>{% endif %}
+    </ul>
+    <a class="rp-plan-link" href="/client/billing#change-plan">{{ 'Change plan' if plan.paid else 'See plans' }}</a>
+  </section>
 
   {% if not cards %}
   <p class="rp-empty">There is nothing more to add to this one right now. <a href="/client">Start a new project</a> to order something else.</p>
@@ -13,6 +30,7 @@
 
   <div class="rp-grid">
     {% for c in cards %}
+    {% set q = c.quote %}
     <form method="post" action="/client/orders" class="rp-card">
       <input type="hidden" name="reuse_order_id" value="{{ order['id'] }}">
       <input type="hidden" name="source_lang" value="{{ order['source_lang'] }}">
@@ -20,8 +38,14 @@
       <input type="hidden" name="review_tier" value="{{ c.tier }}">
       <input type="hidden" name="idempotency_key" value="more-{{ key_prefix }}-{{ c.key }}">
       {% if not c.languages %}<input type="hidden" name="target_lang" value="{{ order['target_lang'] }}">{% endif %}
-      <h2>{{ c.title }}</h2>
-      <p class="muted">{{ c.blurb }}</p>
+      <div class="rp-card-top">
+        <span class="rp-ic rp-ic-{{ c.icon }}" aria-hidden="true">
+          {% if c.icon == 'dub' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          {% elif c.icon == 'review' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+          {% else %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h9M8.5 3v2M6 5c.6 3 2.6 5.4 5.5 7M12 5c-.6 3-2.6 5.4-5.5 7"/><path d="M12 20l4-9 4 9M13.5 17h5"/></svg>{% endif %}
+        </span>
+        <div><h2>{{ c.title }}</h2><p class="muted">{{ c.blurb }}</p></div>
+      </div>
       {% if c.languages %}
       <label class="rp-lang"><span>Into</span>
         <select name="target_lang" aria-label="Target language">
@@ -29,12 +53,28 @@
         </select>
       </label>
       {% endif %}
-      <div class="rp-foot">
-        <span class="rp-price">{% if c.included %}Included in your plan{% elif c.usd <= 0 %}Free{% else %}About ${{ '%.2f'|format(c.usd) }}{% endif %}</span>
-        <button type="submit" class="ds-btn">{{ c.button }}</button>
+
+      <div class="rp-quote" aria-label="Price">
+        <div class="rp-total">
+          {% if q.included %}<span class="rp-badge ok">Included in your plan</span>
+          {% elif q.usd <= 0 %}<span class="rp-badge ok">No charge</span>
+          {% else %}<span class="rp-amount">${{ '%.2f'|format(q.usd) }}</span>{% endif %}
+        </div>
+        <ul class="rp-lines">
+          {% if q.included %}
+            <li>Uses {{ '%.1f'|format(q.included_minutes) }} of your {{ 'human-reviewed' if q.human else 'included' }} minutes{% if q.credits_usd %} and ${{ '%.2f'|format(q.credits_usd) }} of prepaid credit{% endif %}</li>
+          {% else %}
+            <li>{{ '%.1f'|format(q.minutes) }} min at ${{ '%.2f'|format(q.rate) }}/min = ${{ '%.2f'|format(q.minutes * q.rate) }}</li>
+            {% if q.included_minutes %}<li class="rp-minus">&minus; {{ '%.1f'|format(q.included_minutes) }} min included in your {{ q.plan_name }} plan</li>{% endif %}
+            {% if q.credits_usd %}<li class="rp-minus">&minus; ${{ '%.2f'|format(q.credits_usd) }} prepaid credit</li>{% endif %}
+          {% endif %}
+        </ul>
+        {% if q.hint %}<p class="rp-hint">On {{ q.hint.plan }} (${{ q.hint.price }}/month) this would use your included minutes instead ({{ '{:,}'.format(q.hint.minutes) }} a month).</p>{% endif %}
       </div>
+      <button type="submit" class="ds-btn rp-go">{{ c.button }}{% if not q.included and q.usd > 0 %} &middot; ${{ '%.2f'|format(q.usd) }}{% endif %}</button>
     </form>
     {% endfor %}
   </div>
+  <p class="muted rp-fine">Prices are worked out for your account and shown before anything is charged. Nothing starts until you press the button{% if cards %}; if there is something to pay you will be taken to checkout first{% endif %}.</p>
 </div>
 {% endblock %}

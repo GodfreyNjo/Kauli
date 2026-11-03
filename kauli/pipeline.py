@@ -370,6 +370,40 @@ def _restore_untranslatable(text: str | None, placeholders: dict[str, str]) -> s
     return re.sub(r"QQ\w*QQ", _fuzzy_sub, text)
 
 
+def _translate_bracket_tags(source_text: str, mt_provider, source_lang: str, target_lang: str) -> dict[str, str]:
+    """{"[MUZIKI YACHEZA]": "[MUSIC PLAYING]"}: the words inside each [bracket tag] of a segment, translated on their own so the
+    brackets stay exactly where they are. Speaker names are not touched (they are labels), and a tag the translator cannot make sense
+    of keeps its original wording rather than being guessed at."""
+    out: dict[str, str] = {}
+    for tag in dict.fromkeys(re.findall(r"\[[^\]]*\]", source_text or "")):
+        inner = tag[1:-1].strip()
+        if not inner:
+            continue
+        try:
+            r = mt_provider.translate(inner, max(12, len(inner) * 3), source_lang, target_lang)
+        except Exception:  # noqa: BLE001 - a tag that will not translate stays as the human wrote it
+            continue
+        new = (r.get("literal") or r.get("spoken") or "").strip().strip("[]").strip()
+        if not inner.endswith((".", "!", "?")):
+            new = new.rstrip(".!?").strip()
+        if not new or "QQ" in new:
+            continue
+        if inner.isupper():
+            new = new.upper()
+        elif inner[:1].isupper():
+            new = new[:1].upper() + new[1:]
+        out[tag] = f"[{new}]"
+    return out
+
+
+def _apply_tag_translations(text: str | None, translations: dict[str, str]) -> str | None:
+    if not text or not translations:
+        return text
+    for original, translated in translations.items():
+        text = text.replace(original, translated)
+    return text
+
+
 def translate_segment(seg, mt_provider, source_lang: str, target_lang: str, cps: float,
                        all_segments: list | None = None) -> None:
     """Translate one segment and pick the best-fitting candidate, mutating
@@ -395,15 +429,18 @@ def translate_segment(seg, mt_provider, source_lang: str, target_lang: str, cps:
     # candidate fits best never re-exposes an un-restored placeholder.
     protected_text, placeholders = _protect_untranslatable(seg.source_final_text)
     r = mt_provider.translate(protected_text, target_chars, source_lang, target_lang)
-    seg.literal = _restore_untranslatable(r.get("literal"), placeholders)
+    # The tags stay put while the translator works, then the words inside the [brackets] are translated too, so a [MUZIKI YACHEZA]
+    # reads [MUSIC PLAYING] in the translated transcript. Speaker names are labels and stay exactly as the editor typed them.
+    tag_words = _translate_bracket_tags(seg.source_final_text, mt_provider, source_lang, target_lang)
+    seg.literal = _apply_tag_translations(_restore_untranslatable(r.get("literal"), placeholders), tag_words)
     seg.translation_confidence = float(r.get("confidence") or 0.0)
     seg.cultural_notes = r.get("notes")
 
     candidates = [
-        {"text": _restore_untranslatable(r.get("spoken"), placeholders), "similarity": 0.97, "variant": "spoken"},
-        {"text": _restore_untranslatable(r.get("shorter"), placeholders) if r.get("shorter") else None,
+        {"text": _apply_tag_translations(_restore_untranslatable(r.get("spoken"), placeholders), tag_words), "similarity": 0.97, "variant": "spoken"},
+        {"text": _apply_tag_translations(_restore_untranslatable(r.get("shorter"), placeholders), tag_words) if r.get("shorter") else None,
          "similarity": 0.90, "variant": "shorter"},
-        {"text": _restore_untranslatable(r.get("longer"), placeholders) if r.get("longer") else None,
+        {"text": _apply_tag_translations(_restore_untranslatable(r.get("longer"), placeholders), tag_words) if r.get("longer") else None,
          "similarity": 0.95, "variant": "longer"},
         {"text": seg.literal, "similarity": 1.00, "variant": "literal"},
     ]
@@ -609,9 +646,18 @@ def run(
 
     for i, seg in enumerate(job.segments):
         if seg.segment_type == "gap":
-            continue  # nothing to translate - a human tags these manually in Ereri
-        if seg.spoken:
-            continue  # resumed with a real translation already - a retry never re-spends an MT call either
+            # A tag a person typed into a silent stretch ("[MUZIKI YACHEZA]") is carried into the translation, in the target language.
+            # Whatever a human has already written for this stretch in the target language is final and is left alone.
+            tag_text = (seg.source_final_text or "").strip()
+            if tag_text and not seg.final_text.strip():
+                found = _translate_bracket_tags(tag_text, mt_provider, source_lang, target_lang)
+                if not found and not tag_text.startswith("["):
+                    found = _translate_bracket_tags(f"[{tag_text}]", mt_provider, source_lang, target_lang)
+                    found = {tag_text: v[1:-1] for v in found.values()} if found else {}
+                seg.spoken = _apply_tag_translations(tag_text, found) or tag_text
+            continue
+        if seg.spoken or seg.edited_text:
+            continue  # resumed with a real translation already, or a person has written this line: it is final, and a retry never re-spends an MT call either
         translate_segment(seg, mt_provider, source_lang, target_lang, cps, all_segments=job.segments)
         # Real cost bug this closes: translation used to only ever get
         # saved to the manifest ONCE, after every segment in the whole job

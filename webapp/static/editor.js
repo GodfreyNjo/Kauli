@@ -1795,7 +1795,7 @@
 
       // Only meaningful while a cell is actually focused.
       if (editing) {
-        if (e.ctrlKey && key === "enter") {
+        if ((e.ctrlKey || e.shiftKey) && !e.altKey && key === "enter") {          // Shift+Enter (or Ctrl+Enter): this word starts a new paragraph
           e.preventDefault();
           insertParagraphBreak(active);
           return;

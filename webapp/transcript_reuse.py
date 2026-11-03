@@ -90,6 +90,7 @@ def _clean(seg):
     s.est_duration_ms, s.fit_ratio, s.fit_status = 0, 0.0, "unknown"
     s.voice_id, s.audio_path, s.rendered_duration_ms, s.time_stretch_pct, s.manual_pace_pct, s.spell_out = None, None, None, 0.0, 0.0, False
     s.review_flag, s.review_reasons, s.edited_text, s.approved, s.translation_stale, s.notes = False, [], None, False, False, None
+    s.para_start_target = bool(getattr(s, "para_start_source", False))             # a paragraph the editor started stays a paragraph in the translation
     return s
 
 

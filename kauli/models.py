@@ -40,12 +40,22 @@ def split_off_speaker_tag(text: str) -> tuple[str | None, str]:
     return m.group(1), text[m.end():]
 
 
+AUTO_SPEAKER_RE = re.compile(r"^(spk|speaker)[ _\-]?\d+$", re.I)
+
+
+def is_auto_speaker(label: str | None) -> bool:
+    """True for a label the recogniser made up (SPK_1, Speaker 2) rather than a name a person typed."""
+    return bool(label) and bool(AUTO_SPEAKER_RE.match(label.strip()))
+
+
 def label_speakers(pairs: list[tuple[str | None, str]]) -> list[tuple[str, str, str]]:
     """What a reader should see for each (speaker_id, text) line: (name, text without the name tag, the tag that was removed).
 
     A name the human editor typed at the start of a line ("AMARA: Okay, so...") is the speaker, and the machine label (SPK_1)
     is not shown beside it. When a recogniser label has been named on any line, its other lines carry that name too, as long
-    as the editor used only one name for it. A line nobody named keeps its own label."""
+    as the editor used only one name for it. Once an editor has named anyone in the transcript, a leftover recogniser label (SPK_2)
+    is dropped rather than shown among real names, where it only confuses (the recogniser often splits one person across labels).
+    A transcript nobody named keeps its recogniser labels."""
     parsed = []
     names: dict[str, set[str]] = {}
     for sid, text in pairs:
@@ -58,7 +68,12 @@ def label_speakers(pairs: list[tuple[str | None, str]]) -> list[tuple[str, str, 
     for sid, name, rest, tag in parsed:
         if not name:
             only = names.get(sid, set())
-            name = next(iter(only)) if len(only) == 1 else sid
+            if len(only) == 1:
+                name = next(iter(only))
+            elif names and is_auto_speaker(sid):
+                name = ""
+            else:
+                name = sid
         out.append((name, rest, tag))
     return out
 

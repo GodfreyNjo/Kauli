@@ -73,7 +73,7 @@ def test_a_client_can_correct_an_instant_ai_transcript_and_every_download_follow
     r = _edit(env, order, [{"segment_id": "s1", "source": "  Hello   there,  everyone.  "}])
     assert r.status_code == 200 and r.json() == {"ok": True, "changed": 1}
     page = env.client.get(f"/client/orders/{order['id']}").text
-    assert "Hello there, everyone." in page and "edited" in page and "Second line" in page
+    assert "Hello there, everyone." in page and "Second line" in page and "tx-edited" not in page        # no "edited" badge on the customer side
     outdir = Path(order["outdir"])
     assert "Hello there, everyone." in (outdir / "subs_en.srt").read_text(encoding="utf-8")
     assert "Hello there, everyone." in (outdir / "subs_en.vtt").read_text(encoding="utf-8")

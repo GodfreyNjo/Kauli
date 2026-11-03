@@ -79,7 +79,7 @@
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "7d7177ddf4eb4c22ab931af3ffa28bef"}'></script>
   <!-- End Cloudflare Web Analytics -->
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}{% if user and user['role'] == 'staff' %} staff-ui{% endif %}">
   <a href="#main-content" class="skip-link">{% if translated %}{{ t('skip') }}{% else %}Skip to main content{% endif %}</a>
   {% if user %}
   <header class="topbar" lang="{{ page_lang() }}">
@@ -92,9 +92,11 @@
       </a>
     </div>
     {% if user['role'] == 'staff' %}
-    <form method="get" action="/staff/search" class="topbar-search">
-      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads... (Ctrl+K)"
-             aria-label="Search jobs, clients, leads">
+    <form method="get" action="/staff/search" class="topbar-search" role="search">
+      <svg class="topbar-search-ico" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.8"/><path d="M13.5 13.5L17 17"/></svg>
+      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads..."
+             aria-label="Search jobs, clients, leads" aria-keyshortcuts="Control+K">
+      <kbd class="topbar-search-kbd" aria-hidden="true">Ctrl + K</kbd>
     </form>
     {% endif %}
     <div class="topbar-right">
@@ -124,7 +126,11 @@
         {% else %}
           <div class="avatar">{{ user['display_name'][0]|upper }}</div>
         {% endif %}
+        {% if user['role'] == 'staff' %}
+        <span class="account-menu-who"><span class="account-menu-name">{{ user['display_name'] }}</span><span class="account-menu-role">Staff</span></span>
+        {% else %}
         <span class="account-menu-name">{{ (first_name(user) if user['role'] == 'client' else '') or user['display_name'] }}</span>
+        {% endif %}
         <svg class="chevron" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5"/></svg>
       </button>
       <div class="account-menu-panel" id="account-menu-panel" hidden>

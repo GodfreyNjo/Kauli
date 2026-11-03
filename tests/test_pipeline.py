@@ -280,3 +280,42 @@ if __name__ == "__main__":
         fn()
         print(f"PASS {fn.__name__}")
     print(f"\n{len(fns)} passed")
+
+
+class _TagMT(StubMT):
+    """Translates the words inside a bracket tag, echoes everything else (StubMT's own fallback)."""
+    def translate(self, text, target_chars, source_lang="sw", target_lang="en"):
+        if text.strip() == "MUZIKI YACHEZA":
+            return {"literal": "music playing.", "spoken": "music playing.", "confidence": 0.9}
+        return super().translate(text, target_chars, source_lang, target_lang)
+
+
+def test_the_words_inside_bracket_tags_are_translated_and_speaker_names_stay():
+    seg = Segment(segment_id="seg_0001", index=0, start_ms=0, end_ms=5000,
+                  source_edited_transcript="RIGATHI GACHAGUA: Karibu [MUZIKI YACHEZA] kwenye onyesho.")
+    translate_segment(seg, _TagMT(), "sw", "en", cps=16.94)
+    for value in (seg.spoken, seg.literal):
+        assert "[MUSIC PLAYING]" in value and "MUZIKI" not in value       # translated, brackets and capitals kept
+        assert "RIGATHI GACHAGUA:" in value and "QQ" not in value         # the speaker's name is a label: untouched
+
+
+def test_a_line_a_person_has_written_is_never_translated_over(monkeypatch):
+    from kauli import pipeline
+    monkeypatch.setattr(pipeline, "get_mt", lambda name: _TagMT())
+    human = Segment(segment_id="s0", index=0, start_ms=0, end_ms=3000, source_transcript="Habari yako", edited_text="Hello, my friend (final)")
+    machine = Segment(segment_id="s1", index=1, start_ms=3000, end_ms=6000, source_transcript="Habari yako, naitwa Wanjiru kutoka Duka Bora.")
+    tag = Segment(segment_id="gap-1", index=2, start_ms=6000, end_ms=8000, segment_type="gap", source_edited_transcript="[MUZIKI YACHEZA]")
+    from kauli.models import Job
+    import tempfile, os
+    with tempfile.TemporaryDirectory() as d:
+        Job(segments=[human, machine, tag], providers={"asr": "reused", "mt": "stub", "tts": "stub"}).save(os.path.join(d, "manifest.json"))
+        wav = os.path.join(d, "a.wav")
+        import wave
+        with wave.open(wav, "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000); w.writeframes(b"\x00\x00" * 16000 * 9)
+        job = pipeline.run(audio_path=wav, outdir=d, asr="stub", mt="stub", tts="stub", source_lang="sw", target_lang="en",
+                           verbose=False, resume=True, skip_tts=True)
+    got = {s.segment_id: s for s in job.segments}
+    assert got["s0"].edited_text == "Hello, my friend (final)" and got["s0"].final_text == "Hello, my friend (final)"      # the person's line is final
+    assert got["s1"].spoken                                                                                              # the machine's line was translated
+    assert got["gap-1"].final_text == "[MUSIC PLAYING]"                                                                # a tag in a silent stretch is translated too

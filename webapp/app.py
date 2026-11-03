@@ -788,40 +788,68 @@ def _duration_short(seconds) -> str:
 templates.env.filters["duration_short"] = _duration_short
 
 
-def _daily_trend_svg(daily_trend: list[dict], width: int = 760, height: int = 200) -> str:
-    """Hand-rolled inline SVG line chart, real data only (see
-    db.daily_job_trend) - no charting library, two series (created vs
-    delivered per day). currentColor for the "created" line so it follows
-    the page's own text color in both themes; the accent color is reserved
-    for "delivered" since that's the one number worth drawing the eye to."""
+def _short_day(day: str) -> str:
+    """"2026-10-05" -> "Oct 5" for a chart tick; anything unexpected is shown as it came."""
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d")
+        return f"{d.strftime('%b')} {d.day}"
+    except (TypeError, ValueError):
+        return str(day)
+
+
+def _daily_trend_svg(daily_trend: list[dict], width: int = 760, height: int = 240) -> str:
+    """Hand-rolled inline SVG chart, real data only (see db.daily_job_trend) - no charting library. Two smooth series (created vs
+    delivered per day), a soft area under "delivered", horizontal gridlines with the counts, and a few date ticks. The colours are
+    tokens (the accent for delivered, a muted grey for created) so both themes read correctly."""
     if not daily_trend:
         return ""
     n = len(daily_trend)
-    pad_l, pad_r, pad_t, pad_b = 8, 8, 14, 22
+    pad_l, pad_r, pad_t, pad_b = 30, 10, 12, 26
     plot_w = width - pad_l - pad_r
     plot_h = height - pad_t - pad_b
-    max_val = max(1, max(max(d["created"], d["delivered"]) for d in daily_trend))
+    peak = max(1, max(max(d["created"], d["delivered"]) for d in daily_trend))
+    step = 10 if peak > 40 else 5 if peak > 20 else 2 if peak > 8 else 1
+    top = ((peak + step - 1) // step) * step
     x_step = plot_w / max(1, n - 1)
 
-    def points(key: str) -> str:
-        pts = []
-        for i, d in enumerate(daily_trend):
-            x = pad_l + i * x_step
-            y = pad_t + plot_h - (d[key] / max_val) * plot_h
-            pts.append(f"{x:.1f},{y:.1f}")
-        return " ".join(pts)
+    def xy(i: int, key: str) -> tuple[float, float]:
+        return pad_l + i * x_step, pad_t + plot_h - (daily_trend[i][key] / top) * plot_h
 
-    first_day = daily_trend[0]["day"]
-    last_day = daily_trend[-1]["day"]
+    def curve(key: str) -> str:
+        pts = [xy(i, key) for i in range(n)]
+        if n == 1:
+            return f"M{pts[0][0]:.1f},{pts[0][1]:.1f}"
+        d = f"M{pts[0][0]:.1f},{pts[0][1]:.1f}"
+        for i in range(1, n):
+            (x0, y0), (x1, y1) = pts[i - 1], pts[i]
+            mx = (x0 + x1) / 2
+            d += f" C{mx:.1f},{y0:.1f} {mx:.1f},{y1:.1f} {x1:.1f},{y1:.1f}"
+        return d
+
+    base_y = pad_t + plot_h
+    grid = ""
+    for v in range(0, top + 1, step):
+        y = pad_t + plot_h - (v / top) * plot_h
+        grid += (f'<line x1="{pad_l}" y1="{y:.1f}" x2="{width - pad_r}" y2="{y:.1f}" stroke="currentColor" stroke-opacity="{0.22 if v == 0 else 0.1}" '
+                 f'stroke-dasharray="{"" if v == 0 else "3 4"}"/>'
+                 f'<text x="{pad_l - 8}" y="{y + 3.5:.1f}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">{v}</text>')
+    ticks = ""
+    tick_idx = sorted({round(i * (n - 1) / 5) for i in range(6)}) if n > 1 else [0]
+    for i in tick_idx:
+        anchor = "start" if i == 0 else "end" if i == n - 1 else "middle"
+        ticks += (f'<text x="{pad_l + i * x_step:.1f}" y="{height - 6}" font-size="10" fill="currentColor" opacity="0.6" '
+                  f'text-anchor="{anchor}">{_short_day(daily_trend[i]["day"])}</text>')
+    area = f'{curve("delivered")} L{pad_l + (n - 1) * x_step:.1f},{base_y} L{pad_l},{base_y} Z'
     return (
         f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Jobs created and delivered, last {n} days" '
         f'xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">'
-        f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{width - pad_r}" y2="{pad_t + plot_h}" '
-        f'stroke="currentColor" stroke-opacity="0.15"/>'
-        f'<polyline points="{points("created")}" fill="none" stroke="currentColor" stroke-opacity="0.45" stroke-width="2"/>'
-        f'<polyline points="{points("delivered")}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>'
-        f'<text x="{pad_l}" y="{height - 4}" font-size="10" fill="currentColor" opacity="0.6">{first_day}</text>'
-        f'<text x="{width - pad_r}" y="{height - 4}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">{last_day}</text>'
+        f'<defs><linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity="0.28"/>'
+        f'<stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>'
+        f'{grid}'
+        f'<path d="{area}" fill="url(#trend-fill)"/>'
+        f'<path d="{curve("created")}" fill="none" stroke="currentColor" stroke-opacity="0.38" stroke-width="2" stroke-linecap="round"/>'
+        f'<path d="{curve("delivered")}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round"/>'
+        f'{ticks}'
         f'</svg>'
     )
 
@@ -6253,9 +6281,9 @@ def _speaker_lines(job) -> dict:
     """Per speech line, what the customer reads: the speaker's name and the text without the name typed at its start. The name an
     editor added replaces the recogniser's SPK_n label; the stored text is untouched (the dubbing step still reads the tag)."""
     segs = [s for s in (getattr(job, "segments", None) or []) if getattr(s, "segment_type", "speech") == "speech"]
-    src = label_speakers([(s.speaker_id, s.source_final_text) for s in segs])
-    tgt = label_speakers([(s.speaker_id, s.final_text) for s in segs])
-    return {s.segment_id: {"speaker": a[0] or b[0], "source": a[1], "source_tag": a[2], "target": b[1], "target_tag": b[2]}
+    src = label_speakers([(getattr(s, "speaker_id", None), getattr(s, "source_final_text", "") or "") for s in segs])
+    tgt = label_speakers([(getattr(s, "speaker_id", None), getattr(s, "final_text", "") or "") for s in segs])
+    return {getattr(s, "segment_id", ""): {"speaker": a[0] or b[0], "source": a[1], "source_tag": a[2], "target": b[1], "target_tag": b[2]}
             for s, a, b in zip(segs, src, tgt)}
 
 
@@ -9706,7 +9734,7 @@ def staff_overview(request: Request):
 
     greeting = "morning" if now_dt.hour < 12 else ("afternoon" if now_dt.hour < 18 else "evening")
     return templates.TemplateResponse(request, "staff_overview.html", {
-        "user": user, "now_ts": now, "greeting": greeting,
+        "user": user, "now_ts": now, "greeting": greeting, "today_label": now_dt.strftime("%a, %b %d, %Y").replace(" 0", " "),
         "total_jobs": total_jobs, "jobs_pct_change": _pct_change(jobs_last_30, jobs_prev_30),
         "in_progress": in_progress, "in_review": in_review, "ops_decision": ops_decision,
         "completed_total": completed_total, "completed_pct_change": _pct_change(completed_last_30, completed_prev_30),

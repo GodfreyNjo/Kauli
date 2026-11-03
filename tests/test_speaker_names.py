@@ -20,19 +20,20 @@ def _job():
 def test_an_editors_name_replaces_the_machine_label_and_is_not_repeated_in_the_text():
     out = label_speakers([("SPK_1", "AMARA: Okay, so we begin."), ("SPK_2", "Thank you."), ("SPK_1", "And the second point.")])
     assert out[0][:2] == ("AMARA", "Okay, so we begin.") and out[0][2].startswith("AMARA:")
-    assert out[1][0] == "SPK_2"                                     # nobody named this speaker, so the recogniser label stays
+    assert out[1][0] == ""                                          # others are named in this transcript, so a leftover SPK_2 is not shown among them
     assert out[2][0] == "AMARA"                                     # the same speaker, named once, is named everywhere
+    assert [o[0] for o in label_speakers([("SPK_1", "Hello."), ("SPK_2", "Hi.")])] == ["SPK_1", "SPK_2"]       # nobody named: the labels stay
 
 
 def test_two_different_names_for_one_label_are_not_guessed_across_lines():
     out = label_speakers([("SPK_1", "AMARA: Hello."), ("SPK_1", "JOHN: Hi."), ("SPK_1", "No name here.")])
-    assert [o[0] for o in out] == ["AMARA", "JOHN", "SPK_1"]
+    assert [o[0] for o in out] == ["AMARA", "JOHN", ""]
 
 
 def test_exports_show_the_name_once():
     rows = transcript_export.rows(_job())
     assert rows[0]["speaker"] == "AMARA" and rows[0]["text"] == "Okay, so we begin."
-    assert rows[1]["speaker"] == "SPK_2"
+    assert rows[1]["speaker"] == ""
     text = transcript_export.to_txt(_job(), "T", timestamps=False).decode()
     assert "AMARA: Okay, so we begin." in text and "SPK_1" not in text and "AMARA: AMARA" not in text
     assert "AMARA,Okay, so we begin." in transcript_export.to_csv(_job(), timestamps=False).decode("utf-8-sig").replace('"', "")
@@ -54,7 +55,7 @@ def test_the_order_page_shows_only_the_editors_name(env, wav_bytes):
     page = env.client.get(f"/client/orders/{o['id']}").text
     assert ">AMARA</span>" in page and "SPK_1" not in page          # the name is the label, and the machine label is gone
     assert 'data-edit="source" data-tag="AMARA:" style="font-size:0.85rem;">Okay, so we begin.</td>' in page    # the name is not repeated inside the line
-    assert ">SPK_2</span>" in page                                  # an unnamed speaker keeps theirs
+    assert "SPK_2" not in page                                      # nor is a leftover machine label shown among the named speakers
     # (the stored text keeps the tag: the dubbing step reads it, and a saved edit puts it back)
 
 
@@ -114,4 +115,5 @@ def test_the_editor_script_has_the_macro_paragraph_option_and_shift_backspace():
     js = (Path(__file__).parent.parent / "webapp" / "static" / "editor.js").read_text(encoding="utf-8")
     assert "macro-para" in js and "macro.para" in js and "SPEAKER_MACRO_RE" in js
     assert 'e.shiftKey && !e.ctrlKey && !e.altKey && e.key === "Backspace"' in js
+    assert '(e.ctrlKey || e.shiftKey) && !e.altKey && key === "enter"' in js                    # Shift+Enter starts a paragraph
     assert "para_start: paraStart" in js

@@ -1,63 +1,79 @@
 {% extends "base.html" %}
 {% block title %}Overview{% endblock %}
 {% block content %}
-<div class="overview-header">
-  <h1>Good {{ greeting }}, {{ user['display_name'].split(' ')[0] }} 👋</h1>
-  <p class="muted" style="margin-top:2px;">Here's what's happening with your jobs.</p>
+<div class="so-head">
+  <div>
+    <h1>Good {{ greeting }}, {{ user['display_name'].split(' ')[0] }} <span aria-hidden="true">&#128075;</span></h1>
+    <p>Here's what's happening with your jobs today.</p>
+  </div>
+  <div class="so-date"><strong>{{ today_label }}</strong><span>Let's keep things moving.</span></div>
 </div>
 
-<div class="dashboard-stats overview-kpis">
-  <div class="dashboard-stat-card">
-    <div class="stat-icon">{{ icon_svg('checklist') }}</div>
-    <span class="stat-label">Total jobs</span>
-    <span class="stat-value">{{ total_jobs }}</span>
-    <span class="stat-hint">
-      {% if jobs_pct_change is not none %}
-        <span class="trend-chip {{ 'trend-up' if jobs_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(jobs_pct_change) }}{{ '+' if jobs_pct_change >= 0 else '' }}{{ jobs_pct_change }}%</span> vs last 30 days
+<div class="so-kpis">
+  <div class="so-kpi">
+    <div class="so-kpi-top"><span class="so-kpi-ic tone-blue">{{ icon_svg('checklist') }}</span><span class="so-kpi-label">Total Jobs</span></div>
+    <span class="so-kpi-value">{{ total_jobs }}</span>
+    <span class="so-kpi-hint">
+      {% if jobs_pct_change is not none %}<span class="so-chip {{ 'up' if jobs_pct_change >= 0 else 'down' }}">{{ trend_arrow(jobs_pct_change) }}{{ '+' if jobs_pct_change >= 0 else '' }}{{ jobs_pct_change }}%</span> vs last 30 days
       {% else %}No prior 30 days to compare{% endif %}
     </span>
   </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
-    <span class="stat-label">In progress</span>
-    <span class="stat-value">{{ in_progress }}</span>
-    <span class="stat-hint">AI processing right now</span>
+  <div class="so-kpi">
+    <div class="so-kpi-top"><span class="so-kpi-ic tone-amber">{{ icon_svg('spinner') }}</span><span class="so-kpi-label">In Progress</span></div>
+    <span class="so-kpi-value">{{ in_progress }}</span>
+    <span class="so-kpi-hint">AI processing right now</span>
   </div>
-  <div class="dashboard-stat-card {{ 'needs-you' if in_review else '' }}">
-    <div class="stat-icon info">{{ icon_svg('eye') }}</div>
-    <span class="stat-label">In review</span>
-    <span class="stat-value">{{ in_review }}</span>
-    <span class="stat-hint">{{ review_queue|length }} in your queue</span>
+  <div class="so-kpi">
+    <div class="so-kpi-top"><span class="so-kpi-ic tone-violet">{{ icon_svg('eye') }}</span><span class="so-kpi-label">In Review</span></div>
+    <span class="so-kpi-value{{ ' is-hot' if in_review else '' }}">{{ in_review }}</span>
+    <span class="so-kpi-hint">{{ review_queue|length }} in your queue</span>
   </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon ok">{{ icon_svg('check') }}</div>
-    <span class="stat-label">Completed</span>
-    <span class="stat-value">{{ completed_total }}</span>
-    <span class="stat-hint">
-      {% if completed_pct_change is not none %}
-        <span class="trend-chip {{ 'trend-up' if completed_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(completed_pct_change) }}{{ '+' if completed_pct_change >= 0 else '' }}{{ completed_pct_change }}%</span> vs last 30 days
+  <div class="so-kpi">
+    <div class="so-kpi-top"><span class="so-kpi-ic tone-green">{{ icon_svg('check') }}</span><span class="so-kpi-label">Completed</span></div>
+    <span class="so-kpi-value">{{ completed_total }}</span>
+    <span class="so-kpi-hint">
+      {% if completed_pct_change is not none %}<span class="so-chip {{ 'up' if completed_pct_change >= 0 else 'down' }}">{{ trend_arrow(completed_pct_change) }}{{ '+' if completed_pct_change >= 0 else '' }}{{ completed_pct_change }}%</span> vs last 30 days
       {% else %}No prior 30 days to compare{% endif %}
     </span>
   </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon">{{ icon_svg('card') }}</div>
-    <span class="stat-label">Revenue (this month)</span>
-    <span class="stat-value">${{ "%.2f"|format(revenue_this_month) }}</span>
-    <span class="stat-hint">
-      {% if revenue_pct_change is not none %}
-        <span class="trend-chip {{ 'trend-up' if revenue_pct_change >= 0 else 'trend-down' }}">{{ trend_arrow(revenue_pct_change) }}{{ '+' if revenue_pct_change >= 0 else '' }}{{ revenue_pct_change }}%</span> vs last month
+  <div class="so-kpi">
+    <div class="so-kpi-top"><span class="so-kpi-ic tone-rose">{{ icon_svg('bars') }}</span><span class="so-kpi-label">Revenue <small>(This Month)</small></span></div>
+    <span class="so-kpi-value">${{ "%.2f"|format(revenue_this_month) }}</span>
+    <span class="so-kpi-hint">
+      {% if revenue_pct_change is not none %}<span class="so-chip {{ 'up' if revenue_pct_change >= 0 else 'down' }}">{{ trend_arrow(revenue_pct_change) }}{{ '+' if revenue_pct_change >= 0 else '' }}{{ revenue_pct_change }}%</span> vs last month
       {% else %}No prior month to compare{% endif %}
     </span>
   </div>
 </div>
 
 {% if overdue_count %}
-<a href="/staff/jobs?deadline=overdue" class="overdue-banner">
-  {{ icon_svg('alert') }}
-  <span><strong>{{ overdue_count }}</strong> job{{ 's' if overdue_count != 1 else '' }} {{ 'are' if overdue_count != 1 else 'is' }} overdue</span>
-  <span class="overdue-banner-cta">View {{ 'them' if overdue_count != 1 else 'it' }} &rarr;</span>
-</a>
+<div class="so-alert" role="status">
+  <span class="so-alert-ic">{{ icon_svg('alert') }}</span>
+  <div class="so-alert-text"><strong>{{ overdue_count }} job{{ 's' if overdue_count != 1 else '' }} {{ 'are' if overdue_count != 1 else 'is' }} overdue</strong>
+    <span>{{ 'These jobs need' if overdue_count != 1 else 'This job needs' }} attention to avoid delays.</span></div>
+  <a class="so-alert-btn" href="/staff/jobs?deadline=overdue">View {{ 'them' if overdue_count != 1 else 'it' }} <span aria-hidden="true">&rarr;</span></a>
+</div>
 {% endif %}
+
+<div class="so-row">
+  <section class="so-card" aria-labelledby="so-trend-h">
+    <div class="so-card-head">
+      <h2 id="so-trend-h">Jobs, last 30 days</h2>
+      <span class="so-legend"><span><i class="dot-delivered"></i>Delivered</span><span><i class="dot-created"></i>Created</span></span>
+    </div>
+    {% if daily_trend_svg %}<div class="so-chart">{{ daily_trend_svg | safe }}</div>{% else %}<p class="muted">No activity yet.</p>{% endif %}
+  </section>
+
+  <section class="so-card" aria-labelledby="so-qa-h">
+    <div class="so-card-head"><h2 id="so-qa-h">Quick actions</h2></div>
+    <ul class="so-actions">
+      <li><a href="/staff/jobs"><span class="so-act-ic tone-blue">{{ icon_svg('eye') }}</span><span class="so-act-text"><strong>Review queue</strong><small>{{ in_review }} job{{ '' if in_review == 1 else 's' }} waiting for a human</small></span><span class="so-act-go" aria-hidden="true">&rsaquo;</span></a></li>
+      <li><a href="/staff/jobs"><span class="so-act-ic tone-violet">{{ icon_svg('checklist') }}</span><span class="so-act-text"><strong>View all jobs</strong><small>Check status and progress</small></span><span class="so-act-go" aria-hidden="true">&rsaquo;</span></a></li>
+      <li><a href="/staff/clients"><span class="so-act-ic tone-green">{{ icon_svg('users') }}</span><span class="so-act-text"><strong>Manage clients</strong><small>Add or update client details</small></span><span class="so-act-go" aria-hidden="true">&rsaquo;</span></a></li>
+      <li><a href="/staff/support"><span class="so-act-ic tone-amber">{{ icon_svg('message') }}</span><span class="so-act-text"><strong>Support inbox</strong><small>Answer open support tickets</small></span><span class="so-act-go" aria-hidden="true">&rsaquo;</span></a></li>
+    </ul>
+  </section>
+</div>
 
 <div class="overview-grid">
   <div class="overview-main">
@@ -101,26 +117,6 @@
       </table>
       </div>
       {% endif %}
-    </div>
-
-    <div class="card card-collapsible" data-collapse-key="overview-chart">
-      <div class="card-head-row">
-        <h2 style="margin:0;">Jobs, last 30 days</h2>
-        <div style="display:flex; align-items:center; gap:12px;">
-          <span class="muted" style="font-size:0.78rem;">
-            <span style="color:var(--accent);">&#9679;</span> delivered
-            &nbsp; <span style="color:var(--faint);">&#9679;</span> created
-          </span>
-          <button type="button" class="card-collapse-toggle" aria-expanded="false" aria-label="Expand">&#9662;</button>
-        </div>
-      </div>
-      <div class="card-collapse-body">
-        {% if daily_trend_svg %}
-          {{ daily_trend_svg | safe }}
-        {% else %}
-          <p class="muted">No activity yet.</p>
-        {% endif %}
-      </div>
     </div>
 
     <div class="card card-collapsible" data-collapse-key="overview-top-clients">

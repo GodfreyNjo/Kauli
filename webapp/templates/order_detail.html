@@ -126,7 +126,6 @@
               <td class="muted" style="font-size:0.76rem; white-space:nowrap;">
                 <span class="tx-time">{{ '%02d:%02d'|format((seg.start_ms // 60000), (seg.start_ms // 1000) % 60) }}</span>
                 {% if sl.speaker %}<br class="tx-speaker"><span class="meta-pill tx-speaker" style="font-size:0.66rem;">{{ sl.speaker }}</span>{% endif %}
-                {% if seg.edited_text or seg.source_edited_transcript %}<br><span class="meta-pill tx-edited" style="font-size:0.66rem;">edited</span>{% endif %}
               </td>
               {% if same_language %}
               <td lang="{{ order['source_lang'] }}" data-edit="source" data-tag="{{ sl.target_tag }}" style="font-size:0.85rem;">{{ sl.target }}</td>
@@ -920,13 +919,7 @@
     var phone = window.matchMedia("(max-width: 860px)").matches;
     var box = document.querySelector(".order-workspace-transcript");
     if (!box) return;
-    if (!phone) {                                   // on a desktop the two cards are always open: their titles are plain headings, not toggles
-      [].forEach.call(document.querySelectorAll("details.ow-fold > summary.ow-h"), function (sm) {
-        sm.setAttribute("tabindex", "-1");
-        sm.addEventListener("click", function (e) { e.preventDefault(); });
-        sm.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") e.preventDefault(); });
-      });
-    }
+    // AI summary and Ask about this transcript fold away on every screen size; they start open on a desktop and closed on a phone.
     if (phone) {
       [].forEach.call(document.querySelectorAll("details.ow-fold[data-mobile-closed]"), function (d) { d.open = false; });
       if (document.getElementById("tx-source-toggle")) box.classList.add("tx-hide-source");

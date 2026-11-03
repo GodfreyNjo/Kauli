@@ -29,7 +29,7 @@ def test_a_ready_order_offers_more_without_an_upload(env, wav_bytes, monkeypatch
     assert f"/client/orders/{order['id']}/more" in page and "Do more with this file" in page
     more = env.client.get(f"/client/orders/{order['id']}/more")
     assert more.status_code == 200
-    for text in ("Translate it", "Dub it", 'name="reuse_order_id"', "About $"):
+    for text in ("Translate it", "Dub it", 'name="reuse_order_id"', "Your plan", "Pay as you go"):
         assert text in more.text, text
     assert 'name="audio"' not in more.text                                                    # nothing to upload
 
@@ -82,3 +82,57 @@ def test_a_file_that_is_gone_says_so_instead_of_failing(env, wav_bytes):
     r = env.client.post("/client/orders", data={"reuse_order_id": original["id"], "source_lang": "en", "target_lang": "en",
                                                 "service_level": "transcribe", "review_tier": "ai"})
     assert "no longer stored" in r.text
+
+
+def _long(env, order, minutes):
+    conn = env.db.get_conn()
+    conn.execute("UPDATE orders SET duration_minutes = ? WHERE id = ?", (minutes, order["id"]))
+    conn.commit()
+    conn.close()
+    return env.db.get_order(order["id"])
+
+
+def _cards(env, order):
+    return {c["key"]: c for c in repurpose.suggestions(order, {**dict(env.db.get_user("u1")), "client_scope_id": "u1"})}
+
+
+def test_a_customer_on_pay_as_you_go_sees_the_full_rate_and_where_a_plan_would_cover_it(env, wav_bytes, monkeypatch):
+    monkeypatch.setattr(env.app, "_lara_configured", lambda: True)
+    order = _long(env, _first(env, wav_bytes), 20)
+    card = _cards(env, order)["translate"]
+    q = card["quote"]
+    assert not card["included"] and q["usd"] == round(20 * q["rate"], 2) and q["included_minutes"] == 0       # free minutes never pay for a translation
+    assert q["hint"] and q["hint"]["plan"] == "Pro"                                                              # Pro would include it
+    page = env.client.get(f"/client/orders/{order['id']}/more").text
+    assert f"${q['usd']:.2f}" in page and "On Pro" in page and "20.0 min at $" in page
+
+
+def test_a_paid_plan_covers_translation_from_its_included_minutes_and_only_part_when_they_run_low(env, wav_bytes, monkeypatch):
+    monkeypatch.setattr(env.app, "_lara_configured", lambda: True)
+    env.db.set_subscription_plan("u1", "pro", 30)
+    order = _long(env, _first(env, wav_bytes), 20)
+    card = _cards(env, order)["translate"]
+    assert card["included"] and card["usd"] == 0 and card["quote"]["included_minutes"] == 20
+    page = env.client.get(f"/client/orders/{order['id']}/more").text
+    assert "Included in your plan" in page and "Uses 20.0 of your included minutes" in page
+    conn = env.db.get_conn()
+    conn.execute("UPDATE subscriptions SET minutes_used_this_period = ? WHERE user_id = 'u1'", (env.app.billing.plan_included_minutes("pro") - 12,))
+    conn.commit()
+    conn.close()
+    q = _cards(env, order)["translate"]["quote"]
+    assert q["included_minutes"] == 12 and q["billable_minutes"] == 8 and q["usd"] == round(8 * q["rate"], 2)      # 12 included, the other 8 at the rate
+    assert "12.0 min included in your Pro plan" in env.client.get(f"/client/orders/{order['id']}/more").text
+
+
+def test_a_dub_is_always_priced_on_its_own_and_prepaid_credit_comes_off_it(env, wav_bytes, monkeypatch):
+    monkeypatch.setattr(env.app, "_lara_configured", lambda: True)
+    env.db.set_subscription_plan("u1", "premium", 30)
+    order = _long(env, _first(env, wav_bytes), 10)
+    q = _cards(env, order)["dub"]["quote"]
+    assert q["included_minutes"] == 0 and q["usd"] == round(10 * q["rate"], 2)
+    conn = env.db.get_conn()
+    conn.execute("UPDATE subscriptions SET wallet_credits = 100 WHERE user_id = 'u1'")
+    conn.commit()
+    conn.close()
+    q2 = _cards(env, order)["dub"]["quote"]
+    assert q2["credits_usd"] > 0 and q2["usd"] < q["usd"]
