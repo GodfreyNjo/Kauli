@@ -447,7 +447,9 @@ def dashboard(days: int = 28, now: float | None = None) -> dict:
         conn.close()
 
     insights = _insights(channels, country_rows, churn_rate, _change(churn_rate, 0) if False else None, devices, likelihood, high, prospects, features, inactive)
+    more = extras(days, now, visitors, signups_now, paid_now)
     return {
+        **more,
         "days": days, "labels": cur["labels"], "first_hit": first_hit["t"], "hits": first_hit["n"],
         "kpis": [
             {"key": "visitors", "label": "Total website visitors", "value": visitors, "change": _change(visitors, visitors_prev), "series": cur["visitors"], "fmt": "int"},
@@ -475,6 +477,68 @@ def dashboard(days: int = 28, now: float | None = None) -> dict:
         "insights": insights, "model": {"trained": model["trained"], "customers": model["customers"], "paying": model["paying"]},
         "onboarding": {"ttfv": onboarding.ttfv_minutes(90, now), "csat": onboarding.csat_summary(90, now), "stuck": len(onboarding.first_orders_needing_help(now))},
     }
+
+
+def ago(seconds: float) -> str:
+    """"just now", "5m ago", "3h ago", "2d ago"."""
+    seconds = max(0.0, seconds)
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds // 60)}m ago"
+    if seconds < 86400:
+        return f"{int(seconds // 3600)}h ago"
+    return f"{int(seconds // 86400)}d ago"
+
+
+WEEKDAYS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
+
+
+def extras(days: int, now: float, visitors: int, signups: int, paid: int) -> dict:
+    """What the first dashboard did not have: visitors on the site right now, the visit-to-customer funnel, what just happened (sign-ups,
+    payments, orders, contact requests, posts), how well each channel turns visitors into customers, and when visitors arrive."""
+    start = now - (days - 1) * DAY
+    conn = db.get_conn()
+    try:
+        live = _rows(conn, "SELECT COUNT(DISTINCT visitor) AS n FROM site_hits WHERE ts >= ?", (now - 300,))[0]["n"]
+        ordering = _rows(conn, "SELECT COUNT(DISTINCT client_id) AS n FROM orders WHERE created_at >= ?", (start,))[0]["n"]
+        steps = [("Visited the site", visitors), ("Signed up", signups), ("Placed an order", ordering), ("Became a paying customer", paid)]
+        funnel, prior = [], None
+        top = steps[0][1] or max((c for _, c in steps), default=1) or 1
+        for name, count in steps:
+            funnel.append({"label": name, "count": count, "share": _pct(count, top), "step": _pct(count, prior) if prior else None})
+            prior = count or None
+
+        events: list[dict] = []
+        for r in _rows(conn, "SELECT display_name, created_at FROM users WHERE role = 'client' AND created_at >= ? ORDER BY created_at DESC LIMIT 6", (start,)):
+            events.append({"kind": "signup", "title": "New sign-up", "detail": "A new user created an account", "ts": r["created_at"]})
+        for r in _rows(conn, "SELECT amount_usd, completed_at FROM payments WHERE status = 'completed' AND amount_usd > 0 AND completed_at >= ? ORDER BY completed_at DESC LIMIT 6", (start,)):
+            events.append({"kind": "payment", "title": "New payment", "detail": f"${r['amount_usd']:,.2f} received", "ts": r["completed_at"]})
+        for r in _rows(conn, "SELECT created_at FROM orders WHERE created_at >= ? ORDER BY created_at DESC LIMIT 6", (start,)):
+            events.append({"kind": "order", "title": "New order", "detail": "A file was submitted", "ts": r["created_at"]})
+        for r in _rows(conn, "SELECT created_at FROM leads WHERE created_at >= ? ORDER BY created_at DESC LIMIT 4", (start,)):
+            events.append({"kind": "lead", "title": "Contact request", "detail": "New message from the website", "ts": r["created_at"]})
+        for r in _rows(conn, "SELECT title, published_at FROM blog_posts WHERE status = 'published' AND published_at >= ? ORDER BY published_at DESC LIMIT 3", (start,)):
+            events.append({"kind": "post", "title": "Blog post published", "detail": r["title"], "ts": r["published_at"]})
+        events.sort(key=lambda e: -e["ts"])
+        activity = [{**e, "ago": ago(now - e["ts"])} for e in events[:8]]
+
+        quality = []
+        for r in _rows(conn, "SELECT COALESCE(NULLIF(signup_channel, ''), 'Direct') AS ch, COUNT(*) AS n, "
+                             "SUM(EXISTS(SELECT 1 FROM payments p WHERE p.user_id = users.id AND p.status = 'completed' AND p.amount_usd > 0)) AS paid "
+                             "FROM users WHERE role = 'client' AND created_at >= ? GROUP BY ch ORDER BY n DESC", (start,)):
+            quality.append({"name": r["ch"], "signups": r["n"], "paid": r["paid"] or 0, "rate": _pct(r["paid"] or 0, r["n"])})
+
+        grid = [[0] * 24 for _ in range(7)]
+        for r in _rows(conn, "SELECT CAST(strftime('%w', ts, 'unixepoch') AS INTEGER) AS dow, CAST(strftime('%H', ts, 'unixepoch') AS INTEGER) AS hr, "
+                             "COUNT(DISTINCT session) AS n FROM site_hits WHERE ts >= ? GROUP BY dow, hr", (start,)):
+            grid[r["dow"]][r["hr"]] = r["n"]
+    finally:
+        conn.close()
+    peak = max((v for row in grid for v in row), default=0)
+    slots = sorted(((v, d, h) for d, row in enumerate(grid) for h, v in enumerate(row) if v), reverse=True)[:3]
+    return {"live": live, "funnel": funnel, "activity": activity, "quality": quality,
+            "heat": {"grid": grid, "peak": peak, "best": [f"{WEEKDAYS[d]} {h:02d}:00" for _, d, h in slots]}}
 
 
 def _cum(daily_map: dict, labels: list[str], i: int) -> float:

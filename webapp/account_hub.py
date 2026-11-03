@@ -6,7 +6,9 @@ every handler reads current_user, templates, ... from that module at request tim
 """
 from __future__ import annotations
 
+import csv
 import html
+import io
 import json
 import re
 import secrets
@@ -1255,6 +1257,37 @@ def site_analytics(request: Request, days: int = 28, refresh: int = 0):
         "internal_line": _line_chart([(d[5:], n) for d, n in internal["orders_by_day"]]) if len(internal["orders_by_day"]) > 1 else "",
         "property": ga_reports.property_id(), "measurement_id": ga_events.measurement_id(),
         "fetched": datetime.fromtimestamp(ga["fetched_at"]).strftime("%b %d, %H:%M") if ga else None})
+
+
+@router.get("/staff/analytics/export.csv")
+def site_analytics_export(request: Request, days: int = 28):
+    """The headline numbers and the day-by-day visitors, sign-ups-free of any personal data, as a spreadsheet."""
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    days = days if days in (7, 28, 90) else 28
+    d = analytics_engine.dashboard(days)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["Kauli site analytics", f"last {days} days", datetime.now().strftime("%Y-%m-%d %H:%M")])
+    w.writerow([])
+    w.writerow(["Metric", "Value", "Change vs previous period (%)"])
+    for k in d["kpis"]:
+        w.writerow([k["label"], round(k["value"], 2), "" if k["change"] is None else k["change"]])
+    w.writerow([])
+    w.writerow(["Funnel step", "People", "Share of visitors (%)"])
+    for f in d["funnel"]:
+        w.writerow([f["label"], f["count"], f["share"]])
+    w.writerow([])
+    w.writerow(["Channel", "Sessions", "Share (%)"])
+    for c in d["traffic"]["channels"]:
+        w.writerow([c["name"], c["sessions"], c["share"]])
+    w.writerow([])
+    w.writerow(["Day", "Visitors", "Sessions"])
+    for day, v, s_ in zip(d["labels"], d["traffic"]["visitors"], d["traffic"]["sessions_series"]):
+        w.writerow([day, v, s_])
+    return Response(out.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="kauli-site-analytics-{days}d.csv"'})
 
 
 @router.post("/staff/analytics/ad-spend")

@@ -9,189 +9,202 @@
 {% endmacro %}
 {% macro mmss(s) %}{{ '%dm %02ds'|format((s // 60)|int, (s % 60)|int) }}{% endmacro %}
 {% set d = dash %}
-<div class="sa-page" lang="en">
-  <div class="sa-head">
+<div class="sa-page sx" lang="en">
+  <header class="sx-head">
     <div>
-      <h1>Site analytics</h1>
-      <p>How the website and the app are doing: who comes, what they do, who is likely to buy, who may leave. Our own counts and Google Analytics, side by side.</p>
+      <p class="sx-eyebrow">Site analytics <span class="sx-live" title="Visitors on the site in the last 5 minutes"><i></i>Live data &middot; {{ d.live }} on the site now</span></p>
+      <h1>Your audience. Your growth.</h1>
+      <p class="sx-sub">See how people find you, what they do, and how your business is performing.</p>
     </div>
-    <div class="sa-head-right">
-      <nav class="sa-range" aria-label="Time range">
-        {% for n in [7, 28, 90] %}<a href="/staff/analytics?days={{ n }}" class="{{ 'is-on' if days == n else '' }}">Last {{ n }} days</a>{% endfor %}
-      </nav>
-      <div class="sa-ga {{ 'is-on' if configured else '' }}"><span>Powered by</span><strong>Google Analytics 4</strong><em>{{ 'Connected' if configured else 'Not connected' }}</em></div>
+    <div class="sx-head-right">
+      <label class="sx-range"><span class="sr-only">Time range</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>
+        <select onchange="location.href=this.value" aria-label="Time range">
+          {% for n in [7, 28, 90] %}<option value="/staff/analytics?days={{ n }}" {{ 'selected' if days == n else '' }}>Last {{ n }} days</option>{% endfor %}
+        </select>
+      </label>
+      <a class="sx-btn" href="/staff/analytics/export.csv?days={{ days }}" download>Export CSV</a>
+      <div class="sa-ga {{ 'is-on' if configured else '' }}"><span>Google Analytics</span><em>{{ 'Connected' if configured else 'Not connected' }}</em></div>
     </div>
-  </div>
+  </header>
   {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
   {% if d.hits < 50 %}<p class="sa-note">Kauli's own visitor counting started recently, so the traffic numbers fill in as days pass. Sign-ups, customers, orders and revenue already come from our full records.</p>{% endif %}
 
-  <div class="sa-kpis">
+  <div class="sx-kpis">
     {% for k in d.kpis %}
-    <article class="sa-card sa-kpi">
-      <span class="sa-kpi-label">{{ k.label }}</span>
-      <strong>{% if k.fmt == 'usd' %}{{ money(k.value) }}{% elif k.fmt == 'pct' %}{{ '%.1f'|format(k.value) }}%{% else %}{{ '{:,}'.format(k.value|int) }}{% endif %}</strong>
-      {{ delta(k.change, k.get('invert', False)) }}<small class="muted"> vs previous {{ days }} days</small>
-      {% if k.series %}{{ an.spark(k.series)|safe }}{% endif %}
+    <article class="sx-kpi tone-{{ ['blue','green','violet','amber','rose','slate'][loop.index0] }}">
+      <span class="sx-kpi-ic" aria-hidden="true">
+        {% if k.key == 'visitors' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14c2.4 0 4 1.6 4 4"/></svg>
+        {% elif k.key == 'signups' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.4"/><path d="M3.5 19c0-3.4 2.9-5.6 6.5-5.6M18 9v6M15 12h6"/></svg>
+        {% elif k.key == 'active' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-6 4 12 2.5-6H21"/></svg>
+        {% elif k.key == 'paid' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2.5l2 11h10l2-8H7"/><circle cx="9.5" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>
+        {% elif k.key == 'mrr' %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.5-.8-1.4-1.2-2.5-1.2-1.4 0-2.4.7-2.4 1.8 0 2.5 5 1.2 5 3.8 0 1.1-1 1.9-2.6 1.9-1.2 0-2.2-.5-2.7-1.4M12 6.5V8M12 16v1.5"/></svg>
+        {% else %}<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></svg>{% endif %}
+      </span>
+      <div class="sx-kpi-body">
+        <span class="sx-kpi-label">{{ k.label }}</span>
+        <strong>{% if k.fmt == 'usd' %}{{ money(k.value) }}{% elif k.fmt == 'pct' %}{{ '%.1f'|format(k.value) }}%{% else %}{{ '{:,}'.format(k.value|int) }}{% endif %}</strong>
+        <span class="sx-kpi-delta">{{ delta(k.change, k.get('invert', False)) }}</span>
+      </div>
+      {% if k.series %}<div class="sx-kpi-spark">{{ an.spark(k.series)|safe }}</div>{% endif %}
     </article>
     {% endfor %}
   </div>
 
-  <div class="sa-grid">
-    <div class="sa-col">
-    <section class="sa-card sa-traffic" data-tabs>
-      <header class="sa-card-head">
-        <div><h2>Acquisition &amp; Traffic</h2><p>Where do your visitors come from?</p></div>
-        <div class="sa-mini"><span>Sign-up conversion rate</span><strong>{{ '%.1f'|format(d.traffic.signup_rate) }}%</strong>{{ delta(((d.traffic.signup_rate - d.traffic.signup_rate_prev) / d.traffic.signup_rate_prev * 100) if d.traffic.signup_rate_prev else None) }}</div>
-      </header>
-      <div class="sa-tabs" role="tablist">
-        <button type="button" class="is-on" data-tab="channels">Channels</button><button type="button" data-tab="sources">Sources</button>
-        <button type="button" data-tab="landing">Landing pages</button><button type="button" data-tab="geo">Geography</button>
-      </div>
-      <div data-panel="channels" class="sa-split">
+  <div class="sx-row sx-row-3">
+    <section class="sa-card" aria-labelledby="sx-t1">
+      <header class="sa-card-head"><h2 id="sx-t1">Traffic sources</h2><a class="sx-more" href="#sx-channels">View all &rarr;</a></header>
+      <div class="sx-donut-row">
         {{ an.donut(an.pairs(d.traffic.channels, 'name', 'sessions'), 170, 30, '{:,}'.format(d.traffic.sessions), 'Sessions')|safe }}
         <ul class="sa-legend">
-          {% for c in d.traffic.channels %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><span>{{ c.name }}</span><b>{{ '%.1f'|format(c.share) }}%</b></li>{% endfor %}
+          {% for c in d.traffic.channels[:6] %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><span>{{ c.name }}</span><b>{{ '%.1f'|format(c.share) }}%</b></li>{% endfor %}
         </ul>
-        <div class="sa-chart"><div class="sa-legend-inline"><i style="background:#2b7be4"></i>Sessions <i style="background:#8b5cf6"></i>Users</div>
-          {{ an.lines(d.labels, [('Sessions', d.traffic.sessions_series), ('Users', d.traffic.visitors)])|safe }}</div>
-      </div>
-      <div data-panel="sources" hidden>
-        {% if d.traffic.sources %}<table class="sa-table"><thead><tr><th>Source / channel</th><th class="num">Sessions</th></tr></thead><tbody>
-          {% for r in d.traffic.sources %}<tr><td>{{ r.name }}</td><td class="num">{{ '{:,}'.format(r.sessions) }}</td></tr>{% endfor %}</tbody></table>
-        {% else %}<p class="muted">No visits counted yet.</p>{% endif %}
-      </div>
-      <div data-panel="landing" hidden>
-        {% if d.traffic.landing %}<table class="sa-table"><thead><tr><th>Landing page</th><th class="num">Visits</th><th class="num">Bounce rate</th></tr></thead><tbody>
-          {% for r in d.traffic.landing %}<tr><td>{{ r.path }}</td><td class="num">{{ '{:,}'.format(r.views) }}</td><td class="num">{{ '%.1f'|format(r.bounce) }}%</td></tr>{% endfor %}</tbody></table>
-        {% else %}<p class="muted">No visits counted yet.</p>{% endif %}
-      </div>
-      <div data-panel="geo" hidden>
-        {% if d.audience.countries %}<table class="sa-table"><tbody>{% for r in d.audience.countries %}<tr><td>{{ an.flag(r.code) }} {{ an.country_name(r.code) }}</td><td class="num">{{ '{:,}'.format(r.sessions) }} sessions</td></tr>{% endfor %}</tbody></table>
-        {% else %}<p class="muted">No visits counted yet.</p>{% endif %}
       </div>
     </section>
-    <section class="sa-card sa-devices">
-      <header class="sa-card-head"><div><h2>Devices &amp; Browsers</h2><p>How users access your site and app</p></div></header>
-      <div class="sa-split sa-split-2">
+    <section class="sa-card" aria-labelledby="sx-t2">
+      <header class="sa-card-head"><h2 id="sx-t2">Visitors over time</h2>
+        <label class="sx-select"><span class="sr-only">Metric</span><select id="sx-metric" aria-label="Metric"><option value="both">Visitors and sessions</option><option value="visitors">Visitors</option><option value="sessions">Sessions</option></select></label></header>
+      <div class="sa-legend-inline"><i style="background:#2b7be4"></i>Sessions <i style="background:#8b5cf6"></i>Visitors</div>
+      <div class="sx-chart" id="sx-chart-both">{{ an.lines(d.labels, [('Sessions', d.traffic.sessions_series), ('Visitors', d.traffic.visitors)], 560, 190)|safe }}</div>
+      <div class="sx-chart" id="sx-chart-visitors" hidden>{{ an.lines(d.labels, [('Visitors', d.traffic.visitors)], 560, 190)|safe }}</div>
+      <div class="sx-chart" id="sx-chart-sessions" hidden>{{ an.lines(d.labels, [('Sessions', d.traffic.sessions_series)], 560, 190)|safe }}</div>
+    </section>
+    <section class="sa-card" aria-labelledby="sx-t3">
+      <header class="sa-card-head"><h2 id="sx-t3">Audience by location</h2></header>
+      <svg class="sa-map" viewBox="0 0 720 280" role="img" aria-label="Visitors by country"><g class="sa-land">{{ an.world_dots()|safe }}</g>{{ an.map_pins(d.audience.countries)|safe }}</svg>
+      {% set total_c = d.audience.countries|sum(attribute='sessions') or 1 %}
+      {% if d.audience.countries %}
+      <ol class="sx-countries">
+        {% for r in d.audience.countries[:5] %}<li><b>{{ loop.index }}</b><span>{{ an.flag(r.code) }} {{ an.country_name(r.code) }}</span><em>{{ '{:,}'.format(r.sessions) }}</em><i><u style="width: {{ '%.1f'|format(100 * r.sessions / total_c) }}%"></u></i><strong>{{ '%.1f'|format(100 * r.sessions / total_c) }}%</strong></li>{% endfor %}
+      </ol>
+      {% else %}<p class="muted">No country data yet. It fills in as visits are counted.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="sx-row sx-row-4">
+    <section class="sa-card" data-tabs aria-labelledby="sx-t4">
+      <header class="sa-card-head"><h2 id="sx-t4">Devices &amp; browsers</h2></header>
+      <div class="sa-tabs" role="tablist"><button type="button" class="is-on" data-tab="dev">Devices</button><button type="button" data-tab="brw">Browsers</button></div>
+      <div data-panel="dev" class="sx-donut-row">
         {{ an.donut(an.pairs(d.devices.rows, 'name', 'sessions'), 150, 26, '{:,}'.format(d.devices.sessions), 'Sessions')|safe }}
         <ul class="sa-legend">{% for r in d.devices.rows %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><span>{{ r.name }}</span><b>{{ '%.1f'|format(r.share) }}%</b></li>{% endfor %}</ul>
       </div>
-      <h4>Top browsers</h4>
-      <ul class="sa-bars">{% for b in d.devices.browsers %}<li><span>{{ b.name }}</span><i><u style="width: {{ b.share }}%"></u></i><b>{{ '%.1f'|format(b.share) }}%</b></li>{% else %}<li class="muted">No visits counted yet.</li>{% endfor %}</ul>
+      <div data-panel="brw" hidden>
+        <ul class="sa-bars">{% for b in d.devices.browsers %}<li><span>{{ b.name }}</span><i><u style="width: {{ b.share }}%"></u></i><b>{{ '%.1f'|format(b.share) }}%</b></li>{% else %}<li class="muted">No visits counted yet.</li>{% endfor %}</ul>
+      </div>
     </section>
-    <section class="sa-card sa-product">
-      <header class="sa-card-head"><div><h2>Product Usage</h2><p>Which features are used most?</p></div></header>
+    <section class="sa-card" aria-labelledby="sx-t5">
+      <header class="sa-card-head"><h2 id="sx-t5">Top pages</h2></header>
+      {% if d.pages %}
+      {% set top_views = d.pages[0].views or 1 %}
+      <table class="sa-table"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Unique visitors</th><th class="num">Avg. time</th><th></th></tr></thead><tbody>
+        {% for r in d.pages[:7] %}<tr><td class="sx-path">{{ r.path }}</td><td class="num">{{ '{:,}'.format(r.views) }}</td><td class="num">{{ '{:,}'.format(r.people) }}</td><td class="num">{{ mmss(r.time_on) }}</td><td class="sx-minibar"><i><u style="width: {{ '%.0f'|format(100 * r.views / top_views) }}%"></u></i></td></tr>{% endfor %}
+      </tbody></table>
+      <p class="sa-fine">Bounce rate across all visits: {{ '%.0f'|format(d.engagement.bounce) }}%.</p>
+      {% else %}<p class="muted">No visits counted yet.</p>{% endif %}
+    </section>
+    <section class="sa-card" aria-labelledby="sx-t6">
+      <header class="sa-card-head"><h2 id="sx-t6">User engagement</h2></header>
+      <div class="sx-tiles">
+        <div class="tone-blue"><span>Avg. session</span><strong>{{ mmss(d.engagement.avg_session) }}</strong></div>
+        <div class="tone-green"><span>Returning users</span><strong>{{ '%.0f'|format(d.engagement.returning) }}%</strong></div>
+        <div class="tone-violet"><span>Active accounts</span><strong>{{ '{:,}'.format(d.engagement.active) }}</strong></div>
+        <div class="tone-amber"><span>Bounce rate</span><strong>{{ '%.0f'|format(d.engagement.bounce) }}%</strong></div>
+      </div>
+      <div class="sx-tiles sx-tiles-2">
+        <div><span>Time to first result</span><strong>{% if d.onboarding.ttfv.median is not none %}{{ mmss(d.onboarding.ttfv.median * 60) if d.onboarding.ttfv.median < 600 else (('%.1f'|format(d.onboarding.ttfv.median / 60)) ~ ' h') }}{% else %}-{% endif %}</strong></div>
+        <div><span>Satisfaction</span><strong>{% if d.onboarding.csat.avg %}{{ d.onboarding.csat.avg }} / 5{% else %}-{% endif %}</strong></div>
+      </div>
+    </section>
+    <section class="sa-card" aria-labelledby="sx-t7">
+      <header class="sa-card-head"><h2 id="sx-t7">Conversion funnel</h2></header>
+      <ol class="sx-funnel">
+        {% for f in d.funnel %}
+        <li>{% if f.step is not none %}<span class="sx-step">{{ '%.1f'|format(f.step) }}% of the step before</span>{% endif %}
+          <div class="sx-fbar tone-{{ ['blue','violet','green','amber'][loop.index0] }}" style="width: {{ [f.share, 38]|max }}%"><span>{{ f.label }}</span><b>{{ '{:,}'.format(f.count) }}</b></div></li>
+        {% endfor %}
+      </ol>
+    </section>
+  </div>
+
+  <div class="sx-row sx-row-3">
+    <section class="sa-card" aria-labelledby="sx-t8">
+      <header class="sa-card-head"><h2 id="sx-t8">Revenue &amp; business health</h2></header>
+      <div class="sx-tiles">
+        <div><span>Trial &rarr; paid</span><strong>{{ '%.1f'|format(d.revenue.trial_to_paid) }}%</strong></div>
+        <div><span>ARPU</span><strong>${{ '%.2f'|format(d.revenue.arpu) }}</strong></div>
+        <div><span>Revenue ({{ days }} days)</span><strong>{{ money(d.revenue.total) }}</strong></div>
+        <div><span>Cost to win a customer</span><strong>{% if d.revenue.cac is not none %}${{ '%.2f'|format(d.revenue.cac) }}{% else %}-{% endif %}</strong>
+          <form method="post" action="/staff/analytics/ad-spend" class="sa-adspend"><label>Ad spend / month $<input type="text" name="spend" inputmode="decimal" value="{{ '%g'|format(d.revenue.ad_spend) if d.revenue.ad_spend else '' }}" placeholder="0"></label><button type="submit" class="secondary">Set</button></form></div>
+      </div>
+      <div class="sx-chart"><h4>Revenue so far this period</h4>{{ an.lines(d.labels, [('Revenue', d.revenue.series)], 520, 130)|safe }}</div>
+      {% if d.revenue.by_plan %}<ul class="sa-legend sa-legend-tight">{% for p in d.revenue.by_plan %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><span>{{ p.name }}</span><b>{{ money(p.usd) }}</b></li>{% endfor %}</ul>{% endif %}
+    </section>
+    <section class="sa-card" aria-labelledby="sx-t9">
+      <header class="sa-card-head"><h2 id="sx-t9">Feature usage</h2></header>
       <ul class="sa-bars sa-bars-wide">{% for f in d.features %}<li><span>{{ f.name }}</span><em class="muted">{{ '{:,}'.format(f.users) }}</em><i><u style="width: {{ f.share }}%"></u></i><b>{{ '%.0f'|format(f.share) }}%</b></li>{% endfor %}</ul>
       {% if d.features and d.features[0].users %}<div class="sa-popular"><span>Most popular feature</span><strong>{{ d.features[0].name }}</strong><small class="muted">{{ '%.0f'|format(d.features[0].share) }}% of active users</small></div>{% endif %}
     </section>
-    </div>
-    <div class="sa-col">
-    <section class="sa-card sa-geo" data-tabs>
-      <header class="sa-card-head"><div><h2>Global Audience</h2><p>Where your users are located &amp; their purchase likelihood</p></div>
-        <div class="sa-tabs sa-tabs-tight"><button type="button" class="is-on" data-tab="loc">Locations</button><button type="button" data-tab="like">Purchase likelihood</button></div></header>
-      <div class="sa-geo-body">
-        <svg class="sa-map" viewBox="0 0 720 280" role="img" aria-label="Visitors by country"><g class="sa-land">{{ an.world_dots()|safe }}</g>{{ an.map_pins(d.audience.countries)|safe }}</svg>
-        <div>
-          <div data-panel="loc">
-            <table class="sa-table sa-table-tight"><thead><tr><th>Country</th><th class="num">Sessions</th><th class="num">Buy likelihood</th></tr></thead><tbody>
-              {% for r in d.audience.countries[:7] %}<tr><td>{{ an.flag(r.code) }} {{ an.country_name(r.code) }}</td><td class="num">{{ '{:,}'.format(r.sessions) }}</td><td class="num">{{ ('%.0f'|format(r.likelihood) ~ '%') if r.likelihood is not none else '-' }}</td></tr>{% else %}<tr><td colspan="3" class="muted">No country data yet.</td></tr>{% endfor %}
-            </tbody></table>
-          </div>
-          <div data-panel="like" hidden>
-            <table class="sa-table sa-table-tight"><thead><tr><th>Country</th><th class="num">Buy likelihood</th></tr></thead><tbody>
-              {% for r in (d.audience.countries|selectattr('likelihood', 'ne', none)|sort(attribute='likelihood', reverse=True))[:7] %}<tr><td>{{ an.flag(r.code) }} {{ an.country_name(r.code) }}</td><td class="num">{{ '%.0f'|format(r.likelihood) }}%</td></tr>{% else %}<tr><td colspan="2" class="muted">Needs signed-in customers from a country.</td></tr>{% endfor %}
-            </tbody></table>
-          </div>
-        </div>
-      </div>
-      {% set top = d.audience.countries[0] if d.audience.countries else none %}
-      <div class="sa-callouts">
-        <div><span>Top location</span><strong>{% if top %}{{ an.country_name(top.code) }}{% else %}-{% endif %}</strong><small class="muted">{% if top %}{{ '{:,}'.format(top.sessions) }} sessions{% endif %}</small></div>
-        <div><span>High purchase likelihood</span><strong>{{ '%.0f'|format(d.audience.likelihood) }}%</strong><small class="muted">{{ d.audience.high_intent }} of {{ d.audience.prospects }} active free users</small></div>
-      </div>
+    <section class="sa-card sx-insights" aria-labelledby="sx-t10">
+      <header class="sa-card-head"><h2 id="sx-t10">Audience insights</h2></header>
+      <div class="sa-ring-row">{{ an.ring(d.audience.likelihood, '#10b981', 86, 'Purchase likelihood')|safe }}
+        <p><b>Purchase likelihood.</b> of your active free users show high purchase intent ({{ d.audience.high_intent }} of {{ d.audience.prospects }}).</p></div>
+      <div class="sa-ring-row">{{ an.ring(d.churn.risk, '#f59e0b', 86, 'Churn risk')|safe }}
+        <p><b>Churn risk.</b> of active and paying customers may leave ({{ d.churn.at_risk }} of {{ d.churn.watched }}).</p></div>
+      <h4>Quick insights</h4>
+      <ul class="sx-bullets">{% for line in d.insights %}<li>{{ line }}</li>{% endfor %}</ul>
     </section>
-    <section class="sa-card sa-engage">
-      <header class="sa-card-head"><div><h2>User Engagement &amp; Retention</h2><p>Are users finding value and coming back?</p></div></header>
-      <div class="sa-trio">
-        <div><span>Avg. session duration</span><strong>{{ mmss(d.engagement.avg_session) }}</strong></div>
-        <div><span>Returning users</span><strong>{{ '%.0f'|format(d.engagement.returning) }}%</strong></div>
-        <div><span>Active accounts</span><strong>{{ '{:,}'.format(d.engagement.active) }}</strong></div>
-      </div>
-      <div class="sa-onb">
-        <div><span>Time to first result</span><strong>{% if d.onboarding.ttfv.median is not none %}{{ mmss(d.onboarding.ttfv.median * 60) if d.onboarding.ttfv.median < 600 else (('%.1f'|format(d.onboarding.ttfv.median / 60)) ~ ' h') }}{% else %}-{% endif %}</strong><small class="muted">median, new customers</small></div>
-        <div><span>Got a result in a day</span><strong>{{ '%.0f'|format(d.onboarding.ttfv.share_within_day) }}%</strong><small class="muted">of {{ d.onboarding.ttfv.joined }} who joined</small></div>
-        <div><span>Satisfaction</span><strong>{% if d.onboarding.csat.avg %}{{ d.onboarding.csat.avg }} / 5{% else %}-{% endif %}</strong><small class="muted">{{ d.onboarding.csat.n }} rating{{ '' if d.onboarding.csat.n == 1 else 's' }}</small></div>
-        <div><span>First orders stuck</span><strong>{{ d.onboarding.stuck }}</strong><small class="muted"><a href="/staff/engagement">see who</a></small></div>
-      </div>
-      <div class="sa-split sa-split-3">
-        <div>
-          <h4>Cohort retention</h4>
-          <table class="sa-cohort"><thead><tr><th>Signup week</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr></thead><tbody>
-            {% for r in d.engagement.cohorts %}<tr><td>{{ r.label }} <small class="muted">({{ r.size }})</small></td>
-              {% for c in r.cells %}{% if c is none %}<td class="empty">-</td>{% else %}<td style="background: rgba(43,123,228,{{ '%.2f'|format(0.08 + c / 100 * 0.62) }}); color: {{ '#fff' if c > 55 else '#0b2447' }}">{{ '%.0f'|format(c) }}%</td>{% endif %}{% endfor %}</tr>
-            {% else %}<tr><td colspan="5" class="muted">Needs customers who signed up in the last ten weeks.</td></tr>{% endfor %}
-          </tbody></table>
-        </div>
-        <div>
-          <h4>User activity</h4>
-          {{ an.donut([('Daily', d.engagement.dau), ('Weekly', d.engagement.wau - d.engagement.dau), ('Monthly', d.engagement.mau - d.engagement.wau)], 120, 20, '{:,}'.format(d.engagement.active), 'Active users')|safe }}
-          <ul class="sa-legend sa-legend-tight"><li><i style="background:#2b7be4"></i><span>Daily</span><b>{{ d.engagement.dau }}</b></li><li><i style="background:#8b5cf6"></i><span>Weekly</span><b>{{ d.engagement.wau }}</b></li><li><i style="background:#f59e0b"></i><span>Monthly</span><b>{{ d.engagement.mau }}</b></li></ul>
-          <div class="sa-inactive"><h4>Inactive accounts</h4><strong>{{ d.engagement.inactive }}</strong><small class="muted">No activity for 14+ days</small><a class="ds-btn small" href="/staff/engagement">View accounts</a></div>
-        </div>
-      </div>
+  </div>
+
+  <div class="sx-row sx-row-3">
+    <section class="sa-card" aria-labelledby="sx-t11">
+      <header class="sa-card-head"><h2 id="sx-t11">Recent activity</h2></header>
+      {% if d.activity %}
+      <ul class="sx-activity">{% for e in d.activity %}<li><span class="sx-ev ev-{{ e.kind }}" aria-hidden="true"></span><div><strong>{{ e.title }}</strong><small>{{ e.detail }}</small></div><time>{{ e.ago }}</time></li>{% endfor %}</ul>
+      {% else %}<p class="muted">Sign-ups, payments, orders, contact requests and new posts show here as they happen.</p>{% endif %}
     </section>
-    <section class="sa-card sa-pages">
-      <header class="sa-card-head"><div><h2>Website Performance &amp; Top Pages</h2><p>Which pages bring the most traffic and engagement?</p></div></header>
-      {% if d.pages %}<table class="sa-table"><thead><tr><th>Page</th><th class="num">Views</th><th class="num">Unique visitors</th><th class="num">Avg. time on page</th></tr></thead><tbody>
-        {% for r in d.pages %}<tr><td>{{ r.path }}</td><td class="num">{{ '{:,}'.format(r.views) }}</td><td class="num">{{ '{:,}'.format(r.people) }}</td><td class="num">{{ mmss(r.time_on) }}</td></tr>{% endfor %}</tbody></table>
-        <p class="sa-fine">Bounce rate across all visits: {{ '%.0f'|format(d.engagement.bounce) }}%.</p>
-      {% else %}<p class="muted">No visits counted yet.</p>{% endif %}
+    <section class="sa-card" id="sx-channels" aria-labelledby="sx-t12">
+      <header class="sa-card-head"><div><h2 id="sx-t12">Which channels bring customers</h2><p>Visits are only half the story: who signs up and pays.</p></div></header>
+      <table class="sa-table"><thead><tr><th>Channel</th><th class="num">Visits</th><th class="num">Sign-ups</th><th class="num">Paying</th><th class="num">Sign-up &rarr; paying</th></tr></thead><tbody>
+        {% set visits = {} %}{% for c in d.traffic.channels %}{% if visits.update({c.name: c.sessions}) %}{% endif %}{% endfor %}
+        {% for q in d.quality %}<tr><td>{{ q.name }}</td><td class="num">{{ '{:,}'.format(visits.get(q.name, 0)) }}</td><td class="num">{{ q.signups }}</td><td class="num">{{ q.paid }}</td><td class="num">{{ '%.0f'|format(q.rate) }}%</td></tr>
+        {% else %}<tr><td colspan="5" class="muted">No sign-ups in this period yet.</td></tr>{% endfor %}
+      </tbody></table>
+      <h4>Where else people come from</h4>
+      <table class="sa-table"><tbody>{% for r in d.traffic.sources[:5] %}<tr><td>{{ r.name }}</td><td class="num">{{ '{:,}'.format(r.sessions) }}</td></tr>{% else %}<tr><td class="muted">No visits counted yet.</td></tr>{% endfor %}</tbody></table>
     </section>
-    </div>
-    <aside class="sa-card sa-insights">
-      <h2>Audience Insights</h2>
-      <div class="sa-block">
-        <h3>Purchase Likelihood</h3>
-        <div class="sa-ring-row">{{ an.ring(d.audience.likelihood, '#10b981', 92, 'Purchase likelihood')|safe }}
-          <p>of your active free users show high purchase intent based on their behaviour.</p></div>
-        <h4>Top activities linked to purchase</h4>
-        <ul class="sa-checks">{% for a in d.audience.activities %}<li><span class="ok">&#10003;</span>{{ a.label }}<b>{{ '%.0f'|format(a.share) }}%</b></li>{% endfor %}</ul>
-        <p class="sa-fine">{% if d.audience.trained %}Learned from {{ d.audience.model_customers }} customers ({{ d.audience.model_paying }} paying).{% else %}Starting weights: it begins learning from your own customers once there are 20, at least 4 of them paying (now {{ d.audience.model_customers }}, {{ d.audience.model_paying }} paying).{% endif %}</p>
+    <section class="sa-card" aria-labelledby="sx-t13">
+      <header class="sa-card-head"><div><h2 id="sx-t13">When visitors arrive</h2><p>Visits by day and hour (UTC). Darker means busier.</p></div></header>
+      {% set heat = d.heat %}
+      <div class="sx-heat" role="img" aria-label="Visits by weekday and hour">
+        {% for row in heat.grid %}{% set wd = loop.index0 %}
+        <div class="sx-heat-row"><span>{{ ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][wd] }}</span>
+          {% for v in row %}<i title="{{ ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][wd] }} {{ '%02d'|format(loop.index0) }}:00 - {{ v }} visits" style="--h: {{ '%.2f'|format(v / heat.peak) if heat.peak else 0 }}"></i>{% endfor %}</div>
+        {% endfor %}
+        <div class="sx-heat-axis"><span></span><b>0h</b><b>6h</b><b>12h</b><b>18h</b><b>23h</b></div>
       </div>
-      <div class="sa-block">
-        <h3>Churn Risk</h3>
-        <div class="sa-ring-row">{{ an.ring(d.churn.risk, '#f59e0b', 92, 'Churn risk')|safe }}
-          <p>of active and paying customers are at risk of churning ({{ d.churn.at_risk }} of {{ d.churn.watched }}) based on low engagement.</p></div>
-        <h4>Top churn indicators</h4>
-        <ul class="sa-checks">{% for a in d.churn.indicators %}<li><span class="warn">!</span>{{ a.label }}<b>{{ '%.0f'|format(a.share) }}%</b></li>{% endfor %}</ul>
-      </div>
-      <div class="sa-block sa-quick">
-        <h3>Quick Insights</h3>
-        <ul>{% for line in d.insights %}<li>{{ line }}</li>{% endfor %}</ul>
-      </div>
-    </aside>
-    <section class="sa-card sa-revenue">
-      <header class="sa-card-head"><div><h2>Revenue &amp; Business Health</h2><p>Financial growth and customer value</p></div></header>
-      <div class="sa-trio">
-        <div><span>Trial &rarr; Paid conversion</span><strong>{{ '%.1f'|format(d.revenue.trial_to_paid) }}%</strong></div>
-        <div><span>ARPU</span><strong>${{ '%.2f'|format(d.revenue.arpu) }}</strong></div>
-        <div><span>CAC (paid channels)</span><strong>{% if d.revenue.cac is not none %}${{ '%.2f'|format(d.revenue.cac) }}{% else %}-{% endif %}</strong>
-          <form method="post" action="/staff/analytics/ad-spend" class="sa-adspend"><label>Monthly ad spend $<input type="text" name="spend" inputmode="decimal" value="{{ '%g'|format(d.revenue.ad_spend) if d.revenue.ad_spend else '' }}" placeholder="0"></label><button type="submit" class="secondary">Save</button></form></div>
-      </div>
-      <div class="sa-split sa-split-2">
-        <div class="sa-chart"><h4>Revenue so far this period</h4>{{ an.lines(d.labels, [('Revenue', d.revenue.series)])|safe }}</div>
-        <div><h4>Revenue by plan</h4>
-          {{ an.donut(an.pairs(d.revenue.by_plan, 'name', 'usd'), 130, 22, money(d.revenue.total), 'Revenue')|safe }}
-          <ul class="sa-legend sa-legend-tight">{% for p in d.revenue.by_plan %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><span>{{ p.name }}</span><b>{{ money(p.usd) }}</b></li>{% else %}<li class="muted">No payments yet.</li>{% endfor %}</ul></div>
-      </div>
+      {% if heat.best %}<p class="sa-fine">Busiest times: {{ heat.best|join(', ') }}. Post and send campaigns just before them.</p>{% else %}<p class="sa-fine">Fills in as visits are counted.</p>{% endif %}
     </section>
+  </div>
 
-
-
-
-
-
-
+  <div class="sx-row sx-row-2">
+    <section class="sa-card" aria-labelledby="sx-t14">
+      <header class="sa-card-head"><div><h2 id="sx-t14">Cohort retention</h2><p>Of the people who signed up in a week, how many came back.</p></div></header>
+      <table class="sa-cohort"><thead><tr><th>Signup week</th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr></thead><tbody>
+        {% for r in d.engagement.cohorts %}<tr><td>{{ r.label }} <small class="muted">({{ r.size }})</small></td>
+          {% for c in r.cells %}{% if c is none %}<td class="empty">-</td>{% else %}<td style="background: rgba(43,123,228,{{ '%.2f'|format(0.08 + c / 100 * 0.62) }}); color: {{ '#fff' if c > 55 else '#0b2447' }}">{{ '%.0f'|format(c) }}%</td>{% endif %}{% endfor %}</tr>
+        {% else %}<tr><td colspan="5" class="muted">Needs customers who signed up in the last ten weeks.</td></tr>{% endfor %}
+      </tbody></table>
+    </section>
+    <section class="sa-card" aria-labelledby="sx-t15">
+      <header class="sa-card-head"><div><h2 id="sx-t15">Who may leave, and who may buy</h2><p>From how customers actually use Kauli.</p></div></header>
+      <div class="sx-two">
+        <div><h4>Top churn indicators</h4><ul class="sa-checks">{% for a in d.churn.indicators %}<li><span class="warn">!</span>{{ a.label }}<b>{{ '%.0f'|format(a.share) }}%</b></li>{% endfor %}</ul></div>
+        <div><h4>Activities linked to buying</h4><ul class="sa-checks">{% for a in d.audience.activities %}<li><span class="ok">&#10003;</span>{{ a.label }}<b>{{ '%.0f'|format(a.share) }}%</b></li>{% endfor %}</ul></div>
+      </div>
+      <div class="sx-inactive"><strong>{{ d.engagement.inactive }}</strong><span>accounts have been quiet for 14+ days</span><a class="ds-btn small" href="/staff/engagement">View accounts</a></div>
+      <p class="sa-fine">{% if d.audience.trained %}Learned from {{ d.audience.model_customers }} customers ({{ d.audience.model_paying }} paying).{% else %}It begins learning from your own customers once there are 20, at least 4 of them paying; until then it uses starting weights.{% endif %}</p>
+    </section>
   </div>
 
   {% if ga %}
@@ -262,6 +275,12 @@
   </section>
 </div>
 <script>
+  (function () {
+    var sel = document.getElementById('sx-metric');
+    if (sel) sel.addEventListener('change', function () {
+      ['both', 'visitors', 'sessions'].forEach(function (k) { var el = document.getElementById('sx-chart-' + k); if (el) el.hidden = k !== sel.value; });
+    });
+  })();
   document.querySelectorAll('[data-tabs]').forEach(function (box) {
     box.querySelectorAll('[data-tab]').forEach(function (btn) {
       btn.addEventListener('click', function () {
