@@ -66,8 +66,8 @@
     <h1>{{ page.h1|safe }}</h1>
     <p class="m-hero-sub">{{ page.intro }}</p>
     <div class="m-hero-ctas">
-      <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">Start a project</a>
-      <a href="/demo" class="btn secondary">Talk to us</a>
+      <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">{{ page.cta_label or 'Start a project' }}</a>
+      <a href="/demo" class="btn secondary">{{ 'Book a demo' if page.cta_label else 'Talk to us' }}</a>
     </div>
     <p class="m-hero-note">Your first minutes are free. Then pay only for what you process.</p>
     {% if page.tour %}
@@ -93,6 +93,49 @@
       </div>
     </div>
   </section>
+
+  {% if page.comparison %}
+  <section class="m-section" id="compare">
+    <div class="m-inner">
+      <h2 class="m-h2">Instant AI or human-reviewed?</h2>
+      <p class="m-lede">Start with Instant AI. Add a person when the transcript has to be right.</p>
+      <div class="m-compare">
+        {% for c in page.comparison %}
+        <div class="m-compare-card">
+          <h3>{{ c.name }}</h3>
+          <p class="m-compare-price">{{ c.price }}<small> per audio-minute</small></p>
+          <ul><li><strong>Ready:</strong> {{ c.ready }}</li><li><strong>Best for:</strong> {{ c.best }}</li><li><strong>Checking:</strong> {{ c.checked }}</li></ul>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if page.sample %}
+  <section class="m-section" id="sample">
+    <div class="m-inner">
+      <h2 class="m-h2">{{ page.sample.title }}</h2>
+      <div class="m-sample" role="table" aria-label="{{ page.sample.title }}">
+        <div class="m-sample-head" role="row"><span role="columnheader">Instant AI</span><span role="columnheader">After human review</span><span role="columnheader">What changed</span></div>
+        {% for line in page.sample.lines %}
+        <div class="m-sample-row" role="row"><span role="cell" class="m-sample-ai">{{ line.ai }}</span><span role="cell" class="m-sample-human">{{ line.human }}</span><span role="cell" class="m-sample-note">{{ line.note }}</span></div>
+        {% endfor %}
+      </div>
+      <p class="muted m-sample-fine">{{ page.sample.note }}</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if page.guarantee %}
+  <section class="m-section" id="guarantee">
+    <div class="m-inner narrow">
+      <h2 class="m-h2">{{ page.guarantee.title }}</h2>
+      <p class="m-lede">{{ page.guarantee.body }}</p>
+      <p><a href="{{ page.guarantee.href }}">{{ page.guarantee.link }} &rarr;</a></p>
+    </div>
+  </section>
+  {% endif %}
 
   {% if choose %}
   <section class="m-section" id="choose">
@@ -176,11 +219,23 @@
       <h2 class="m-h2">{{ page.cta_heading }}</h2>
       <p class="m-lede">{{ page.cta_body }}</p>
       <div class="m-hero-ctas" style="justify-content:center;">
-        <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">Start a project</a>
-        <a href="/demo" class="btn secondary">Talk to us</a>
+        <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">{{ page.cta_label or 'Start a project' }}</a>
+        <a href="/demo" class="btn secondary">{{ 'Book a demo' if page.cta_label else 'Talk to us' }}</a>
       </div>
     </div>
   </section>
+
+  {% if page.more %}
+  <section class="m-section" id="more-pages">
+    <div class="m-inner">
+      <h2 class="m-h2">Related pages</h2>
+      <div class="m-more-links">
+        <div><h3>More in this language</h3><ul>{% for l in page.more.same_language %}<li><a href="{{ l.href }}">{{ l.label }}</a></li>{% endfor %}</ul></div>
+        <div><h3>The same job in other languages</h3><ul>{% for l in page.more.same_task %}<li><a href="{{ l.href }}">{{ l.label }}</a></li>{% endfor %}</ul></div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 
   {% if guides %}
   <section class="m-section" id="guides" style="border-top:1px solid var(--border-subtle);">

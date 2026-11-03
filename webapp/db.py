@@ -498,6 +498,13 @@ CREATE TABLE IF NOT EXISTS app_flags (
 );
 
 -- Our own cookie-free page views (see site_analytics.py): a visitor is a daily-rotating hash, never a cookie, an address or a person.
+CREATE TABLE IF NOT EXISTS ui_translations (
+    h TEXT NOT NULL,
+    lang TEXT NOT NULL,
+    text TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (h, lang)
+);
 CREATE TABLE IF NOT EXISTS site_hits (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     ts REAL NOT NULL,
@@ -1073,6 +1080,11 @@ def init_db() -> None:
         # "two-factor is on" without an extra Supabase API round-trip on
         # every page load. Kept in sync at enroll/disable time.
         conn.execute("ALTER TABLE users ADD COLUMN mfa_enabled_at REAL")
+    if "is_internal" not in existing_user_cols:
+        # Team, test and friends-and-family accounts. They are left out of every business number (sign-ups, active users, churn, revenue,
+        # funnel) so the dashboard shows real customers only. Set automatically for the addresses in KAULI_INTERNAL_EMAILS / _DOMAINS and
+        # the staff and test lists, and by hand on the client page.
+        conn.execute("ALTER TABLE users ADD COLUMN is_internal INTEGER NOT NULL DEFAULT 0")
     if "ui_lang" not in existing_user_cols:
         # The language this person's screens are shown in (webapp/ui_text.py): set from the translated site they
         # arrived on or the language switcher, then followed from every device. NULL = never chosen = English.
@@ -1702,6 +1714,49 @@ def delete_pending_auth_state(token: str | None) -> None:
     conn.close()
 
 
+def is_internal_email(email: str) -> bool:
+    """True for an address that belongs to the team or a test: KAULI_INTERNAL_EMAILS, KAULI_INTERNAL_DOMAINS, KAULI_STAFF_EMAILS or KAULI_TEST_CLIENT_EMAILS."""
+    email = (email or "").strip().lower()
+    if not email:
+        return False
+
+    def listed(name: str) -> set[str]:
+        return {x.strip().lower() for x in os.environ.get(name, "").split(",") if x.strip()}
+    domain = email.rsplit("@", 1)[-1]
+    return (email in listed("KAULI_INTERNAL_EMAILS") or domain in listed("KAULI_INTERNAL_DOMAINS") or email in listed("KAULI_STAFF_EMAILS")
+            or email in listed("KAULI_TEST_CLIENT_EMAILS"))
+
+
+def set_user_internal(user_id: str, flag: bool) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE users SET is_internal = ? WHERE id = ?", (1 if flag else 0, user_id))
+    conn.commit()
+    conn.close()
+
+
+def flag_internal_by_rule() -> int:
+    """Marks every account whose address matches the internal lists (never un-marks one a person set by hand). Returns how many were newly marked."""
+    conn = get_conn()
+    n = 0
+    try:
+        for row in conn.execute("SELECT id, email FROM users WHERE COALESCE(is_internal, 0) = 0").fetchall():
+            if is_internal_email(row["email"]):
+                conn.execute("UPDATE users SET is_internal = 1 WHERE id = ?", (row["id"],))
+                n += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return n
+
+
+def internal_user_count() -> int:
+    conn = get_conn()
+    try:
+        return conn.execute("SELECT COUNT(*) AS n FROM users WHERE role = 'client' AND COALESCE(is_internal, 0) = 1").fetchone()["n"]
+    finally:
+        conn.close()
+
+
 def get_user_by_email(email: str):
     conn = get_conn()
     row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
@@ -2037,6 +2092,8 @@ def get_or_create_user(user_id: str, email: str, default_role: str, display_name
             "VALUES (?, 'free', 'active', ?)",
             (user_id, now),
         )
+        if is_internal_email(email):
+            conn.execute("UPDATE users SET is_internal = 1 WHERE id = ?", (user_id,))
         matching_leads = conn.execute(
             "SELECT id FROM leads WHERE lower(email) = ? AND status NOT IN ('won', 'lost')",
             (email.strip().lower(),),

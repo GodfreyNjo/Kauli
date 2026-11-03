@@ -28,6 +28,8 @@
     </div>
   </header>
   {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+  <p class="sa-note sx-real">{% if d.include_internal %}Showing <strong>everyone</strong>, internal and test accounts included. <a href="/staff/analytics?days={{ days }}">Back to real customers only</a>.
+    {% else %}Real customers only: {{ d.internal_excluded }} internal or test account{{ '' if d.internal_excluded == 1 else 's' }} left out. <a href="/staff/analytics?days={{ days }}&amp;internal=1">Include them</a> &middot; mark accounts on the client page.{% endif %}</p>
   {% if d.hits < 50 %}<p class="sa-note">Kauli's own visitor counting started recently, so the traffic numbers fill in as days pass. Sign-ups, customers, orders and revenue already come from our full records.</p>{% endif %}
 
   <div class="sx-kpis">
@@ -113,7 +115,9 @@
       </div>
       <div class="sx-tiles sx-tiles-2">
         <div><span>Time to first result</span><strong>{% if d.onboarding.ttfv.median is not none %}{{ mmss(d.onboarding.ttfv.median * 60) if d.onboarding.ttfv.median < 600 else (('%.1f'|format(d.onboarding.ttfv.median / 60)) ~ ' h') }}{% else %}-{% endif %}</strong></div>
-        <div><span>Satisfaction</span><strong>{% if d.onboarding.csat.avg %}{{ d.onboarding.csat.avg }} / 5{% else %}-{% endif %}</strong></div>
+        <div><span>Satisfaction</span><strong>{% if d.onboarding.csat.avg %}{{ d.onboarding.csat.avg }} / 5{% else %}-{% endif %}</strong><small class="muted">{{ d.onboarding.csat.n }} rating{{ '' if d.onboarding.csat.n == 1 else 's' }}</small></div>
+        <div><span>Got a result in a day</span><strong>{{ '%.0f'|format(d.onboarding.ttfv.share_within_day) }}%</strong><small class="muted">of {{ d.onboarding.ttfv.joined }} who joined</small></div>
+        <div><span>First orders stuck</span><strong>{{ d.onboarding.stuck }}</strong><small class="muted"><a href="/staff/engagement">see who</a></small></div>
       </div>
     </section>
     <section class="sa-card" aria-labelledby="sx-t7">
@@ -206,6 +210,37 @@
       <p class="sa-fine">{% if d.audience.trained %}Learned from {{ d.audience.model_customers }} customers ({{ d.audience.model_paying }} paying).{% else %}It begins learning from your own customers once there are 20, at least 4 of them paying; until then it uses starting weights.{% endif %}</p>
     </section>
   </div>
+
+  <section class="sa-card sx-utm" aria-labelledby="sx-utm-h">
+    <header class="sa-card-head"><div><h2 id="sx-utm-h">Tag a link</h2><p>Every link you share should say where it was posted, so the traffic stops showing up as "Direct".</p></div></header>
+    <form class="sx-utm-form" onsubmit="return false">
+      <label>Page <input type="text" id="utm-url" value="{{ site_origin() }}/" inputmode="url" autocomplete="off"></label>
+      <label>Source <input type="text" id="utm-source" placeholder="linkedin, whatsapp, newsletter, youtube-desc" autocomplete="off"></label>
+      <label>Medium <input type="text" id="utm-medium" placeholder="social, email, referral, outreach" autocomplete="off"></label>
+      <label>Campaign <input type="text" id="utm-campaign" placeholder="spanish-interviews, pilot-outreach" autocomplete="off"></label>
+    </form>
+    <div class="sx-utm-out"><output id="utm-out" aria-live="polite">Fill in the source, medium and campaign.</output><button type="button" id="utm-copy" class="secondary" disabled>Copy link</button></div>
+    <p class="sa-fine">Use lower case and dashes, and keep the names the same each time. Keep a shared sheet of every link you tag.</p>
+  </section>
+  <script>
+    (function () {
+      var ids = ['url', 'source', 'medium', 'campaign'].map(function (k) { return document.getElementById('utm-' + k); }), out = document.getElementById('utm-out'), btn = document.getElementById('utm-copy');
+      function clean(v) { return v.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+      function build() {
+        var base = ids[0].value.trim(), parts = [['utm_source', ids[1].value], ['utm_medium', ids[2].value], ['utm_campaign', ids[3].value]].filter(function (p) { return clean(p[1]); });
+        if (!base || parts.length < 3) { out.textContent = 'Fill in the source, medium and campaign.'; btn.disabled = true; return ''; }
+        var hash = base.indexOf('#') > -1 ? base.slice(base.indexOf('#')) : '', root = hash ? base.slice(0, base.indexOf('#')) : base;
+        var link = root + (root.indexOf('?') > -1 ? '&' : '?') + parts.map(function (p) { return p[0] + '=' + encodeURIComponent(clean(p[1])); }).join('&') + hash;
+        out.textContent = link; btn.disabled = false; return link;
+      }
+      ids.forEach(function (el) { el.addEventListener('input', build); });
+      btn.addEventListener('click', function () {
+        var link = build(); if (!link) return;
+        (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { if (window.kpToast) kpToast('Link copied to the clipboard.', 'success'); },
+          function () { if (window.kpToast) kpToast('Could not copy. Select the link and press Ctrl+C.', 'warning'); });
+      });
+    })();
+  </script>
 
   {% if ga %}
   <details class="sa-card sa-ga-detail" open>

@@ -52,7 +52,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                        f"shown before you order, and your first {free:.0f} minutes every month are free."}
 
     instant = {"name": "Instant AI", "best": "Drafts, internal use, anything you will review yourself.",
-               "get": "Ready in minutes and machine-generated, and labelled that way. Transcription in 70+ languages, translation between them."}
+               "get": "Ready in minutes and machine-generated, and labelled that way. Transcription in 76+ languages, translation between them."}
     human = {"name": "Human-reviewed", "best": "Anything you will publish, air, submit or quote.",
              "get": f"A dedicated editor checks the work against your audio, and {QUALITY[0].lower()}{QUALITY[1:]}. Available in {hr_names}."}
 
@@ -60,7 +60,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ translation
         "video-translation": {
             "title": "AI Video Translation and Subtitles, Human-Reviewed on Request",
-            "meta_description": "Translate videos and audio into 70+ languages in minutes with Instant AI, or add a dedicated editor for up to 99% accuracy. Transcript, subtitles or a dub. Per-minute pricing.",
+            "meta_description": "Translate videos and audio into 76+ languages in minutes with Instant AI, or add a dedicated editor for up to 99% accuracy. Transcript, subtitles or a dub. Per-minute pricing.",
             "kicker": "Video and audio translation",
             "h1": "Translate your videos for every audience",
             "intro": "Upload a file or paste a link and get a translated transcript, subtitles or a dubbed track back. Instant AI "
@@ -68,7 +68,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                      "when it has to be right.",
             "why_heading": "Built for translation you can actually publish",
             "points": [
-                {"title": "Translate between 70+ languages",
+                {"title": "Translate between 76+ languages",
                  "body": "Transcribe the speech and translate it in one order. Instant AI is machine translation and is labelled "
                          "as not reviewed by a person."},
                 {"title": "Human review for up to 99% accuracy",
@@ -110,7 +110,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ captions
         "captioning": {
             "title": "Subtitles and Closed Captions for Any Video, in 70+ Languages",
-            "meta_description": "Generate subtitles and closed captions for YouTube or any video in minutes. SRT and VTT files, burned-in captions, 70+ languages, and human review for up to 99% accuracy.",
+            "meta_description": "Generate subtitles and closed captions for YouTube or any video in minutes. SRT and VTT files, burned-in captions, 76+ languages, and human review for up to 99% accuracy.",
             "kicker": "Subtitles and closed captions",
             "h1": "Subtitles and captions for every video you publish",
             "intro": "Get timestamped subtitles in minutes, as a separate SRT or VTT file or burned into the video. Add human review "
@@ -121,7 +121,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "body": f"Download a subtitle file for your player, or have captions burned into the video (included on Premium, or ${video_rate:.2f}/minute on any plan)."},
                 {"title": "Up to 99% accurate with human review",
                  "body": f"An editor checks every line against the audio before the order is marked ready. Available in {hr_names}."},
-                {"title": "70+ languages and translated captions",
+                {"title": "76+ languages and translated captions",
                  "body": "Transcribe in the language spoken and translate the captions into other languages in the same order."},
                 {"title": "Publish straight to YouTube",
                  "body": "Connect your channel and push finished captions to the video, or paste a link instead of uploading a file."},
@@ -249,7 +249,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "tour": {"mode": "upload", "filename": "training_video.mp4"},
             "faq": [
                 {"q": "Which languages can you dub into?",
-                 "a": f"Dubbing is available in {dub_names}, and more languages are coming soon. Translation and transcription cover 70+ languages."},
+                 "a": f"Dubbing is available in {dub_names}, and more languages are coming soon. Translation and transcription cover 76+ languages."},
                 {"q": "Is a person involved?",
                  "a": f"Not on Instant AI, which is machine-generated and labelled that way. On a Human-reviewed order an editor checks the script first. {QUALITY}."},
                 {"q": "Can the dub sound like the original speaker?",
@@ -304,7 +304,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ localization
         "video-localization": {
             "title": "Video Localization: Transcribe, Translate, Caption and Dub",
-            "meta_description": "Localize a video in one order: transcript, translation, subtitles or a dub. 70+ languages with Instant AI, human review for up to 99% accuracy, one team and one invoice.",
+            "meta_description": "Localize a video in one order: transcript, translation, subtitles or a dub. 76+ languages with Instant AI, human review for up to 99% accuracy, one team and one invoice.",
             "kicker": "Video localization",
             "h1": "One order from source video to every audience",
             "intro": "Localizing a video normally means a transcription vendor, a translation vendor and a dubbing studio. Kauli does each "
@@ -315,8 +315,8 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                  "body": "Choose what the video needs or combine the steps: a translated transcript, subtitles, or a fully dubbed track with captions."},
                 {"title": "Up to 99% accurate with human review",
                  "body": f"A dedicated editor checks each step against the source audio. Available in {hr_names}, with more languages coming soon."},
-                {"title": "70+ languages",
-                 "body": f"Instant AI transcribes and translates 70+ languages. Dubbing is available in {dub_names}."},
+                {"title": "76+ languages",
+                 "body": f"Instant AI transcribes and translates 76+ languages. Dubbing is available in {dub_names}."},
                 pricing,
             ],
             "choose": [
@@ -345,7 +345,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ transcription
         "video-transcription": {
             "title": "Video and Audio Transcription in 70+ Languages, Up to 99% Accurate",
-            "meta_description": "Transcribe video and audio to timestamped text with speaker labels in minutes. Instant AI in 70+ languages, or human review for up to 99% accuracy. Word, text and SRT downloads.",
+            "meta_description": "Transcribe video and audio to timestamped text with speaker labels in minutes. Instant AI in 76+ languages, or human review for up to 99% accuracy. Word, text and SRT downloads.",
             "kicker": "Transcription services",
             "h1": "Accurate transcripts of every video and recording",
             "intro": "Get a timestamped transcript in minutes, or add a human review pass for up to 99% accuracy. Download Word, text, SRT "
@@ -353,7 +353,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "why_heading": "Built for transcripts you can use",
             "points": [
                 {"title": "Minutes, not days",
-                 "body": "Instant AI returns a draft as soon as processing finishes, in 70+ languages."},
+                 "body": "Instant AI returns a draft as soon as processing finishes, in 76+ languages."},
                 {"title": "Up to 99% accurate with human review",
                  "body": f"A dedicated editor checks the draft against the audio. Available in {hr_names}."},
                 {"title": "Clean read or verbatim",
@@ -377,7 +377,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"q": "How accurate is it?",
                  "a": f"Instant AI depends on audio quality, accents and background noise, and is labelled as machine-generated. {QUALITY}."},
                 {"q": "Which languages are supported?",
-                 "a": "Instant AI transcribes 70+ languages. Human review is available in selected languages, and the list is growing."},
+                 "a": "Instant AI transcribes 76+ languages. Human review is available in selected languages, and the list is growing."},
                 {"q": "Can I get the text in Word?",
                  "a": "Yes: Word, plain text, SRT and VTT downloads on every plan."},
                 {"q": "Is my recording private?",
@@ -475,7 +475,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ e-learning
         "e-learning": {
             "title": "Course Transcripts and Localization for Creators and Training Teams",
-            "meta_description": "Create accurate transcripts and subtitles for your courses and localize them into 70+ languages fast. Human review for up to 99% accuracy, minutes included on every plan.",
+            "meta_description": "Create accurate transcripts and subtitles for your courses and localize them into 76+ languages fast. Human review for up to 99% accuracy, minutes included on every plan.",
             "kicker": "For course creators and training teams",
             "h1": "Accurate course transcripts, localized fast",
             "intro": "Upload a lesson and get a transcript and subtitles in minutes, then translate them for every cohort. Human review keeps "
@@ -485,7 +485,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"title": "A transcript for every lesson",
                  "body": "Searchable transcripts and downloadable subtitles make lessons accessible and easier to follow."},
                 {"title": "Localize in minutes",
-                 "body": f"Translate transcripts and subtitles into 70+ languages, and dub lessons in {dub_names}."},
+                 "body": f"Translate transcripts and subtitles into 76+ languages, and dub lessons in {dub_names}."},
                 {"title": "Consistent terminology",
                  "body": f"Add notes or a style guide and a human editor follows it across lessons. Available in {hr_names}."},
                 {"title": "Minutes included",
@@ -518,15 +518,15 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         # ------------------------------------------------------------------ NGOs
         "ngos": {
             "title": "Transcription and Translation for NGOs and Civil Society Groups",
-            "meta_description": "Transcribe field recordings and translate reports, training and campaign videos into 70+ languages. Human review for up to 99% accuracy, per-minute pricing and no agency rates.",
+            "meta_description": "Transcribe field recordings and translate reports, training and campaign videos into 76+ languages. Human review for up to 99% accuracy, per-minute pricing and no agency rates.",
             "kicker": "For NGOs and civil society",
             "h1": "Reach every community in its own language",
             "intro": "Field interviews, training videos and campaigns need to reach the people they are about. Kauli transcribes and translates "
-                     "across 70+ languages, with human review where accuracy and trust matter, at a per-minute price you can budget.",
+                     "across 76+ languages, with human review where accuracy and trust matter, at a per-minute price you can budget.",
             "why_heading": "Built for field and campaign work",
             "points": [
                 {"title": "Transcribe in the language spoken",
-                 "body": "Instant AI transcribes 70+ languages, with a manual transcription option for languages no speech model covers yet."},
+                 "body": "Instant AI transcribes 76+ languages, with a manual transcription option for languages no speech model covers yet."},
                 {"title": "Up to 99% accurate with human review",
                  "body": f"A dedicated editor checks the work against the audio. Available in {hr_names}, with more languages coming soon."},
                 {"title": "Consent before any voice is cloned",
@@ -551,7 +551,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"q": "Can we be invoiced?",
                  "a": "Yes. Invoicing is part of the Enterprise plan for organizations with an ongoing relationship."},
                 {"q": "What if our language is not supported by speech recognition?",
-                 "a": "Instant AI transcribes 70+ languages. For a language no model covers yet, such as Kikuyu, a human transcriber types the source by ear at a slightly higher per-minute price."},
+                 "a": "Instant AI transcribes 76+ languages. For a language no model covers yet, such as Kikuyu, a human transcriber types the source by ear at a slightly higher per-minute price."},
                 {"q": "How is pricing for volume?",
                  "a": f"Pro is ${pro['price_usd']}/month and includes {pro['included_ai_minutes']:.0f} Instant AI minutes for transcription and translation, Premium is ${prem['price_usd']}/month with {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])}. For a custom volume rate, talk to us."},
             ],
@@ -586,7 +586,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"name": "Quality assurance and coaching", "best": "Reviewing more calls with the same team.",
                  "get": f"Instant AI transcripts with speakers and timestamps in minutes, and {pro['included_ai_minutes']:,.0f} to {prem['included_ai_minutes']:,.0f} minutes a month{billing.hours_suffix(prem['included_ai_minutes'])} included on Pro and Premium."},
                 {"name": "Multilingual support lines", "best": "Teams that take calls in several languages.",
-                 "get": "Transcription in 70+ languages with translation, so reviewers can read every call in one language."},
+                 "get": "Transcription in 76+ languages with translation, so reviewers can read every call in one language."},
                 {**human, "name": "Human-reviewed evidence", "best": "Complaints, disputes, compliance checks and anything you may need to show."},
                 {"name": "Integrated pipeline", "best": "Teams that want it automatic.",
                  "get": "Send each recording through the API as it is made and receive the finished transcript by webhook, with an account manager on Enterprise."},
@@ -626,7 +626,7 @@ def refresh(pages: dict, hr_names: str) -> None:
     extras = {
         "audio-to-text": {
             "choose": [
-                {"name": "Instant AI", "best": "Notes, search and first drafts.", "get": "A transcript in minutes in 70+ languages, labelled as machine-generated."},
+                {"name": "Instant AI", "best": "Notes, search and first drafts.", "get": "A transcript in minutes in 76+ languages, labelled as machine-generated."},
                 {"name": "Human-reviewed", "best": "Anything you will publish or quote.", "get": f"An editor checks the work against the audio, for up to 99% accuracy. Available in {hr_names}."},
             ],
             "demo": "meeting",

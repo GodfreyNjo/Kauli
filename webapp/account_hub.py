@@ -1225,12 +1225,13 @@ def _fmt_day(raw: str) -> str:
 
 
 @router.get("/staff/analytics", response_class=HTMLResponse)
-def site_analytics(request: Request, days: int = 28, refresh: int = 0):
+def site_analytics(request: Request, days: int = 28, refresh: int = 0, internal: int = 0):
     user = _staff(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
     days = days if days in (7, 28, 90) else 28
     ga, error, tiles, line = None, None, [], ""
+    include_internal = bool(internal)
     if ga_reports.configured():
         try:
             ga = ga_reports.overview(days, force=bool(refresh))
@@ -1252,11 +1253,36 @@ def site_analytics(request: Request, days: int = 28, refresh: int = 0):
         line = _line_chart([(_fmt_day(r["date"]), r["activeUsers"]) for r in ga["daily"]])
     internal = internal_site_stats(days)
     return A.templates.TemplateResponse(request, "staff_site_analytics.html", {
-        "dash": analytics_engine.dashboard(days), "an": analytics_engine, "user": user, "theme": "light", "days": days, "configured": ga_reports.configured(), "error": error, "ga": ga, "tiles": tiles, "line": line,
+        "dash": analytics_engine.dashboard(days, include_internal=include_internal), "an": analytics_engine, "user": user, "theme": "light", "days": days, "configured": ga_reports.configured(), "error": error, "ga": ga, "tiles": tiles, "line": line,
         "insights": ga_reports.insights(ga) if ga else [], "funnel": ga_reports.funnel(ga) if ga else [], "internal": internal,
         "internal_line": _line_chart([(d[5:], n) for d, n in internal["orders_by_day"]]) if len(internal["orders_by_day"]) > 1 else "",
         "property": ga_reports.property_id(), "measurement_id": ga_events.measurement_id(),
         "fetched": datetime.fromtimestamp(ga["fetched_at"]).strftime("%b %d, %H:%M") if ga else None})
+
+
+@router.get("/staff/translations", response_class=HTMLResponse)
+def staff_translations(request: Request):
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    from . import page_translate, ui_text
+    return A.templates.TemplateResponse(request, "staff_translations.html", {
+        "user": user, "theme": "light", "configured": page_translate.configured(), "counts": page_translate.counts(), "warm": dict(page_translate.WARM),
+        "langs": [(c, ui_text.NATIVE[c]) for c in ui_text.LANGS if c != "en"]})
+
+
+@router.post("/staff/translations/warm")
+def staff_translations_warm(request: Request):
+    """Translate and remember every public page in every language now, so crawlers and visitors never wait for the first translation."""
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    import threading
+
+    from . import page_translate
+    if page_translate.configured() and not page_translate.WARM["running"]:
+        threading.Thread(target=page_translate.warm, args=(A.app,), daemon=True).start()
+    return RedirectResponse("/staff/translations", status_code=303)
 
 
 @router.get("/staff/analytics/export.csv")

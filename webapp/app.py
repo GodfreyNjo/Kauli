@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -295,6 +295,7 @@ def _load_dotenv() -> None:
 
 _load_dotenv()
 db.init_db()
+db.flag_internal_by_rule()          # team, staff and test addresses are left out of the business numbers
 blog_guides.seed_guides_at_startup()
 db.replace_blog_text("first 5 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")      # posts written when the allowance was 5
 db.replace_blog_text("first 60 minutes", f"first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes")
@@ -1472,18 +1473,165 @@ templates.env.globals["plan_chosen"] = lambda u: bool(u) and (u["role"] != "clie
 LANG_COOKIE = "kauli_lang"
 
 
+def _accept_language(request) -> str | None:
+    """The language the browser asks for first among the ones Kauli speaks (zh-CN, zh-TW and so on all read as zh), else None."""
+    try:
+        header = request.headers.get("accept-language", "") if request is not None else ""
+    except Exception:  # noqa: BLE001
+        return None
+    ranked = []
+    for part in header.split(","):
+        tag, _, q = part.strip().partition(";q=")
+        if not tag:
+            continue
+        try:
+            weight = float(q) if q else 1.0
+        except ValueError:
+            weight = 0.0
+        ranked.append((weight, tag.split("-")[0].lower()))
+    for _w, code in sorted(ranked, key=lambda x: -x[0]):
+        if ui_text.valid(code):
+            return code
+    return None
+
+
 def _ui_lang(request, user=None) -> str:
-    """Their saved language, else the one in the cookie (set by the translated site or the switcher), else English."""
+    """The language of this screen: the /xx/ address it was asked for, else their saved language, else the cookie (set by the translated
+    site or the switcher), else what their browser asks for, else English."""
     try:
         if user is not None and user["role"] != "client":
             return "en"                      # staff and voice-talent screens are English
         code = user["ui_lang"] if user is not None else None
     except (KeyError, IndexError, TypeError):
         code = None
+    forced = getattr(getattr(request, "state", None), "lang_override", None) if request is not None else None
+    if ui_text.valid(forced):
+        return forced
     if ui_text.valid(code):
         return code
     code = request.cookies.get(LANG_COOKIE) if request is not None else None
-    return code if ui_text.valid(code) else "en"
+    if ui_text.valid(code):
+        return code
+    return _accept_language(request) or "en"
+
+
+# ---- every page in the visitor's language (the engine is webapp/page_translate.py)
+_LOCALIZE_SKIP = ("/static/", "/api/", "/webhooks/", "/staff", "/actor", "/lang/", "/avatar/", "/blog-cover/", "/media", "/download", "/s/", "/r/",
+                  "/healthz", "/status", "/sitemap", "/robots", "/llms", "/feed", "/podcast", "/mcp", "/.well-known", "/favicon", "/sw.js", "/logout")
+_PREFIXED_PATH = re.compile(r"^/([a-z]{2})(/.+)$")
+_FILE_LIKE = re.compile(r"\.(png|jpe?g|webp|gif|svg|ico|css|js|json|xml|txt|pdf|mp3|mp4|webm|woff2?|zip|docx|srt|vtt)$", re.I)
+_OG_LOCALE = {"es": "es_ES", "zh": "zh_CN", "ar": "ar_AR", "fr": "fr_FR", "pt": "pt_BR", "de": "de_DE", "hi": "hi_IN", "ja": "ja_JP", "ko": "ko_KR", "sw": "sw_KE", "en": "en_US"}
+
+
+def _is_public_page(path: str) -> bool:
+    """A page a search engine may list (so it has a /xx/ address in each language)."""
+    if path == "/":
+        return True
+    return not (path.startswith(_NOINDEX_PREFIXES) or path.startswith(_LOCALIZE_SKIP) or _FILE_LIKE.search(path) or path.strip("/") in site_locales.LOCALES)
+
+
+def _lang_url(base: str, code: str, path: str) -> str:
+    if code == "en":
+        return f"{base}{path}"
+    return f"{base}/{code}" if path == "/" else f"{base}/{code}{path}"
+
+
+def _finish_localized_html(request: Request, page: str, lang: str, prefixed: bool, path: str, complete: bool) -> str:
+    """The language tags, the canonical address and the alternates for the other languages; links that stay in the language."""
+    page = re.sub(r'<html\b[^>]*>', lambda m: re.sub(r'\s(?:lang|dir)="[^"]*"', "", m.group(0))[:-1] + f' lang="{ui_text.HTML_LANG.get(lang, lang)}"'
+                  + (' dir="rtl"' if ui_text.direction(lang) == "rtl" else "") + ">", page, count=1)
+    page = brand.localize_logos(page, lang)
+    if not (_is_public_page(path) and complete):
+        return page
+    base = _site_base(request)
+    if prefixed:
+        canonical = f'<link rel="canonical" href="{_lang_url(base, lang, path)}">'
+        if re.search(r'<link\b[^>]*rel="canonical"', page):
+            page = re.sub(r'<link\b[^>]*rel="canonical"[^>]*>', canonical, page, count=1)
+        else:
+            page = page.replace("</head>", canonical + "</head>", 1)
+        page = re.sub(r'(<meta\b[^>]*property="og:url"[^>]*content=")[^"]*"', lambda m: m.group(1) + _lang_url(base, lang, path) + '"', page, count=1)
+        if 'property="og:locale"' not in page:
+            page = page.replace("</head>", f'<meta property="og:locale" content="{_OG_LOCALE.get(lang, "en_US")}"></head>', 1)
+
+        def prefix_link(m: re.Match) -> str:
+            href = m.group(2)
+            target = href.split("#")[0].split("?")[0]
+            if href.startswith("//") or not _is_public_page(target):
+                return m.group(0)
+            new = f"/{lang}" if target == "/" else f"/{lang}{href}"
+            return f'{m.group(1)}"{new}"'
+        page = re.sub(r'(<a\b[^>]*?\shref=)"(/[^"]*)"', prefix_link, page)
+    if "hreflang=" not in page:
+        alts = "".join(f'<link rel="alternate" hreflang="{"en" if c == "en" else ui_text.HTML_LANG.get(c, c)}" href="{_lang_url(base, c, path)}">' for c in ui_text.LANGS)
+        alts += f'<link rel="alternate" hreflang="x-default" href="{_lang_url(base, "en", path)}">'
+        page = page.replace("</head>", alts + "</head>", 1)
+    return page
+
+
+@app.middleware("http")
+async def localize_pages(request: Request, call_next):
+    """Shows each page in the language of the person reading it. A /xx/ address (/zh/solutions/podcasters) is the indexable version of a
+    public page; anywhere else the language comes from the account, the cookie or the browser. See webapp/page_translate.py."""
+    path = request.url.path
+    prefixed = None
+    m = _PREFIXED_PATH.match(path)
+    if m and m.group(1) in ui_text.LANGS and m.group(1) != "en" and request.method in ("GET", "HEAD") and _is_public_page(m.group(2)):
+        prefixed = m.group(1)
+        path = m.group(2)
+        request.scope["path"] = path
+        request.scope["raw_path"] = path.encode()
+        request.state.lang_override = prefixed
+    elif request.method == "GET" and path.strip("/") in site_locales.LOCALES:
+        request.state.lang_override = path.strip("/")                     # /zh is the hand-written Chinese home page
+    elif (request.method == "GET" and path != "/lang" and _is_public_page(path) and LANG_COOKIE not in request.cookies and "session" not in request.cookies
+          and not site_analytics.is_bot(request.headers.get("user-agent", ""))):
+        wanted = _accept_language(request)
+        if wanted and wanted != "en" and page_translate.configured():
+            # first visit from a browser set to another language: send them to that language's address (and remember it)
+            target = f"/{wanted}" if path == "/" else f"/{wanted}{path}"
+            if request.url.query:
+                target += "?" + request.url.query
+            resp = RedirectResponse(target, status_code=302)
+            resp.headers["Vary"] = "Accept-Language, Cookie"
+            return _set_lang_cookie(resp, wanted)
+    response = await call_next(request)
+    ctype = response.headers.get("content-type", "")
+    skip = path.startswith(_LOCALIZE_SKIP) and not path.startswith("/receipts")
+    if skip or request.method == "HEAD" or response.status_code >= 500 or not (ctype.startswith("text/html") or ctype.startswith("application/json")):
+        return response
+    try:
+        user = current_user(request)
+    except Exception:  # noqa: BLE001
+        user = None
+    lang = _ui_lang(request, user)
+    if lang == "en" or not (page_translate.configured() or prefixed):
+        return response
+    body = b"".join([chunk async for chunk in response.body_iterator])
+    raw = [(k, v) for k, v in response.raw_headers if k.lower() not in (b"content-length", b"content-type")]
+    if ctype.startswith("application/json"):
+        try:
+            data = await run_in_threadpool(page_translate.localize_json, json.loads(body.decode("utf-8")), lang)
+            out = json.dumps(data, ensure_ascii=False).encode("utf-8")
+        except Exception:  # noqa: BLE001
+            out = body
+        new = Response(content=out, status_code=response.status_code, media_type="application/json")
+    else:
+        page, complete = await run_in_threadpool(page_translate.localize_html, body.decode("utf-8", "replace"), lang)
+        page = _finish_localized_html(request, page, lang, bool(prefixed), path, complete)
+        new = Response(content=page.encode("utf-8"), status_code=response.status_code, media_type="text/html")
+        new.headers["Content-Language"] = ui_text.HTML_LANG.get(lang, lang)
+        new.headers["Vary"] = "Accept-Language, Cookie"
+        if not complete:
+            new.headers["X-Robots-Tag"] = "noindex"                      # never list a half-translated page
+            new.headers["Cache-Control"] = "no-store"
+    ct = [(k, v) for k, v in new.raw_headers if k.lower() in (b"content-length", b"content-type")]
+    mine = [(k, v) for k, v in new.raw_headers if k.lower() not in (b"content-length", b"content-type")]
+    taken = {k.lower() for k, _ in mine}
+    new.raw_headers = [(k, v) for k, v in raw if k.lower() not in taken] + mine + ct
+    if prefixed:
+        _set_lang_cookie(new, prefixed)
+    return new
 
 
 def _set_lang_cookie(response, code: str):
@@ -1531,6 +1679,8 @@ def _ts_ui(ctx, ts):
 templates.env.globals.update(t=_t, ui_lang=_ui_lang_global, page_lang=_page_lang, page_dir=_page_dir,
                               ui_languages=[(c, ui_text.NATIVE[c]) for c in ui_text.LANGS], ui_native=ui_text.NATIVE)
 templates.env.filters["ts_ui"] = _ts_ui
+templates.env.filters["blog_ctas"] = lambda body, post: Markup(seo_pages.add_blog_ctas(str(body), post["title"], post["slug"]))
+templates.env.globals["site_verification"] = lambda: {"google": os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip(), "bing": os.environ.get("BING_SITE_VERIFICATION", "").strip()}
 def _human_minutes_left(u):
     """Included human-reviewed minutes this client has left this month (0 on a plan without any)."""
     if not u or u["role"] != "client":
@@ -1701,8 +1851,8 @@ _DUB_NAMES = _dub_language_list()
 
 MARKETING_FAQ = [
     {"q": "How much does it cost?",
-     "a": f"Starting at $0: your first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are free every month. "
-          "After that you pay per audio-minute, and the exact price, for Instant AI or human review, is shown before you order.",
+     "a": f"Starting at $0: your first {billing.FREE_MINUTES_PER_MONTH:.0f} minutes of Instant AI transcription are free every month, to process and read. "
+          "To download or edit a result you pay for that order. After the free minutes you pay per audio-minute, and the exact price, for Instant AI or human review, is shown before you order.",
      "link": ("#pricing", "See all prices")},
     {"q": "What is the difference between Instant AI and Human-reviewed?",
      "a": "Instant AI is generated by machine and ready in minutes, and it is labelled as not reviewed by a "
@@ -1750,15 +1900,15 @@ MARKETING_FAQ = [
 SOLUTION_PAGES = {
     "audio-to-text": {
         "title": "Audio to Text Converter - Transcribe Audio in 70+ Languages",
-        "meta_description": "Convert audio and video to text in minutes in 70+ languages, starting at $0 with free minutes every month. "
+        "meta_description": "Convert audio and video to text in minutes in 76+ languages, starting at $0 with free minutes every month. "
                              "Download as Word, text or SRT. Pay as you go, with optional human review for up to 99% accuracy.",
         "kicker": "Audio to text",
-        "h1": "Convert audio to text in minutes - in 70+ languages",
+        "h1": "Convert audio to text in minutes - in 76+ languages",
         "intro": "Upload a recording or paste a YouTube link and get a timestamped transcript back in "
-                 "minutes, ready to download as Word, plain text or SRT. Pay by the minute - no subscription.",
+                 "minutes, ready to download as Word, plain text or SRT. Pay by the minute - no subscription required.",
         "why_heading": "Built for getting text out of audio, fast",
         "points": [
-            {"title": "70+ languages, one upload",
+            {"title": "76+ languages, one upload",
              "body": "Spanish, French, German, Arabic, Hindi, Mandarin, Swahili and dozens more. Pick the "
                       "language the speaker uses and we transcribe it - no per-language pricing."},
             {"title": "Word, text and SRT downloads",
@@ -1795,7 +1945,7 @@ SOLUTION_PAGES = {
     },
     "youtube-video-to-text": {
         "title": "YouTube Video to Text - Transcribe Any YouTube Link",
-        "meta_description": "Paste a YouTube link and get the transcript back as Word, text or SRT - starting at $0, in 70+ languages. Pay as you go.",
+        "meta_description": "Paste a YouTube link and get the transcript back as Word, text or SRT - starting at $0, in 76+ languages. Pay as you go.",
         "kicker": "YouTube video to text",
         "h1": "Turn a YouTube video into text - paste the link",
         "intro": "Paste a YouTube link, choose the spoken language and get a timestamped transcript back "
@@ -1815,8 +1965,8 @@ SOLUTION_PAGES = {
             {"title": "If a link can't be fetched, upload the file",
              "body": "YouTube sometimes blocks automated downloads for particular videos. If that happens "
                       "to yours, upload the video file instead and the rest works exactly the same."},
-            {"title": "Pay per minute, no subscription",
-             "body": "Starting at $0: your first few minutes are free, and the price is shown before you order. No subscription."},
+            {"title": "Pay per minute, no subscription required",
+             "body": "Starting at $0: your first few minutes are free, and the price is shown before you order. No subscription required."},
         ],
         "cta_heading": "Paste a YouTube link and try it",
         "cta_body": "Your first minutes are free.",
@@ -1852,9 +2002,9 @@ SOLUTION_PAGES = {
              "body": "Paste into your CMS from the .txt, edit in the .docx, or use the SRT for captions "
                       "on video versions of the episode."},
             {"title": "Priced for a weekly show",
-             "body": "Your first minutes are free, and the price of a full episode is shown before you order. Pay as you go, no subscription."},
+             "body": "Your first minutes are free, and the price of a full episode is shown before you order. Pay as you go, no subscription required."},
             {"title": "Shows in many languages",
-             "body": f"Instant AI transcribes 70+ languages, and podcasts in {_HR_NAMES} can add human review."},
+             "body": f"Instant AI transcribes 76+ languages, and podcasts in {_HR_NAMES} can add human review."},
         ],
         "cta_heading": "Transcribe your next episode",
         "cta_body": "Your first minutes are free.",
@@ -1871,7 +2021,7 @@ SOLUTION_PAGES = {
     "interview-transcription": {
         "title": "Interview Transcription - Researchers, Journalists and Teams",
         "meta_description": "Transcribe interviews and recordings with speaker labels and timestamps in "
-                             "minutes, in 70+ languages. Word, text and SRT downloads. Human review "
+                             "minutes, in 76+ languages. Word, text and SRT downloads. Human review "
                              "available for up to 99% accuracy.",
         "kicker": "Interview transcription",
         "h1": "Interview transcripts with speaker labels and timestamps",
@@ -1882,7 +2032,7 @@ SOLUTION_PAGES = {
             {"title": "Speaker labels and timestamps",
              "body": "Each line shows who spoke and when, so you can find and verify a quote against the "
                       "recording."},
-            {"title": "Interviews in 70+ languages",
+            {"title": "Interviews in 76+ languages",
              "body": "Transcribe the interview in the language it was held in, and translate it with Instant AI. "
                       f"For {_HR_NAMES}, add human review."},
             {"title": "Clean read or verbatim",
@@ -1902,7 +2052,7 @@ SOLUTION_PAGES = {
              "a": "Files are processed to produce your transcript and are only visible to your account "
                   "and our staff. See our privacy policy for how files and our transcription provider are handled."},
             {"q": "Can you transcribe interviews in languages other than English?",
-             "a": "Yes - Instant AI transcribes 70+ languages, and human review is available in "
+             "a": "Yes - Instant AI transcribes 76+ languages, and human review is available in "
                   f"{_HR_NAMES}. Kikuyu goes through a real human transcriber, since no speech-recognition model supports it yet."},
         ],
     },
@@ -1999,7 +2149,7 @@ def _marketing_context(sent: bool = False, lead_error: str | None = None, home: 
         "free_minutes": billing.FREE_MINUTES_PER_MONTH,
         "email": CONTACT_EMAIL,
         "language_marquee": _language_marquee(),
-        "human_review_languages": _human_review_language_list(),
+        "human_review_languages": _human_review_language_list(), "human_review_count": len(_human_review_live()),
         "calendly_url": os.environ.get("KAULI_CALENDLY_URL"),
         "faq": MARKETING_FAQ,
         "source_languages": SOURCE_LANGUAGES, "ai_only_languages": AI_ONLY_LANGUAGES, "lara_available": _lara_configured(),
@@ -2132,7 +2282,7 @@ def _language_page_dict(code: str) -> dict:
             {"title": "Word, text and SRT downloads",
              "body": "Download your transcript as a Word document (.docx), plain text (.txt) or an SRT file."},
             {"title": "Simple per-minute pricing",
-             "body": "Starting at $0, no subscription. Your first minutes are free, and the price is shown before you order."},
+             "body": "Starting at $0, no subscription required. Your first minutes are free, and the price is shown before you order."},
             {"title": "Honest about the limits",
              "body": f"Instant AI is machine transcription and is not reviewed by a person; accuracy depends on "
                       f"audio quality, accent and background noise, so check names and numbers before you "
@@ -2155,7 +2305,7 @@ def _language_page_dict(code: str) -> dict:
                   "transcription and is not reviewed by a person, so we don't publish a headline accuracy "
                   "figure. Skim the transcript for names, numbers and specialist terms before you publish."},
             {"q": f"How much does {label} transcription cost?",
-             "a": "Starting at $0: your first minutes are free, then it is priced per audio-minute and shown before you order, with no subscription."},
+             "a": "Starting at $0: your first minutes are free, then it is priced per audio-minute and shown before you order, with no subscription required."},
         ],
     }
 
@@ -2172,9 +2322,31 @@ def language_page(request: Request, slug: str):
         {"slug": s, "kicker": SOLUTION_PAGES[s]["kicker"], "h1": SOLUTION_PAGES[s]["h1"]}
         for s in ("audio-to-text", "youtube-video-to-text", "podcast-transcription") if s in SOLUTION_PAGES
     ]
+    page = _language_page_dict(code)
+    if code in seo_pages.REVIEWED:
+        page = {**page, **seo_pages.language_page_extras(code, billing.PRICE_CARD["intl"]["transcribe"]["ai"],
+                                                          billing.PRICE_CARD["intl"]["transcribe"]["human"], code in _human_review_live())}
     return templates.TemplateResponse(request, "solution_page.html", {
         **_marketing_context(home="/", market=_display_market(request)),
-        "page": _language_page_dict(code), "related_pages": related_pages,
+        "page": page, "related_pages": related_pages,
+    })
+
+
+@app.get("/transcribe/{slug}/{task}", response_class=HTMLResponse)
+def language_task_page(request: Request, slug: str, task: str):
+    """A language plus a job people search for ("Spanish interview transcription"), for the languages Kauli reviews with a person."""
+    code = seo_pages.known(slug)
+    if not code or task not in seo_pages.TASKS:
+        return HTMLResponse("Page not found.", status_code=404)
+    redirect = _logged_in_redirect(request)
+    if redirect:
+        return redirect
+    card = billing.PRICE_CARD["intl"]["transcribe"]
+    page = seo_pages.combo_page(code, task, card["ai"], card["human"], code in _human_review_live(), seo_pages.REVIEWED[code][1])
+    related_pages = [{"slug": s, "kicker": SOLUTION_PAGES[s]["kicker"], "h1": SOLUTION_PAGES[s]["h1"]} for s in page["related"] if s in SOLUTION_PAGES]
+    return templates.TemplateResponse(request, "solution_page.html", {
+        **_marketing_context(home="/", market=_display_market(request)),
+        "page": page, "related_pages": related_pages,
     })
 
 
@@ -2545,6 +2717,7 @@ def sitemap(request: Request):
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
     static_urls += [(f"{base}/languages", "0.8")]
     static_urls += [(f"{base}/transcribe/{slug}", "0.6") for slug in AI_LANGUAGE_SLUGS]
+    static_urls += [(f"{base}/transcribe/{seo_pages.REVIEWED[c][0]}/{t}", "0.7") for c in seo_pages.REVIEWED for t in seo_pages.TASKS]
     # The homepage and the translated landing pages are alternates of each
     # other - every one lists the whole set, itself included.
     alt_urls = {f"{base}/"} | {f"{base}/{code}" for code in site_locales.LOCALES}
@@ -2552,13 +2725,33 @@ def sitemap(request: Request):
     alt_links = "".join(
         f'<xhtml:link rel="alternate" hreflang="{hl}" href="{href}"/>' for hl, href in _hreflang_alternates(base))
     alt_links += f'<xhtml:link rel="alternate" hreflang="x-default" href="{base}/"/>'
-    entries = [f"  <url><loc>{u}</loc>{alt_links if u in alt_urls else ''}<priority>{p}</priority></url>"
-               for u, p in static_urls]
+    # Every public page also has an address in each language (/zh/solutions/..., see localize_pages); each one lists the whole set.
+    not_translated = ("/terms", "/privacy", "/formatting-standards", "/developers", "/demo")
+
+    def alternates(path: str) -> str:
+        links = "".join(f'<xhtml:link rel="alternate" hreflang="{"en" if c == "en" else ui_text.HTML_LANG.get(c, c)}" href="{_lang_url(base, c, path)}"/>'
+                        for c in ui_text.LANGS)
+        return links + f'<xhtml:link rel="alternate" hreflang="x-default" href="{_lang_url(base, "en", path)}"/>'
+
+    def localizable(path: str) -> bool:
+        return page_translate_enabled and _is_public_page(path) and path != "/" and not path.startswith(not_translated)
+
+    page_translate_enabled = page_translate.configured()
+    entries = []
+    for u, p in static_urls:
+        path = u[len(base):] or "/"
+        entries.append(f"  <url><loc>{u}</loc>{alt_links if u in alt_urls else (alternates(path) if localizable(path) else '')}<priority>{p}</priority></url>")
+        if localizable(path):
+            entries += [f"  <url><loc>{_lang_url(base, c, path)}</loc>{alternates(path)}<priority>{max(0.3, float(p) - 0.1):.1f}</priority></url>"
+                        for c in ui_text.LANGS if c != "en"]
     for p in db.list_blog_posts(published_only=True):
         loc = f"{base}/blog/{p['slug']}"
         lastmod = datetime.fromtimestamp(p["updated_at"]).strftime("%Y-%m-%d") if p["updated_at"] else None
-        entries.append(f"  <url><loc>{loc}</loc>"
-                        f"{f'<lastmod>{lastmod}</lastmod>' if lastmod else ''}<priority>0.5</priority></url>")
+        stamp = f"<lastmod>{lastmod}</lastmod>" if lastmod else ""
+        path = f"/blog/{p['slug']}"
+        entries.append(f"  <url><loc>{loc}</loc>{stamp}{alternates(path) if localizable(path) else ''}<priority>0.5</priority></url>")
+        if localizable(path):
+            entries += [f"  <url><loc>{_lang_url(base, c, path)}</loc>{stamp}{alternates(path)}<priority>0.4</priority></url>" for c in ui_text.LANGS if c != "en"]
     xml = ('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n'
            + "\n".join(entries) + "\n</urlset>")
     return Response(content=xml, media_type="application/xml")
@@ -8096,6 +8289,19 @@ def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
         "trial_payment": db.get_trial_verification_payment(client_id) if tab == "settings" else None,
         "markets": billing.MARKETS, "client_market": db.get_billing_market(client_id),
     })
+
+
+@app.post("/staff/clients/{client_id}/internal")
+def staff_client_set_internal(request: Request, client_id: str, internal: str = Form("")):
+    """Team, test and friends-and-family accounts are left out of the business numbers on Site analytics."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    client = db.get_user(client_id)
+    if not client or client["role"] != "client":
+        return HTMLResponse("Client not found.", status_code=404)
+    db.set_user_internal(client_id, bool(internal))
+    return RedirectResponse(f"/staff/clients/{client_id}?notice={quote('Marked as an internal account: left out of the business numbers.' if internal else 'Counted as a real customer again.')}", status_code=303)
 
 
 @app.post("/staff/clients/{client_id}/market")

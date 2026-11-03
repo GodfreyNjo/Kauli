@@ -209,10 +209,10 @@ def test_the_staff_dashboard_has_every_section_and_only_staff_see_it(env):
         assert env.client.get(f"/staff/analytics?days={n}").status_code == 200
     page = env.client.get("/staff/analytics").text
     for section in ("Total website visitors", "New sign-ups", "Active users (app)", "Paid customers", "Monthly recurring revenue", "Churn rate",
-                    "Acquisition &amp; Traffic", "Global Audience", "Audience Insights", "Purchase Likelihood", "Churn Risk", "Quick Insights",
-                    "Devices &amp; Browsers", "User Engagement &amp; Retention", "Cohort retention", "Inactive accounts", "Product Usage",
-                    "Website Performance &amp; Top Pages", "Revenue &amp; Business Health", "Trial &rarr; Paid conversion", "ARPU", "CAC (paid channels)",
-                    "Revenue by plan", "Google Analytics 4"):
+                    "Traffic sources", "Audience by location", "Audience insights", "Purchase likelihood", "Churn risk", "Quick insights",
+                    "Devices &amp; browsers", "User engagement", "Cohort retention", "Feature usage",
+                    "Top pages", "Revenue &amp; business health", "Trial &rarr; paid", "ARPU", "Cost to win a customer",
+                    "Conversion funnel", "Recent activity", "Google Analytics"):
         assert section in page, section
     assert "<svg" in page and 'class="sa-map"' in page
 

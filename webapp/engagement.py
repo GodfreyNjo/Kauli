@@ -126,7 +126,7 @@ def can_nudge(c: dict, now: float | None = None) -> bool:
 def suggestion(c: dict) -> tuple[str, str, str]:
     """(what to try, the sentence, where it is) for someone who only uses one thing."""
     if "translate" not in c["used"]:
-        return ("Translate", "Turn a transcript into another language: Instant AI translation covers 70+ languages, and it comes with your free minutes on Pro and Premium.", "/client#new-project")
+        return ("Translate", "Turn a transcript into another language: Instant AI translation covers 76+ languages, and it comes with your free minutes on Pro and Premium.", "/client#new-project")
     if "summary" not in c["used"]:
         return ("Summarise", "Open a finished order and press Summarise to get the key points, action items or a blog outline in a click.", "/client/home")
     return ("Dub", "Hear a video spoken in another language with an AI voice, with captions burned in.", "/client#new-project")

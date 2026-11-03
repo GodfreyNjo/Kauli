@@ -147,6 +147,18 @@ def prune(keep_days: int = 400) -> int:
 
 
 # ----------------------------------------------------------------------------------------------------------------- helpers
+def _exclude_internal(conn) -> None:
+    """Makes this connection see real customers only: temporary views with the names of the tables hide the accounts marked internal (team,
+    test, friends and family), their orders, payments, subscriptions and visits. Every query below then counts real customers without each
+    one having to remember the filter."""
+    inner = "(SELECT id FROM main.users WHERE COALESCE(is_internal, 0) = 1)"
+    conn.execute("CREATE TEMP VIEW IF NOT EXISTS users AS SELECT * FROM main.users WHERE COALESCE(is_internal, 0) = 0")
+    conn.execute(f"CREATE TEMP VIEW IF NOT EXISTS orders AS SELECT * FROM main.orders WHERE client_id NOT IN {inner}")
+    conn.execute(f"CREATE TEMP VIEW IF NOT EXISTS payments AS SELECT * FROM main.payments WHERE user_id NOT IN {inner}")
+    conn.execute(f"CREATE TEMP VIEW IF NOT EXISTS subscriptions AS SELECT * FROM main.subscriptions WHERE user_id NOT IN {inner}")
+    conn.execute(f"CREATE TEMP VIEW IF NOT EXISTS site_hits AS SELECT * FROM main.site_hits WHERE user_id IS NULL OR user_id NOT IN {inner}")
+
+
 def _rows(conn, sql: str, params: tuple = ()) -> list:
     return conn.execute(sql, params).fetchall()
 
@@ -297,13 +309,15 @@ def _traffic_block(conn, start: float, end: float, days: int) -> dict:
             "sessions": [daily[d]["sessions"] if d in daily else 0 for d in labels]}
 
 
-def dashboard(days: int = 28, now: float | None = None) -> dict:
+def dashboard(days: int = 28, now: float | None = None, include_internal: bool = False) -> dict:
     now = now or time.time()
     end = now
     start = now - (days - 1) * DAY
     prev_end, prev_start = start - DAY, start - days * DAY
     conn = db.get_conn()
     try:
+        if not include_internal:
+            _exclude_internal(conn)
         owners = _owners(conn)
         cur, prev = _traffic_block(conn, start, end, days), _traffic_block(conn, prev_start, prev_end, days)
         first_hit = _rows(conn, "SELECT MIN(ts) AS t, COUNT(*) AS n FROM site_hits")[0]
@@ -447,9 +461,9 @@ def dashboard(days: int = 28, now: float | None = None) -> dict:
         conn.close()
 
     insights = _insights(channels, country_rows, churn_rate, _change(churn_rate, 0) if False else None, devices, likelihood, high, prospects, features, inactive)
-    more = extras(days, now, visitors, signups_now, paid_now)
+    more = extras(days, now, visitors, signups_now, paid_now, include_internal)
     return {
-        **more,
+        **more, "internal_excluded": 0 if include_internal else db.internal_user_count(), "include_internal": include_internal,
         "days": days, "labels": cur["labels"], "first_hit": first_hit["t"], "hits": first_hit["n"],
         "kpis": [
             {"key": "visitors", "label": "Total website visitors", "value": visitors, "change": _change(visitors, visitors_prev), "series": cur["visitors"], "fmt": "int"},
@@ -494,12 +508,14 @@ def ago(seconds: float) -> str:
 WEEKDAYS = ("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")
 
 
-def extras(days: int, now: float, visitors: int, signups: int, paid: int) -> dict:
+def extras(days: int, now: float, visitors: int, signups: int, paid: int, include_internal: bool = False) -> dict:
     """What the first dashboard did not have: visitors on the site right now, the visit-to-customer funnel, what just happened (sign-ups,
     payments, orders, contact requests, posts), how well each channel turns visitors into customers, and when visitors arrive."""
     start = now - (days - 1) * DAY
     conn = db.get_conn()
     try:
+        if not include_internal:
+            _exclude_internal(conn)
         live = _rows(conn, "SELECT COUNT(DISTINCT visitor) AS n FROM site_hits WHERE ts >= ?", (now - 300,))[0]["n"]
         ordering = _rows(conn, "SELECT COUNT(DISTINCT client_id) AS n FROM orders WHERE created_at >= ?", (start,))[0]["n"]
         steps = [("Visited the site", visitors), ("Signed up", signups), ("Placed an order", ordering), ("Became a paying customer", paid)]

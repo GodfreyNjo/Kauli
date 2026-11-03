@@ -63,3 +63,51 @@ def test_the_csv_export_is_for_staff_only_and_has_the_numbers(env, wav_bytes):
     body = r.text
     for text in ("Metric,Value", "Total website visitors", "Funnel step", "Channel,Sessions", "Day,Visitors,Sessions"):
         assert text in body, text
+
+
+# ------------------------------------------------------------------------------------------------ real customers only
+def test_internal_and_test_accounts_are_left_out_of_every_business_number(env, wav_bytes):
+    o = env.order_from(env.place(wav_bytes))
+    env.db.create_payment("p1", "u1", "pro", 10.0, None, "USD", "paystack")
+    env.db.complete_payment("p1", "ref-1", 30)
+    everyone = site_analytics.dashboard(28, include_internal=True)
+    real = site_analytics.dashboard(28)
+    assert everyone["internal_excluded"] == 0 and everyone["include_internal"]
+    k_all = {k["key"]: k["value"] for k in everyone["kpis"]}
+    assert k_all["signups"] >= 1 and k_all["paid"] >= 1
+    env.db.set_user_internal("u1", True)
+    real = site_analytics.dashboard(28)
+    k = {x["key"]: x["value"] for x in real["kpis"]}
+    assert k["signups"] == 0 and k["paid"] == 0 and k["mrr"] == 0 and real["internal_excluded"] == 1
+    assert real["revenue"]["total"] == 0 and not real["activity"] or all(e["kind"] != "payment" for e in real["activity"])
+    assert {x["key"]: x["value"] for x in site_analytics.dashboard(28, include_internal=True)["kpis"]}["signups"] >= 1       # the raw view still has them
+
+
+def test_the_address_lists_mark_accounts_as_internal_automatically(env, monkeypatch):
+    monkeypatch.setenv("KAULI_INTERNAL_DOMAINS", "forge-team.test")
+    monkeypatch.setenv("KAULI_INTERNAL_EMAILS", "friend@gmail.com")
+    assert env.db.is_internal_email("anyone@forge-team.test") and env.db.is_internal_email("Friend@Gmail.com") and not env.db.is_internal_email("customer@gmail.com")
+    row, was_new = env.db.get_or_create_user("new1", "ops@forge-team.test", "client")
+    assert env.db.get_user("new1")["is_internal"] == 1
+    env.db.get_or_create_user("new2", "real@customer.test", "client")
+    assert env.db.get_user("new2")["is_internal"] == 0
+    env.db.get_or_create_user("new3", "friend@gmail.com", "client")
+    env.db.set_user_internal("new3", False)
+    assert env.db.flag_internal_by_rule() >= 1 and env.db.get_user("new3")["is_internal"] == 1
+
+
+def test_staff_can_mark_a_client_internal_and_the_analytics_page_says_so(env, wav_bytes):
+    _staff(env)
+    r = env.client.post("/staff/clients/u1/internal", data={"internal": "1"}, follow_redirects=False)
+    assert r.status_code == 303 and env.db.get_user("u1")["is_internal"] == 1
+    page = env.client.get("/staff/analytics").text
+    assert "Real customers only: 1 internal or test account left out" in page
+    assert "Showing <strong>everyone</strong>" in env.client.get("/staff/analytics?internal=1").text
+    env.client.post("/staff/clients/u1/internal", data={}, follow_redirects=False)
+    assert env.db.get_user("u1")["is_internal"] == 0
+
+
+def test_the_page_has_a_link_tagger_for_utm_sources(env):
+    _staff(env)
+    page = env.client.get("/staff/analytics").text
+    assert "Tag a link" in page and 'id="utm-source"' in page and "utm_campaign" in page and 'id="utm-copy"' in page

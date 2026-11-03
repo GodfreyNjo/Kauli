@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Translations{% endblock %}
+{% block content %}
+<div class="ds-page">
+  <header class="ds-head">
+    <div>
+      <h1>Translations</h1>
+      <p>Every public page and every signed-in screen is shown in the reader's language. Each sentence is translated once and remembered here.</p>
+    </div>
+    <div class="ds-head-actions">
+      {% if configured %}
+      <form method="post" action="/staff/translations/warm"><button type="submit" class="ds-btn" {{ 'disabled' if warm.running else '' }}>{{ 'Translating...' if warm.running else 'Translate every public page now' }}</button></form>
+      {% endif %}
+    </div>
+  </header>
+  {% if not configured %}<p class="hub-flash bad" role="alert">The translator is not connected (AZURE_TRANSLATOR_KEY and AZURE_TRANSLATOR_REGION). Pages are shown in English outside the hand-written screens until it is.</p>{% endif %}
+  {% if warm.total %}
+  <section class="ds-card" aria-live="polite">
+    <div class="ds-card-head"><h2>Last run</h2><span class="muted">{{ warm.done }} of {{ warm.total }} pages{% if warm.errors %} &middot; {{ warm.errors }} could not be opened{% endif %}</span></div>
+    <progress max="{{ warm.total }}" value="{{ warm.done }}" style="width:100%"></progress>
+    {% if warm.last %}<p class="muted">Last page: {{ warm.last }}</p>{% endif %}
+  </section>
+  {% endif %}
+  <section class="ds-card">
+    <div class="ds-card-head"><h2>Remembered sentences</h2></div>
+    <table class="ds-table"><thead><tr><th>Language</th><th class="num">Sentences</th><th>Address pattern</th></tr></thead><tbody>
+      {% for code, name in langs %}<tr><td>{{ name }}</td><td class="num">{{ '{:,}'.format(counts.get(code, 0)) }}</td><td><code>/{{ code }}/solutions/...</code></td></tr>{% endfor %}
+    </tbody></table>
+    <p class="muted">A page that could not be fully translated is shown with the rest in English and is hidden from search engines until it can be. Opening every public page here fills the memory before a visitor or a crawler asks for it.</p>
+  </section>
+</div>
+{% endblock %}

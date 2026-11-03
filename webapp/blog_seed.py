@@ -47,7 +47,7 @@ POSTS = [
 <p>AI transcription services take the video's audio and return a transcript, usually within minutes.</p>
 <p>With Kauli you can paste a YouTube link or upload the file, choose the spoken language and download the result as Word, text or SRT.</p>
 <p>Instant AI transcription starts at $0.12 per audio-minute in the US, and it is machine-generated, so skim it for names and numbers before you publish.</p>
-<p>It covers 77 languages - see the <a href="/languages">full language list</a>.</p>
+<p>It covers 76+ languages - see the <a href="/languages">full language list</a>.</p>
 <p>YouTube sometimes blocks automated downloads of particular videos, and if a link fails you can upload the video file instead.</p>
 
 <h2>Method 4: Pay for human transcription</h2>
@@ -164,7 +164,7 @@ POSTS = [
 <h2>AI transcription</h2>
 <p>Happy Scribe lists additional AI minutes at $0.20 per minute on top of its plans.</p>
 <p>Transkriptor's <a href="https://transkriptor.com/pricing/" target="_blank" rel="noopener">public plans</a> include $9.99 per month for 300 minutes and $19.99 per month for 2,400 minutes (disclosure: Transkriptor is one of the vendors behind part of Kauli's own AI transcription).</p>
-<p>Kauli's Instant AI transcription is pay-as-you-go from $0.12 per audio-minute in the US, with no subscription.</p>
+<p>Kauli's Instant AI transcription is pay-as-you-go from $0.12 per audio-minute in the US, with no subscription required.</p>
 
 <h2>Translation and subtitles</h2>
 <p>Rev lists human-made global subtitles from $6.49 per minute for Spanish and Hindi, rising to $15.99 per minute for Japanese and Korean.</p>
@@ -212,7 +212,7 @@ POSTS = [
 
 <h2>Step 2: Translate the text</h2>
 <p>Machine translation is quick and inexpensive, and it is a sensible first draft.</p>
-<p>Kauli's Instant AI can translate between 76 languages, and it labels the result as machine translation that no person has reviewed.</p>
+<p>Kauli's Instant AI can translate between 76+ languages, and it labels the result as machine translation that no person has reviewed.</p>
 <p>For Swahili, Kikuyu and English you can add human review, which is worth it for anything you'll publish.</p>
 
 <h2>Step 3: Check the translation</h2>
@@ -404,7 +404,7 @@ POSTS = [
 <ul>
 <li><strong>Chinese.</strong> Mandarin and Cantonese are separate options - see <a href="/transcribe/chinese-mandarin">Mandarin Chinese</a> and <a href="/transcribe/chinese-cantonese">Cantonese Chinese</a>.</li>
 <li><strong>Spanish.</strong> Regional vocabulary varies - see <a href="/transcribe/spanish">Spanish transcription</a>.</li>
-<li><strong>Everything else.</strong> Browse the <a href="/languages">full list of 77 languages</a>.</li>
+<li><strong>Everything else.</strong> Browse the <a href="/languages">full list of 76+ languages</a>.</li>
 </ul>
 
 <h2>Step 2: Translate into English</h2>
@@ -505,7 +505,7 @@ POSTS = [
 <li><strong>Wait a few minutes.</strong> Instant AI transcription is usually ready quickly.</li>
 <li><strong>Download as Word, text or SRT.</strong> Word suits editing, text suits pasting, and SRT adds timestamps for subtitles.</li>
 </ol>
-<p>Kauli's <a href="/solutions/audio-to-text">audio to text</a> page covers this in 77 languages.</p>
+<p>Kauli's <a href="/solutions/audio-to-text">audio to text</a> page covers this in 76+ languages.</p>
 
 <h2>How to get a more accurate transcript</h2>
 <ul>
@@ -793,7 +793,7 @@ Today we're looking at subtitles.</code></pre>
 
 <h2>Step 2: Translate the transcript</h2>
 <p>For subtitles, translate the transcript and export it as an SRT or VTT file.</p>
-<p>Kauli's Instant AI translates between 76 languages and delivers SRT and VTT, and it labels the output as machine translation that no person has reviewed.</p>
+<p>Kauli's Instant AI translates between 76+ languages and delivers SRT and VTT, and it labels the output as machine translation that no person has reviewed.</p>
 <p>See our step-by-step guide to <a href="/blog/add-subtitles-to-video-in-another-language">adding subtitles in another language</a>.</p>
 
 <h2>Step 3: Translate the title and description</h2>

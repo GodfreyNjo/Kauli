@@ -32,6 +32,12 @@
     </div>
     <div class="card">
       <h2 style="margin-top:0;">Account</h2>
+      <form method="post" action="/staff/clients/{{ client['id'] }}/internal" style="margin:0 0 12px;">
+        <label style="display:flex; gap:8px; align-items:center; font-size:0.88rem;">
+          <input type="checkbox" name="internal" value="1" {{ 'checked' if client['is_internal'] else '' }} onchange="this.form.submit()" style="width:auto; margin:0;">
+          Internal or test account <span class="muted">(left out of Site analytics, churn and revenue)</span>
+        </label>
+      </form>
       <table>
         <tbody>
           <tr><td class="muted">Email</td><td>{{ client['email'] }}</td></tr>

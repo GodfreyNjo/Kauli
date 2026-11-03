@@ -73,6 +73,7 @@
        for their own body copy, so that was already the same font. -->
   <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-grotesk@500,600,700&display=swap"></noscript>
+  {% set verify = site_verification() %}{% if verify.google %}<meta name="google-site-verification" content="{{ verify.google }}">{% endif %}{% if verify.bing %}<meta name="msvalidate.01" content="{{ verify.bing }}">{% endif %}
   <link rel="stylesheet" href="/static/style.css?v={{ static_version('style.css') }}">
   {% block head_extra %}{% endblock %}
   <!-- Cloudflare Web Analytics - cookieless, no personal data, see Privacy Policy -->
@@ -179,6 +180,7 @@
         <a href="/staff/providers" class="{{ 'active' if '/staff/providers' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Providers</span></a>
         <a href="/staff/models" class="{{ 'active' if '/staff/models' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Models and review</span></a>
         <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
+        <a href="/staff/translations" class="{{ 'active' if '/staff/translations' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Translations</span></a>
         <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
         <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">Handbook</span></a>
         <a href="/staff/resources" class="{{ 'active' if '/staff/resources' in request.url.path else '' }}">{{ nav_icon('folder') }}<span class="label">Resources</span></a>

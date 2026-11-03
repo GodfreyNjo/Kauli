@@ -3,8 +3,8 @@
 {% block body_class %}m-public{% endblock %}
 {% block title %}Audio &amp; Video Transcription in 70+ Languages, Dubbing &amp; Subtitles{% endblock %}
 {% block head_extra %}
-<meta name="description" content="Transcribe audio and video to text in 70+ languages in minutes, starting at $0 with free minutes every month - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
-<meta property="og:title" content="Kauli - Audio &amp; video transcription in 70+ languages, with human review when it counts">
+<meta name="description" content="Transcribe audio and video to text in 76+ languages in minutes, starting at $0 with free minutes every month - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
+<meta property="og:title" content="Kauli - Audio &amp; video transcription in 76+ languages, with human review when it counts">
 <meta property="og:description" content="Instant AI transcription, translation and dubbing - or add a real human reviewer. Transparent per-minute pricing, pay as you go.">
 <meta property="og:type" content="website">
 <link rel="icon" href="/static/kauli-icon.png">
@@ -62,7 +62,7 @@
   "@context": "https://schema.org",
   "@type": "Product",
   "name": "Kauli",
-  "description": "Instant AI transcription in 70+ languages, plus translation, dubbing and subtitles, with optional human review in {{ human_review_languages }}. Priced per audio-minute.",
+  "description": "Instant AI transcription in 76+ languages, plus translation, dubbing and subtitles, with optional human review in {{ human_review_languages }}. Priced per audio-minute.",
   "brand": { "@type": "Brand", "name": "Forge Media Services" },
   "offers": [
     {% for key, sl in service_levels.items() %}
@@ -91,7 +91,7 @@
 <div class="marketing-page">
 
   <div class="tk-announce"><span class="tk-announce-tag">New</span>
-    <span><strong>Instant AI in {{ language_total }} languages.</strong> Your first {{ free_minutes|int }} minutes of transcription are free.</span>
+    <span><strong>Instant AI in 76+ languages.</strong> Your first {{ free_minutes|int }} minutes of transcription are free every month.</span>
     <a href="/login?mode=signup" data-cta="announce">Try it now &rarr;</a>
     <button type="button" class="tk-announce-close" aria-label="Dismiss this announcement">&times;</button></div>
   <script>
@@ -113,8 +113,9 @@
 
   <section class="tk-hero">
     <div class="tk-hero-inner">
-      <h1>Transcribe Audio to Text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ Languages</h1>
-      <p class="tk-hero-sub">Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it.</p>
+      <h1>Accurate transcripts and subtitles in 76+ languages. Human-checked when it has to be right.</h1>
+      <p class="tk-hero-sub">Instant AI in 76+ languages. Add a real human editor in {{ human_review_languages }}. Word, TXT, SRT and VTT downloads. First {{ free_minutes|int }} minutes free every month.</p>
+      <p class="tk-hero-proof">Every human-reviewed transcript is checked against the audio by a dedicated editor before it is marked ready.</p>
       <details class="tk-more">
         <summary>
           <span>Learn more</span>
@@ -124,8 +125,7 @@
           <p class="tk-more-lede">Instantly with AI, or human-reviewed in selected languages. <a href="/human-review">See which</a>.</p>
           <ul class="tk-more-grid">
             <li><strong>Instant AI</strong>
-              Ready in minutes. Transcription in {{ language_total }} languages and translation into
-              {{ language_total - 1 }}. Clearly labelled as AI-generated, not reviewed by a person.</li>
+              Ready in minutes. Transcription and translation in 76+ languages. Clearly labelled as AI-generated, not reviewed by a person.</li>
             <li><strong>Human-reviewed</strong>
               In selected languages (<a href="/human-review">see which</a>), with more coming soon. A dedicated editor checks the work against the audio before it is
               marked ready.</li>
@@ -142,7 +142,7 @@
         <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
         <a href="/demo" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
-      <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
+      <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, to process and read. To download or edit a result, you pay for that order.</p>
     </div>
 
     <section class="tk-langs" aria-labelledby="langs-title">
@@ -214,9 +214,9 @@
   </section>
 
   <section class="tk-stats" aria-label="Kauli at a glance">
-    <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length }}</b><span>transcription languages</span></div>
-    <div class="tk-stat"><b>{{ ai_only_languages|length + source_languages|length - 1 }}</b><span>translation languages</span></div>
-    <div class="tk-stat"><b>3</b><span>human-reviewed languages</span></div>
+    <div class="tk-stat"><b>76+</b><span>transcription languages</span></div>
+    <div class="tk-stat"><b>76+</b><span>translation languages</span></div>
+    <div class="tk-stat"><b>{{ human_review_count }}</b><span>human-reviewed languages</span></div>
     <div class="tk-stat tk-stat-text"><b>Pay as you go</b><span>starting from $0 &middot; first {{ free_minutes|int }} minutes free</span></div>
   </section>
 
@@ -446,7 +446,7 @@
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Pricing</span>
       <h2 class="m-h2">Simple pricing. Pay only for what you use.</h2>
-      <p class="m-lede">No subscription. You see the exact price before you order, and your first {{ free_minutes|int }} minutes of Instant AI transcription are free.</p>
+      <p class="m-lede">No subscription required. You see the exact price before you order. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, to process and read; to download or edit a result you pay for that order.</p>
 
       {% set in_kenya = (request.headers.get('cf-ipcountry', '') | upper) == 'KE' %}
       <div class="pz-panel" id="pz">

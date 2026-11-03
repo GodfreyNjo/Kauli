@@ -109,6 +109,29 @@ def wrap_email_html(body_html: str, cta_text: str | None = None, cta_url: str | 
 </div>"""
 
 
+def _in_recipients_language(to: str, subject: str, html_body: str, text_body: str | None):
+    """A customer who uses Kauli in Chinese gets the email in Chinese. Staff and anyone who has not chosen a language get English, and any
+    trouble translating sends the English original: an email must never be lost because a translator was slow."""
+    try:
+        from . import db, page_translate, ui_text
+        user = db.get_user_by_email(to)
+        lang = user["ui_lang"] if user is not None and user["role"] == "client" else None
+        if not lang or lang == "en" or not ui_text.valid(lang) or not page_translate.configured():
+            return subject, html_body, text_body
+        new_subject = page_translate.localize_text(subject, lang, budget=5.0)
+        new_html, complete = page_translate.localize_html(html_body, lang, budget=8.0)
+        if not complete:
+            return subject, html_body, text_body
+        new_text = text_body
+        if text_body:
+            lines = [ln for ln in text_body.splitlines() if ln.strip()]
+            tr, _ = page_translate.translate_many(lines, lang, budget=5.0)
+            new_text = chr(10).join(tr.get(ln, ln) if ln.strip() else ln for ln in text_body.splitlines())
+        return new_subject, new_html, new_text
+    except Exception:  # noqa: BLE001
+        return subject, html_body, text_body
+
+
 def send_email(to: str, subject: str, html_body: str, text_body: str | None = None,
                 tags: list[str] | None = None, sender_name: str = "Kauli Operations") -> tuple[bool, str]:
     """Returns (ok, detail) - detail is Brevo's messageId on success, or a
@@ -132,6 +155,7 @@ def send_email(to: str, subject: str, html_body: str, text_body: str | None = No
     without needing a second verified sender identity."""
     if not email_configured():
         return False, "email not configured (BREVO_API_KEY / BREVO_FROM_EMAIL not set)"
+    subject, html_body, text_body = _in_recipients_language(to, subject, html_body, text_body)
     payload = {
         "sender": {"name": sender_name, "email": os.environ["BREVO_FROM_EMAIL"]},
         "to": [{"email": to}],

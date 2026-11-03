@@ -106,7 +106,7 @@ def client():
 def test_homepage_structure_follows_the_plan(client):
     html = client.get("/").text
     assert len(re.findall(r"<h1[ >]", html)) == 1
-    assert re.search(r"<h1[^>]*>Transcribe Audio to Text in \d+\+ Languages</h1>", html)
+    assert re.search(r"<h1[^>]*>Accurate transcripts and subtitles in 76\+ languages\. Human-checked when it has to be right\.</h1>", html)
     assert "Nairobi sample" not in html                       # the old sample is gone (the Nairobi office is in the footer)
     ids = re.findall(r'<section[^>]*id="([a-z-]+)"', html)
     assert ids[:5] == ["services", "demo", "why", "integrations", "pricing"], ids   # services before pricing, as specified
@@ -243,7 +243,8 @@ def test_use_case_menu_replaces_solutions_and_links_real_pages(client):
 def test_hero_subtitle_is_short_with_a_learn_more_that_holds_the_rest(client):
     html = client.get("/").text
     sub = re.search(r'<p class="tk-hero-sub">(.*?)</p>', html, re.S).group(1).strip()
-    assert sub == "Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it."
+    assert sub.startswith("Instant AI in 76+ languages. Add a real human editor in") and sub.endswith("First 30 minutes free every month.")   # the one canonical promise
+    assert "Accurate transcripts and subtitles in 76+ languages. Human-checked when it has to be right." in html
     more = re.search(r'<details class="tk-more">.*?</details>', html, re.S).group(0)
     assert "<summary" in more and "Learn more" in more and "<details class=\"tk-more\" open" not in html   # closed by default
     assert "Instantly with AI, or human-reviewed in selected languages." in more and 'href="/human-review"' in more

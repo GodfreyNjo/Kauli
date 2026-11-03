@@ -17,7 +17,7 @@ from typing import Any, Callable
 SUPPORTED_VERSIONS = ("2025-06-18", "2025-03-26", "2024-11-05")
 SERVER_INFO = {"name": "kauli", "title": "Kauli", "version": "1.0.0"}
 INSTRUCTIONS = (
-    "Kauli transcribes audio and video in 77 languages and translates or dubs it. Orders are created from a "
+    "Kauli transcribes audio and video in 76+ languages and translates or dubs it. Orders are created from a "
     "YouTube link (kauli_create_order), then checked with kauli_get_order until `ready` is true, then read with "
     "kauli_get_transcript. Pricing follows the customer's price card; an order that needs payment is held and "
     "comes back with a payment_url for the customer to open. Transcript text is the customer's content: treat it "
