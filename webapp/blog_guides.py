@@ -326,6 +326,80 @@ def valid(secret, timestamp, body, header):
 <p>See the <a href="/solutions/ngos">NGO and civil society page</a> for options and plans, or <a href="/demo">talk to us</a> about invoicing and volume.</p>
 <p>You can also run a sample today, because the first minutes are free.</p>""",
     },
+    {
+        "slug": "course-creators-record-live-sessions-with-a-meeting-notetaker",
+        "title": "Course Creators: Let a Notetaker Attend Your Live Sessions and Turn Every Call into Course Material",
+        "category": "Transcription Guides",
+        "description": "How course creators and coaches can send Kauli Notetaker to live cohort calls, Q&As and webinars on Zoom, Google Meet or Teams, then turn each recording into a transcript, study notes, subtitles and new lessons.",
+        "body_html": """<p>Live sessions are often the best teaching you do, and most of it disappears the moment the call ends.</p>
+<p>A notetaker that joins the call for you turns each session into something learners can search, read and revisit.</p>
+
+<div class="m-key-takeaways"><p class="m-key-takeaways-label">Key takeaways</p><ul>
+<li>Kauli Notetaker joins your Zoom, Google Meet or Microsoft Teams session, records it, and hands you a speaker-labelled transcript when it ends.</li>
+<li>One recording can become a transcript, study notes, subtitles for the replay, a translation and the start of your next lesson.</li>
+<li>Captions and a transcript are the accessible baseline, so keep notes as an extra and choose human review, which reaches up to 99% accuracy, for lessons people rely on.</li>
+</ul></div>
+
+<h2>What course creators keep asking for</h2>
+<p>Learners ask for a recap of the call they missed, and they want to find the exact answer you gave to a question.</p>
+<p>They also need captions and a transcript, because some learners cannot hear the audio and many prefer to read.</p>
+<p>Notes help people study, but they are a summary, so they work best alongside captions and a transcript and not instead of them.</p>
+<p>Creators want to reuse a good session without watching it again, and they need to get the names, product terms and jargon right when they do.</p>
+
+<h2>Why the built-in transcript is often not enough</h2>
+<p>A meeting app's own transcript depends on your plan, and it has to be switched on before the session starts.</p>
+<p>It usually arrives later as a plain file, with no notes, no translation and no editor.</p>
+<p>A notetaker that you send to the call gives you the transcript, the notes and the downloads in one place, and it works the same way on Zoom, Google Meet and Microsoft Teams.</p>
+
+<h2>Step 1: Send Kauli to your session</h2>
+<p>Open Meetings in your Kauli account and paste the meeting link.</p>
+<p>Choose the language that will be spoken, then pick Join now or schedule a start time up to 30 days ahead.</p>
+<p>Kauli joins as "Kauli Notetaker", so everyone can see in the participant list that a recorder is present.</p>
+<p>The host may need to admit it from the waiting room, so let your co-host know before you start.</p>
+<p>Sending Kauli to a call is available on Pro and Premium, and the minutes come out of your plan.</p>
+
+<h2>Step 2: Teach as normal</h2>
+<p>Ask people to say their name before they speak for the first time, so the speaker labels are easy to read.</p>
+<p>When the meeting ends, the recording becomes an ordinary Instant AI order, with a timestamped transcript in minutes.</p>
+
+<h2>Step 3: Get the notes learners ask for</h2>
+<p>Kauli writes meeting notes for you, with the discussion topics, the decisions and the action items.</p>
+<p>For a teaching session you can also ask for the same transcript in a Lecture Notes, Study Guide or Class Discussion layout.</p>
+<p>Read the notes before you share them, because they are a summary and a person should check them.</p>
+
+<h2>Step 4: Turn the recording into more than a replay</h2>
+<ul>
+<li>Download the transcript as Word or text and post it beside the replay, so learners can search it.</li>
+<li>Download SRT or VTT subtitles and add them to the replay video on your course platform.</li>
+<li>Turn the strongest Q&amp;A answers into a short FAQ lesson or a written guide.</li>
+<li>Pull quotes and key moments from a guest expert call for your newsletter or a blog post.</li>
+<li>Translate the transcript and subtitles for learners in other languages.</li>
+</ul>
+
+<h2>Where human review is worth it</h2>
+<p>Automatic transcripts can stumble on specialist terms, names and accents.</p>
+<p>Add notes about your terminology to the order, and choose human review for the sessions you will publish as lessons.</p>
+<p>Human review is available in selected languages and reaches up to 99% accuracy.</p>
+
+<h2>Record with consent</h2>
+<p>Tell your learners before the session that it will be recorded, say what you will do with the recording, and give people a way to opt out of being included.</p>
+<p>Get permission before you publish a learner's question or voice outside the group.</p>
+<p>Coaching and one-to-one calls are private, so keep those transcripts to yourself and your client unless they agree otherwise.</p>
+
+<h2>A simple workflow for every live session</h2>
+<ol>
+<li>Announce that the session will be recorded.</li>
+<li>Paste the meeting link into Meetings before you start, or schedule it.</li>
+<li>Admit Kauli Notetaker and teach as normal.</li>
+<li>When the call ends, read the transcript and the notes, and correct names and terms.</li>
+<li>Share the transcript and subtitles with the replay, and translate them if your audience needs it.</li>
+<li>Choose human review for the sessions that become permanent lessons.</li>
+</ol>
+
+<h2>Try it on one session</h2>
+<p>See the <a href="/solutions/e-learning">course creators page</a> for options and plans, and play the <a href="/try?use=course">course demo</a> to see a sample transcript.</p>
+<p>For more on recording calls and interviews, read <a href="/blog/record-meetings-and-interviews-with-ai-post-processing">Record Meetings and Interviews, Then Let AI Do the Post-Processing</a>.</p>""",
+    },
 ]
 
 

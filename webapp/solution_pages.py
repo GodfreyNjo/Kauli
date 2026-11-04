@@ -497,7 +497,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"name": "Dubbed lessons", "best": "Learners who prefer to listen.", "get": f"Voiced in a new language. Available in {dub_names}."},
             ],
             "demo": "course",
-            "guides": ["course-creators-accurate-transcripts-and-fast-localization", "add-subtitles-to-video-in-another-language", "how-does-ai-transcription-work"],
+            "guides": ["course-creators-record-live-sessions-with-a-meeting-notetaker", "course-creators-accurate-transcripts-and-fast-localization", "add-subtitles-to-video-in-another-language", "how-does-ai-transcription-work"],
             "cta_heading": "Run a lesson through Kauli",
             "cta_body": "Upload one module and see the transcript, subtitles and translation. Your first minutes are free.",
             "related": ["video-translation", "video-transcription", "video-localization"],
