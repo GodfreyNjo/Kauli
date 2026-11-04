@@ -7375,3 +7375,14 @@ body .cookie-notice .cookie-actions #cookie-notice-manage:hover { background: rg
 .dm-video-main video { height: auto; aspect-ratio: 16 / 9; object-fit: contain; }
 /* the free-minutes badge sits in the flow under the intro line, so it can never cover the headline */
 .pz-gift { position: static; width: max-content; max-width: 100%; margin: 0 auto 22px; }
+
+/* the logo block and the sidebar read as one navy rail: same width, same blue, no seam, logo left edge on the icon column, and both shrink together when the menu is collapsed */
+@media (min-width: 901px) {
+  body.staff-ui .topbar { border-bottom-color: #e3eaf6; }
+  body.staff-ui .topbar-brand { background: #0b2b57; padding: 0 0 0 26px; margin-bottom: -1px; border-bottom: 0; position: relative; z-index: 2; transition: width 0.15s ease; }
+  body.client-ui .topbar-brand { width: 250px; padding-left: 28px; }
+  body.staff-ui .sidebar { background: linear-gradient(180deg, #0b2b57 0%, #08213f 100%); }
+  body.staff-ui .sidebar-top { margin: 2px 0 10px; }
+  body.staff-ui:has(.sidebar.collapsed) .topbar-brand { width: 64px; padding-left: 0; justify-content: center; overflow: hidden; }
+  body.staff-ui:has(.sidebar.collapsed) .topbar-logo { width: 38px; height: 38px; object-fit: cover; object-position: left center; }
+}
