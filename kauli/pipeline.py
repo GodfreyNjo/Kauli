@@ -71,6 +71,35 @@ def _insert_non_speech_segments(segments: list[Segment], total_duration_ms: int)
         seg.index = i
     return filled
 
+STRAY_MAX_WORDS = 2          # a last "sentence" this short...
+STRAY_MIN_MS = 5000          # ...stretched over this long is not speech (people say a word in about half a second)
+
+
+def _without_speaker_label(text: str) -> str:
+    return re.sub(r"^[A-Z][A-Z0-9 _.'-]{0,30}:\s*", "", (text or "").strip())
+
+
+def drop_stray_final_words(segments: list[Segment]) -> list[str]:
+    """Speech recognizers often invent a word or two over the music or silence at the very end of a file ("Thank you.", "Sam."), and
+    stretch it across the whole tail. Real speech has no word lasting five seconds, so when the last speech segment is one or two words
+    spread over five seconds or more, it is taken out and the stretch becomes ordinary non-speech (the caller fills it in as gap cells).
+    A segment a person has edited is their decision and is never touched, and neither is a clip with nothing else in it. Returns the
+    texts removed, so the order can say what happened."""
+    speech = [s for s in segments if s.segment_type != "gap"]
+    if len(speech) < 3:
+        return []
+    last = speech[-1]
+    source = (last.source_transcript or "").strip()
+    words = source.split()
+    if not 1 <= len(words) <= STRAY_MAX_WORDS or last.end_ms - last.start_ms < STRAY_MIN_MS:
+        return []
+    for typed in (last.source_edited_transcript, last.edited_text):
+        if typed and _without_speaker_label(typed) != source:             # someone wrote something here: it stays
+            return []
+    segments.remove(last)
+    return [source]
+
+
 FLAG_CONF_ASR = 0.85     # below this, a human looks at it
 FLAG_CONF_MT = 0.80
 
@@ -667,6 +696,9 @@ def run(
             log(f"      {note or 'ASR used the backup Transkriptor key'}")
         if not job.source_duration_ms and job.segments:
             job.source_duration_ms = job.segments[-1].end_ms
+        for stray in drop_stray_final_words(job.segments):
+            job.warnings.append(f"A stray word over the music at the end (\"{stray}\") was treated as non-speech.")
+            log(f"      dropped a stray final word: {stray!r}")
         job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
         if label_speakers:
             try:

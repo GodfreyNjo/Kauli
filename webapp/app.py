@@ -49,7 +49,7 @@ from . import billing, db, supabase_auth, worker, upload_security, logging_setup
 from kauli import caption_formats, timing  # noqa: E402
 from kauli.models import Job, Segment, Word, apply_speaker_paragraphs, label_speakers, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
-from kauli.pipeline import split_gap_span, translate_segment, translate_gap_tag, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
+from kauli.pipeline import drop_stray_final_words, split_gap_span, translate_segment, translate_gap_tag, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
@@ -1066,6 +1066,26 @@ def _repair_leaked_translations(job: Job) -> bool:
                 alt["text"] = cleaned
                 changed = True
     return changed
+
+
+def _drop_stray_ending(job: Job, order) -> bool:
+    """The same guard a new order gets (kauli.pipeline.drop_stray_final_words), for an order made before it existed: a word or two that the
+    recognizer invented over the music at the end is taken out, its stretch becomes non-speech, and the subtitle and transcript files are
+    written again so a download no longer carries it. True when something was removed."""
+    gone = drop_stray_final_words(job.segments)
+    if not gone:
+        return False
+    job.segments = _insert_non_speech_segments(job.segments, job.source_duration_ms)
+    for text in gone:
+        job.warnings.append(f"A stray word over the music at the end (\"{text}\") was treated as non-speech.")
+    out = Path(order["outdir"])
+    try:
+        (out / f"subs_{order['target_lang']}.srt").write_text(to_srt(job), encoding="utf-8")
+        (out / f"subs_{order['target_lang']}.vtt").write_text(to_vtt(job), encoding="utf-8")
+        (out / f"transcript_{order['source_lang']}.srt").write_text(to_srt(job, source=True), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - the repaired manifest is what matters; the files are rewritten again on the next save
+        logging_setup.get_logger("editor").warning("could not rewrite subtitle files after dropping a stray word", exc_info=True)
+    return True
 
 
 def _split_long_gaps(job: Job) -> bool:
@@ -11034,7 +11054,8 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     if job is None:
         return HTMLResponse(
             "Job hasn't finished processing yet - nothing to edit.", status_code=404)
-    opened_changes = _split_long_gaps(job) | _repair_leaked_translations(job)          # silences cut into seconds; leaked commentary cleaned
+    opened_changes = _drop_stray_ending(job, order)                                     # a word invented over the closing music is removed
+    opened_changes = _split_long_gaps(job) | _repair_leaked_translations(job) | opened_changes   # silences cut into seconds; leaked commentary cleaned
     if not job.speaker_paragraphs_applied:                                              # every new speaker starts a new paragraph, once: after that it is the editor's call
         apply_speaker_paragraphs(job.segments)
         job.speaker_paragraphs_applied = True
