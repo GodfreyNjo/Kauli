@@ -117,3 +117,15 @@ def test_the_home_demo_is_the_real_demo_video_with_the_words_the_video_says(env)
         root = Path(__file__).parent.parent / "webapp" / "static" / "demo"
         assert (root / f"vid-video-{code}.mp4").is_file() and (root / f"vid-video-{code}.jpg").is_file(), code
         assert env.client.get(f"/static/demo/vid-video-{code}.mp4").status_code == 200
+
+
+def test_no_language_mentions_a_card_verification_charge():
+    """The $1 card step was retired; no hand-written page in any language may still promise or describe it."""
+    from webapp import locales, ui_text
+    banned = ("1 $", "US$ 1", "1 美元", "1 دولار", "1 डॉलर", "1ドル", "1달러", "dola 1", "1 dollar", "$1 ", "$1.", "$1,", "1 USD")
+    for code, block in locales.STRINGS.items():
+        for key, value in block.items():
+            assert not any(b in str(value) for b in banned), (code, key)
+    for lang, catalog in {**ui_text.CATALOG, "en": ui_text.EN}.items():
+        for key, value in catalog.items():
+            assert not any(b in str(value) for b in banned), (lang, key)
