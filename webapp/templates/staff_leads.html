@@ -2,23 +2,61 @@
 {% block theme %}dark{% endblock %}
 {% block title %}CRM{% endblock %}
 {% block content %}
-<h1>CRM</h1>
-<p class="muted" style="margin-top:0;">Every lead, wherever it came from - the website form lands here automatically;
-   log anything from Instagram, WhatsApp, a referral, etc. by hand below.</p>
+<header class="rp-head">
+  <div><h1>CRM</h1><p>Turn conversations into customers. Capture, track and convert every opportunity.</p></div>
+  <div class="rp-head-actions">
+    <label class="qp-select"><span class="sr-only">Source</span>
+      <select onchange="location.href=this.value" aria-label="Source">
+        <option value="/staff/leads">All sources</option>
+        {% for s in lead_sources %}<option value="/staff/leads?source={{ s }}" {{ 'selected' if filter_source == s else '' }}>{{ s|capitalize }}</option>{% endfor %}
+      </select></label>
+    <a class="rp-btn primary" href="#log-lead-form" onclick="document.getElementById('log-lead-form').open = true;">+ Add lead</a>
+  </div>
+</header>
 {% if error %}<p class="error">{{ error }}</p>{% endif %}
 
-<div class="stat-grid">
-  <div class="stat-tile"><div class="stat-icon">{{ icon_svg('target') }}</div><div class="stat-value">{{ pipeline['by_status'].get('new', 0) }}</div><div class="stat-label">New</div></div>
-  <div class="stat-tile"><div class="stat-icon info">{{ icon_svg('eye') }}</div><div class="stat-value">{{ pipeline['by_status'].get('contacted', 0) }}</div><div class="stat-label">Contacted</div></div>
-  <div class="stat-tile"><div class="stat-icon warn">{{ icon_svg('spinner') }}</div><div class="stat-value">{{ pipeline['by_status'].get('qualified', 0) }}</div><div class="stat-label">Qualified</div></div>
-  <div class="stat-tile"><div class="stat-icon">{{ icon_svg('paper') }}</div><div class="stat-value">{{ pipeline['by_status'].get('proposal', 0) }}</div><div class="stat-label">Proposal sent</div></div>
-  <div class="stat-tile ok"><div class="stat-icon ok">{{ icon_svg('check') }}</div><div class="stat-value">{{ pipeline['won'] }}</div><div class="stat-label">Won</div></div>
-  <div class="stat-tile{% if pipeline['conversion_rate'] is not none and pipeline['conversion_rate'] < 0.3 %} warn{% endif %}">
-    <div class="stat-icon{% if pipeline['conversion_rate'] is not none and pipeline['conversion_rate'] < 0.3 %} warn{% endif %}">{{ icon_svg('bars') }}</div>
-    <div class="stat-value">{% if pipeline['conversion_rate'] is not none %}{{ "%.0f"|format(pipeline['conversion_rate'] * 100) }}%{% else %}-{% endif %}</div>
-    <div class="stat-label">Conversion rate</div>
-    <div class="stat-sub">of {{ pipeline['won'] + pipeline['lost'] }} decided</div>
-  </div>
+{% set st = pipeline['by_status'] %}
+<div class="crm-kpis">
+  <a class="crm-kpi tone-blue" href="/staff/leads?status=new"><span class="crm-ic">{{ icon_svg('users') }}</span><span class="crm-kb"><strong>{{ st.get('new', 0) }}</strong><span>New leads</span></span><span class="crm-spark">{{ lead_spark_new|safe }}</span></a>
+  <a class="crm-kpi tone-slate" href="/staff/leads?status=contacted"><span class="crm-ic">{{ icon_svg('eye') }}</span><span class="crm-kb"><strong>{{ st.get('contacted', 0) }}</strong><span>Contacted</span></span></a>
+  <a class="crm-kpi tone-amber" href="/staff/leads?status=qualified"><span class="crm-ic">{{ icon_svg('spinner') }}</span><span class="crm-kb"><strong>{{ st.get('qualified', 0) }}</strong><span>Qualified</span></span></a>
+  <a class="crm-kpi tone-violet" href="/staff/leads?status=proposal"><span class="crm-ic">{{ icon_svg('paper') }}</span><span class="crm-kb"><strong>{{ st.get('proposal', 0) }}</strong><span>Proposal sent</span></span></a>
+  <a class="crm-kpi tone-green" href="/staff/leads?status=won"><span class="crm-ic">{{ icon_svg('check') }}</span><span class="crm-kb"><strong>{{ pipeline['won'] }}</strong><span>Won{% if pipeline['conversion_rate'] is not none %} &middot; {{ '%.0f'|format(pipeline['conversion_rate'] * 100) }}% of decided{% endif %}</span></span><span class="crm-spark">{{ lead_spark_won|safe }}</span></a>
+  <a class="crm-kpi tone-red" href="/staff/leads?status=lost"><span class="crm-ic">{{ icon_svg('alert') }}</span><span class="crm-kb"><strong>{{ pipeline['lost'] }}</strong><span>Lost</span></span></a>
+</div>
+
+{% set src_total = pipeline['by_source']|sum(attribute='n') or 1 %}
+{% set cat_max = (pipeline['by_org_type'].values()|max) if pipeline['by_org_type'] else 1 %}
+<div class="crm-row">
+  <section class="crm-card" aria-labelledby="crm-src-h">
+    <header><h2 id="crm-src-h">Leads by source</h2><a class="rp-link" href="/staff/leads">View all</a></header>
+    {% if pipeline['by_source'] %}
+    <div class="crm-donut">
+      {{ an.donut(lead_source_items, 170, 30, src_total, 'Total leads')|safe }}
+      <ul class="sa-legend">{% for r in pipeline['by_source'] %}<li><i style="background: {{ an.PALETTE[loop.index0 % 7] }}"></i><a href="/staff/leads?source={{ r['source'] }}" style="color:inherit; text-decoration:none; flex:1; text-transform:capitalize;">{{ r['source'] }}</a><b>{{ r['n'] }}</b><em>{{ '%.0f'|format(100 * r['n'] / src_total) }}%</em></li>{% endfor %}</ul>
+    </div>
+    {% else %}<p class="muted">No leads yet.</p>{% endif %}
+  </section>
+  <section class="crm-card" aria-labelledby="crm-cat-h">
+    <header><h2 id="crm-cat-h">Leads by category</h2><a class="rp-link" href="/staff/leads">View all</a></header>
+    <ul class="crm-bars">
+      {% for ot, n in pipeline['by_org_type'].items()|sort(attribute='1', reverse=True) %}
+      <li><a href="/staff/leads?org_type={{ ot or '' }}" style="color:inherit; text-decoration:none;"><span style="text-transform:capitalize;">{{ (ot or 'unknown')|replace('_', ' ') }}</span></a><i><u style="width: {{ 100 * n / cat_max }}%"></u></i><b>{{ n }}</b></li>
+      {% else %}<li class="muted">No leads yet.</li>{% endfor %}
+    </ul>
+  </section>
+  <section class="crm-card" aria-labelledby="crm-onb-h">
+    <header><h2 id="crm-onb-h">Client onboarding</h2><a class="rp-link" href="#onboarding">{{ pending_onboarding_messages|length }} pending</a></header>
+    {% if pending_onboarding_messages %}
+    {% set m = pending_onboarding_messages[0] %}
+    <div class="crm-msg">
+      <strong>{{ m['user_display_name'] }}</strong><small>{{ m['user_email'] }}</small>
+      <span class="source-badge">{{ m['kind']|replace('_', ' ') }}</span>
+      <p>{{ m['subject'] }}</p>
+      <form method="post" action="/staff/onboarding/{{ m['id'] }}/mark-sent"><button type="submit" class="rp-btn primary">Mark as sent</button></form>
+    </div>
+    {% else %}<p class="muted">Nothing waiting. New customers get their welcome automatically.</p>{% endif %}
+  </section>
 </div>
 
 {% if stale_leads %}
@@ -40,7 +78,7 @@
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card" id="onboarding">
   <h2 style="margin-top:0;">Client onboarding</h2>
   <p class="muted" style="margin-top:0; font-size:0.85rem;">There's no email service connected yet, so nothing here
      sends itself - every message below is real, ready to use, and waiting for you to actually send it (email or
@@ -120,33 +158,6 @@
 </div>
 
 <div class="card">
-  <h2 style="margin-top:0;">By source</h2>
-  {% if by_source_chart %}{{ by_source_chart }}{% endif %}
-  <table>
-    <thead><tr><th>Source</th><th>Leads</th><th>Won</th></tr></thead>
-    <tbody>
-      {% for row in pipeline['by_source'] %}
-      <tr><td style="text-transform:capitalize;">{{ row['source'] }}</td><td>{{ row['n'] }}</td><td>{{ row['won'] }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-
-<div class="card">
-  <h2 style="margin-top:0;">By category</h2>
-  {% if by_org_type_chart %}{{ by_org_type_chart }}{% else %}
-  <table>
-    <thead><tr><th>Category</th><th>Leads</th></tr></thead>
-    <tbody>
-      {% for ot, n in pipeline['by_org_type'].items() %}
-      <tr><td style="text-transform:capitalize;">{{ (ot or 'unknown')|replace('_', ' ') }}</td><td>{{ n }}</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-</div>
-
-<div class="card">
   <details id="log-lead-form">
     <summary style="cursor:pointer; font-weight:650; font-size:1rem;">+ Log a lead manually</summary>
     <form method="post" action="/staff/leads/new" style="margin-top:16px; max-width:600px;">
@@ -169,9 +180,12 @@
   </details>
 </div>
 
-<div class="card" style="padding:0;">
+<div class="crm-row-b">
+<div class="crm-main">
+<div class="card crm-leads" style="padding:0;">
   <div style="padding:20px 24px 10px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-    <h2 style="margin:0;">All leads</h2>
+    <h2 style="margin:0;">Recent leads</h2>
+    <input type="search" id="crm-search" placeholder="Search leads..." aria-label="Search leads" style="max-width:240px; margin:0;">
     <div class="filter-tabs">
       <a href="/staff/leads{{ '?org_type=' ~ filter_org_type if filter_org_type }}" class="{{ 'active' if not filter_status else '' }}">All <span class="tab-count">{{ pipeline['by_status'].values() | sum }}</span></a>
       {% for s in lead_statuses %}
@@ -215,4 +229,34 @@
   </table>
   {% endif %}
 </div>
+</div>
+<aside class="crm-side">
+  <section class="crm-card" aria-labelledby="crm-qa-h">
+    <header><h2 id="crm-qa-h">Quick actions</h2></header>
+    <div class="crm-qa">
+      <a href="#log-lead-form" onclick="document.getElementById('log-lead-form').open = true;">Add lead</a>
+      <a href="/staff/newsletter">Send campaign</a>
+      <a href="/staff/ops">View reports</a>
+      <a href="/staff/clients">Clients</a>
+    </div>
+  </section>
+  <section class="crm-card" aria-labelledby="crm-fn-h">
+    <header><h2 id="crm-fn-h">Conversion funnel</h2></header>
+    <ol class="crm-funnel">
+      {% for label, n in [('New', st.get('new', 0)), ('Contacted', st.get('contacted', 0)), ('Qualified', st.get('qualified', 0)), ('Proposal', st.get('proposal', 0)), ('Won', pipeline['won'])] %}
+      <li><b class="tone-{{ ['blue', 'slate', 'amber', 'violet', 'green'][loop.index0] }}">{{ n }}</b><span>{{ label }}</span></li>
+      {% endfor %}
+    </ol>
+  </section>
+</aside>
+</div>
+<script>
+  (function () {
+    var q = document.getElementById('crm-search'); if (!q) return;
+    q.addEventListener('input', function () {
+      var needle = q.value.trim().toLowerCase();
+      document.querySelectorAll('.crm-leads tbody tr').forEach(function (r) { r.style.display = !needle || r.textContent.toLowerCase().indexOf(needle) > -1 ? '' : 'none'; });
+    });
+  })();
+</script>
 {% endblock %}

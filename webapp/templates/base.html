@@ -162,34 +162,66 @@
       </div>
       <nav class="sidebar-nav" aria-label="App">
         {% if user['role'] == 'staff' %}
-        <a href="/staff" class="{{ 'active' if request.url.path == '/staff' else '' }}">{{ nav_icon('grid') }}<span class="label">Overview</span></a>
-        <a href="/staff/jobs" class="{{ 'active' if request.url.path == '/staff/jobs' else '' }}">{{ nav_icon('checklist') }}<span class="label">All jobs</span></a>
-        <a href="/staff/ops" class="{{ 'active' if '/staff/ops' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Reports</span></a>
-        <a href="/staff/leads" class="{{ 'active' if '/staff/leads' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">CRM</span></a>
-        <a href="/staff/clients" class="{{ 'active' if '/staff/clients' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">Clients</span></a>
-        <a href="/staff/support" class="{{ 'active' if '/staff/support' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Support</span></a>
-        <a href="/staff/analytics" class="{{ 'active' if '/staff/analytics' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Site analytics</span></a>
-        <a href="/staff/exceptions" class="{{ 'active' if '/staff/exceptions' in request.url.path else '' }}">{{ nav_icon('alert') }}<span class="label">Exceptions</span></a>
-        <a href="/staff/billing" class="{{ 'active' if '/staff/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Billing</span></a>
-        <a href="/staff/blog" class="{{ 'active' if request.url.path.startswith('/staff/blog') and 'audio' not in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">Blog</span></a>
-        <a href="/staff/blog-audio" class="{{ 'active' if '/staff/blog-audio' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Blog audio</span></a>
-        <a href="/staff/engagement" class="{{ 'active' if '/staff/engagement' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">Engagement</span></a>
-        <a href="/staff/payment-failures" class="{{ 'active' if '/staff/payment-failures' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">Failed payments</span></a>
-        <a href="/staff/winback" class="{{ 'active' if '/staff/winback' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">Win-back</span></a>
-        <a href="/staff/exit-feedback" class="{{ 'active' if '/staff/exit-feedback' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Exit feedback</span></a>
-        <a href="/staff/providers" class="{{ 'active' if '/staff/providers' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Providers</span></a>
-        <a href="/staff/models" class="{{ 'active' if '/staff/models' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">Models and review</span></a>
-        <a href="/staff/newsletter" class="{{ 'active' if '/staff/newsletter' in request.url.path else '' }}">{{ nav_icon('mail') }}<span class="label">Newsletter</span></a>
-        <a href="/staff/translations" class="{{ 'active' if '/staff/translations' in request.url.path else '' }}">{{ nav_icon('message') }}<span class="label">Translations</span></a>
-        <a href="/staff/guide" class="{{ 'active' if '/staff/guide' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">Editor guide</span></a>
-        <a href="/staff/handbook" class="{{ 'active' if '/staff/handbook' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">Handbook</span></a>
-        <a href="/staff/resources" class="{{ 'active' if '/staff/resources' in request.url.path else '' }}">{{ nav_icon('folder') }}<span class="label">Resources</span></a>
-        <a href="/status" class="{{ 'active' if request.url.path == '/status' else '' }}">{{ nav_icon('pulse') }}<span class="label">Status</span></a>
+        {% set sp = request.url.path %}
+        {% macro snav(href, label, icon, matches, children=[], exclude='') -%}
+          {% set ns = namespace(on=false, child=false) %}
+          {% for m in matches %}{% if ((sp == m[1:]) if m.startswith('=') else (m in sp)) %}{% set ns.on = true %}{% endif %}{% endfor %}
+          {% if exclude and exclude in sp %}{% set ns.on = false %}{% endif %}
+          {% for c in children %}{% if c[3] in sp %}{% set ns.child = true %}{% endif %}{% endfor %}
+          {% if children %}
+          <div class="nav-grp{{ ' is-open' if ns.on or ns.child else '' }}" data-nav-grp="{{ href }}">
+            <div class="nav-grp-row">
+              <a href="{{ href }}" class="{{ 'active' if ns.on else '' }}">{{ nav_icon(icon) }}<span class="label">{{ label }}</span></a>
+              <button type="button" class="nav-toggle" aria-expanded="{{ 'true' if ns.on or ns.child else 'false' }}" aria-label="Show or hide the pages under {{ label }}"><svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5L7.5 6 4 9.5"/></svg></button>
+            </div>
+            <div class="nav-sub">{% for c in children %}<a href="{{ c[0] }}" class="{{ 'active' if c[3] in sp else '' }}">{{ nav_icon(c[2]) }}<span class="label">{{ c[1] }}</span></a>{% endfor %}</div>
+          </div>
+          {% else %}
+          <a href="{{ href }}" class="{{ 'active' if ns.on else '' }}">{{ nav_icon(icon) }}<span class="label">{{ label }}</span></a>
+          {% endif %}
+        {%- endmacro %}
+        {{ snav('/staff', 'Overview', 'grid', ['=/staff']) }}
+
+        <div class="snav-sec"><span>Operations</span></div>
+        {{ snav('/staff/jobs', 'Jobs', 'checklist', ['/staff/jobs', '/staff/orders'], [('/staff/exceptions', 'Exceptions', 'alert', '/staff/exceptions')]) }}
+        {{ snav('/staff/leads', 'CRM', 'target', ['/staff/leads']) }}
+        {{ snav('/staff/clients', 'Clients', 'users', ['/staff/clients'], [('/staff/engagement', 'Engagement', 'pulse', '/staff/engagement'), ('/staff/winback', 'Win-back', 'target', '/staff/winback'), ('/staff/exit-feedback', 'Exit feedback', 'message', '/staff/exit-feedback')]) }}
+        {{ snav('/staff/support', 'Support', 'message', ['/staff/support']) }}
+
+        <div class="snav-sec"><span>Insights</span></div>
+        {{ snav('/staff/ops', 'Reports', 'bars', ['/staff/ops']) }}
+        {{ snav('/staff/analytics', 'Site analytics', 'bars', ['/staff/analytics'], [('/staff/translations', 'Translations', 'message', '/staff/translations')]) }}
+        {{ snav('/staff/models', 'Models and review', 'pulse', ['/staff/models'], [('/staff/providers', 'Providers', 'mic', '/staff/providers')]) }}
+
+        <div class="snav-sec"><span>Content</span></div>
+        {{ snav('/staff/blog', 'Blog', 'paper', ['/staff/blog'], [('/staff/blog-audio', 'Blog audio', 'mic', '/staff/blog-audio'), ('/staff/newsletter', 'Newsletter', 'mail', '/staff/newsletter')], 'blog-audio') }}
+
+        <div class="snav-sec"><span>Finance</span></div>
+        {{ snav('/staff/billing', 'Billing and payments', 'card', ['/staff/billing'], [('/staff/payment-failures', 'Failed payments', 'alert', '/staff/payment-failures')]) }}
+
+        <div class="snav-sec"><span>Help</span></div>
+        {{ snav('/staff/guide', 'Editor guide', 'book_open', ['/staff/guide']) }}
+        {{ snav('/staff/handbook', 'Handbook', 'book', ['/staff/handbook']) }}
+        {{ snav('/staff/resources', 'Resources', 'folder', ['/staff/resources']) }}
+        {{ snav('/status', 'Status', 'pulse', ['=/status']) }}
         {% if user['is_admin'] %}
-        <a href="/staff/voice-actors" class="{{ 'active' if '/staff/voice-actors' in request.url.path else '' }}">{{ nav_icon('mic') }}<span class="label">Voice Talent</span></a>
-        <a href="/staff/admin" class="{{ 'active' if '/staff/admin' in request.url.path else '' }}">{{ nav_icon('shield') }}<span class="label">Admin</span></a>
-        <a href="/staff/security" class="{{ 'active' if '/staff/security' in request.url.path else '' }}">{{ nav_icon('lock') }}<span class="label">Security log</span></a>
+        <div class="snav-sec"><span>Admin</span></div>
+        {{ snav('/staff/admin', 'Admin', 'shield', ['/staff/admin'], [('/staff/voice-actors', 'Voice talent', 'mic', '/staff/voice-actors'), ('/staff/security', 'Security log', 'lock', '/staff/security')]) }}
         {% endif %}
+        <script>
+          (function () {
+            document.querySelectorAll('.nav-grp').forEach(function (g) {
+              var key = 'kauli_nav_' + g.dataset.navGrp, btn = g.querySelector('.nav-toggle'), stored = null;
+              try { stored = localStorage.getItem(key); } catch (e) {}
+              if (stored === 'open') { g.classList.add('is-open'); btn.setAttribute('aria-expanded', 'true'); }
+              btn.addEventListener('click', function () {
+                var open = g.classList.toggle('is-open'); btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                try { localStorage.setItem(key, open ? 'open' : 'closed'); } catch (e) {}
+              });
+              if (stored === 'closed' && !g.querySelector('a.active')) { g.classList.remove('is-open'); btn.setAttribute('aria-expanded', 'false'); }
+            });
+          })();
+        </script>
         {% elif user['role'] == 'voice_actor' %}
         <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>
         <div class="sidebar-divider"></div>

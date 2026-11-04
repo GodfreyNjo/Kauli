@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block theme %}light{% endblock %}
 {% block body_class %}m-public{% endblock %}
-{% block title %}Audio &amp; Video Transcription in 70+ Languages, Dubbing &amp; Subtitles{% endblock %}
+{% block title %}Audio &amp; Video Transcription in 76+ Languages, Dubbing &amp; Subtitles{% endblock %}
 {% block head_extra %}
 <meta name="description" content="Transcribe audio and video to text in 76+ languages in minutes, starting at $0 with free minutes every month - plus AI translation, dubbing and subtitles, with optional human review. Pay as you go, first {{ free_minutes|int }} minutes free.">
 <meta property="og:title" content="Kauli - Audio &amp; video transcription in 76+ languages, with human review when it counts">
@@ -112,9 +112,11 @@
   {% include "_nav.html" %}
 
   <section class="tk-hero">
-    <div class="tk-hero-inner">
-      <h1>Accurate transcripts and subtitles in 76+ languages. Human-checked when it has to be right.</h1>
-      <p class="tk-hero-sub">Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it.</p>
+    <div class="tk-hero-inner hx-hero">
+     <div class="hx-copy">
+      <p class="hx-eyebrow">Audio &amp; video to text, subtitles, translation</p>
+      <h1>Understand any voice. <span class="hx-accent">In any language.</span></h1>
+      <p class="tk-hero-sub">Transcribe, translate and add subtitles in 76+ languages with AI: fast, accurate and effortless. Human-checked when it has to be right.</p>
       <details class="tk-more">
         <summary>
           <span>Learn more</span>
@@ -140,11 +142,39 @@
         </div>
       </details>
       <div class="tk-hero-ctas">
-        <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try Free Transcription</a>
+        <a href="/login?mode=signup" class="btn cta-olive" data-cta="hero">Try It Free <span aria-hidden="true">&rarr;</span></a>
         <a href="/demo" class="btn secondary" data-cta="hero-demo">Book a Demo</a>
       </div>
-      <p class="tk-hero-note">Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, to process and read. To download or edit a result, you pay for that order.</p>
+      <p class="tk-hero-note"><span class="hx-check" aria-hidden="true">&#10003;</span> No credit card required. Pay as you go. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, to process and read. To download or edit a result, you pay for that order.</p>
+     </div>
+     <div class="hx-visual" aria-hidden="true">
+      <p class="hx-hand hx-hand-a">From audio or video&hellip;</p>
+      <div class="hx-app">
+        <div class="hx-side"><span class="is-on">Transcribe</span><span>Subtitles</span><span>Translate</span><span>Dub</span></div>
+        <div class="hx-main">
+          <div class="hx-file"><strong>Team Meeting.mp4</strong><span class="hx-lang">English</span></div>
+          <div class="hx-wave"><i class="hx-play"></i><span class="hx-bars">{% for h in [8, 14, 22, 12, 26, 18, 30, 20, 12, 24, 16, 28, 10, 22, 14, 26, 18, 12, 24, 16, 8, 20, 28, 14, 10, 22] %}<b style="height: {{ h }}px"></b>{% endfor %}</span></div>
+          <ul class="hx-lines">
+            <li><em class="s1">Speaker 1</em><time>00:00</time><span>Welcome everyone to today's meeting.</span></li>
+            <li><em class="s2">Speaker 2</em><time>00:08</time><span>Let's review the roadmap for Q2.</span></li>
+            <li><em class="s1">Speaker 1</em><time>00:14</time><span>Great. I'll share the next steps.</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="hx-trans"><b>Translate to</b>
+        <ul><li class="is-on"><i>ES</i>Spanish</li><li><i>FR</i>French</li><li><i>DE</i>German</li><li><i>SW</i>Swahili</li><li><i>ZH</i>Chinese</li><li class="more">+ 70+ more</li></ul>
+      </div>
+      <p class="hx-hand hx-hand-b">&hellip;to text, subtitles and translation</p>
+     </div>
     </div>
+
+    <ul class="hx-strip" aria-label="What you get">
+      <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13.5h6L10 21l9-11h-6.2L13 3Z"/></svg></span>Fast, accurate results</li>
+      <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span>76+ languages</li>
+      <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M17 14c2.4 0 4 1.6 4 4"/></svg></span>Speaker identification</li>
+      <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 3h6"/></svg></span>Timestamps</li>
+      <li><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></span>Human review (optional)</li>
+    </ul>
 
     <section class="tk-langs" aria-labelledby="langs-title">
       <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
@@ -180,29 +210,42 @@
       </script>
     </section>
 
-    <div class="tk-cards">
-      <div class="tk-card tk-try" id="try-card">
-        <div class="tk-card-head">
-          <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
-          <h2>Try it now: no account needed</h2>
+    <div class="tk-cards hx-try" id="try-card">
+      <h2 class="hx-try-title">Try it now: no account needed</h2>
+      <div class="hx-try-grid">
+        <div class="hx-try-up">
+          <input type="file" id="try-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
+          <label class="hx-drop" for="try-file" id="try-drop" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+            <span><strong>Upload audio or video</strong><small id="try-label">Or drag and drop, up to 30 minutes free. The result is kept in your free account.</small></span>
+          </label>
+          <div class="tk-try-row">
+            <label class="tk-try-lang"><span>Language spoken</span>
+              <select id="try-lang" aria-label="Language spoken in the recording">
+                {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
+                {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+              </select></label>
+            <button type="button" class="btn cta-olive" id="try-go" disabled data-cta="hero-try">Transcribe it</button>
+          </div>
+          <div class="tk-try-progress" id="try-progress" hidden><progress id="try-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="try-pct">0%</span></div>
+          <p class="tk-try-msg" id="try-msg" role="status" aria-live="polite"></p>
         </div>
-        <input type="file" id="try-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
-        <label class="tk-drop" for="try-file" id="try-drop" tabindex="0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-          <span id="try-label">Choose a recording (up to 30 minutes). It is transcribed free, and the result is kept in your free account.</span>
-        </label>
-        <div class="tk-try-row">
-          <label class="tk-try-lang"><span>Language spoken</span>
-            <select id="try-lang" aria-label="Language spoken in the recording">
-              {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
-              {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
-            </select></label>
-          <button type="button" class="btn cta-olive" id="try-go" disabled data-cta="hero-try">Transcribe it</button>
+        <span class="hx-or" aria-hidden="true">or</span>
+        <div class="hx-try-yt">
+          <div class="hx-yt-row">
+            <label class="hx-yt-in"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
+              <input type="url" id="yt-link" placeholder="Paste a YouTube link" aria-label="YouTube link"></label>
+            <button type="button" class="btn cta-olive" id="yt-go" data-cta="hero-link">Transcribe <span aria-hidden="true">&rarr;</span></button>
+          </div>
+          <p class="tk-try-msg" id="yt-msg" role="status" aria-live="polite"></p>
+          <ul class="tk-chips" aria-label="Accepted formats"><li>MP4</li><li>MP3</li><li>WAV</li><li>MOV</li><li>M4A</li><li>FLAC</li></ul>
+          <p class="tk-try-fine">YouTube links need a free account. Your file is used only to make this transcript, and you see it inside your account. <a href="/login?mode=signup" data-cta="hero-upload">Create a free account</a>.</p>
         </div>
-        <div class="tk-try-progress" id="try-progress" hidden><progress id="try-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="try-pct">0%</span></div>
-        <p class="tk-try-msg" id="try-msg" role="status" aria-live="polite"></p>
-        <ul class="tk-chips" aria-label="Accepted formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
-        <p class="tk-try-fine">Your file is used only to make this transcript, and you see it inside your account. <a href="/login?mode=signup" data-cta="hero-upload">Create a free account instead</a>.</p>
+        <div class="hx-subs" aria-hidden="true">
+          <div class="hx-vid"><i class="hx-play"></i><span>Ideas today. A brighter tomorrow.</span></div>
+          <span class="hx-gen">Generate subtitles</span>
+          <ul><li><i>ES</i>Ideas para un mañana mejor.</li><li><i>FR</i>Des idées pour un avenir meilleur.</li><li><i>DE</i>Ideen für eine bessere Zukunft.</li><li><i>ZH</i>迈向更好的明天。</li><li class="more">+ 70+ more languages</li></ul>
+        </div>
       </div>
       <script>
         (function () {
@@ -210,6 +253,9 @@
               bar = document.getElementById("try-bar"), pct = document.getElementById("try-pct"), prog = document.getElementById("try-progress"), lang = document.getElementById("try-lang"),
               drop = document.getElementById("try-drop");
           if (!file) return;
+          ["dragover", "dragenter"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("is-over"); }); });
+          ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function () { drop.classList.remove("is-over"); }); });
+          drop.addEventListener("drop", function (e) { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) { file.files = e.dataTransfer.files; file.dispatchEvent(new Event("change")); } });
           drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
           file.addEventListener("change", function () {
             var f = file.files[0]; msg.textContent = "";
@@ -236,25 +282,44 @@
           });
         })();
       </script>
-      <a class="tk-card" href="/login?mode=signup" data-cta="hero-link">
-        <div class="tk-card-head">
-          <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
-          <h2>Paste a YouTube link and transcribe it</h2>
-        </div>
-        <div class="tk-drop">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/></svg>
-          <span>No file needed - paste a link in your project</span>
-        </div>
-        <ul class="tk-chips" aria-label="What you can order"><li>Transcript</li><li>Subtitles</li><li>Translation</li><li>Dubbing</li></ul>
-      </a>
+      <script>
+        (function () {
+          var go = document.getElementById("yt-go"), input = document.getElementById("yt-link"), msg = document.getElementById("yt-msg"); if (!go) return;
+          function start() {
+            var v = (input.value || "").trim();
+            if (!/^https?:\/\/(www\.|m\.)?(youtube\.com|youtu\.be)\//i.test(v)) { msg.textContent = "Paste a YouTube link, for example https://www.youtube.com/watch?v=..."; return; }
+            try { localStorage.setItem("kauli_pending_youtube", v); } catch (e) {}
+            window.location.href = "/login?mode=signup";
+          }
+          go.addEventListener("click", start);
+          input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); start(); } });
+        })();
+      </script>
     </div>
+  </section>
+
+  <section class="hx-uses" aria-labelledby="uses-h">
+    <h2 id="uses-h">Built for every workflow</h2>
+    <ul>
+      <li><a href="/solutions/interview-transcription">Interviews</a></li>
+      <li><a href="/solutions/podcast-transcription">Podcasts</a></li>
+      <li><a href="/solutions/e-learning">Education</a></li>
+      <li><a href="/solutions/youtubers">Content creation</a></li>
+      <li><a href="/solutions/call-centers">Call centers</a></li>
+      <li><a href="/solutions/media-broadcast">Media &amp; news</a></li>
+      <li><a href="/solutions/ngos">NGOs</a></li>
+      <li><a href="/transcribe/spanish/research-transcripts">Research</a></li>
+      <li><a href="/solutions/accessibility-compliance">Accessibility</a></li>
+    </ul>
+    <a class="hx-all" href="/solutions">See all use cases <span aria-hidden="true">&rarr;</span></a>
   </section>
 
   <section class="tk-band">
     <div class="tk-band-inner">
-      <h2>Audio to text in minutes. Checked by an expert when it matters.</h2>
-      <p>Instant AI drafts your transcript in minutes and is clearly labelled as machine-generated. In selected languages, choose Human-reviewed and a real expert checks it before it is marked ready. <a href="/human-review">See the languages</a>.</p>
-      <a href="/login?mode=signup" class="btn tk-band-btn" data-cta="band">Try It Now</a>
+      <h2>Turn conversations into global opportunities</h2>
+      <p>Accurate transcripts, translation and subtitles in 76+ languages, with a human editor when it has to be right. <a href="/human-review" style="color:#fff; text-decoration:underline;">See which languages</a>.</p>
+      <a href="/login?mode=signup" class="btn tk-band-btn" data-cta="band">Start Free Now <span aria-hidden="true">&rarr;</span></a>
+      <p class="tk-band-note">No credit card required</p>
     </div>
   </section>
 

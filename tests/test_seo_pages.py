@@ -88,3 +88,13 @@ def test_search_console_and_bing_verification_tags_appear_when_configured(env, m
     monkeypatch.setenv("BING_SITE_VERIFICATION", "xyz789")
     page = env.client.get("/human-review").text
     assert '<meta name="google-site-verification" content="abc123">' in page and '<meta name="msvalidate.01" content="xyz789">' in page
+
+
+def test_the_home_try_band_has_upload_and_youtube_and_the_use_case_index_exists(env):
+    home = env.client.get("/").text
+    for text in ('id="try-card"', "Upload audio or video", 'id="yt-link"', 'id="yt-go"', "Generate subtitles", "Built for every workflow", "See all use cases",
+                 "Turn conversations into global opportunities", "Start Free Now"):
+        assert text in home, text
+    page = env.client.get("/solutions")
+    assert page.status_code == 200 and "Built for every workflow" in page.text and "/solutions/interview-transcription" in page.text
+    assert "/solutions</loc>" in env.client.get("/sitemap.xml").text

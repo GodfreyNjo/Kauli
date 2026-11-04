@@ -1901,7 +1901,7 @@ MARKETING_FAQ = [
 # burned captions) - nothing here promises anything the product doesn't do.
 SOLUTION_PAGES = {
     "audio-to-text": {
-        "title": "Audio to Text Converter - Transcribe Audio in 70+ Languages",
+        "title": "Audio to Text Converter - Transcribe Audio in 76+ Languages",
         "meta_description": "Convert audio and video to text in minutes in 76+ languages, starting at $0 with free minutes every month. "
                              "Download as Word, text or SRT. Pay as you go, with optional human review for up to 99% accuracy.",
         "kicker": "Audio to text",
@@ -1958,7 +1958,7 @@ SOLUTION_PAGES = {
             {"title": "No downloading or re-uploading",
              "body": "Paste the link - we fetch the audio ourselves. Only submit videos you own or have "
                       "the rights to use."},
-            {"title": "70+ spoken languages",
+            {"title": "76+ spoken languages",
              "body": "Choose the language spoken in the video. Instant AI transcribes it and can translate it; "
                       f"you can add human review for {_HR_NAMES}, and dubbing for {_DUB_NAMES}."},
             {"title": "Subtitle files ready for YouTube",
@@ -2352,6 +2352,16 @@ def language_task_page(request: Request, slug: str, task: str):
     })
 
 
+@app.get("/solutions", response_class=HTMLResponse)
+def solutions_index(request: Request):
+    redirect = _logged_in_redirect(request)
+    if redirect:
+        return redirect
+    rows = [{"slug": s, "kicker": p["kicker"], "h1": p["h1"], "intro": p.get("intro", "")} for s, p in SOLUTION_PAGES.items()]
+    return templates.TemplateResponse(request, "solutions_index.html", {
+        **_marketing_context(home="/", market=_display_market(request)), "rows": rows, "base_url": _site_base(request)})
+
+
 @app.get("/languages", response_class=HTMLResponse)
 def languages_hub(request: Request):
     redirect = _logged_in_redirect(request)
@@ -2717,7 +2727,7 @@ def sitemap(request: Request):
     static_urls += [(f"{base}/human-review/{slug}", "0.7") for slug in human_review_content.ORDER]
     static_urls += [(f"{base}/locations/{slug}", "0.6") for slug in locations.OFFICES]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
-    static_urls += [(f"{base}/languages", "0.8")]
+    static_urls += [(f"{base}/languages", "0.8"), (f"{base}/solutions", "0.8")]
     static_urls += [(f"{base}/transcribe/{slug}", "0.6") for slug in AI_LANGUAGE_SLUGS]
     static_urls += [(f"{base}/transcribe/{seo_pages.REVIEWED[c][0]}/{t}", "0.7") for c in seo_pages.REVIEWED for t in seo_pages.TASKS]
     # The homepage and the translated landing pages are alternates of each
@@ -8138,7 +8148,16 @@ def staff_leads(request: Request, status: str | None = None, source: str | None 
         {"label": (ot or "unknown").replace("_", " "), "value": n}
         for ot, n in sorted(pipeline["by_org_type"].items(), key=lambda kv: -kv[1])
     ], label_width=140) if len(pipeline["by_org_type"]) > 1 else ""
+    lead_days = site_analytics._days_list(time.time(), 14)
+    conn = db.get_conn()
+    try:
+        made = {r["d"]: r["n"] for r in conn.execute("SELECT date(created_at, 'unixepoch') AS d, COUNT(*) AS n FROM leads WHERE created_at >= ? GROUP BY d", (time.time() - 15 * 86400,)).fetchall()}
+        won_by_day = {r["d"]: r["n"] for r in conn.execute("SELECT date(created_at, 'unixepoch') AS d, COUNT(*) AS n FROM leads WHERE status = 'won' AND created_at >= ? GROUP BY d", (time.time() - 15 * 86400,)).fetchall()}
+    finally:
+        conn.close()
     return templates.TemplateResponse(request, "staff_leads.html", {
+        "an": site_analytics, "lead_source_items": [(r["source"], r["n"]) for r in pipeline["by_source"]], "lead_spark_new": site_analytics.spark([made.get(d, 0) for d in lead_days], 120, 34),
+        "lead_spark_won": site_analytics.spark([won_by_day.get(d, 0) for d in lead_days], 120, 34, "#10b981"),
         "user": user, "leads": db.list_leads(status=status, source=source, org_type=org_type),
         "filter_status": status, "filter_source": source, "filter_org_type": org_type, "error": error,
         "pipeline": pipeline, "by_source_chart": by_source_chart, "by_org_type_chart": by_org_type_chart,
@@ -8398,7 +8417,7 @@ def staff_clients(request: Request, q: str | None = None):
         c["plan"] = billing.effective_plan(c, db.get_subscription_current(c["id"]))
         rows.append(c)
     return templates.TemplateResponse(request, "staff_clients.html", {
-        "user": user, "clients": rows, "q": q or "", "plans": billing.PLANS,
+        "user": user, "clients": rows, "q": q or "", "plans": billing.PLANS, "now_ts": time.time(),
     })
 
 
@@ -8423,7 +8442,8 @@ def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
         "plan": billing.effective_plan(client, subscription), "plans": billing.PLANS,
         "wallet_credits": db.wallet_credits_remaining(client_id),
         "free_minutes_remaining": billing.free_minutes_remaining(subscription),
-        "orders": db.list_orders_for_client(client_id) if tab == "orders" else [],
+        "orders": db.list_orders_for_client(client_id) if tab in ("orders", "overview") else [],
+        "now_ts": time.time(),
         "team_members": db.list_team_members(client_id) if tab == "team" else [],
         "payments": db.list_payments_for_user(client_id) if tab == "billing" else [],
         "api_key_row": db.get_client_api_key(client_id) if tab == "settings" else None,
@@ -10204,7 +10224,14 @@ def staff_jobs(request: Request):
     delivered_today_n = sum(1 for r in rows if r["order"]["status"] == "delivered" and r["order"]["status_changed_at"] >= today_start)
 
     service_level_labels = {k: v["name"] for k, v in billing.SERVICE_LEVELS.items()}
+    trend = db.daily_job_trend(days=28)
+    recent, earlier = trend[-14:], trend[:-14]
+
+    def _trend_card(key: str) -> dict:
+        now_n, before_n = sum(d[key] for d in recent), sum(d[key] for d in earlier)
+        return {"spark": site_analytics.spark([d[key] for d in recent], 120, 34) if recent else "", "change": _pct_change(now_n, before_n)}
     return templates.TemplateResponse(request, "staff_dashboard.html", {
+        "trend_created": _trend_card("created"), "trend_delivered": _trend_card("delivered"),
         "user": user, "rows": rows, "now_ts": now,
         "stuck_threshold_seconds": tat.STUCK_STAGE_THRESHOLD_SECONDS,
         "service_level_labels": service_level_labels,
@@ -10213,6 +10240,77 @@ def staff_jobs(request: Request):
         "awaiting_review_n": awaiting_review_n, "exceptions_n": exceptions_n,
         "ready_n": ready_n, "delivered_n": delivered_n, "delivered_today_n": delivered_today_n,
     })
+
+
+def _ops_bars_svg(labels: list[str], values: list[float], color: str, money: bool = False, width: int = 640, height: int = 230) -> str:
+    """The bars for a Reports chart: one bar a day, a few value labels on the left and date ticks along the bottom. Real data only."""
+    pad_l, pad_r, pad_t, pad_b = 40, 8, 10, 24
+    plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
+    peak = max(values) if values and max(values) > 0 else 1
+    step = 10 ** max(0, len(str(int(peak))) - 1)
+    top = ((int(peak) + step - 1) // step) * step if peak >= 1 else 1
+    n = max(1, len(values))
+    slot = plot_w / n
+    out = [f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="Daily values" xmlns="http://www.w3.org/2000/svg" style="width:100%; height:auto;">']
+    for i in range(0, 5):
+        v = top * i / 4
+        y = pad_t + plot_h - (v / top) * plot_h
+        label = f"${v:,.0f}" if money else f"{v:,.0f}"
+        out.append(f'<line x1="{pad_l}" y1="{y:.1f}" x2="{width - pad_r}" y2="{y:.1f}" stroke="currentColor" stroke-opacity="{0.2 if i == 0 else 0.08}"/>'
+                   f'<text x="{pad_l - 6}" y="{y + 3.5:.1f}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="end">{label}</text>')
+    for i, v in enumerate(values):
+        h = (v / top) * plot_h
+        out.append(f'<rect x="{pad_l + i * slot + slot * 0.18:.1f}" y="{pad_t + plot_h - h:.1f}" width="{max(1.5, slot * 0.64):.1f}" height="{max(0.0, h):.1f}" rx="2" fill="{color}"><title>{labels[i]}: {v:,.2f}</title></rect>')
+    for i in sorted({round(k * (n - 1) / 6) for k in range(7)}) if n > 1 else [0]:
+        out.append(f'<text x="{pad_l + i * slot + slot / 2:.1f}" y="{height - 6}" font-size="10" fill="currentColor" opacity="0.6" text-anchor="middle">{_short_day(labels[i])}</text>')
+    out.append("</svg>")
+    return "".join(out)
+
+
+def _ops_series(days: int, now: float) -> dict:
+    labels = site_analytics._days_list(now, days)
+    start = now - days * 86400
+    conn = db.get_conn()
+    try:
+        def daily(sql: str) -> dict:
+            return {r["d"]: r["v"] for r in conn.execute(sql, (start,)).fetchall()}
+        rev = daily("SELECT date(completed_at, 'unixepoch') AS d, SUM(amount_usd) AS v FROM payments WHERE status = 'completed' AND completed_at >= ? GROUP BY d")
+        orders = daily("SELECT date(created_at, 'unixepoch') AS d, COUNT(*) AS v FROM orders WHERE created_at >= ? GROUP BY d")
+        clients = daily("SELECT date(created_at, 'unixepoch') AS d, COUNT(*) AS v FROM users WHERE role = 'client' AND created_at >= ? GROUP BY d")
+        leads_now = conn.execute("SELECT COUNT(*) FROM leads WHERE created_at >= ?", (start,)).fetchone()[0]
+        leads_prev = conn.execute("SELECT COUNT(*) FROM leads WHERE created_at >= ? AND created_at < ?", (start - days * 86400, start)).fetchone()[0]
+    finally:
+        conn.close()
+    series = {"revenue": [float(rev.get(d, 0.0)) for d in labels], "orders": [float(orders.get(d, 0)) for d in labels], "clients": [float(clients.get(d, 0)) for d in labels]}
+    return {"labels": labels, **series, "leads_now": leads_now, "leads_prev": leads_prev,
+            "svg": {"revenue": _ops_bars_svg(labels, series["revenue"], "#2fd08a", money=True), "orders": _ops_bars_svg(labels, series["orders"], "#4c8dff"),
+                    "clients": _ops_bars_svg(labels, series["clients"], "#a78bfa")}}
+
+
+@app.get("/staff/ops/export.csv")
+def staff_ops_export(request: Request, days: int = 30):
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    days = max(1, min(days, 365))
+    now = time.time()
+    s = _ops_series(days, now)
+    rev, margin = db.revenue_summary(days=days), db.margin_summary(days=days)
+    import csv as _csv
+    import io as _io
+    out = _io.StringIO()
+    w = _csv.writer(out)
+    w.writerow(["Kauli reports", f"last {days} days", datetime.now().strftime("%Y-%m-%d %H:%M")])
+    w.writerow([])
+    for label, value in (("Revenue (period)", rev["total_period"]), ("Revenue (all time)", rev["total_all_time"]), ("Pending bank transfers", rev["pending_bank_amount"]),
+                         ("Orders created", db.orders_created_since(days=days)), ("Minutes delivered", db.minutes_processed(days=days)),
+                         ("Revenue billed", margin["total_revenue_usd"]), ("Est. AI cost", margin["total_est_ai_cost_usd"]), ("Est. margin", margin["total_est_margin_usd"])):
+        w.writerow([label, round(float(value), 2)])
+    w.writerow([])
+    w.writerow(["Day", "Revenue", "Orders", "New clients"])
+    for i, d in enumerate(s["labels"]):
+        w.writerow([d, round(s["revenue"][i], 2), int(s["orders"][i]), int(s["clients"][i])])
+    return Response(out.getvalue(), media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="kauli-reports-{days}d.csv"'})
 
 
 @app.get("/staff/ops", response_class=HTMLResponse)
@@ -10240,7 +10338,11 @@ def staff_ops(request: Request, days: int = 30):
          "display": f"${row['est_margin_usd']:.2f}"}
         for row in margin["by_pair"]
     ], label_width=160) if len(margin["by_pair"]) > 1 else ""
+    series = _ops_series(days, time.time())
+    rev_prev = db.revenue_between(time.time() - 2 * days * 86400, time.time() - days * 86400)
     return templates.TemplateResponse(request, "staff_ops.html", {
+        "series": series, "rev_change": _pct_change(db.revenue_summary(days=days)["total_period"], rev_prev),
+        "rev_spark": site_analytics.spark(series["revenue"], 140, 40, "#2fd08a"), "leads_change": _pct_change(series["leads_now"], series["leads_prev"]),
         "user": user, "days": days, "now_ts": time.time(),
         "status_counts": db.orders_by_status(),
         "stale_orders": db.stale_active_orders(threshold_hours=24.0),

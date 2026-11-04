@@ -265,15 +265,15 @@ def test_the_blue_band_names_only_the_languages_that_are_really_human_reviewed(e
     html = extras.client.get("/").text if False else None
     monkeypatch.setattr(extras.app, "current_user", lambda request: None)
     band = extras.client.get("/").text.split('class="tk-band"')[1].split("</section>")[0]
-    assert "Audio to text in minutes. Checked by an expert when it matters." in band
-    assert "a real expert checks it before it is marked ready" in band and "editor" not in band
-    assert "In selected languages, choose Human-reviewed" in band and 'href="/human-review"' in band
+    assert "Turn conversations into global opportunities" in band
+    assert "with a human editor when it has to be right" in band and "Start Free Now" in band
+    assert 'href="/human-review"' in band and "See which languages" in band                          # it points at the list instead of naming languages
 
 
 def test_the_blue_band_before_the_extra_languages_are_switched_on(studio, monkeypatch):
     monkeypatch.setattr(studio.app, "current_user", lambda request: None)
     band = studio.client.get("/").text.split('class="tk-band"')[1].split("</section>")[0]
-    assert "In selected languages, choose Human-reviewed" in band and "Swahili" not in band and "Chinese" not in band
+    assert 'href="/human-review"' in band and "Swahili" not in band and "Chinese" not in band           # no language is named before it is switched on
 
 
 # ------------------------------------------------------------------- the services section

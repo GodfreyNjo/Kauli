@@ -402,6 +402,16 @@
       </details>
     </div>
 
+    <script>
+      (function () {
+        var link = null; try { link = localStorage.getItem("kauli_pending_youtube"); } catch (e) {}
+        var input = document.getElementById("youtube-url-input"); if (!link || !input) return;
+        try { localStorage.removeItem("kauli_pending_youtube"); } catch (e) {}
+        input.value = link; input.dispatchEvent(new Event("input", { bubbles: true }));
+        var box = document.getElementById("new-project"); if (box) box.scrollIntoView({ block: "start" });
+        if (window.kpToast) kpToast("We kept your YouTube link. Press the arrow to continue.", "info");
+      })();
+    </script>
     <div class="exit-prompt" id="exit-prompt" hidden>
       <button type="button" class="exit-prompt-toggle" id="exit-toggle" aria-expanded="false" aria-controls="exit-panel">Not ready? Tell us why</button>
       <div id="exit-panel" hidden>

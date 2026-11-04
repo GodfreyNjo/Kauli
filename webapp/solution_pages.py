@@ -109,7 +109,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         },
         # ------------------------------------------------------------------ captions
         "captioning": {
-            "title": "Subtitles and Closed Captions for Any Video, in 70+ Languages",
+            "title": "Subtitles and Closed Captions for Any Video, in 76+ Languages",
             "meta_description": "Generate subtitles and closed captions for YouTube or any video in minutes. SRT and VTT files, burned-in captions, 76+ languages, and human review for up to 99% accuracy.",
             "kicker": "Subtitles and closed captions",
             "h1": "Subtitles and captions for every video you publish",
@@ -344,7 +344,7 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
         },
         # ------------------------------------------------------------------ transcription
         "video-transcription": {
-            "title": "Video and Audio Transcription in 70+ Languages, Up to 99% Accurate",
+            "title": "Video and Audio Transcription in 76+ Languages, Up to 99% Accurate",
             "meta_description": "Transcribe video and audio to timestamped text with speaker labels in minutes. Instant AI in 76+ languages, or human review for up to 99% accuracy. Word, text and SRT downloads.",
             "kicker": "Transcription services",
             "h1": "Accurate transcripts of every video and recording",

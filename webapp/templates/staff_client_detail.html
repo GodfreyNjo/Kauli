@@ -2,59 +2,75 @@
 {% block theme %}dark{% endblock %}
 {% block title %}{{ client['display_name'] or client['email'] }}{% endblock %}
 {% block content %}
-<p class="muted" style="margin:0 0 4px; font-size:0.82rem;"><a href="/staff/clients">Clients</a> / {{ client['display_name'] or client['email'] }}</p>
-<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-  <h1 style="margin:0;">{{ client['display_name'] or client['email'] }}
-    {% if client['account_status'] == 'closed' %}<span class="status status-closed">Closed</span>{% endif %}
-  </h1>
-  <a href="mailto:{{ client['email'] }}" class="btn secondary">Email</a>
-</div>
-{% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+{% set name = client['display_name'] or client['email'] %}
+<p class="cl-crumbs"><a href="/staff/clients">&larr; Clients</a> / {{ name }}</p>
+<header class="cl-hero">
+  <span class="cl-avatar" aria-hidden="true">{{ name[0]|upper }}</span>
+  <div class="cl-hero-main">
+    <h1>{{ name }} {% if client['account_status'] == 'closed' %}<span class="cl-status closed">Closed</span>{% else %}<span class="cl-status on">Active</span>{% endif %}
+      {% if client['is_internal'] %}<span class="cl-tag">Internal</span>{% endif %}</h1>
+    <p class="cl-mail">{{ client['email'] }} <button type="button" class="cl-copy" data-copy="{{ client['email'] }}" aria-label="Copy email address">Copy</button></p>
+    <p class="cl-meta">Joined {{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }} &middot; Last seen {{ client['last_seen_at']|time_ago }}</p>
+  </div>
+  <div class="cl-hero-actions"><a class="rp-btn" href="mailto:{{ client['email'] }}">Email</a></div>
+</header>
+{% if notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 
-<div class="settings-layout" style="margin-top:16px;">
-  <nav class="settings-nav">
-    <a href="/staff/clients/{{ client['id'] }}?tab=overview" class="{{ 'active' if tab == 'overview' }}">Overview</a>
-    <a href="/staff/clients/{{ client['id'] }}?tab=orders" class="{{ 'active' if tab == 'orders' }}">Orders</a>
-    <a href="/staff/clients/{{ client['id'] }}?tab=team" class="{{ 'active' if tab == 'team' }}">Team</a>
-    <a href="/staff/clients/{{ client['id'] }}?tab=billing" class="{{ 'active' if tab == 'billing' }}">Billing</a>
-    <a href="/staff/clients/{{ client['id'] }}?tab=settings" class="{{ 'active' if tab == 'settings' }}">Settings</a>
-  </nav>
+<nav class="cl-tabs" aria-label="Client sections">
+  {% for key, label in [('overview', 'Overview'), ('orders', 'Orders'), ('team', 'Team'), ('billing', 'Billing'), ('settings', 'Settings')] %}
+  <a href="/staff/clients/{{ client['id'] }}?tab={{ key }}" class="{{ 'is-on' if tab == key else '' }}" {{ 'aria-current=page' if tab == key else '' }}>{{ label }}</a>
+  {% endfor %}
+</nav>
 
-  <div class="settings-panel">
-  {% if tab == 'overview' %}
-    <div class="stat-grid">
-      <div class="stat-tile"><div class="stat-icon warn">{{ icon_svg('spinner') }}</div><div class="stat-value">{{ stats['in_progress'] }}</div><div class="stat-label">In progress</div></div>
-      <div class="stat-tile"><div class="stat-icon info">{{ icon_svg('eye') }}</div><div class="stat-value">{{ stats['in_review'] }}</div><div class="stat-label">In review</div></div>
-      <div class="stat-tile"><div class="stat-icon {{ 'err' if stats['needs_you'] else '' }}">{{ icon_svg('alert') }}</div><div class="stat-value">{{ stats['needs_you'] }}</div><div class="stat-label">Needs client</div></div>
-      <div class="stat-tile ok"><div class="stat-icon ok">{{ icon_svg('check') }}</div><div class="stat-value">{{ stats['completed'] }}</div><div class="stat-label">Completed</div></div>
-      <div class="stat-tile"><div class="stat-icon">{{ icon_svg('card') }}</div><div class="stat-value">${{ "%.0f"|format(stats['total_spent_usd']) }}</div><div class="stat-label">Total spent</div></div>
+<div class="cl-body">
+{% if tab == 'overview' %}
+    <div class="cl-cards">
+      <a class="cl-stat tone-green" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('check') }}</span><span><strong>{{ stats['completed'] }}</strong><small>Completed orders</small></span></a>
+      <a class="cl-stat tone-amber" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('spinner') }}</span><span><strong>{{ stats['in_progress'] }}</strong><small>In progress</small></span></a>
+      <a class="cl-stat tone-blue" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('eye') }}</span><span><strong>{{ stats['in_review'] }}</strong><small>In review</small></span></a>
+      <a class="cl-stat tone-red" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('alert') }}</span><span><strong>{{ stats['needs_you'] }}</strong><small>Needs action</small></span></a>
+      <a class="cl-stat tone-violet" href="/staff/clients/{{ client['id'] }}?tab=billing"><span class="rp-ic">{{ icon_svg('card') }}</span><span><strong>${{ "%.0f"|format(stats['total_spent_usd']) }}</strong><small>Total spent</small></span></a>
     </div>
-    <div class="card">
-      <h2 style="margin-top:0;">Account</h2>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/internal" style="margin:0 0 12px;">
-        <label style="display:flex; gap:8px; align-items:center; font-size:0.88rem;">
-          <input type="checkbox" name="internal" value="1" {{ 'checked' if client['is_internal'] else '' }} onchange="this.form.submit()" style="width:auto; margin:0;">
-          Internal or test account <span class="muted">(left out of Site analytics, churn and revenue)</span>
-        </label>
-      </form>
-      <table>
-        <tbody>
-          <tr><td class="muted">Email</td><td>{{ client['email'] }}</td></tr>
-          <tr><td class="muted">Plan</td><td>{{ plans[plan]['name'] }}</td></tr>
-          <tr><td class="muted">Free minutes remaining (this month)</td><td>{{ "%.1f"|format(free_minutes_remaining) }} min</td></tr>
-          <tr><td class="muted">Prepaid wallet credits</td><td>{{ wallet_credits }}</td></tr>
-          <tr><td class="muted">Marketing email</td><td>{{ 'Opted in' if client['marketing_consent'] else 'Not opted in' }}</td></tr>
-          <tr><td class="muted">Joined</td><td>{{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }}</td></tr>
-          <tr><td class="muted">Last seen</td><td>{{ client['last_seen_at']|time_ago }}</td></tr>
-          <tr><td class="muted">Signup IP</td><td>
-            {{ client['signup_ip'] or 'Not recorded' }}
+    <div class="cl-two">
+      <section class="crm-card">
+        <header><h2>Account</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=settings">Edit</a></header>
+        <form method="post" action="/staff/clients/{{ client['id'] }}/internal" style="margin:0 0 12px;">
+          <label style="display:flex; gap:8px; align-items:center; font-size:0.88rem;">
+            <input type="checkbox" name="internal" value="1" {{ 'checked' if client['is_internal'] else '' }} onchange="this.form.submit()" style="width:auto; margin:0;">
+            Internal or test account <span class="muted">(left out of Site analytics, churn and revenue)</span>
+          </label>
+        </form>
+        <ul class="cl-facts">
+          <li><span>Email</span><b>{{ client['email'] }}</b></li>
+          <li><span>Plan</span><b>{{ plans[plan]['name'] }}</b></li>
+          <li><span>Free minutes remaining this month</span><b>{{ "%.1f"|format(free_minutes_remaining) }} min</b></li>
+          <li><span>Prepaid wallet credits</span><b>{{ wallet_credits }}</b></li>
+          <li><span>Marketing email</span><b>{{ 'Opted in' if client['marketing_consent'] else 'Not opted in' }}</b></li>
+          <li><span>Signup IP</span><b>{{ client['signup_ip'] or 'Not recorded' }}
             {% if client['signup_ip_is_datacenter'] == 1 %}<span class="status status-pending_payment" style="font-size:0.68rem;">Datacenter IP</span>
-            {% elif client['signup_ip_is_datacenter'] == 0 %}<span class="muted" style="font-size:0.78rem;">(looks residential)</span>{% endif %}
-          </td></tr>
-        </tbody>
-      </table>
+            {% elif client['signup_ip_is_datacenter'] == 0 %}<span class="muted" style="font-size:0.78rem;">(looks residential)</span>{% endif %}</b></li>
+        </ul>
+      </section>
+      <section class="crm-card">
+        <header><h2>Activity</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=orders">View all</a></header>
+        <ol class="cl-activity">
+          {% if orders %}<li><i class="tone-violet"></i><span><b>Placed an order</b><small>{{ orders[0]['created_at']|int|timestamp_to_str }}</small></span></li>{% endif %}
+          <li><i class="tone-blue"></i><span><b>Last seen</b><small>{{ client['last_seen_at']|time_ago }}</small></span></li>
+          <li><i class="tone-green"></i><span><b>Account created</b><small>{{ client['created_at']|int|timestamp_to_str if client['created_at'] else '-' }}</small></span></li>
+        </ol>
+      </section>
     </div>
+    <section class="crm-card cl-recent">
+      <header><h2>Recent orders</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=orders">View all</a></header>
+      {% if orders %}
+      <table class="rp-table"><thead><tr><th>File</th><th>Route</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
+        {% for o in orders[:5] %}<tr><td class="ellipsis-cell" style="max-width:280px;">{{ o['original_filename'] }}</td><td class="muted">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</td>
+          <td><span class="status status-{{ o['status'] }}">{{ o['status']|replace('_', ' ') }}</span></td><td class="muted">{{ o['created_at']|int|timestamp_to_str }}</td>
+          <td><a href="/staff/orders/{{ o['id'] }}" class="row-action-chip">Open &rarr;</a></td></tr>{% endfor %}
+      </tbody></table>
+      {% else %}<p class="muted">No orders yet.</p>{% endif %}
+    </section>
     {% if client['staff_notes'] %}
     <div class="card internal-card">
       <h2 style="margin-top:0;">Notes</h2>
@@ -211,6 +227,13 @@
       {% endif %}
     </div>
   {% endif %}
-  </div>
 </div>
+<script>
+  document.querySelectorAll('[data-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      (navigator.clipboard ? navigator.clipboard.writeText(b.dataset.copy) : Promise.reject()).then(function () { if (window.kpToast) kpToast('Email address copied.', 'success'); },
+        function () { if (window.kpToast) kpToast('Could not copy. Select the address and press Ctrl+C.', 'warning'); });
+    });
+  });
+</script>
 {% endblock %}

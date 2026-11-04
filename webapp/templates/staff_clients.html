@@ -2,44 +2,83 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Clients{% endblock %}
 {% block content %}
-<h1>Clients</h1>
-<p class="muted" style="margin-top:0;">Every real account, not a prospect - see <a href="/staff/leads">CRM</a>
-   for people who haven't signed up yet.</p>
+{% set tones = ['#7c5cff', '#2f6fe0', '#1fa55a', '#f0782a', '#e0489a', '#14a3b8', '#d99a14'] %}
+<header class="rp-head">
+  <div><h1>Clients</h1><p>Manage all your clients in one place. Every real account, not a prospect: people who have not signed up yet are in the <a href="/staff/leads">CRM</a>.</p></div>
+</header>
 
-<form method="get" action="/staff/clients" style="max-width:360px; margin-bottom:16px;">
-  <input type="text" name="q" value="{{ q }}" placeholder="Search name or email&hellip;" aria-label="Search clients by name or email">
-</form>
+<div class="cl-bar">
+  <form method="get" action="/staff/clients" class="cl-search" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name or email..." aria-label="Search clients by name or email">
+  </form>
+  <div class="cl-pills" id="cl-pills" role="group" aria-label="Show">
+    <button type="button" class="is-on" data-show="all">All</button>
+    <button type="button" data-show="active">Active</button>
+    <button type="button" data-show="inactive">Inactive</button>
+  </div>
+  <button type="button" class="rp-btn" id="cl-more" aria-expanded="false" aria-controls="cl-extra">More filters</button>
+</div>
+<div class="cl-extra" id="cl-extra" hidden>
+  <label>Plan <select id="cl-plan"><option value="all">All plans</option>{% for key, p in plans.items() %}<option value="{{ key }}">{{ p['name'] }}</option>{% endfor %}</select></label>
+  <label><input type="checkbox" id="cl-internal" style="width:auto; margin:0 6px 0 0;"> Hide internal and test accounts</label>
+</div>
 
-<div class="card" style="padding:0;">
-  <table>
-    <thead><tr><th>Client</th><th>Plan</th><th>Orders</th><th>Total spent</th><th>Joined</th><th>Last seen</th><th>Status</th></tr></thead>
+<div class="crm-card cl-card">
+  <table class="cl-table" id="cl-table">
+    <thead><tr><th>Client</th><th>Plan</th><th class="num">Orders</th><th class="num">Spent</th><th>Joined</th><th>Last seen</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for c in clients %}
-      <tr>
+      {% set active = c['account_status'] != 'closed' and c['last_seen_at'] and (now_ts - c['last_seen_at']) < 30 * 86400 %}
+      <tr data-active="{{ '1' if active else '0' }}" data-plan="{{ c['plan'] }}" data-internal="{{ '1' if c['is_internal'] else '0' }}" data-href="/staff/clients/{{ c['id'] }}" tabindex="0" role="link">
         <td>
-          <a href="/staff/clients/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
-          {% if c['signup_ip_is_datacenter'] %}
-          <span class="status status-pending_payment" style="font-size:0.68rem;"
-                title="Signed up from a known cloud/hosting IP ({{ c['signup_ip'] }}) - a real signal worth a look, not proof of anything on its own.">Datacenter IP</span>
-          {% endif %}
-          <br><span class="muted" style="font-size:0.78rem;">{{ c['email'] }}</span>
+          <span class="cl-who"><i style="background: {{ tones[loop.index0 % 7] }}" aria-hidden="true">{{ ((c['display_name'] or c['email'] or '?')[0])|upper }}</i>
+            <span><a href="/staff/clients/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
+              {% if c['signup_ip_is_datacenter'] %}<span class="status status-pending_payment" style="font-size:0.66rem;" title="Signed up from a known cloud/hosting IP ({{ c['signup_ip'] }}): worth a look, not proof of anything on its own.">Datacenter IP</span>{% endif %}
+              {% if c['is_internal'] %}<span class="cl-tag">Internal</span>{% endif %}
+              <small>{{ c['email'] }}</small></span></span>
         </td>
-        <td><span class="source-badge">{{ plans[c['plan']]['name'] }}</span></td>
-        <td>{{ c['order_count'] }}</td>
-        <td>${{ "%.2f"|format(c['total_spent_usd']) }}</td>
+        <td><span class="cl-plan cl-plan-{{ c['plan'] }}">{{ plans[c['plan']]['name'] }}</span></td>
+        <td class="num">{{ c['order_count'] }}</td>
+        <td class="num">${{ "%.2f"|format(c['total_spent_usd']) }}</td>
         <td class="muted">{{ c['created_at']|int|timestamp_to_str if c['created_at'] else '-' }}</td>
         <td class="muted">{{ c['last_seen_at']|time_ago }}</td>
-        <td>
-          {% if c['account_status'] == 'closed' %}<span class="status status-closed">Closed</span>
-          {% else %}<span class="status status-accepted">Active</span>{% endif %}
-        </td>
+        <td>{% if c['account_status'] == 'closed' %}<span class="cl-status closed">Closed</span>{% elif active %}<span class="cl-status on">Active</span>{% else %}<span class="cl-status off">Inactive</span>{% endif %}</td>
+        <td class="cl-go"><a href="/staff/clients/{{ c['id'] }}" aria-label="Open {{ c['display_name'] or c['email'] }}">&#8942;</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="7" class="muted" style="padding:20px 24px;">
-        {% if q %}No clients match "{{ q }}".{% else %}No client accounts yet.{% endif %}
-      </td></tr>
+      <tr><td colspan="8" class="muted" style="padding:20px 24px;">{% if q %}No clients match "{{ q }}".{% else %}No client accounts yet.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>
+  <div class="cl-foot"><span class="muted" id="cl-count"></span><div class="cl-pager" id="cl-pager" hidden>
+    <button type="button" id="cl-prev" aria-label="Previous page">&lsaquo;</button><span id="cl-page"></span><button type="button" id="cl-next" aria-label="Next page">&rsaquo;</button></div></div>
 </div>
+<script>
+  (function () {
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#cl-table tbody tr[data-href]')); if (!rows.length) return;
+    var show = 'all', plan = 'all', hideInternal = false, page = 1, size = 10;
+    function ok(r) { return (show === 'all' || (show === 'active') === (r.dataset.active === '1')) && (plan === 'all' || r.dataset.plan === plan) && !(hideInternal && r.dataset.internal === '1'); }
+    function draw() {
+      var m = rows.filter(ok), pages = Math.max(1, Math.ceil(m.length / size)); page = Math.min(page, pages);
+      rows.forEach(function (r) { r.style.display = 'none'; });
+      m.slice((page - 1) * size, page * size).forEach(function (r) { r.style.display = ''; });
+      var from = m.length ? (page - 1) * size + 1 : 0, to = Math.min(page * size, m.length);
+      document.getElementById('cl-count').textContent = 'Showing ' + from + '-' + to + ' of ' + m.length + ' client' + (m.length === 1 ? '' : 's');
+      var pager = document.getElementById('cl-pager'); pager.hidden = pages <= 1; document.getElementById('cl-page').textContent = page + ' / ' + pages;
+      document.getElementById('cl-prev').disabled = page <= 1; document.getElementById('cl-next').disabled = page >= pages;
+    }
+    document.querySelectorAll('#cl-pills button').forEach(function (b) { b.addEventListener('click', function () {
+      document.querySelectorAll('#cl-pills button').forEach(function (x) { x.classList.toggle('is-on', x === b); }); show = b.dataset.show; page = 1; draw(); }); });
+    document.getElementById('cl-plan').addEventListener('change', function (e) { plan = e.target.value; page = 1; draw(); });
+    document.getElementById('cl-internal').addEventListener('change', function (e) { hideInternal = e.target.checked; page = 1; draw(); });
+    var more = document.getElementById('cl-more'), extra = document.getElementById('cl-extra');
+    more.addEventListener('click', function () { extra.hidden = !extra.hidden; more.setAttribute('aria-expanded', extra.hidden ? 'false' : 'true'); });
+    document.getElementById('cl-prev').addEventListener('click', function () { page -= 1; draw(); }); document.getElementById('cl-next').addEventListener('click', function () { page += 1; draw(); });
+    rows.forEach(function (r) {
+      r.addEventListener('click', function (e) { if (!e.target.closest('a')) window.location.href = r.dataset.href; });
+      r.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.href = r.dataset.href; });
+    });
+    draw();
+  })();
+</script>
 {% endblock %}

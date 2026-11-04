@@ -1,122 +1,99 @@
 {% extends "base.html" %}
 {% block title %}Production Queue{% endblock %}
 {% block content %}
-<div class="overview-header">
-  <h1>Production Queue</h1>
-  <p class="muted" style="margin-top:2px;">All jobs across Kauli. Monitor progress and keep deliveries on schedule.</p>
-</div>
+<header class="qp-head">
+  <div>
+    <h1>Production Queue</h1>
+    <p>Monitor progress and deliver high-quality work on time.</p>
+  </div>
+  <div class="qp-head-actions">
+    <button type="button" id="queue-export" class="qp-btn">{{ icon_svg('check') }} Export CSV</button>
+    <div class="qp-view" role="group" aria-label="View">
+      <span>View</span>
+      <button type="button" id="qp-view-list" class="is-on" aria-pressed="true" aria-label="List view">{{ icon_svg('checklist') }}</button>
+      <button type="button" id="qp-view-grid" aria-pressed="false" aria-label="Card view">{{ icon_svg('grid') }}</button>
+    </div>
+  </div>
+</header>
 
-<div class="dashboard-stats overview-kpis">
-  <div class="dashboard-stat-card">
-    <div class="stat-icon">{{ icon_svg('checklist') }}</div>
-    <span class="stat-label">Total jobs</span>
-    <span class="stat-value">{{ total_jobs }}</span>
-    <span class="stat-hint">All time in queue</span>
-  </div>
-  <div class="dashboard-stat-card {{ 'needs-you' if needs_attention_n else '' }}">
-    <div class="stat-icon {{ 'err' if needs_attention_n else '' }}">{{ icon_svg('alert') }}</div>
-    <span class="stat-label">Needs attention</span>
-    <span class="stat-value">{{ needs_attention_n }}</span>
-    <span class="stat-hint">{{ overdue_n }} overdue &middot; {{ due_today_n }} due today</span>
-  </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon warn">{{ icon_svg('spinner') }}</div>
-    <span class="stat-label">In progress</span>
-    <span class="stat-value">{{ in_progress_n }}</span>
-    <span class="stat-hint">AI processing</span>
-  </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon info">{{ icon_svg('eye') }}</div>
-    <span class="stat-label">Ready</span>
-    <span class="stat-value">{{ ready_n }}</span>
-    <span class="stat-hint">Ready for delivery</span>
-  </div>
-  <div class="dashboard-stat-card">
-    <div class="stat-icon ok">{{ icon_svg('check') }}</div>
-    <span class="stat-label">Delivered</span>
-    <span class="stat-value">{{ delivered_today_n }}</span>
-    <span class="stat-hint">Completed today</span>
-  </div>
-</div>
-
-<div class="card queue-health">
-  <div class="queue-health-row">
-    <div class="queue-health-item"><span class="queue-health-num queue-health-red">{{ overdue_n }}</span><span class="muted">Overdue</span></div>
-    <div class="queue-health-item"><span class="queue-health-num queue-health-warn">{{ due_today_n }}</span><span class="muted">Due today</span></div>
-    <div class="queue-health-item"><span class="queue-health-num">{{ awaiting_review_n }}</span><span class="muted">Awaiting review</span></div>
-    <div class="queue-health-item"><span class="queue-health-num">{{ in_progress_n }}</span><span class="muted">AI processing</span></div>
-    <div class="queue-health-item"><span class="queue-health-num queue-health-warn">{{ exceptions_n }}</span><span class="muted">Exceptions</span></div>
-    <div class="queue-health-item"><span class="queue-health-num queue-health-ok">{{ ready_n }}</span><span class="muted">Ready</span></div>
-    <span class="muted queue-health-updated">&#9679; Last updated: just now</span>
-  </div>
+<div class="qp-kpis" id="qp-kpis">
+  <button type="button" class="qp-kpi tone-blue" data-open-tab="all" aria-label="Show all {{ total_jobs }} jobs">
+    <span class="qp-kpi-ic">{{ icon_svg('checklist') }}</span>
+    <span class="qp-kpi-body"><span class="qp-kpi-label">Total</span><strong>{{ total_jobs }}</strong>
+      <span class="qp-kpi-hint">{% if trend_created.change is not none %}<span class="so-chip {{ 'up' if trend_created.change >= 0 else 'down' }}">{{ '&#8593;'|safe if trend_created.change >= 0 else '&#8595;'|safe }} {{ '%.0f'|format(trend_created.change|abs) }}%</span>{% else %}All time{% endif %}</span></span>
+    <span class="qp-kpi-spark">{{ trend_created.spark|safe }}</span>
+  </button>
+  <button type="button" class="qp-kpi tone-red {{ 'is-hot' if needs_attention_n else '' }}" data-open-tab="needs_attention" aria-label="Show the {{ needs_attention_n }} jobs that need attention">
+    <span class="qp-kpi-ic">{{ icon_svg('alert') }}</span>
+    <span class="qp-kpi-body"><span class="qp-kpi-label">Needs attention</span><strong>{{ needs_attention_n }}</strong>
+      <span class="qp-kpi-hint">{{ overdue_n }} overdue &middot; {{ due_today_n }} due today</span></span>
+  </button>
+  <button type="button" class="qp-kpi tone-amber" data-open-tab="in_progress" aria-label="Show the {{ in_progress_n }} jobs in progress">
+    <span class="qp-kpi-ic">{{ icon_svg('spinner') }}</span>
+    <span class="qp-kpi-body"><span class="qp-kpi-label">In progress</span><strong>{{ in_progress_n }}</strong><span class="qp-kpi-hint">{{ awaiting_review_n }} awaiting review</span></span>
+  </button>
+  <button type="button" class="qp-kpi tone-violet" data-open-tab="ready" aria-label="Show the {{ ready_n }} jobs ready for delivery">
+    <span class="qp-kpi-ic">{{ icon_svg('eye') }}</span>
+    <span class="qp-kpi-body"><span class="qp-kpi-label">Ready</span><strong>{{ ready_n }}</strong><span class="qp-kpi-hint">Ready for delivery</span></span>
+  </button>
+  <button type="button" class="qp-kpi tone-green" data-open-tab="delivered" aria-label="Show the {{ delivered_n }} delivered jobs">
+    <span class="qp-kpi-ic">{{ icon_svg('check') }}</span>
+    <span class="qp-kpi-body"><span class="qp-kpi-label">Delivered</span><strong>{{ delivered_n }}</strong>
+      <span class="qp-kpi-hint">{% if trend_delivered.change is not none %}<span class="so-chip {{ 'up' if trend_delivered.change >= 0 else 'down' }}">{{ '&#8593;'|safe if trend_delivered.change >= 0 else '&#8595;'|safe }} {{ '%.0f'|format(trend_delivered.change|abs) }}%</span>{% else %}{{ delivered_today_n }} today{% endif %}</span></span>
+    <span class="qp-kpi-spark">{{ trend_delivered.spark|safe }}</span>
+  </button>
 </div>
 
 {% if rows %}
-<div class="card queue-toolbar">
-  <input type="text" id="queue-search" placeholder="Search jobs, clients, files or Job ID..."
-         aria-label="Search jobs, clients, files or Job ID">
-  <button type="button" id="queue-filters-toggle" class="secondary">Filters <span id="queue-filters-badge" class="filter-count-badge" hidden>0</span></button>
-  <div style="flex:1;"></div>
-  <button type="button" id="queue-columns-toggle" class="secondary">Columns</button>
-  <button type="button" id="queue-export" class="secondary">Export CSV</button>
+<div class="qp-bar">
+  <div class="filter-tabs qp-tabs" id="queue-tabs">
+    <button type="button" class="active" data-tab="all">All <span class="tab-count">{{ total_jobs }}</span></button>
+    <button type="button" data-tab="needs_attention">Needs attention <span class="tab-count tab-count-red">{{ needs_attention_n }}</span></button>
+    <button type="button" data-tab="in_progress">In progress <span class="tab-count">{{ in_progress_n }}</span></button>
+    <button type="button" data-tab="ready">Ready <span class="tab-count">{{ ready_n }}</span></button>
+    <button type="button" data-tab="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
+  </div>
+  <div class="qp-quick">
+    <label class="qp-select"><span class="sr-only">Client</span>
+      <select id="filter-client"><option value="all">All clients</option>
+        {% for name in rows|map(attribute='order')|map(attribute='client_name')|unique|sort %}<option value="{{ name|lower }}">{{ name }}</option>{% endfor %}
+      </select></label>
+    <label class="qp-select"><span class="sr-only">Service</span>
+      <select id="filter-service">
+        <option value="all">All services</option><option value="transcribe">Transcription</option><option value="translate">Translation</option><option value="dub">Full dub</option>
+      </select></label>
+    <label class="qp-select"><span class="sr-only">Date</span>
+      <select id="filter-date"><option value="all">All time</option><option value="1">Today</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+    <button type="button" id="queue-filters-toggle" class="qp-btn">More filters <span id="queue-filters-badge" class="filter-count-badge" hidden>0</span></button>
+  </div>
+</div>
+<div class="qp-search-row">
+  <input type="text" id="queue-search" placeholder="Search jobs, clients, files or Job ID..." aria-label="Search jobs, clients, files or Job ID">
+  <button type="button" id="queue-columns-toggle" class="qp-btn">Columns</button>
 </div>
 
 <div class="card queue-filters" id="queue-filters-panel" hidden>
   <div class="queue-filter-field">
     <label for="filter-status">Status</label>
     <select id="filter-status">
-      <option value="all">All</option>
-      <option value="pending_payment">Pending payment</option>
-      <option value="queued">Queued</option>
-      <option value="processing">Processing</option>
-      <option value="awaiting_review">Awaiting review</option>
-      <option value="editor_returned">Ops decision</option>
-      <option value="ready_for_delivery">Ready</option>
-      <option value="delivered">Delivered</option>
-      <option value="dead_letter">Dead letter</option>
-      <option value="failed">Failed</option>
-      <option value="returned_to_client">Returned to client</option>
-    </select>
-  </div>
-  <div class="queue-filter-field">
-    <label for="filter-service">Service</label>
-    <select id="filter-service">
-      <option value="all">All</option>
-      <option value="transcribe">Transcription</option>
-      <option value="translate">Translation</option>
-      <option value="dub">Full dub</option>
+      <option value="all">All</option><option value="pending_payment">Pending payment</option><option value="queued">Queued</option><option value="processing">Processing</option>
+      <option value="awaiting_review">Awaiting review</option><option value="editor_returned">Ops decision</option><option value="ready_for_delivery">Ready</option>
+      <option value="delivered">Delivered</option><option value="dead_letter">Dead letter</option><option value="failed">Failed</option><option value="returned_to_client">Returned to client</option>
     </select>
   </div>
   <div class="queue-filter-field">
     <label for="filter-tier">Tier</label>
-    <select id="filter-tier">
-      <option value="all">All</option>
-      <option value="free">Free</option>
-      <option value="pro">Pro</option>
-      <option value="enterprise">Enterprise</option>
-    </select>
+    <select id="filter-tier"><option value="all">All</option><option value="free">Free</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select>
   </div>
   <div class="queue-filter-field">
     <label for="filter-deadline">Deadline</label>
-    <select id="filter-deadline">
-      <option value="all">All</option>
-      <option value="overdue">Overdue</option>
-      <option value="today">Due today</option>
-    </select>
+    <select id="filter-deadline"><option value="all">All</option><option value="overdue">Overdue</option><option value="today">Due today</option></select>
   </div>
   <button type="button" id="queue-filters-clear" class="link-btn">Clear all</button>
 </div>
-
-<div class="filter-tabs" id="queue-tabs" style="margin-bottom:14px;">
-  <button type="button" class="active" data-tab="all">All <span class="tab-count">{{ total_jobs }}</span></button>
-  <button type="button" data-tab="needs_attention">Needs attention <span class="tab-count">{{ needs_attention_n }}</span></button>
-  <button type="button" data-tab="in_progress">In progress <span class="tab-count">{{ in_progress_n }}</span></button>
-  <button type="button" data-tab="ready">Ready <span class="tab-count">{{ ready_n }}</span></button>
-  <button type="button" data-tab="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
-</div>
 {% endif %}
 
-<div class="card" style="padding:0;">
+<div class="card qp-card" style="padding:0;">
   {% if not rows %}
     <div class="empty-state">
       <svg class="empty-state-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -151,7 +128,7 @@
           data-tab-delivered="{{ '1' if o['status'] == 'delivered' else '0' }}"
           data-overdue="{{ '1' if (r['ts'] and r['ts']['overdue']) else '0' }}"
           data-due-today="{{ '1' if (r['ts'] and not r['ts']['overdue'] and r['ts']['remaining_s'] <= 86400) else '0' }}"
-          data-search="{{ (o['original_filename'] ~ ' ' ~ o['client_name'] ~ ' ' ~ o['id'])|lower }}"
+          data-search="{{ (o['original_filename'] ~ ' ' ~ o['client_name'] ~ ' ' ~ o['id'])|lower }}" data-client="{{ o['client_name']|lower }}" data-created="{{ o['created_at']|int }}"
           data-sortvals="{{ r['pct'] if r['pct'] is not none else -1 }}|{{ (o['internal_deadline_at']|int) if r['ts'] else 9999999999 }}|{{ r['stage_seconds']|int }}|{{ o['created_at']|int }}"
           class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0" role="link">
         <td onclick="event.stopPropagation();"><input type="checkbox" class="queue-row-select" data-order-id="{{ o['id'] }}"
@@ -165,10 +142,10 @@
           {% if r['unread'] %}<span class="unread-dot" title="New message"></span>{% endif %}
           <div class="muted queue-job-sub">#{{ o['id'] }} &middot; {{ "%.1f"|format(r['duration_minutes']) }} min</div>
         </td>
-        <td class="ellipsis-cell" style="max-width:130px;">{{ o['client_name'] }}</td>
+        <td class="ellipsis-cell" style="max-width:170px;"><span class="qp-client"><i aria-hidden="true">{{ (o['client_name'] or '?')[0]|upper }}</i>{{ o['client_name'] }}</span></td>
         <td style="font-size:0.82rem;">
           {{ service_level_labels.get(o['service_level'], o['service_level'] or '-') }}
-          <div class="muted" style="font-family:var(--font-mono); font-size:0.78rem;">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</div>
+          <div class="qp-route"><span>{{ o['source_lang']|upper }}</span> &rarr; <span>{{ o['target_lang']|upper }}</span></div>
         </td>
         <td style="white-space:nowrap;"><span class="status status-{{ o['status'] }}">{{ o['status'].replace('_', ' ') }}</span></td>
         <td style="white-space:nowrap;">
@@ -216,6 +193,7 @@
     </tbody>
   </table>
   </div>
+  <div class="qp-grid" id="qp-grid" hidden></div>
   <div class="queue-footer">
     <span class="muted" id="queue-selected-label">0 selected</span>
     <button type="button" id="queue-mark-read" class="secondary" disabled>Mark read</button>
@@ -255,7 +233,9 @@
   var rowsAll = Array.from(table.querySelectorAll('tbody tr'));
   var activeTab = view.tab || 'all';
   var searchQ = '';
-  var f = { status: view.status || 'all', service: view.service || 'all', tier: view.tier || 'all', deadline: view.deadline || 'all' };
+  var f = { status: view.status || 'all', service: view.service || 'all', tier: view.tier || 'all', deadline: view.deadline || 'all', client: view.client || 'all', date: view.date || 'all' };
+  var FILTER_KEYS = ['status', 'service', 'tier', 'deadline', 'client', 'date'];
+  var viewMode = view.mode === 'grid' ? 'grid' : 'list';
   var sortCol = view.sortCol, sortDir = view.sortDir || 'asc';
   var pageSize = view.pageSize || 25;
   var currentPage = 1;
@@ -264,6 +244,8 @@
   document.getElementById('filter-service').value = f.service;
   document.getElementById('filter-tier').value = f.tier;
   document.getElementById('filter-deadline').value = f.deadline;
+  document.getElementById('filter-client').value = f.client;
+  document.getElementById('filter-date').value = f.date;
   document.getElementById('queue-page-size').value = String(pageSize);
   document.querySelectorAll('#queue-tabs button').forEach(function (b) {
     b.classList.toggle('active', b.dataset.tab === activeTab);
@@ -283,11 +265,13 @@
     if (f.tier !== 'all' && row.dataset.tier !== f.tier) return false;
     if (f.deadline === 'overdue' && row.dataset.overdue !== '1') return false;
     if (f.deadline === 'today' && row.dataset.dueToday !== '1') return false;
+    if (f.client !== 'all' && row.dataset.client !== f.client) return false;
+    if (f.date !== 'all' && Number(row.dataset.created) < Date.now() / 1000 - Number(f.date) * 86400) return false;
     if (searchQ && row.dataset.search.indexOf(searchQ) === -1) return false;
     return true;
   }
   function updateFiltersBadge() {
-    var n = ['status', 'service', 'tier', 'deadline'].filter(function (k) { return f[k] !== 'all'; }).length;
+    var n = ['status', 'tier', 'deadline'].filter(function (k) { return f[k] !== 'all'; }).length;
     var badge = document.getElementById('queue-filters-badge');
     badge.hidden = n === 0;
     badge.textContent = String(n);
@@ -308,7 +292,52 @@
     document.getElementById('queue-pager-prev').disabled = currentPage <= 1;
     document.getElementById('queue-pager-next').disabled = currentPage >= totalPages;
     updateFiltersBadge();
+    syncCards();
+    drawGrid(matching.slice(start, start + pageSize));
   }
+
+  // ---- the five cards open their jobs: a click shows that group and brings the list into view
+  function syncCards() {
+    document.querySelectorAll('.qp-kpi').forEach(function (c) {
+      var on = c.dataset.openTab === activeTab;
+      c.classList.toggle('is-on', on);
+      c.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  document.querySelectorAll('.qp-kpi').forEach(function (card) {
+    card.addEventListener('click', function () {
+      var tab = document.querySelector('#queue-tabs button[data-tab="' + card.dataset.openTab + '"]');
+      if (tab) tab.click();
+      (document.querySelector('.qp-bar') || table).scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // ---- card view: the same jobs as cards, each one opens the job
+  var grid = document.getElementById('qp-grid'), tableWrap = table.closest('.table-scroll'), footer = document.querySelector('.queue-footer');
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function drawGrid(rows) {
+    if (viewMode !== 'grid') return;
+    grid.innerHTML = rows.map(function (row) {
+      var c = row.children, title = c[1].querySelector('[title]') ? c[1].textContent.trim().split('#')[0].trim() : c[1].textContent.trim();
+      return '<a class="qp-job" href="' + esc(row.dataset.href) + '"><div class="qp-job-top"><strong>' + esc(title) + '</strong>' + c[4].innerHTML + '</div>' +
+        '<div class="qp-job-sub">' + esc(c[1].querySelector('.queue-job-sub') ? c[1].querySelector('.queue-job-sub').textContent.trim() : '') + '</div>' +
+        '<div class="qp-job-row"><span>' + esc(c[2].textContent.trim()) + '</span><span>' + c[3].innerHTML + '</span></div>' +
+        '<div class="qp-job-row"><span>' + c[5].innerHTML + '</span><span>' + c[7].innerHTML + '</span></div></a>';
+    }).join('') || '<p class="muted" style="padding:20px;">No jobs match these filters.</p>';
+  }
+  function setMode(mode) {
+    viewMode = mode; view.mode = mode;
+    document.getElementById('qp-view-list').classList.toggle('is-on', mode === 'list');
+    document.getElementById('qp-view-grid').classList.toggle('is-on', mode === 'grid');
+    document.getElementById('qp-view-list').setAttribute('aria-pressed', mode === 'list' ? 'true' : 'false');
+    document.getElementById('qp-view-grid').setAttribute('aria-pressed', mode === 'grid' ? 'true' : 'false');
+    if (tableWrap) tableWrap.hidden = mode === 'grid';
+    grid.hidden = mode !== 'grid';
+    saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize, mode: mode }));
+    render();
+  }
+  document.getElementById('qp-view-list').addEventListener('click', function () { setMode('list'); });
+  document.getElementById('qp-view-grid').addEventListener('click', function () { setMode('grid'); });
 
   document.querySelectorAll('#queue-tabs button').forEach(function (btn) {
     btn.addEventListener('click', function () {
@@ -332,7 +361,7 @@
   document.getElementById('queue-filters-toggle').addEventListener('click', function () {
     filtersPanel.hidden = !filtersPanel.hidden;
   });
-  ['status', 'service', 'tier', 'deadline'].forEach(function (key) {
+  FILTER_KEYS.forEach(function (key) {
     document.getElementById('filter-' + key).addEventListener('change', function (e) {
       f[key] = e.target.value;
       currentPage = 1;
@@ -341,8 +370,8 @@
     });
   });
   document.getElementById('queue-filters-clear').addEventListener('click', function () {
-    f = { status: 'all', service: 'all', tier: 'all', deadline: 'all' };
-    ['status', 'service', 'tier', 'deadline'].forEach(function (k) { document.getElementById('filter-' + k).value = 'all'; });
+    f = { status: 'all', service: 'all', tier: 'all', deadline: 'all', client: 'all', date: 'all' };
+    FILTER_KEYS.forEach(function (k) { document.getElementById('filter-' + k).value = 'all'; });
     currentPage = 1;
     saveView(Object.assign({}, view, f, { tab: activeTab, sortCol: sortCol, sortDir: sortDir, pageSize: pageSize }));
     render();
@@ -393,6 +422,7 @@
     });
   });
   if (sortCol !== undefined && sortCol !== null) sortRows(sortCol, sortDir);
+  if (viewMode === 'grid') { if (tableWrap) tableWrap.hidden = true; grid.hidden = false; document.getElementById('qp-view-list').classList.remove('is-on'); document.getElementById('qp-view-grid').classList.add('is-on'); }
   render();
 
   // ---------------------------------------------------- row select ----
