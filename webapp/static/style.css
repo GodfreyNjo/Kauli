@@ -7016,3 +7016,11 @@ html[data-theme="dark"] .sa-donut-top, html[data-theme="dark"] .sa-ring-text { f
 .hx-trans li { transition: background 0.25s ease, border-color 0.25s ease; }
 .hx-visual.is-still .hx-bars b, .hx-visual.is-still .hx-scene .hx-lines li, .hx-visual.is-still .hx-dubbar u { animation: none; opacity: 1; transform: none; width: auto; }
 @media (prefers-reduced-motion: reduce) { .hx-bars b, .hx-scene .hx-lines li, .hx-dubbar u, .hx-cap { animation: none !important; opacity: 1; transform: none; } .hx-scene { transition: none; } }
+
+/* the home page demo is the real demo video; each language button plays that language's version */
+.hx-vidbox { position: relative; } .hx-demo { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 14px; background: #0b2447; object-fit: cover; }
+.hx-subs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.hx-subs-list button { width: 100%; display: flex; align-items: center; gap: 8px; text-align: left; padding: 5px 8px; border-radius: 8px; background: #fff; border: 1px solid #e6edf7; color: #243a63; font: inherit; font-size: 0.74rem; cursor: pointer; margin: 0; }
+.hx-subs-list button:hover { border-color: #b8cff4; } .hx-subs-list button.is-on { background: #eaf2ff; border-color: #9db8e3; font-weight: 600; }
+.hx-subs-list button i { font-style: normal; font-size: 0.58rem; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #e8eef8; color: #3b4a63; flex: none; } .hx-subs-list button span { min-width: 0; }
+.hx-subs-list .more { font-size: 0.74rem; color: #5a6b85; padding: 2px 4px; } .hx-subs-list .more a { color: #1769d3; font-weight: 700; }

@@ -1679,6 +1679,17 @@ def _ts_ui(ctx, ts):
 templates.env.globals.update(t=_t, ui_lang=_ui_lang_global, page_lang=_page_lang, page_dir=_page_dir,
                               ui_languages=[(c, ui_text.NATIVE[c]) for c in ui_text.LANGS], ui_native=ui_text.NATIVE)
 templates.env.filters["ts_ui"] = _ts_ui
+def _hero_demo() -> dict:
+    """The real demo video on the home page (static/demo/vid-video-<lang>.mp4, made by scripts/make_demo_videos.py) and the first sentence of its
+    script in each language, taken from webapp/demo_content.py so the words shown are the words the video says."""
+    scenario = demo_content.SCENARIOS["video"]
+
+    def first(text: str) -> str:
+        return re.split(r"(?<=[.\u3002])\s*", text.strip())[0]
+    return {"en": first(scenario["en"]), "rows": [{"code": c, "name": demo_content.LANGUAGES[c]["name"], "line": first(scenario["tr"][c])} for c in ("es", "de", "zh", "sw")]}
+
+
+templates.env.globals["hero_demo"] = _hero_demo
 templates.env.globals["usage_banner"] = usage_prompts.banner
 templates.env.globals["pro_savings"] = lambda u: savings.pro_savings(u["client_scope_id"]) if u and u["role"] == "client" else None
 templates.env.filters["blog_ctas"] = lambda body, post: Markup(seo_pages.add_blog_ctas(str(body), post["title"], post["slug"]))

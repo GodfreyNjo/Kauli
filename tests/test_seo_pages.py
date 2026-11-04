@@ -106,3 +106,14 @@ def test_the_hero_picture_rotates_scenes_languages_and_moves_the_waveform(env):
         assert text in page, text
     css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
     assert "@keyframes hx-pulse" in css and ".hx-visual.is-paused" in css
+
+
+def test_the_home_demo_is_the_real_demo_video_with_the_words_the_video_says(env):
+    page = env.client.get("/").text
+    assert 'id="hx-demo"' in page and "/static/demo/vid-video-en.mp4" in page and "/static/demo/vid-video-en.jpg" in page
+    for line in ("Meet the new Aurora backpack.", "Conoce la nueva mochila Aurora.", "Lernen Sie den neuen Aurora-Rucksack kennen.", "全新极光背包闪亮登场。", "Kutana na mkoba mpya wa Aurora."):
+        assert line in page, line
+    for code in ("en", "es", "de", "zh", "sw"):                                                # every version the buttons play really exists
+        root = Path(__file__).parent.parent / "webapp" / "static" / "demo"
+        assert (root / f"vid-video-{code}.mp4").is_file() and (root / f"vid-video-{code}.jpg").is_file(), code
+        assert env.client.get(f"/static/demo/vid-video-{code}.mp4").status_code == 200

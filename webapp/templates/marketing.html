@@ -281,11 +281,32 @@
           <ul class="tk-chips" aria-label="Accepted formats"><li>MP4</li><li>MP3</li><li>WAV</li><li>MOV</li><li>M4A</li><li>FLAC</li></ul>
           <p class="tk-try-fine">YouTube links need a free account. Your file is used only to make this transcript, and you see it inside your account. <a href="/login?mode=signup" data-cta="hero-upload">Create a free account</a>.</p>
         </div>
-        <div class="hx-subs" aria-hidden="true">
-          <div class="hx-vid"><i class="hx-play"></i><span>Ideas today. A brighter tomorrow.</span></div>
-          <span class="hx-gen">Generate subtitles</span>
-          <ul><li><i>ES</i>Ideas para un mañana mejor.</li><li><i>FR</i>Des idées pour un avenir meilleur.</li><li><i>DE</i>Ideen für eine bessere Zukunft.</li><li><i>ZH</i>迈向更好的明天。</li><li class="more">+ 70+ more languages</li></ul>
+        {% set hd = hero_demo() %}
+        <div class="hx-subs">
+          <div class="hx-vidbox">
+            <video id="hx-demo" class="hx-demo" controls playsinline preload="none" poster="/static/demo/vid-video-en.jpg" src="/static/demo/vid-video-en.mp4" aria-label="Demo video: the same video in another language, with subtitles"></video>
+            <span class="hx-gen">Generate subtitles</span>
+          </div>
+          <ul class="hx-subs-list" role="group" aria-label="Choose a language for the demo video">
+            <li><button type="button" class="is-on" data-v="en" lang="en"><i>EN</i><span>{{ hd.en }}</span></button></li>
+            {% for r in hd.rows %}<li><button type="button" data-v="{{ r.code }}" lang="{{ r.code }}"><i>{{ r.code|upper }}</i><span>{{ r.line }}</span></button></li>{% endfor %}
+            <li class="more">+ 70+ more languages &middot; <a href="/try?use=video">See the full demo</a></li>
+          </ul>
         </div>
+        <script>
+          (function () {
+            var v = document.getElementById("hx-demo"); if (!v) return;
+            var buttons = document.querySelectorAll(".hx-subs-list button");
+            buttons.forEach(function (b) {
+              b.addEventListener("click", function () {
+                buttons.forEach(function (x) { x.classList.toggle("is-on", x === b); });
+                var code = b.dataset.v;
+                v.poster = "/static/demo/vid-video-" + code + ".jpg"; v.src = "/static/demo/vid-video-" + code + ".mp4"; v.load();
+                var p = v.play(); if (p && p.catch) p.catch(function () {});
+              });
+            });
+          })();
+        </script>
       </div>
       <script>
         (function () {
