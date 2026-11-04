@@ -7024,3 +7024,28 @@ html[data-theme="dark"] .sa-donut-top, html[data-theme="dark"] .sa-ring-text { f
 .hx-subs-list button:hover { border-color: #b8cff4; } .hx-subs-list button.is-on { background: #eaf2ff; border-color: #9db8e3; font-weight: 600; }
 .hx-subs-list button i { font-style: normal; font-size: 0.58rem; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: #e8eef8; color: #3b4a63; flex: none; } .hx-subs-list button span { min-width: 0; }
 .hx-subs-list .more { font-size: 0.74rem; color: #5a6b85; padding: 2px 4px; } .hx-subs-list .more a { color: #1769d3; font-weight: 700; }
+
+/* ---- Customer menu: the same navy rail as the staff portal, with roomier rows, an amber count, a boxed "Get Help" and the orange edge on the page you are on ---- */
+@media (min-width: 901px) { body.client-ui .sidebar { padding: 18px 14px 20px; width: 250px; } }
+@media (min-width: 901px) { body.client-ui .sidebar.collapsed { width: 64px; padding: 18px 8px; } }
+body.client-ui .sidebar-nav { gap: 4px; }
+body.client-ui .sidebar-nav a { padding: 12px 14px; border-radius: 12px; font-size: 0.97rem; gap: 16px; color: #c6d3ea; }
+body.client-ui .sidebar-nav a .icon { width: 24px; height: 24px; color: #d3def2; }
+body.client-ui .sidebar-nav a .icon svg { width: 22px; height: 22px; stroke-width: 1.4; }
+body.client-ui .sidebar-nav a.active { background: linear-gradient(90deg, #1769e0, #2a80f0); box-shadow: inset 4px 0 0 #f59a1b, 0 10px 22px -12px rgba(23, 105, 224, 0.9); font-weight: 700; }
+body.client-ui .sidebar-nav a.active .icon { color: #fff; }
+body.client-ui .sidebar-nav .nav-sub a { padding: 8px 12px; font-size: 0.88rem; gap: 12px; }
+body.client-ui .sidebar-nav .nav-sub a .icon svg { width: 18px; height: 18px; }
+body.client-ui .sidebar-divider { margin: 12px 6px; background: rgba(255, 255, 255, 0.12); }
+body.client-ui .sidebar-nav a .nav-badge { margin-left: auto; background: #f7b52c; color: #2b1d00; font-weight: 800; font-size: 0.82rem; min-width: 28px; padding: 3px 9px; }
+body.client-ui .sidebar-nav a.sidebar-help-btn { background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(160, 190, 240, 0.28); color: #fff !important; font-weight: 700; padding: 11px 14px; margin: 4px 0 2px; }
+body.client-ui .sidebar-nav a.sidebar-help-btn:hover { background: rgba(255, 255, 255, 0.09); }
+body.client-ui .sidebar-nav a.sidebar-help-btn.active { background: rgba(23, 105, 224, 0.35); box-shadow: none; }
+body.client-ui .sidebar-help-btn .help-q { width: 28px; height: 28px; border-radius: 50%; background: #2b5fb5; color: #fff !important; font: 700 0.95rem var(--font-ui); }
+body.client-ui .sidebar-help-btn .help-chev { margin-left: auto; color: #c6d3ea; }
+body.client-ui .sidebar.collapsed .help-chev { display: none; }
+body.client-ui .sidebar.collapsed .sidebar-nav a { padding: 12px; }
+body.client-ui .sidebar-collapse-btn { width: 34px; height: 34px; border-radius: 10px; }
+html:not([data-theme="dark"]) body.client-ui { background: #f3f7fd; }
+@media (max-width: 900px) { body.client-ui .sidebar-nav a { padding: 8px; gap: 0; } body.client-ui .sidebar-nav a .nav-badge { position: absolute; top: 2px; right: 2px; min-width: 18px; padding: 0 5px; font-size: 0.68rem; margin: 0; } body.client-ui .sidebar-help-btn .help-chev { display: none; } }
+@media (max-width: 900px) { body.client-ui .sidebar { width: 100%; padding: 6px 10px; } body.client-ui .sidebar-divider { width: 1px; height: 24px; margin: 0 6px; flex: none; } body.client-ui .sidebar-nav a.sidebar-help-btn { margin: 0; padding: 8px; } body.client-ui .sidebar-help-btn .help-q { width: 24px; height: 24px; font-size: 0.85rem; } }

@@ -80,7 +80,7 @@
   <script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "7d7177ddf4eb4c22ab931af3ffa28bef"}'></script>
   <!-- End Cloudflare Web Analytics -->
 </head>
-<body class="{% block body_class %}{% endblock %}{% if user and user['role'] == 'staff' %} staff-ui{% endif %}">
+<body class="{% block body_class %}{% endblock %}{% if user and user['role'] == 'staff' %} staff-ui{% elif user and user['role'] == 'client' %} staff-ui client-ui{% endif %}">
   <a href="#main-content" class="skip-link">{% if translated %}{{ t('skip') }}{% else %}Skip to main content{% endif %}</a>
   {% if user %}
   <header class="topbar" lang="{{ page_lang() }}">
@@ -161,7 +161,6 @@
         <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">«</button>
       </div>
       <nav class="sidebar-nav" aria-label="App">
-        {% if user['role'] == 'staff' %}
         {% set sp = request.url.path %}
         {% macro snav(href, label, icon, matches, children=[], exclude='') -%}
           {% set ns = namespace(on=false, child=false) %}
@@ -180,6 +179,7 @@
           <a href="{{ href }}" class="{{ 'active' if ns.on else '' }}">{{ nav_icon(icon) }}<span class="label">{{ label }}</span></a>
           {% endif %}
         {%- endmacro %}
+        {% if user['role'] == 'staff' %}
         {{ snav('/staff', 'Overview', 'grid', ['=/staff']) }}
 
         <div class="snav-sec"><span>Operations</span></div>
@@ -208,6 +208,28 @@
         <div class="snav-sec"><span>Admin</span></div>
         {{ snav('/staff/admin', 'Admin', 'shield', ['/staff/admin'], [('/staff/voice-actors', 'Voice talent', 'mic', '/staff/voice-actors'), ('/staff/security', 'Security log', 'lock', '/staff/security')]) }}
         {% endif %}
+        {% elif user['role'] == 'voice_actor' %}
+        <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-contact-row">
+          <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
+        </div>
+        {% else %}
+        {% set pending = pending_count(user) %}
+        {{ snav('/client/home', t('nav_dashboard'), 'grid', ['=/client/home']) }}
+        {{ snav('/client', t('nav_orders'), 'checklist', ['=/client', '/client/order'], ([('/client/meetings', t('nav_meetings'), 'mic', '/client/meetings')] if meetings_enabled() else [])) }}
+        <a href="/client/pending" class="{{ 'active' if request.url.path == '/client/pending' else '' }}">{{ nav_icon('bell') }}<span class="label">{{ t('nav_pending') }}</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
+        {{ snav('/client/files', t('nav_files'), 'paper', ['/client/files'], [('/client/notes', t('nav_notes'), 'message', '/client/notes')]) }}
+        {{ snav('/client/billing', t('nav_billing'), 'card', ['/client/billing']) }}
+        <div class="sidebar-divider"></div>
+        {{ snav('/client/analytics', t('nav_analytics'), 'bars', ['/client/analytics']) }}
+        {{ snav('/client/workspace', t('nav_workspace'), 'users', ['/client/workspace'], [('/client/vocabulary', t('nav_vocabulary'), 'book', '/client/vocabulary')]) }}
+        {{ snav('/client/resources', t('nav_learn'), 'book_open', ['/client/resources']) }}
+        {{ snav('/client/integrations', t('nav_integrations'), 'puzzle', ['/client/integrations']) }}
+        {{ snav('/client/rewards', t('nav_rewards'), 'gift', ['/client/rewards']) }}
+        <div class="sidebar-divider"></div>
+        <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon help-q">?</span><span class="label">{{ t('nav_get_help') }}</span><svg class="help-chev label" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5L7.5 6 4 9.5"/></svg></a>
+        {% endif %}
         <script>
           (function () {
             document.querySelectorAll('.nav-grp').forEach(function (g) {
@@ -222,34 +244,6 @@
             });
           })();
         </script>
-        {% elif user['role'] == 'voice_actor' %}
-        <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>
-        <div class="sidebar-divider"></div>
-        <div class="sidebar-contact-row">
-          <a href="mailto:{{ contact_email }}" title="Email us"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">Email</span></a>
-        </div>
-        {% else %}
-        <a href="/client/home" class="{{ 'active' if request.url.path == '/client/home' else '' }}">{{ nav_icon('grid') }}<span class="label">{{ t('nav_dashboard') }}</span></a>
-        <a href="/client" class="{{ 'active' if request.url.path == '/client' else '' }}">{{ nav_icon('checklist') }}<span class="label">{{ t('nav_orders') }}</span></a>
-        {% set pending = pending_count(user) %}
-        <a href="/client/pending" class="{{ 'active' if request.url.path == '/client/pending' else '' }}">{{ nav_icon('pulse') }}<span class="label">{{ t('nav_pending') }}</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
-        {% if meetings_enabled() %}<a href="/client/meetings" class="{{ 'active' if request.url.path == '/client/meetings' else '' }}">{{ nav_icon('mic') }}<span class="label">{{ t('nav_meetings') }}</span></a>{% endif %}
-        <a href="/client/files" class="{{ 'active' if request.url.path == '/client/files' else '' }}">{{ nav_icon('folder') }}<span class="label">{{ t('nav_files') }}</span></a>
-        <a href="/client/billing" class="{{ 'active' if '/client/billing' in request.url.path else '' }}">{{ nav_icon('card') }}<span class="label">{{ t('nav_billing') }}</span></a>
-        <div class="sidebar-divider"></div>
-        <a href="/client/notes" class="{{ 'active' if '/client/notes' in request.url.path else '' }}">{{ nav_icon('paper') }}<span class="label">{{ t('nav_notes') }}</span></a>
-        <a href="/client/analytics" class="{{ 'active' if '/client/analytics' in request.url.path else '' }}">{{ nav_icon('bars') }}<span class="label">{{ t('nav_analytics') }}</span></a>
-        <a href="/client/workspace" class="{{ 'active' if '/client/workspace' in request.url.path else '' }}">{{ nav_icon('users') }}<span class="label">{{ t('nav_workspace') }}</span></a>
-        <a href="/client/vocabulary" class="{{ 'active' if '/client/vocabulary' in request.url.path else '' }}">{{ nav_icon('book') }}<span class="label">{{ t('nav_vocabulary') }}</span></a>
-        <a href="/client/integrations" class="{{ 'active' if '/client/integrations' in request.url.path else '' }}">{{ nav_icon('gear') }}<span class="label">{{ t('nav_integrations') }}</span></a>
-        <a href="/client/rewards" class="{{ 'active' if '/client/rewards' in request.url.path else '' }}">{{ nav_icon('target') }}<span class="label">{{ t('nav_rewards') }}</span></a>
-        <a href="/client/resources" class="{{ 'active' if '/client/resources' in request.url.path else '' }}">{{ nav_icon('book_open') }}<span class="label">{{ t('nav_resources') }}</span></a>
-        <div class="sidebar-divider"></div>
-        <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon">?</span><span class="label">{{ t('nav_help') }}</span></a>
-        <div class="sidebar-contact-row">
-          <a href="mailto:{{ contact_email }}" title="{{ t('menu_email') }}"><span class="icon">@</span><span class="label" style="font-size:0.76rem;">{{ t('nav_email') }}</span></a>
-        </div>
-        {% endif %}
         <a href="/settings" class="{{ 'active' if request.url.path == '/settings' else '' }}">{{ nav_icon('gear') }}<span class="label">{{ t('nav_settings') }}</span></a>
       </nav>
     </aside>

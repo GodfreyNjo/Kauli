@@ -351,7 +351,7 @@ def test_the_transcript_can_be_opened_as_an_editable_note(env, wav_bytes):
 
 def test_billing_and_plans_are_one_page_matching_the_website(env):
     nav = env.client.get("/client/home").text
-    assert 'href="/client/billing"' in nav and 'href="/client/plans"' not in nav and "Billing and plans" in nav
+    assert 'href="/client/billing"' in nav and 'href="/client/plans"' not in nav and ">Billing<" in nav
     moved = env.client.get("/client/plans", follow_redirects=False)
     assert moved.status_code == 303 and moved.headers["location"] == "/client/billing#change-plan"
     page = env.client.get("/client/billing").text

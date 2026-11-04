@@ -96,7 +96,7 @@ def test_the_switcher_saves_the_choice_for_every_device_and_cannot_be_abused(env
     assert env.client.get("/lang/fr?next=//evil.example", follow_redirects=False).headers["location"] == "/"
     assert env.client.get("/lang/fr", follow_redirects=False).headers["x-robots-tag"] == "noindex, nofollow"
     env.client.get("/lang/en")
-    assert "Overview" in env.client.get("/client/home").text
+    assert ">Home<" in env.client.get("/client/home").text
 
 
 def test_the_account_menu_lists_every_language(env):
