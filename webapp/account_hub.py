@@ -725,29 +725,36 @@ INTEGRATIONS = [
      "desc": "Connect Kauli to thousands of apps with Webhooks by Zapier and your API key."},
     {"id": "make", "name": "Make", "cat": "Developer", "kind": "zapier", "state": "live", "href": "/docs/api",
      "desc": "Build automations with Make using Kauli's webhooks and API."},
-    {"id": "hubspot", "name": "HubSpot", "cat": "CRM", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "hubspot", "name": "HubSpot", "cat": "CRM", "kind": "built", "state": "soon", "href": "",
      "desc": "Log call and meeting transcripts to HubSpot contacts through Zapier."},
-    {"id": "salesforce", "name": "Salesforce", "cat": "CRM", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "salesforce", "name": "Salesforce", "cat": "CRM", "kind": "built", "state": "soon", "href": "",
      "desc": "Attach transcripts to Salesforce records through Zapier."},
-    {"id": "pipedrive", "name": "Pipedrive", "cat": "CRM", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "pipedrive", "name": "Pipedrive", "cat": "CRM", "kind": "built", "state": "soon", "href": "",
      "desc": "Add transcripts to Pipedrive deals through Zapier."},
-    {"id": "trello", "name": "Trello", "cat": "Project Management", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "trello", "name": "Trello", "cat": "Project Management", "kind": "built", "state": "soon", "href": "",
      "desc": "Create Trello cards from action items through Zapier."},
-    {"id": "asana", "name": "Asana", "cat": "Project Management", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "asana", "name": "Asana", "cat": "Project Management", "kind": "built", "state": "soon", "href": "",
      "desc": "Turn finished transcripts into Asana tasks through Zapier."},
-    {"id": "monday", "name": "monday.com", "cat": "Project Management", "kind": "zapier", "state": "live", "href": "/docs/api",
+    {"id": "monday", "name": "monday.com", "cat": "Project Management", "kind": "built", "state": "soon", "href": "",
      "desc": "Send transcripts to monday.com boards through Zapier."},
     {"id": "gdocs", "name": "Google Docs", "cat": "Notes & Documentation", "kind": "built", "state": "live", "href": "/client/integrations",
      "desc": "Save transcripts directly to Google Docs for easy editing, sharing, and collaboration."},
-    {"id": "gsheets", "name": "Google Sheets", "cat": "Notes & Documentation", "kind": "zapier", "state": "live", "href": "/docs/api",
-     "desc": "Add a row per transcript to a Google Sheet through Zapier."},
+    {"id": "gsheets", "name": "Google Sheets", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
+     "desc": "Add a row to a Google Sheet for every finished transcript."},
+    {"id": "discord", "name": "Discord", "cat": "Communication", "kind": "built", "state": "soon", "href": "",
+     "desc": "Post a message in your Discord channel when a transcript is ready."},
     {"id": "gdrive", "name": "Google Drive", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Pick a recording from Google Drive when you upload a file."},
+     "desc": "Save every transcript to your Drive, and pick recordings from it when you upload."},
     {"id": "onedrive", "name": "OneDrive", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Pick a recording from OneDrive when you upload a file."},
+     "desc": "Save every transcript to your OneDrive, and pick recordings from it when you upload."},
     {"id": "dropbox", "name": "Dropbox", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
-     "desc": "Pick a recording from Dropbox when you upload a file."},
+     "desc": "Auto-save every transcript to your Dropbox, and pick recordings from it when you upload."},
 ]
+# the colour of each service's initial on its card (the services' own logos are theirs, so a coloured initial stands in)
+BRAND = {"slack": "#4a154b", "teams": "#5b5fc7", "notion": "#111827", "zoom": "#2d8cff", "meet": "#00897b", "youtube": "#e11d1d", "api": "#334155",
+         "webhooks": "#475569", "zapier": "#ff4f00", "make": "#6d28d9", "hubspot": "#ff7a59", "salesforce": "#00a1e0", "pipedrive": "#1f2937",
+         "trello": "#0079bf", "asana": "#f06a6a", "monday": "#ff3d57", "gdocs": "#1a73e8", "gsheets": "#188038", "gdrive": "#f9ab00",
+         "onedrive": "#0a64ad", "dropbox": "#0061ff", "discord": "#5865f2"}
 CALENDARS = [{"id": "google_calendar", "name": "Google Calendar"}, {"id": "outlook_calendar", "name": "Outlook Calendar"}]
 
 
@@ -770,6 +777,7 @@ def integrations_page(request: Request, notice: str | None = None):
     # webhook set-up to Connect only once its app is set up
     mine = connections.connections_for(user["client_scope_id"])
     for i in items:
+        i["color"] = BRAND.get(i["id"], "#2563eb")
         if i["id"] in connections.PROVIDERS and (i["id"] == "gdocs" or connections.configured(i["id"])):
             i["connect"], i["connectable"] = i["id"], connections.configured(i["id"])
             i["connected"] = i["id"] in mine

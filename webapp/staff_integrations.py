@@ -144,8 +144,9 @@ def page(request: Request):
         cards.append({"key": key, **meta, "connected": bool(row), "url": mask(row["url"]) if row else "", "enabled": bool(row["enabled"]) if row else True,
                       "secret": (row["secret"] if row and key == "webhook" else ""), "events": chosen,
                       "last_status": row["last_status"] if row else None, "last_at": row["last_at"] if row else None})
+    from . import connections
     return A.templates.TemplateResponse(request, "staff_integrations.html", {
-        "user": user, "theme": "dark", "cards": cards, "events": EVENTS, "notice": request.query_params.get("notice"), "error": request.query_params.get("error")})
+        "user": user, "theme": "dark", "cards": cards, "events": EVENTS, "apps": connections.setup_status(A._public_base_url(request)), "notice": request.query_params.get("notice"), "error": request.query_params.get("error")})
 
 
 @router.post("/staff/integrations/save")

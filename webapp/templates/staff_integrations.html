@@ -36,6 +36,21 @@
   </section>
   {% endfor %}
   </div>
+  <section class="hub-card" id="customer-apps">
+    <h2>Customer one-click connections</h2>
+    <p class="muted">Customers connect Google, Slack, Discord, Notion, Dropbox, OneDrive and their calendars with one click. Each needs Kauli's own app registered once with that service. Register it, give it the addresses below, then add the two keys to the server's <code>.env</code> and redeploy. Until then customers see "Coming soon".</p>
+    <div class="si-grid">
+    {% for a in apps %}
+      <div class="si-card">
+        <header class="si-head"><h3>{{ a.title }}</h3>{% if a.ready %}<span class="pf-tag ok">Ready</span>{% else %}<span class="pf-tag">Needs setup</span>{% endif %}</header>
+        <p class="muted">Register at <a href="{{ a.console }}" target="_blank" rel="noopener">{{ a.console_name }}</a>. Redirect address{{ 'es' if a.redirects|length > 1 else '' }}:</p>
+        <ul>{% for r in a.redirects %}<li><code>{{ r }}</code></li>{% endfor %}</ul>
+        {% if a.scopes %}<p class="muted">Access to ask for: <code>{{ a.scopes }}</code></p>{% endif %}
+        <p class="muted">Keys for <code>.env</code>: <code>{{ a.id_env }}</code> and <code>{{ a.secret_env }}</code></p>
+      </div>
+    {% endfor %}
+    </div>
+  </section>
   <p class="muted">Providers (transcription, translation, voices) are managed on <a href="/staff/providers">Providers</a>.</p>
 </div>
 {% endblock %}

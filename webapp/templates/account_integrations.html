@@ -42,7 +42,7 @@
   <div class="ig-grid" id="ig-grid">
     {% for i in items %}
     <article class="hub-card ig-card" data-kind="{{ i.kind }}" data-cat="{{ i.cat }}" data-text="{{ (i.name ~ ' ' ~ i.desc ~ ' ' ~ i.cat)|lower }}">
-      <div class="ig-head"><span class="ws-badge">{{ i.name[0] }}</span><div><h3>{{ i.name }}</h3><span class="ig-cat">{{ i.cat }}</span></div></div>
+      <div class="ig-head"><span class="ws-badge" style="background: {{ i.color }}; color: #fff;">{{ i.name[0] }}</span><div><h3>{{ i.name }}</h3><span class="ig-cat">{{ i.cat }}</span></div></div>
       <p>{{ i.desc }}</p>
       <div class="ig-actions">
         {% if i.connect %}
@@ -50,8 +50,10 @@
             <span class="ig-on">Connected{% if i.account %} &middot; {{ i.account }}{% endif %}</span>
             <button type="button" class="btn" data-settings="{{ i.connect }}">Settings</button>
             <button type="button" class="ig-link" data-disconnect="{{ i.connect }}">Disconnect</button>
+            {% if i.import %}<a class="ig-link" href="/client#order-form">Import a file</a>{% endif %}
           {% elif i.connectable %}
             <button type="button" class="btn" data-connect="{{ i.connect }}">Connect</button>
+            {% if i.import %}<a class="ig-link" href="/client#order-form">Import a file</a>{% endif %}
           {% else %}
             <span class="ig-via">Coming soon</span>
           {% endif %}
@@ -60,6 +62,7 @@
           {% if i.kind == 'zapier' %}<span class="ig-via">via Zapier / Make</span>{% endif %}
         {% else %}
           <span class="ig-via">Coming soon</span>
+          <form method="post" action="/client/integrations/request" class="ig-notify"><input type="hidden" name="body" value="Please tell me when {{ i.name }} connects"><button type="submit" class="ig-link">Tell me when it is ready</button></form>
         {% endif %}
       </div>
     </article>
