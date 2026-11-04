@@ -6993,3 +6993,5 @@ html[data-theme="dark"] .sa-donut-top, html[data-theme="dark"] .sa-ring-text { f
 .tk-cards.hx-try { display: block; margin-top: 36px; } .marketing-page .hx-uses a { text-decoration: none; } .marketing-page .hx-all { text-decoration: none; }
 .hx-try .tk-chips { justify-content: flex-start; }
 .hx-uses a, .hx-all { text-decoration: none !important; }
+
+.auth-magic-btn { width: 100%; margin-top: 8px; } .auth-magic-note { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); text-align: center; }

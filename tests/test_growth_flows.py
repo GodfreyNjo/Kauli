@@ -105,7 +105,10 @@ def test_a_bad_email_is_refused_kindly(env, wav_bytes):
 def test_the_sign_in_page_offers_a_link_by_email_and_never_reveals_which_addresses_have_accounts(env, monkeypatch):
     _real_sessions(env)
     _real_limits(env)
-    assert 'action="/login/magic"' in env.client.get("/login").text
+    page = env.client.get("/login").text
+    assert 'formaction="/login/magic"' in page and "Email me a sign-in link instead" in page
+    signin = page.split('id="panel-signin"')[1].split('id="panel-signup"')[0]
+    assert signin.count('name="email"') == 1                                                       # one email box per form, not two
     sent = []
     monkeypatch.setattr(env.app.supabase_auth, "send_magic_link", lambda email, redirect_to: sent.append(email))
     good = env.client.post("/login/magic", data={"email": "anyone@example.com", "next": "/client"})

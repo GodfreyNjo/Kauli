@@ -40,7 +40,6 @@
           {% include "_google_g_icon.svg" %}
           {{ t('lg_google') }}
         </a>
-        {% include "_magic_link.html" %}
         <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/login">
           <input type="hidden" name="next" value="{{ next or '' }}">
@@ -59,6 +58,8 @@
           </label>
           <p class="auth-forgot"><a href="/forgot-password">{{ t('lg_forgot') }}</a></p>
           <button type="submit">{{ t('lg_btn_signin') }}</button>
+          <button type="submit" class="secondary auth-magic-btn" formaction="/login/magic" formnovalidate>Email me a sign-in link instead</button>
+          <p class="auth-magic-note">No password needed. The link works once, and it creates your account if you do not have one yet.</p>
         </form>
         <p class="auth-switch">{{ t('lg_new_here') }} <button type="button" class="auth-link-btn" data-show="panel-signup">{{ t('lg_create_link') }}</button></p>
         <p class="auth-consent">{{ t('lg_consent_in', terms=terms_link, privacy=privacy_link, cookies=cookies_link) }}</p>
@@ -72,7 +73,6 @@
           {% include "_google_g_icon.svg" %}
           {{ t('lg_google') }}
         </a>
-        {% include "_magic_link.html" %}
         <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/signup" id="signup-form">
           <input type="hidden" name="next" value="{{ next or '' }}">
@@ -101,6 +101,8 @@
             <span>{{ t('lg_tips') }}</span>
           </label>
           <button type="submit">{{ t('lg_btn_create') }}</button>
+          <button type="submit" class="secondary auth-magic-btn" formaction="/login/magic" formnovalidate>Email me a sign-in link instead</button>
+          <p class="auth-magic-note">No password needed. The link works once, and it creates your account if you do not have one yet.</p>
         </form>
         <p class="auth-switch">{{ t('lg_have_account') }} <button type="button" class="auth-link-btn" data-show="panel-signin">{{ t('lg_signin') }}</button></p>
         <p class="auth-consent">{{ t('lg_consent_up', terms=terms_link, privacy=privacy_link, cookies=cookies_link) }}</p>
