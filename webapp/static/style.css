@@ -6995,3 +6995,5 @@ html[data-theme="dark"] .sa-donut-top, html[data-theme="dark"] .sa-ring-text { f
 .hx-uses a, .hx-all { text-decoration: none !important; }
 
 .auth-magic-btn { width: 100%; margin-top: 8px; } .auth-magic-note { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); text-align: center; }
+.hx-visual { min-height: 390px; padding-bottom: 80px; } .hx-hand-b { right: 2%; bottom: 8px; max-width: 260px; } .hx-trans { box-shadow: 0 16px 34px -24px rgba(10, 40, 100, 0.4); }
+@media (max-width: 960px) { .hx-visual { min-height: 360px; } }
