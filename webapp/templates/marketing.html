@@ -149,23 +149,63 @@
      </div>
      <div class="hx-visual" aria-hidden="true">
       <p class="hx-hand hx-hand-a">From audio or video&hellip;</p>
-      <div class="hx-app">
-        <div class="hx-side"><span class="is-on">Transcribe</span><span>Subtitles</span><span>Translate</span><span>Dub</span></div>
+      <div class="hx-app" id="hx-app">
+        <div class="hx-side" id="hx-side"><span class="is-on" data-scene="0">Transcribe</span><span data-scene="1">Subtitles</span><span data-scene="2">Translate</span><span data-scene="3">Dub</span></div>
         <div class="hx-main">
-          <div class="hx-file"><strong>Team Meeting.mp4</strong><span class="hx-lang">English</span></div>
-          <div class="hx-wave"><i class="hx-play"></i><span class="hx-bars">{% for h in [8, 14, 22, 12, 26, 18, 30, 20, 12, 24, 16, 28, 10, 22, 14, 26, 18, 12, 24, 16, 8, 20, 28, 14, 10, 22] %}<b style="height: {{ h }}px"></b>{% endfor %}</span></div>
-          <ul class="hx-lines">
-            <li><em class="s1">Speaker 1</em><time>00:00</time><span>Welcome everyone to today's meeting.</span></li>
-            <li><em class="s2">Speaker 2</em><time>00:08</time><span>Let's review the roadmap for Q2.</span></li>
-            <li><em class="s1">Speaker 1</em><time>00:14</time><span>Great. I'll share the next steps.</span></li>
-          </ul>
+          <div class="hx-file"><strong id="hx-file">Team Meeting.mp4</strong><span class="hx-lang" id="hx-lang">English</span></div>
+          <div class="hx-wave"><i class="hx-play" id="hx-play"></i><span class="hx-bars">{% for h in [8, 14, 22, 12, 26, 18, 30, 20, 12, 24, 16, 28, 10, 22, 14, 26, 18, 12, 24, 16, 8, 20, 28, 14, 10, 22] %}<b style="height: {{ h }}px; --d: {{ '%.2f'|format(loop.index0 * 0.06) }}s"></b>{% endfor %}</span><time id="hx-time">0:00</time></div>
+          <div class="hx-scene" id="hx-scene"></div>
         </div>
       </div>
       <div class="hx-trans"><b>Translate to</b>
-        <ul><li class="is-on"><i>ES</i>Spanish</li><li><i>FR</i>French</li><li><i>DE</i>German</li><li><i>SW</i>Swahili</li><li><i>ZH</i>Chinese</li><li class="more">+ 70+ more</li></ul>
+        <ul id="hx-langs"><li class="is-on"><i>ES</i>Spanish</li><li><i>FR</i>French</li><li><i>DE</i>German</li><li><i>SW</i>Swahili</li><li><i>ZH</i>Chinese</li><li class="more">+ 70+ more</li></ul>
       </div>
       <p class="hx-hand hx-hand-b">&hellip;to text, subtitles and translation</p>
      </div>
+      <script>
+        (function () {
+          var app = document.getElementById("hx-app"), scene = document.getElementById("hx-scene"); if (!app || !scene) return;
+          var visual = app.parentNode, side = document.getElementById("hx-side").children, langs = document.getElementById("hx-langs").children,
+              file = document.getElementById("hx-file"), lang = document.getElementById("hx-lang"), clock = document.getElementById("hx-time");
+          var L = [["Spanish", "Bienvenidos a la reunión de hoy."], ["French", "Bienvenue à la réunion d'aujourd'hui."], ["German", "Willkommen zur heutigen Besprechung."],
+                   ["Swahili", "Karibuni kwenye mkutano wa leo."], ["Chinese", "欢迎大家参加今天的会议。"]];
+          function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+          var sel = 0, sc = 0, secs = 0, timers = [];
+          var scenes = [
+            function () { file.textContent = "Team Meeting.mp4"; lang.textContent = "English";
+              return '<ul class="hx-lines"><li style="--i:0"><em class="s1">Speaker 1</em><time>00:00</time><span>Welcome everyone to today\'s meeting.</span></li>' +
+                '<li style="--i:1"><em class="s2">Speaker 2</em><time>00:08</time><span>Let\'s review the roadmap for Q2.</span></li>' +
+                '<li style="--i:2"><em class="s1">Speaker 1</em><time>00:14</time><span>Great. I\'ll share the next steps.</span></li></ul>'; },
+            function () { file.textContent = "Product demo.mp4"; lang.textContent = "English";
+              return '<div class="hx-frame"><span class="hx-cap">Welcome everyone to today\'s meeting.</span></div><div class="hx-srt"><code>1&nbsp;&nbsp;00:00:02,000 &rarr; 00:00:05,400</code><span>SRT</span><span>VTT</span></div>'; },
+            function () { file.textContent = "Team Meeting.mp4"; lang.textContent = "English \u2192 " + L[sel][0];
+              return '<ul class="hx-lines hx-tr"><li style="--i:0"><em class="s1">EN</em><span>Welcome everyone to today\'s meeting.</span></li><li style="--i:1"><em class="s2">' + esc(L[sel][0].slice(0, 2).toUpperCase()) + '</em><span id="hx-tr">' + esc(L[sel][1]) + '</span></li></ul>'; },
+            function () { file.textContent = "Welcome.mp4"; lang.textContent = "English \u2192 Swahili";
+              return '<div class="hx-dub"><b>Dubbed voice track</b><div class="hx-dubbar"><u></u></div><ul><li>Natural voice</li><li>Timing matched to the original</li><li>Karibuni kwenye mkutano wa leo.</li></ul></div>'; }
+          ];
+          function show(i) {
+            sc = i;
+            for (var k = 0; k < side.length; k++) side[k].classList.toggle("is-on", k === i);
+            visual.classList.add("is-paused");
+            scene.classList.remove("is-in");
+            timers.push(setTimeout(function () { scene.innerHTML = scenes[i](); scene.classList.add("is-in"); visual.classList.remove("is-paused"); }, 260));
+          }
+          function pick(i) {
+            sel = i;
+            for (var k = 0; k < langs.length - 1; k++) langs[k].classList.toggle("is-on", k === i);
+            var tr = document.getElementById("hx-tr");
+            if (tr) { tr.textContent = L[i][1]; lang.textContent = "English \u2192 " + L[i][0]; var e = tr.closest("li"); e.classList.remove("flash"); void e.offsetWidth; e.classList.add("flash"); }
+          }
+          function tick() { secs = (secs + 1) % 95; clock.textContent = Math.floor(secs / 60) + ":" + (secs % 60 < 10 ? "0" : "") + (secs % 60); }
+          scene.innerHTML = scenes[0](); scene.classList.add("is-in");
+          if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { visual.classList.add("is-still"); return; }
+          var held = false;
+          visual.addEventListener("mouseenter", function () { held = true; }); visual.addEventListener("mouseleave", function () { held = false; });
+          setInterval(function () { if (!held && !document.hidden) tick(); }, 1000);
+          setInterval(function () { if (!held && !document.hidden) pick((sel + 1) % L.length); }, 1700);
+          setInterval(function () { if (!held && !document.hidden) show((sc + 1) % scenes.length); }, 5200);
+        })();
+      </script>
     </div>
 
     <ul class="hx-strip" aria-label="What you get">

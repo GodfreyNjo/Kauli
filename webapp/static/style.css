@@ -6997,3 +6997,22 @@ html[data-theme="dark"] .sa-donut-top, html[data-theme="dark"] .sa-ring-text { f
 .auth-magic-btn { width: 100%; margin-top: 8px; } .auth-magic-note { margin: 6px 0 0; font-size: 0.8rem; color: var(--muted); text-align: center; }
 .hx-visual { min-height: 390px; padding-bottom: 80px; } .hx-hand-b { right: 2%; bottom: 8px; max-width: 260px; } .hx-trans { box-shadow: 0 16px 34px -24px rgba(10, 40, 100, 0.4); }
 @media (max-width: 960px) { .hx-visual { min-height: 360px; } }
+
+/* the hero picture moves: scenes rotate, the language selection changes, the waveform dances and the play button pauses between scenes */
+.hx-wave time { flex: none; font-size: 0.72rem; color: #8a98ae; font-variant-numeric: tabular-nums; min-width: 32px; text-align: right; }
+.hx-bars b { transform-origin: center; animation: hx-pulse 1.05s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+@keyframes hx-pulse { from { transform: scaleY(0.35); opacity: 0.55; } to { transform: scaleY(1); opacity: 0.95; } }
+.hx-visual.is-paused .hx-bars b { animation-play-state: paused; transform: scaleY(0.3); }
+.hx-play { transition: background 0.2s ease; } .hx-visual.is-paused .hx-play::after { left: 11px; top: 11px; width: 4px; height: 12px; border: 0; background: #fff; border-radius: 1px; box-shadow: 7px 0 0 #fff; }
+.hx-scene { min-height: 108px; opacity: 0; transform: translateY(6px); transition: opacity 0.26s ease, transform 0.26s ease; } .hx-scene.is-in { opacity: 1; transform: none; }
+.hx-scene .hx-lines li { opacity: 0; transform: translateY(6px); animation: hx-in 0.4s ease forwards; animation-delay: calc(var(--i, 0) * 0.45s + 0.1s); }
+@keyframes hx-in { to { opacity: 1; transform: none; } }
+.hx-lines.hx-tr li { grid-template-columns: auto 1fr; } .hx-tr li.flash span { animation: hx-flash 0.6s ease; } @keyframes hx-flash { from { background: #fff3c4; } to { background: transparent; } }
+.hx-frame { position: relative; height: 86px; border-radius: 10px; background: linear-gradient(135deg, #1e3a66, #3d6ab0 60%, #8bb4e8); display: grid; align-items: end; justify-items: center; padding: 8px; }
+.hx-cap { padding: 3px 9px; border-radius: 4px; background: rgba(8, 8, 8, 0.78); color: #fff; font-size: 0.7rem; animation: hx-in 0.4s ease both; }
+.hx-srt { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 0.7rem; color: #50627f; } .hx-srt code { font-size: 0.68rem; } .hx-srt span { padding: 2px 8px; border-radius: 6px; background: #e3efff; color: #1d5fd1; font-weight: 700; }
+.hx-dub { display: grid; gap: 8px; font-size: 0.74rem; color: #243a63; } .hx-dub b { color: #0b2447; } .hx-dubbar { height: 8px; border-radius: 6px; background: #e8eef8; overflow: hidden; } .hx-dubbar u { display: block; height: 100%; width: 0; background: #2b7be4; text-decoration: none; animation: hx-fill 4.2s ease forwards; } @keyframes hx-fill { to { width: 100%; } }
+.hx-dub ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; } .hx-dub li { padding: 4px 10px; border-radius: 8px; background: #f4f7fd; border: 1px solid #e6edf7; }
+.hx-trans li { transition: background 0.25s ease, border-color 0.25s ease; }
+.hx-visual.is-still .hx-bars b, .hx-visual.is-still .hx-scene .hx-lines li, .hx-visual.is-still .hx-dubbar u { animation: none; opacity: 1; transform: none; width: auto; }
+@media (prefers-reduced-motion: reduce) { .hx-bars b, .hx-scene .hx-lines li, .hx-dubbar u, .hx-cap { animation: none !important; opacity: 1; transform: none; } .hx-scene { transition: none; } }

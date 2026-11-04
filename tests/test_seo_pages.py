@@ -98,3 +98,11 @@ def test_the_home_try_band_has_upload_and_youtube_and_the_use_case_index_exists(
     page = env.client.get("/solutions")
     assert page.status_code == 200 and "Built for every workflow" in page.text and "/solutions/interview-transcription" in page.text
     assert "/solutions</loc>" in env.client.get("/sitemap.xml").text
+
+
+def test_the_hero_picture_rotates_scenes_languages_and_moves_the_waveform(env):
+    page = env.client.get("/").text
+    for text in ('id="hx-app"', 'data-scene="3"', 'id="hx-langs"', 'id="hx-play"', 'id="hx-time"', "Dubbed voice track", "prefers-reduced-motion"):
+        assert text in page, text
+    css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
+    assert "@keyframes hx-pulse" in css and ".hx-visual.is-paused" in css
