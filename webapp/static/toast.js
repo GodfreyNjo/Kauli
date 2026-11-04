@@ -30,7 +30,7 @@
     el.className = "kp-toast kp-toast-" + kind;
     el.setAttribute("role", kind === "error" ? "alert" : "status");
     el.innerHTML = '<svg class="kp-toast-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".22"/>' + ICONS[kind] + '</svg>' +
-      '<span class="kp-toast-text"></span><button type="button" class="kp-toast-x" aria-label="Dismiss message" data-no-busy>&times;</button>';
+      '<span class="kp-toast-text"></span><button type="button" class="kp-toast-x" aria-label="' + (window.kauliT ? window.kauliT("Dismiss message") : "Dismiss message") + '" data-no-busy>&times;</button>';
     el.querySelector(".kp-toast-text").textContent = text;
     var box = host();
     while (box.children.length >= 3) box.removeChild(box.firstChild);          // never a wall of messages

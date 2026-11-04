@@ -83,6 +83,7 @@ def needs_translation(text: str, lang: str) -> bool:
 def _fence(text: str) -> str:
     """The text as HTML for the translator, with brand names marked do-not-translate."""
     escaped = _html.escape(text, quote=False)
+    escaped = re.sub(r"\{[A-Za-z_]+\}", lambda m: f'<span class="notranslate">{m.group(0)}</span>', escaped)       # a gap a script fills in, like {n}
     return _BRAND_RE.sub(lambda m: f'<span class="notranslate">{m.group(1)}</span>', escaped)
 
 

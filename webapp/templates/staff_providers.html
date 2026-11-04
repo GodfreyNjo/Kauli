@@ -22,6 +22,25 @@
     <p class="muted">Transcription is the step this changes. Translation always goes to Lara first, then the next connected provider; voices to our own free voice first. The customer's price never changes with the mode.</p>
   </section>
 
+  <section class="hub-card" id="defaults">
+    <h2>Default providers</h2>
+    <p class="muted">Pin one provider for each step, or leave it on Automatic and let the mode above decide. A pinned default is used for new orders whenever it can take the job (connected, switched on, not set aside after a failure, and able to take the languages); otherwise the automatic routing carries on as before. It is also the provider the editor's "Redo with a provider" popup opens on, so an editor can still pick a different one for a single section.</p>
+    <div class="pf-defaults">
+      {% for step in steps %}
+      <form method="post" action="/staff/providers/default" class="pf-default">
+        <input type="hidden" name="kind" value="{{ step.kind }}">
+        <label>{{ kind_labels[step.kind] }}
+          <select name="name">
+            <option value="">Automatic (follows the mode)</option>
+            {% for r in step.rows %}<option value="{{ r.name }}"{% if defaults[step.kind] == r.name %} selected{% endif %}>{{ r.label }}{% if not r.enabled %} (turned off){% elif not r.connected %} (not connected){% endif %}{% if r.cost is not none %} - ${{ '%g'|format(r.cost) }}/min{% endif %}</option>{% endfor %}
+          </select>
+        </label>
+        <button type="submit">Save</button>
+      </form>
+      {% endfor %}
+    </div>
+  </section>
+
   <section class="hub-card">
     <h2>What one audio-minute of Instant AI costs us</h2>
     <table class="pf-table">

@@ -8,6 +8,7 @@ stubbed, and the signed-in user is a stand-in (no session cookie is forged)."""
 import os
 import shutil
 import subprocess
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -291,3 +292,97 @@ def test_every_account_opens_on_instant_ai_so_orders_ship_by_themselves(env):
         page = env.client.get("/client").text
         assert re.search(r'name="review_tier" value="ai"\s+checked', page), market
         assert not re.search(r'name="review_tier" value="human"\s+checked', page), market
+
+
+# ------------------------------------------------ the service follows the languages
+def test_a_transcription_order_with_different_languages_is_taken_as_a_translation(env, wav_bytes):
+    _set_lara(env)
+    order = env.order_from(env.place(wav_bytes, source_lang="en", target_lang="de", service_level="transcribe", review_tier="ai"))
+    assert order["service_level"] == "translate" and order["target_lang"] == "de"
+    cost = order["cost_usd"] or 0
+    plain = env.order_from(env.place(wav_bytes, source_lang="en", target_lang="en", service_level="transcribe", review_tier="ai"))
+    assert plain["service_level"] == "transcribe" and plain["target_lang"] == "en"
+    assert cost >= (plain["cost_usd"] or 0)
+
+
+def test_same_language_or_nothing_chosen_stays_a_plain_transcript(env, wav_bytes):
+    for target in ("same", ""):
+        order = env.order_from(env.place(wav_bytes, source_lang="sw", target_lang=target, service_level="transcribe", review_tier="ai"))
+        assert order["service_level"] == "transcribe" and order["target_lang"] == "sw", target
+
+
+def test_swahili_to_english_chosen_under_transcription_is_a_translation(env, wav_bytes):
+    order = env.order_from(env.place(wav_bytes, source_lang="sw", target_lang="en", service_level="transcribe", review_tier="ai"))
+    assert order["service_level"] == "translate" and order["target_lang"] == "en"
+
+
+def test_the_form_offers_same_language_and_the_wizard_switches_the_service_itself(env):
+    page = env.client.get("/client").text
+    assert 'value="same"' in page and "Same language (transcript only)" in page and 'id="translation-switch-note"' in page
+    js = env.client.get("/static/client_wizard.js").text
+    assert "translation-switch-note" in js and 'value="translate"' in js
+
+
+
+# ------------------------------------------------ the human-verification offer on a delivered Instant AI translation
+def _delivered_translation(env, wav_bytes, **overrides):
+    env.monkeypatch.setenv("PAYSTACK_SECRET_KEY", "sk_test_dummy")
+    _set_lara(env)
+    data = {"source_lang": "sw", "target_lang": "en", "service_level": "translate"}
+    data.update(overrides)
+    order = env.order_from(env.place(wav_bytes, **data))
+    env.db.update_order_status(order["id"], "ready_for_delivery")
+    return env.db.get_order(order["id"])
+
+
+def test_a_delivered_automatic_translation_offers_human_verification_with_its_benefits_and_the_difference_as_the_price(env, wav_bytes):
+    order = _delivered_translation(env, wav_bytes)
+    offer = env.app._human_check_offer(order)
+    assert offer and abs(offer["price"] - env.app._order_upsell_prices(order)["upgrade"]) < 0.005 and offer["turnaround"].startswith("within about")
+    page = env.client.get(f"/client/orders/{order['id']}").text
+    assert 'id="human-check"' in page and "Want a person to check this translation?" in page
+    for benefit in ("Fast", "Up to 99% accuracy", "Context, not just words", "Marked ready only after review"):
+        assert benefit in page, benefit
+    assert f"${offer['price']:.2f}" in page and "You pay only the difference" in page and "Add human review" in page and 'id="hc-later"' in page
+    assert page.count('action="/client/orders/' + order["id"] + '/upgrade-review"') == 1                  # one offer, not the old button as well
+
+
+def test_the_offer_is_only_for_automatic_translations_that_can_really_be_human_reviewed(env, wav_bytes):
+    _set_lara(env)
+    plain = env.order_from(env.place(wav_bytes, source_lang="sw", target_lang="sw", service_level="transcribe"))
+    env.db.update_order_status(plain["id"], "ready_for_delivery")
+    assert env.app._human_check_offer(env.db.get_order(plain["id"])) is None                              # a transcript: the plain upgrade button as before
+    pending = _delivered_translation(env, wav_bytes)
+    env.db.update_order_status(pending["id"], "processing")
+    assert env.app._human_check_offer(env.db.get_order(pending["id"])) is None                            # not delivered yet
+    human = env.order_from(env.place(wav_bytes, source_lang="sw", service_level="translate", review_tier="human"))
+    env.db.update_order_status(human["id"], "ready_for_delivery")
+    assert env.app._human_check_offer(env.db.get_order(human["id"])) is None                              # already human-reviewed
+    german = _delivered_translation(env, wav_bytes, source_lang="en", target_lang="de")
+    env.monkeypatch.setenv("KAULI_REVIEW_EXTRA_LANGUAGES", "none")
+    assert env.app._human_check_offer(env.db.get_order(german["id"])) is None                             # no human reviewers for German when it is switched off
+    env.monkeypatch.setenv("KAULI_REVIEW_EXTRA_LANGUAGES", "zh,de,es")
+    assert env.app._human_check_offer(env.db.get_order(german["id"]))
+
+
+
+# ------------------------------------------------ the payment page by market, and honest steps
+def test_the_payment_page_offers_mobile_money_only_in_kenya(env, wav_bytes):
+    env.monkeypatch.setenv("PAYSTACK_SECRET_KEY", "sk_test_dummy")
+    order = env.order_from(env.place(wav_bytes, review_tier="human"))                      # waits for payment
+    abroad = env.client.get(f"/client/orders/{order['id']}/pay", headers={"cf-ipcountry": "DE"}).text
+    assert "Secure checkout by Paystack" in abroad or "Paystack" in abroad
+    for word in ("M-Pesa", "Airtel Money", "M-Pesa Till"):
+        assert word not in abroad, word                                                    # a customer outside Kenya sees a card payment, nothing local
+    kenya = env.client.get(f"/client/orders/{order['id']}/pay", headers={"cf-ipcountry": "KE"}).text
+    assert "M-Pesa" in kenya and "Airtel Money" in kenya
+
+
+def test_the_upload_steps_do_not_say_starting_when_payment_comes_first_and_the_page_is_not_rewritten(env):
+    js = env.client.get("/static/client_wizard.js").text
+    assert 'kT("Preparing your payment")' in js and 'kT("Confirming your order")' in js and "finalStepLabel()" in js
+    assert 'labels = [first, kT("Checking your audio"), kT("Working out your price"), finalStepLabel()]' in js
+    assert js.count('kT("Starting your order")') == 1                                       # only inside the one function that decides the label
+    assert "window.location.replace(landedUrl)" in js                                       # success is an ordinary navigation, so no flash of unstyled icons
+    page = env.client.get("/client/home").text
+    assert re.search(r'<svg class="icon" viewBox="0 0 24 24" width="22" height="22"', page)  # the header bell does not depend on the stylesheet for its size

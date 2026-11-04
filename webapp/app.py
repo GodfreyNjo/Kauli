@@ -47,16 +47,16 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server, notion_export  # noqa: E402
 from kauli import caption_formats, timing  # noqa: E402
-from kauli.models import Job, Word, label_speakers, split_off_speaker_tag  # noqa: E402
+from kauli.models import Job, Segment, Word, apply_speaker_paragraphs, label_speakers, split_off_speaker_tag  # noqa: E402
 from kauli.mixer import build_timeline, write_wav_mono, extract_reference_clip, extract_audio_window, time_stretch  # noqa: E402
-from kauli.pipeline import translate_segment, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
+from kauli.pipeline import split_gap_span, translate_segment, translate_gap_tag, apply_stretch_fit, resolve_voice_for_segment, _insert_non_speech_segments, spell_out_text, render_gap_audio, strip_bracket_tags_for_tts  # noqa: E402
 from kauli.providers import get_asr, get_mt, get_tts  # noqa: E402
 from kauli.providers.tts import PIPER_VOICES  # noqa: E402
 from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -1047,6 +1047,53 @@ def workflow_steps_for_order(order) -> list[dict]:
 GAP_THRESHOLD_MS = 1000  # a full second or more of non-speech gets a sound-tag cell
 
 
+def _repair_leaked_translations(job: Job) -> bool:
+    """A translation that kept a model's own commentary (an embedded {"literal": ...} object, "**Note:** ..." paragraphs) is cleaned. Only the machine's
+    text is touched, never a line a person wrote. True when anything changed."""
+    from kauli.providers.mt import clean_model_leak
+    changed = False
+    for seg in job.segments:
+        for field in ("literal", "spoken"):
+            value = getattr(seg, field, "") or ""
+            cleaned = clean_model_leak(value)
+            if cleaned != value:
+                setattr(seg, field, cleaned)
+                changed = True
+        for alt in (seg.alternates or []):
+            value = alt.get("text") or ""
+            cleaned = clean_model_leak(value)
+            if cleaned != value:
+                alt["text"] = cleaned
+                changed = True
+    return changed
+
+
+def _split_long_gaps(job: Job) -> bool:
+    """Cut every non-speech segment longer than two seconds into one-second cells (see kauli.pipeline.split_gap_span) so each second can carry its
+    own sound tag. A tag already typed stays on the first second. A silence that already has rendered dub audio is left alone: its audio belongs to
+    the whole stretch. True when anything changed."""
+    changed = False
+    out: list = []
+    for seg in job.segments:
+        if getattr(seg, "segment_type", "speech") != "gap" or seg.end_ms - seg.start_ms < 2 * GAP_THRESHOLD_MS or getattr(seg, "audio_path", None):
+            out.append(seg)
+            continue
+        spans = split_gap_span(seg.start_ms, seg.end_ms)
+        for k, (a, b) in enumerate(spans):
+            if k == 0:
+                seg.start_ms, seg.end_ms = a, b
+                out.append(seg)
+            else:
+                out.append(Segment(segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0, start_ms=a, end_ms=b, segment_type="gap", source_confidence=1.0,
+                                   source_language=seg.source_language, target_language=seg.target_language))
+        changed = True
+    if changed:
+        for i, seg in enumerate(out):
+            seg.index = i
+        job.segments = out
+    return changed
+
+
 def _find_gaps(seg) -> list[tuple[int, int]]:
     """Real silence/non-speech intervals, from the SOURCE ASR words' actual
     timestamps - the only place genuine word-level timing exists."""
@@ -1660,6 +1707,18 @@ def _ui_lang_global(ctx):
 
 
 @pass_context
+def _js_i18n(ctx):
+    """The scripts' own words for this reader (see webapp/js_strings.py); {} for English."""
+    lang = _ui_lang(ctx.get("request"), ctx.get("user"))
+    if lang == "en" or not page_translate.configured():
+        return {}
+    try:
+        return js_strings.for_lang(lang)
+    except Exception:  # noqa: BLE001 - the scripts simply show English if this fails
+        return {}
+
+
+@pass_context
 def _page_lang(ctx):
     code = _ui_lang(ctx.get("request"), ctx.get("user"))
     return ui_text.HTML_LANG.get(code, code)
@@ -1738,6 +1797,9 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str,
     Claude-first rule, and the original local/Azure fallbacks are kept for
     anything Lara can't take - so nothing changes for an account until Lara's
     keys are actually set."""
+    pinned = provider_health.default_for("mt", source_lang, target_lang)           # staff's default on the Providers page, when it can take this pair
+    if pinned:
+        return pinned, None
     lara_ok = _lara_configured() and not provider_health.blocked("lara")
     if source_lang in MANUAL_TRANSCRIPTION_LANGUAGES:
         # Kikuyu: Claude if connected (as before), otherwise Lara (which
@@ -1819,6 +1881,7 @@ templates.env.globals["ga_measurement_id"] = ga_events.measurement_id()
 # script needs the real number, not a guessed one, to warn far enough
 # ahead of the actual cutoff.
 templates.env.globals["idle_timeout_seconds"] = IDLE_TIMEOUT_SECONDS
+templates.env.globals["js_i18n"] = _js_i18n
 templates.env.globals["nav_icon"] = nav_icons.nav_icon
 templates.env.globals["icon_svg"] = nav_icons.icon_svg
 templates.env.globals["trend_arrow"] = nav_icons.trend_arrow
@@ -4004,6 +4067,31 @@ def logout(request: Request):
 
 
 # ------------------------------------------------------- notifications ----
+_READY_TITLE = re.compile(r"^(.+) is ready$")
+
+
+def _notification_titles(titles: list[str], lang: str) -> dict[str, str]:
+    """{stored English title: title in the reader's language}. Titles are saved in English when the event happens, so they are translated as they
+    are shown. "<file name> is ready" is translated as a sentence with the file name kept exactly; the rest are translated whole."""
+    if lang == "en" or not page_translate.configured():
+        return {}
+    templates_needed: list[str] = []
+    plain: list[str] = []
+    for t in dict.fromkeys(titles):
+        (templates_needed if _READY_TITLE.match(t or "") else plain).append(t)
+    out: dict[str, str] = {}
+    try:
+        tr, _ = page_translate.translate_many(["{name} is ready"] + plain, lang, 3.0)
+        ready = tr.get("{name} is ready")
+        for t in templates_needed:
+            if ready and "{name}" in ready:
+                out[t] = ready.replace("{name}", _READY_TITLE.match(t).group(1))
+        out.update({t: tr[t] for t in plain if tr.get(t)})
+    except Exception:  # noqa: BLE001 - an untranslated title is better than none
+        pass
+    return out
+
+
 @app.get("/notifications/recent")
 def notifications_recent(request: Request):
     """JSON, polled by the bell in base.html - a real, persistent notification
@@ -4013,10 +4101,12 @@ def notifications_recent(request: Request):
     if not user:
         return JSONResponse({"error": "unauthorized"}, status_code=401)
     rows = db.list_recent_notifications(user["id"], limit=10)
+    lang = _ui_lang(request, user)
+    titles = _notification_titles([r["title"] for r in rows], lang)
     return JSONResponse({
         "unread_count": db.count_unread_notifications(user["id"]),
         "items": [
-            {"id": r["id"], "title": r["title"], "link": r["link"], "kind": r["kind"],
+            {"id": r["id"], "title": titles.get(r["title"], r["title"]), "link": r["link"], "kind": r["kind"],
              "created_at": r["created_at"], "unread": r["read_at"] is None}
             for r in rows
         ],
@@ -5956,7 +6046,7 @@ def create_order(
     upload_key: str = Form(""),
     youtube_url: str = Form(""),
     source_lang: str = Form("sw"),
-    target_lang: str = Form("en"),
+    target_lang: str = Form(""),
     service_level: str = Form("transcribe"),
     addon_video_deliverables: str = Form(""),
     addon_human_voice_over: str = Form(""),
@@ -6031,6 +6121,14 @@ def create_order(
         return _client_dashboard_error(request, user, "Unknown service level.", form_values=form_values)
     if source_lang not in LANGUAGE_NAMES:
         return _client_dashboard_error(request, user, "Unknown source language.", form_values=form_values)
+    # "Same language" (or nothing chosen) means a plain transcript. Any OTHER language means the client wants the words in that language,
+    # so a Transcription order with different languages is taken as a Transcription + translation order, and priced as one.
+    if target_lang in ("", "same"):
+        target_lang = source_lang
+    if service_level == "transcribe" and target_lang != source_lang:
+        service_level = "translate"
+        form_values["service_level"] = "translate"
+    form_values["target_lang"] = target_lang
     if target_lang not in LANGUAGE_NAMES or target_lang == "ki":
         return _client_dashboard_error(request, user, "Unknown target language.", form_values=form_values)
     # Market pricing: the price card is the TEAM OWNER's (fixed at signup,
@@ -6335,6 +6433,8 @@ def create_order(
         tts = "stub"
     elif wants_premium_voice:
         tts = "elevenlabs"
+    elif provider_health.default_for("tts", source_lang, target_lang):
+        tts = provider_health.default_for("tts", source_lang, target_lang)       # staff's default voice provider, when it can take this language
     elif target_lang == "sw":
         if not provider_health.usable("azure"):
             return _client_dashboard_error(request, user,
@@ -6673,6 +6773,9 @@ def _route_asr(default_asr: str, *, source_lang: str, free_covered: bool, minute
     """Which transcription provider (or chain of them) an order uses: see _route_asr_outside, with our own model in front where it is
     reliable. If our own model is not confident about a recording the chain hands it to the next provider; if every other provider
     fails, our own draft is delivered rather than lost."""
+    pinned = provider_health.default_for("asr", source_lang, source_lang)          # staff's default on the Providers page, when it can take this job
+    if pinned:
+        return pinned
     outside = _route_asr_outside(default_asr, source_lang=source_lang, free_covered=free_covered)
     if not free_covered or not _own_asr_first(source_lang, minutes) or default_asr not in ("transkriptor", "faster-whisper"):
         return outside
@@ -6851,6 +6954,7 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
         "youtube_error": youtube_error, "youtube_connected": youtube_connected, "youtube_pushed": youtube_pushed,
         "youtube_connection": db.get_youtube_connection(user["id"]),
         "upsell": _order_upsell_prices(order),
+        "human_check": _human_check_offer(order),
         "paystack_configured": billing.paystack_configured(),
         "transcript_teaser": (_transcript_teaser(job, order["id"])
                               if job and order["status"] in db.TERMINAL_OK_STATUSES
@@ -7728,6 +7832,29 @@ def _order_upsell_prices(order) -> dict:
         upgrade = round(diff * (order["duration_minutes"] or 0), 2)
         prices["upgrade"] = upgrade if upgrade > 0 else None
     return prices
+
+
+def _human_check_offer(order) -> dict | None:
+    """The offer on a delivered Instant AI translation: have a dedicated editor verify it against the audio. Priced as the difference between
+    what the order was charged and the human-reviewed rate (see _order_upsell_prices), so the customer pays only for the extra work. None when
+    it does not apply: not a paid, delivered Instant AI translation, or human review cannot be ordered for that language pair."""
+    if order["service_level"] != "translate" or order["review_tier"] != "ai" or order["status"] not in db.TERMINAL_OK_STATUSES:
+        return None
+    price = _order_upsell_prices(order)["upgrade"]
+    if not price:
+        return None
+    extras = _review_extra_languages()
+    if order["source_lang"] not in ({"en", "sw", "ki"} | extras) or order["target_lang"] not in ({"en", "sw"} | extras):
+        return None
+    minutes = float(order["duration_minutes"] or 0)
+    hours = tat.compute_deadlines(order["tier"], "translate", minutes)["client_tat_hours"]
+    if hours <= 24:
+        turnaround = f"within about {max(1, math.ceil(hours))} hour{'s' if math.ceil(hours) > 1 else ''}"
+    else:
+        days = math.ceil(hours / 24)
+        turnaround = f"within about {days} day{'s' if days > 1 else ''}"
+    return {"price": price, "minutes": round(minutes, 1), "per_min": round(price / minutes, 2) if minutes else None, "turnaround": turnaround,
+            "target": LANGUAGE_NAMES.get(order["target_lang"], order["target_lang"])}
 
 
 def _upsell_checkout(request: Request, order_id: str, provider: str, phone: str, kind: str):
@@ -10731,6 +10858,7 @@ def staff_providers(request: Request):
     return templates.TemplateResponse(request, "staff_providers.html", {
         "user": user, "resources": provider_health.resources(), "steps": provider_health.switchboard(), "modes": provider_health.MODES,
         "mode": provider_health.mode(), "estimates": provider_health.cost_estimates(), "notice": request.query_params.get("notice"),
+        "defaults": {k: provider_health.default_name(k) for k in provider_health.DEFAULT_KEYS}, "kind_labels": provider_health.KIND_LABELS,
         "error": request.query_params.get("error")})
 
 
@@ -10759,6 +10887,22 @@ def staff_provider_mode(request: Request, mode: str = Form("")):
     db.set_flag("provider_mode", mode, by=user["id"])
     _provider_log(user, f"mode = {mode}")
     return RedirectResponse("/staff/providers?notice=" + quote(f"Mode set to {provider_health.MODES[mode][0]}. It applies to new orders."), status_code=303)
+
+
+@app.post("/staff/providers/default")
+def staff_provider_default(request: Request, kind: str = Form(""), name: str = Form("")):
+    """Pin the default provider for one step (transcription, translation or dubbing), or go back to automatic. New orders use it when it can take
+    the job, and the editor's provider popup opens on it."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    problem = provider_health.set_default(kind, name.strip(), by=user["id"])
+    if problem:
+        return RedirectResponse("/staff/providers?error=" + quote(problem), status_code=303)
+    _provider_log(user, f"default {kind} = {name.strip() or 'automatic'}")
+    label = provider_health.KIND_LABELS[kind]
+    said = provider_health.NAMES.get(name.strip(), name.strip()) if name.strip() else "automatic (follows the mode above)"
+    return RedirectResponse("/staff/providers?notice=" + quote(f"{label} default: {said}. It applies to new orders and to the editor's provider popup."), status_code=303)
 
 
 @app.post("/staff/providers/set")
@@ -10866,6 +11010,13 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     if job is None:
         return HTMLResponse(
             "Job hasn't finished processing yet - nothing to edit.", status_code=404)
+    opened_changes = _split_long_gaps(job) | _repair_leaked_translations(job)          # silences cut into seconds; leaked commentary cleaned
+    if not job.speaker_paragraphs_applied:                                              # every new speaker starts a new paragraph, once: after that it is the editor's call
+        apply_speaker_paragraphs(job.segments)
+        job.speaker_paragraphs_applied = True
+        opened_changes = True
+    if opened_changes:
+        job.save(str(Path(order["outdir"]) / "manifest.json"))
 
     segments_json = [
         {
@@ -10932,6 +11083,7 @@ def staff_editor(request: Request, order_id: str, notice: str | None = None):
     # the stage-picker just never consulted the same fact.
     order_level = billing.SERVICE_LEVELS.get(order["service_level"] or "dub", billing.SERVICE_LEVELS["dub"])
     return templates.TemplateResponse(request, "editor.html", {
+        "redo_kinds": provider_health.editor_kinds(order), "kind_labels": provider_health.KIND_LABELS,
         "user": user, "order": order, "job": job,
         "has_translation": order_level["mt"], "has_dub": order_level["tts"],
         "source_lang_name": LANGUAGE_NAMES.get(order["source_lang"], order["source_lang"]),
@@ -11081,8 +11233,19 @@ def _retranslate_and_resync(order, job: Job, seg, mt_provider=None) -> None:
         # caption directly (editor_save_target, which DOES set
         # edited_text) still permanently wins, exactly like a real
         # hand-edited translation would.
-        seg.literal = seg.source_final_text
-        seg.spoken = seg.source_final_text
+        #
+        # What an editor typed there is a caption in the SOURCE language, and a translation reads it in the target language ([MUZIKI YACHEZA]
+        # reads [MUSIC PLAYING], [MUSIC PLAYING] reads [MUSIK SPIELT]), the same as a tag inside a sentence. A tag that cannot be translated, or an order
+        # with no translation step (a transcript), keeps the editor's own wording.
+        tag = (seg.source_final_text or "").strip()
+        translated = tag
+        if tag and order["mt"] != "stub" and order["source_lang"] != order["target_lang"]:
+            try:
+                translated = translate_gap_tag(tag, mt_provider or get_mt(order["mt"]), order["source_lang"], order["target_lang"]) or tag
+            except Exception:  # noqa: BLE001 - a tag that will not translate stays as the editor wrote it
+                translated = tag
+        seg.literal = translated
+        seg.spoken = translated
         seg.translation_stale = False
         return
     mt_provider = mt_provider or get_mt(order["mt"])
@@ -11174,8 +11337,105 @@ def editor_save_source(request: Request, order_id: str, segment_id: str, body: d
     })
 
 
+def _editor_provider(order, kind: str, body) -> tuple[str | None, str | None]:
+    """(the provider the editor chose for this redo, or None for the order's own; an error message, if the choice is not allowed)."""
+    chosen = ((body or {}).get("provider") or "").strip() if isinstance(body, dict) else ""
+    if not chosen or chosen == order[kind]:
+        return None, None
+    problem = provider_health.valid_switch(order, kind, chosen)
+    return (None, problem) if problem else (chosen, None)
+
+
+def _editor_log(user, order_id: str, kind: str, provider: str, detail: str) -> None:
+    db.log_security_event("editor_provider_redo", user_id=user["id"], email=user["email"], detail=f"{order_id} {kind} {provider} {detail}")
+
+
+@app.get("/staff/orders/{order_id}/provider-options")
+def editor_provider_options(request: Request, order_id: str, kind: str = "asr"):
+    """The editor's provider popup: who could do this step for this order, what each costs us, and which one is the default."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+    if kind not in provider_health.COLUMN:
+        return JSONResponse({"error": "unknown step"}, status_code=400)
+    return JSONResponse(provider_health.editor_options(order, kind))
+
+
+@app.post("/staff/orders/{order_id}/use-provider")
+def editor_use_provider(request: Request, order_id: str, body: dict = Body(...)):
+    """A whole-file redo moves the order itself to the chosen provider, so later edits and redos carry on with it."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+    kind = (body.get("kind") or "").strip()
+    chosen = (body.get("provider") or "").strip()
+    if kind not in provider_health.COLUMN:
+        return JSONResponse({"error": "unknown step"}, status_code=400)
+    if chosen != order[kind]:
+        problem = provider_health.valid_switch(order, kind, chosen)
+        if problem:
+            return JSONResponse({"error": problem}, status_code=400)
+        db.set_order_provider(order_id, kind, chosen)
+        _editor_log(user, order_id, kind, chosen, "order moved to this provider")
+    return JSONResponse({"ok": True, "provider": chosen})
+
+
+@app.post("/staff/orders/{order_id}/redub")
+def editor_redub(request: Request, order_id: str, body: dict = Body(...)):
+    """Dubbing redo with a chosen voice provider: re-renders the audio of the chosen segments (or every segment) and rebuilds the dub track.
+    Only the chosen segments are paid for. Redoing the whole file also moves the order to that provider."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    order = db.get_order(order_id)
+    if not order:
+        return JSONResponse({"error": "order not found"}, status_code=404)
+    if order["tts"] == "stub":
+        return JSONResponse({"error": "This order has no dub to redo."}, status_code=400)
+    if order["dub_voice"] == "human":
+        return JSONResponse({"error": "This order's dub is the voice actor's own recording, so there is no AI audio to redo."}, status_code=400)
+    job = _load_job(order)
+    if job is None:
+        return JSONResponse({"error": "job not processed yet"}, status_code=404)
+    chosen, problem = _editor_provider(order, "tts", body)
+    if problem:
+        return JSONResponse({"error": problem}, status_code=400)
+    whole = bool(body.get("all"))
+    wanted = set(body.get("segment_ids") or [])
+    if not whole and not wanted:
+        return JSONResponse({"error": "Choose a section first."}, status_code=400)
+    tts_name, voice_id = (chosen, None) if chosen else _current_tts_route(order)
+    try:
+        tts_provider = get_tts(tts_name)
+        redone = 0
+        for seg in job.segments:
+            if not (whole or seg.segment_id in wanted):
+                continue
+            if getattr(seg, "segment_type", "speech") == "gap" and not whole:
+                continue
+            _render_segment_audio(order, job, seg, tts_provider, voice_id)
+            redone += 1
+        track = build_timeline([(s.start_ms, s.audio_path) for s in job.segments],
+                               job.source_duration_ms or (job.segments[-1].end_ms if job.segments else 0), sample_rate=tts_provider.sample_rate)
+        write_wav_mono(str(Path(order["outdir"]) / f"dub_{order['target_lang']}.wav"), track, tts_provider.sample_rate)
+    except Exception as exc:  # noqa: BLE001 - a real provider failure comes back as a message the editor can show
+        traceback.print_exc()
+        return JSONResponse({"error": f"{tts_name} provider failed: {exc}"}, status_code=502)
+    job.save(str(Path(order["outdir"]) / "manifest.json"))
+    if whole and chosen:
+        db.set_order_provider(order_id, "tts", chosen)
+    _editor_log(user, order_id, "tts", chosen or order["tts"], f"{redone} segment(s){' (whole file)' if whole else ''}")
+    return JSONResponse({"ok": True, "redone": redone, "provider": chosen or order["tts"]})
+
+
 @app.post("/staff/orders/{order_id}/segments/{segment_id}/retranslate")
-def editor_retranslate(request: Request, order_id: str, segment_id: str):
+def editor_retranslate(request: Request, order_id: str, segment_id: str, body: dict | None = Body(None)):
     """Step 1 -> step 2 of the editor's workflow: the manual trigger for
     the same real re-translate-and-resync _retranslate_and_resync does
     automatically on a source save now - kept as its own action for
@@ -11196,13 +11456,17 @@ def editor_retranslate(request: Request, order_id: str, segment_id: str):
     if seg is None:
         return JSONResponse({"error": "segment not found"}, status_code=404)
 
+    chosen, problem = _editor_provider(order, "mt", body)
+    if problem:
+        return JSONResponse({"error": problem}, status_code=400)
     try:
-        _retranslate_and_resync(order, job, seg)
+        _retranslate_and_resync(order, job, seg, mt_provider=get_mt(chosen) if chosen else None)
     except Exception as exc:  # noqa: BLE001 - a real provider failure (bad/missing key,
         # network error) should come back as a real error the editor UI can show, not a
         # raw 500 with no message.
         traceback.print_exc()
-        return JSONResponse({"error": f"{order['mt']} provider failed: {exc}"}, status_code=502)
+        return JSONResponse({"error": f"{chosen or order['mt']} provider failed: {exc}"}, status_code=502)
+    _editor_log(user, order_id, "mt", chosen or order["mt"], f"segment {segment_id}")
 
     (Path(order["outdir"]) / f"subs_{order['target_lang']}.srt").write_text(
         to_srt(job), encoding="utf-8")
@@ -11226,7 +11490,7 @@ def editor_retranslate(request: Request, order_id: str, segment_id: str):
 
 
 @app.post("/staff/orders/{order_id}/segments/{segment_id}/retranscribe")
-def editor_retranscribe(request: Request, order_id: str, segment_id: str):
+def editor_retranscribe(request: Request, order_id: str, segment_id: str, body: dict | None = Body(None)):
     """Alt+T: re-run ASR on just this segment's own audio window, instead of
     fixing a transcription miss by hand. Real, not a re-run of the whole
     file - slices exactly [start_ms, end_ms] out of the order's source audio
@@ -11270,18 +11534,22 @@ def editor_retranscribe(request: Request, order_id: str, segment_id: str):
         return JSONResponse({"error": "segment not found"}, status_code=404)
     if getattr(seg, "segment_type", "speech") == "gap":
         return JSONResponse({"error": "This is a non-speech gap - there's no speech here to re-transcribe."}, status_code=400)
+    chosen, problem = _editor_provider(order, "asr", body)
+    if problem:
+        return JSONResponse({"error": problem}, status_code=400)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         clip_path = str(Path(tmpdir) / "clip.wav")
         if not extract_audio_window(order["audio_path"], seg.start_ms, seg.end_ms, clip_path, sample_rate=16000):
             return JSONResponse({"error": "Could not extract this segment's audio (ffmpeg unavailable, or the window is empty)."}, status_code=502)
         try:
-            asr_provider = get_asr(order["asr"])
+            asr_provider = get_asr(chosen or order["asr"])
             clip_segments = asr_provider.transcribe(clip_path, language=order["source_lang"])
         except Exception as exc:  # noqa: BLE001 - a real provider failure should come back
             # as a real error the editor UI can show, not a raw 500 with no message.
             traceback.print_exc()
-            return JSONResponse({"error": f"{order['asr']} provider failed: {exc}"}, status_code=502)
+            return JSONResponse({"error": f"{chosen or order['asr']} provider failed: {exc}"}, status_code=502)
+        _editor_log(user, order_id, "asr", chosen or order["asr"], f"segment {segment_id}")
 
     if not clip_segments:
         return JSONResponse({"error": "The ASR provider found no speech in this window - it may genuinely be silence or non-speech audio."}, status_code=422)
@@ -11459,8 +11727,8 @@ def editor_retranslate_all(request: Request, order_id: str):
     skipped = 0
     failed_error = None
     for seg in job.segments:
-        if getattr(seg, "segment_type", "speech") == "gap":
-            continue
+        if getattr(seg, "segment_type", "speech") == "gap" and not (seg.source_final_text or "").strip():
+            continue                                                          # an empty silent stretch has no tag to translate
         if seg.edited_text is not None or seg.approved:
             skipped += 1
             continue
@@ -11823,6 +12091,7 @@ account_hub.register(sys.modules[__name__])
 blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
 connections.register(sys.modules[__name__])
+staff_integrations.register(sys.modules[__name__])
 account_closure.register(sys.modules[__name__])
 winback.register(sys.modules[__name__])
 dunning.register(sys.modules[__name__])

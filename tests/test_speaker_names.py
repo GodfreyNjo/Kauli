@@ -117,3 +117,73 @@ def test_the_editor_script_has_the_macro_paragraph_option_and_shift_backspace():
     assert 'e.shiftKey && !e.ctrlKey && !e.altKey && e.key === "Backspace"' in js
     assert '(e.ctrlKey || e.shiftKey) && !e.altKey && key === "enter"' in js                    # Shift+Enter starts a paragraph
     assert "para_start: paraStart" in js
+
+
+
+# ------------------------------------------------ every new speaker starts a new paragraph
+def _spoken(i, sid, text, **kw):
+    return Segment(segment_id=f"s{i}", index=i, start_ms=i * 3000, end_ms=i * 3000 + 3000, source_transcript=text, speaker_id=sid, **kw)
+
+
+def test_a_new_speaker_starts_a_new_paragraph_in_the_source_and_the_translation():
+    from kauli.models import apply_speaker_paragraphs
+    segs = [_spoken(0, "SPK_1", "Welcome to the show."), _spoken(1, "SPK_1", "Today we talk about captions."), _spoken(2, "SPK_2", "Thanks for having me."),
+            _spoken(3, "SPK_2", "It is good to be here."), _spoken(4, "SPK_1", "Let us begin.")]
+    assert apply_speaker_paragraphs(segs) is True
+    assert [(s.para_start_source, s.para_start_target) for s in segs] == [(False, False), (False, False), (True, True), (False, False), (True, True)]
+    assert apply_speaker_paragraphs(segs) is False                                        # nothing more to add the second time
+
+
+def test_a_name_the_editor_typed_counts_as_the_speaker_and_silence_is_skipped():
+    from kauli.models import apply_speaker_paragraphs
+    segs = [_spoken(0, "SPK_1", "AMARA: Welcome."), Segment(segment_id="g", index=1, start_ms=3000, end_ms=4000, segment_type="gap"),
+            _spoken(2, "SPK_1", "We begin."), _spoken(3, "SPK_2", "DAN: Hello."), _spoken(4, "SPK_2", "Good to be here.")]
+    apply_speaker_paragraphs(segs)
+    assert [s.para_start_source for s in segs] == [False, False, False, True, False]       # the silence between two lines of one speaker adds nothing
+
+
+def test_a_paragraph_break_the_editor_took_away_is_not_put_back(env, wav_bytes):
+    """The rule runs once per job; opening the editor again never re-adds a break the editor removed."""
+    from kauli.models import Job
+    job = Job(segments=[_spoken(0, "SPK_1", "Hello."), _spoken(1, "SPK_2", "Hi.")])
+    assert env.app.apply_speaker_paragraphs(job.segments) is True and job.segments[1].para_start_target
+    job.speaker_paragraphs_applied = True
+    job.segments[1].para_start_source = job.segments[1].para_start_target = False          # the editor pressed Shift+Backspace
+    assert job.speaker_paragraphs_applied                                                  # the editor and the pipeline both skip a job with this set
+    assert job.segments[1].para_start_source is False
+
+
+def test_the_pipeline_applies_it_once_and_the_reused_transcript_keeps_who_spoke(env, wav_bytes, monkeypatch):
+    import pytest
+    from kauli import pipeline
+    from kauli.models import Job
+    from webapp import transcript_reuse
+    from test_transcript_reuse import _delivered, _order_translation
+    original = _delivered(env, wav_bytes)
+    new = _order_translation(env, original)
+    assert transcript_reuse.seed_manifest(new)
+    monkeypatch.setattr(pipeline, "get_asr", lambda name: pytest.fail("speech recognition must not run again"))
+    job = pipeline.run(audio_path=new["audio_path"], outdir=new["outdir"], asr="stub", mt="stub", tts="stub", source_lang="en", target_lang="en",
+                       verbose=False, resume=True, skip_tts=True)
+    first, second = job.segments[0], job.segments[1]                                      # SPK_1 then SPK_2 in the delivered transcript
+    assert (first.speaker_id, second.speaker_id) == ("SPK_1", "SPK_2")
+    assert second.para_start_source and second.para_start_target and not first.para_start_source
+    assert job.speaker_paragraphs_applied is True
+    reloaded = Job.load(str(Path(new["outdir"]) / "manifest.json"))
+    assert reloaded.speaker_paragraphs_applied and reloaded.segments[1].para_start_target
+
+
+def test_opening_the_editor_on_an_older_order_adds_the_breaks_once(env, wav_bytes):
+    from test_editor_providers import _staff, _order
+    from kauli.models import Job
+    o = _order(env, wav_bytes, asr="own", mt="lara", tts="stub")
+    Job(segments=[_spoken(0, "SPK_1", "Hello."), _spoken(1, "SPK_2", "Hi there."), _spoken(2, "SPK_2", "How are you?")], source_duration_ms=9000
+        ).save(str(Path(o["outdir"]) / "manifest.json"))
+    _staff(env)
+    assert env.client.get(f"/staff/orders/{o['id']}/editor").status_code == 200
+    saved = Job.load(str(Path(o["outdir"]) / "manifest.json"))
+    assert saved.speaker_paragraphs_applied and [s.para_start_target for s in saved.segments] == [False, True, False]
+    saved.segments[1].para_start_target = False                                           # the editor takes it away ...
+    saved.save(str(Path(o["outdir"]) / "manifest.json"))
+    env.client.get(f"/staff/orders/{o['id']}/editor")                                     # ... and opens the editor again
+    assert Job.load(str(Path(o["outdir"]) / "manifest.json")).segments[1].para_start_target is False

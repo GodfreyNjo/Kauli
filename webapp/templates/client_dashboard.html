@@ -160,7 +160,8 @@
         </label>
         <label id="target-lang-field">To
           <select name="target_lang">
-            <option value="en" {% if form_values.get('target_lang', 'en') == 'en' %}selected{% endif %}>English</option>
+            <option value="same" {% if form_values.get('target_lang', 'same') in ('same', '') or form_values.get('target_lang') == form_values.get('source_lang') %}selected{% endif %}>Same language (transcript only)</option>
+            <option value="en" {% if form_values.get('target_lang') == 'en' and form_values.get('source_lang') != 'en' %}selected{% endif %}>English</option>
             <option value="sw" {% if form_values.get('target_lang') == 'sw' %}selected{% endif %}>Swahili</option>
             {% if lara_available %}
             <optgroup label="Instant AI translation only">
@@ -172,6 +173,7 @@
           </select>
         </label>
       </div>
+      <p class="muted" id="translation-switch-note" role="status" hidden style="margin-top:8px; font-size:0.86rem; color:var(--brand-blue-deep);">You chose a different language to translate into, so this order is Transcription + translation.</p>
       <p class="muted" id="manual-transcription-note" hidden style="margin-top:8px; font-size:0.82rem;">
          We don't have a speech-recognition model for this language, so one of our team transcribes it by
          hand before translation starts. Same pipeline from there - just a bit more turnaround time on the

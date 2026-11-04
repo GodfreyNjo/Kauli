@@ -1,3 +1,4 @@
+var kT = window.kauliT || function (s, v) { return s; };   // the words the scripts show, in the reader's language (see webapp/js_strings.py)
 (function () {
   "use strict";
   var dataEl = document.getElementById("hd-data");
@@ -125,7 +126,7 @@
     }
     box.hidden = false;
     if (vid.getAttribute("src") !== url) { vid.pause(); vid.setAttribute("poster", url.replace(/\.mp4$/, ".jpg")); vid.setAttribute("src", url); }
-    $("hd-video-sub").textContent = dubbed ? "Video dubbed in " + L.name : "Video with live " + L.name + " subtitles";
+    $("hd-video-sub").textContent = dubbed ? kT("Video dubbed in {lang}", { lang: kT(L.name) }) : kT("Video with live {lang} subtitles", { lang: kT(L.name) });
   }
 
   function render() {
@@ -137,14 +138,14 @@
     var dubbed = s.service === "dub";
     document.querySelector(".dm").classList.toggle("is-dub", dubbed);
     $("hd-dubhead").hidden = !dubbed;
-    $("hd-chip-in").textContent = dubbed ? "Original (" + (toEn ? L.name : "English") + ")" : "Original Audio";
-    $("hd-service").textContent = dubbed ? "Dubbed (" + (toEn ? "English" : L.name) + ")" : "Translated Output";
+    $("hd-chip-in").textContent = dubbed ? kT("Original ({lang})", { lang: kT(toEn ? L.name : "English") }) : kT("Original Audio");
+    $("hd-service").textContent = dubbed ? kT("Dubbed ({lang})", { lang: kT(toEn ? "English" : L.name) }) : kT("Translated Output");
     $("hd-dur-in").textContent = clipLength(clipFor("in"));
     $("hd-dur-out").textContent = clipLength(dubbed ? clipFor("out") : clipFor("in"));
-    $("hd-in-title").textContent = toEn ? L.name : "English";
-    $("hd-out-title").textContent = toEn ? "English" : L.name;
+    $("hd-in-title").textContent = kT(toEn ? L.name : "English");
+    $("hd-out-title").textContent = kT(toEn ? "English" : L.name);
     setPair(L, toEn);
-    $("hd-feat-lang").textContent = toEn ? "English" : L.name;
+    $("hd-feat-lang").textContent = kT(toEn ? "English" : L.name);
     $("hd-dir-lang").textContent = L.name;
     var names = s.multi ? s.cast : [];
     var startsIn = turnStarts(clipFor("in")), startsOut = turnStarts(dubbed ? clipFor("out") : clipFor("in"));
@@ -161,10 +162,10 @@
     var avail = $("hd-avail");
     if (dubbed && !toEn) {
       var live = !!L.dub_live;
-      avail.textContent = live ? "Live demo" : "Voice preview - " + L.name + " dubbing coming soon";
+      avail.textContent = live ? kT("Live demo") : kT("Voice preview - {lang} dubbing coming soon", { lang: kT(L.name) });
       avail.className = "dm-live " + (live ? "now" : "soon");
     } else {
-      avail.textContent = "Live demo";
+      avail.textContent = kT("Live demo");
       avail.className = "dm-live now";
     }
     var r = D.rates[s.service];
@@ -186,8 +187,8 @@
   }
   function setPair(L, toEn) {
     var from = toEn ? state.lang : "en", to = toEn ? "en" : state.lang;
-    $("dm-from").innerHTML = flagOf(from) + "<span>" + (toEn ? L.name : "English") + "</span>";
-    $("dm-to").innerHTML = flagOf(to) + "<span>" + (toEn ? "English" : L.name) + "</span>";
+    $("dm-from").innerHTML = flagOf(from) + "<span>" + kT(toEn ? L.name : "English") + "</span>";
+    $("dm-to").innerHTML = flagOf(to) + "<span>" + kT(toEn ? "English" : L.name) + "</span>";
   }
 
   function track(name, params) { if (window.kauliTrack) window.kauliTrack(name, params); }

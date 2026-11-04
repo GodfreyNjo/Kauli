@@ -4,6 +4,7 @@
    count on the button and a small pop-up when something important arrives. */
 (function () {
   "use strict";
+  var kT = window.kauliT || function (s, v) { return s; };   // the words the scripts show, in the reader's language (see webapp/js_strings.py)
   var root = document.getElementById("as-root");
   if (!root) return;
   var $ = function (id) { return document.getElementById(id); };
@@ -16,7 +17,7 @@
   };
 
   var name = root.dataset.name;
-  $("as-hello").textContent = name ? "Hi " + name + ", how can we help?" : "Hi, how can we help?";
+  $("as-hello").textContent = name ? kT("Hi {name}, how can we help?", { name: name }) : kT("Hi, how can we help?");
 
   function show(view) {
     $("as-home").hidden = view !== "home";
@@ -37,14 +38,14 @@
   function bubble(sender, text) {
     var d = document.createElement("div");
     d.className = "as-msg as-" + (sender === "user" ? "user" : sender === "staff" ? "staff" : "bot");
-    if (sender === "staff") { var s = document.createElement("small"); s.textContent = "Kauli team"; d.appendChild(s); }
+    if (sender === "staff") { var s = document.createElement("small"); s.textContent = kT("Kauli team"); d.appendChild(s); }
     var p = document.createElement("p"); p.textContent = text; d.appendChild(p);
     log.appendChild(d); log.scrollTop = log.scrollHeight;
     return d;
   }
   function api(url, body) {
     return fetch(url, { method: body ? "POST" : "GET", credentials: "same-origin", headers: body ? { "Content-Type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined })
-      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; }); });
+      .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || kT("Something went wrong.")); return d; }); });
   }
 
   function send(text, topic) {
@@ -57,7 +58,7 @@
       $("as-handoff").hidden = !d.handoff || d.escalated;
       log.scrollTop = log.scrollHeight;
       if (d.escalated) refresh();
-    }).catch(function (e) { wait.querySelector("p").textContent = e.message || "Could not reach the assistant. Check your connection."; })
+    }).catch(function (e) { wait.querySelector("p").textContent = e.message || kT("Could not reach the assistant. Check your connection."); })
       .then(function () { busy = false; });
   }
   $("as-form").addEventListener("submit", function (e) { e.preventDefault(); send(input.value); });
@@ -66,7 +67,7 @@
     b.addEventListener("click", function () {
       var box = $("as-chips"); box.textContent = "";
       QUESTIONS[b.dataset.topic].forEach(function (q) {
-        var c = document.createElement("button"); c.type = "button"; c.textContent = q;
+        var c = document.createElement("button"); c.type = "button"; c.textContent = kT(q);
         c.addEventListener("click", function () { send(q, b.dataset.topic); });
         box.appendChild(c);
       });
@@ -84,10 +85,10 @@
   // ---- the inbox: updates and replies, then earlier conversations
   function ago(ts) {
     var s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-    if (s < 60) return "just now";
-    if (s < 3600) return Math.floor(s / 60) + " min ago";
-    if (s < 86400) return Math.floor(s / 3600) + " h ago";
-    return Math.floor(s / 86400) + " d ago";
+    if (s < 60) return kT("just now");
+    if (s < 3600) return kT("{n} min ago", { n: Math.floor(s / 60) });
+    if (s < 86400) return kT("{n} h ago", { n: Math.floor(s / 3600) });
+    return kT("{n} d ago", { n: Math.floor(s / 86400) });
   }
   function openThread(t) {
     threadId = t.id; ctxOrder = t.order_id || null; log.textContent = "";
@@ -120,8 +121,8 @@
       b.type = "button";
       var last = t.messages.length ? t.messages[t.messages.length - 1] : null;
       b.innerHTML = "<strong></strong><span></span>";
-      b.firstChild.textContent = t.subject || "Conversation";
-      b.lastChild.textContent = (last && last.sender === "staff" ? "Team: " : "") + (last ? last.body.slice(0, 70) : "");
+      b.firstChild.textContent = t.subject || kT("Conversation");
+      b.lastChild.textContent = (last && last.sender === "staff" ? kT("Team:") + " " : "") + (last ? last.body.slice(0, 70) : "");
       b.addEventListener("click", function () { openThread(t); });
       li.appendChild(b); ul.appendChild(li);
     });
@@ -169,7 +170,7 @@
       if (ctxOrder) {
         var mine = threadsCache.filter(function (t) { return t.order_id === ctxOrder; })[0];
         if (mine) { openThread(mine); }
-        else { bubble("bot", "Ask me anything about this order: where it is, what you can download, or what to do next."); }
+        else { bubble("bot", kT("Ask me anything about this order: where it is, what you can download, or what to do next.")); }
       }
       if (o.text) { input.value = o.text; input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
     }

@@ -7,9 +7,11 @@ How an earlier order is found, in order of preference:
   2. the same file bytes were sent before by the same account (a SHA-256 of the file), or the same YouTube video, in the same language.
 Only orders that finished (ready or delivered) and have real transcript text are used, and only the same account's own orders.
 
-The new order gets a manifest seeded from the old one: timings, speakers and the delivered source text are kept, everything downstream
-(translation, voices, edits to the old translation) starts clean. worker._run_job then runs the pipeline in resume mode, which skips
-speech recognition because every segment already has its text.
+The new order gets a manifest seeded from the old one: timings, speakers (each line's speaker and the job's speaker voices, names and
+subtitle choices) and the delivered source text are kept exactly as the editor left them, with the formatting they did (speaker names typed
+into lines, paragraph breaks, italics, sound tags), so no work is done twice. Everything downstream (translation, audio, edits to the old
+translation) starts clean. worker._run_job then runs the pipeline in resume mode, which skips speech recognition because every segment
+already has its text.
 """
 from __future__ import annotations
 
@@ -84,7 +86,9 @@ def _clean(seg):
     if getattr(s, "segment_type", "speech") == "gap":
         return s
     s.source_transcript = seg.source_final_text            # the delivered text: the customer's corrections win
-    s.source_edited_transcript = None
+    # The human's corrected text stays AS the correction. The editor rebuilds a corrected line from that text (its speaker name, paragraph
+    # breaks, italics and sound tags), where a line with no correction is rebuilt from the recogniser's original words, which have none of it.
+    s.source_edited_transcript = seg.source_edited_transcript
     s.literal, s.spoken, s.alternates, s.selected = "", "", [], "spoken"
     s.translation_confidence, s.cultural_notes = 0.0, None
     s.est_duration_ms, s.fit_ratio, s.fit_status = 0, 0.0, "unknown"
@@ -106,7 +110,13 @@ def seed_manifest(order) -> bool:
     if not _has_text(job):
         return False
     seeded = Job(source_path=order["audio_path"] or "", source_language=order["source_lang"], target_language=order["target_lang"],
-                 segments=[_clean(s) for s in job.segments], providers={"asr": "reused", "mt": order["mt"] or "stub", "tts": order["tts"] or "stub"})
+                 segments=[_clean(s) for s in job.segments], providers={"asr": "reused", "mt": order["mt"] or "stub", "tts": order["tts"] or "stub"},
+                 source_duration_ms=job.source_duration_ms,
+                 # who is who, carried as the editor set it: a speaker's voice, the voice name for Azure, and which speakers are in the subtitles
+                 speaker_voices=dict(job.speaker_voices), speaker_voice_names=dict(job.speaker_voice_names),
+                 speaker_subtitle_included=dict(job.speaker_subtitle_included),
+                 # a transcript an editor already worked on keeps the paragraphs they chose; one that was never opened gets "a new speaker, a new paragraph"
+                 speaker_paragraphs_applied=bool(job.speaker_paragraphs_applied))
     out = Path(order["outdir"])
     out.mkdir(parents=True, exist_ok=True)
     seeded.save(str(out / "manifest.json"))

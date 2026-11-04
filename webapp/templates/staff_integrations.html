@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Integrations{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top"><div>
+    <h1>Integrations</h1>
+    <p class="muted">Send your own staff alerts on to the tools you work in. Each member connects their own: a job ready for review, a job that failed, a help request and the others below. The bell in the app keeps working either way.</p>
+  </div></div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+
+  <div class="si-grid">
+  {% for c in cards %}
+  <section class="hub-card si-card" id="{{ c.key }}">
+    <header class="si-head"><h2>{{ c.name }}</h2>{% if c.connected %}<span class="pf-tag ok">{{ 'Connected' if c.enabled else 'Paused' }}</span>{% else %}<span class="pf-tag">Not connected</span>{% endif %}</header>
+    <p class="muted">{{ c.blurb }}</p>
+    <form method="post" action="/staff/integrations/save" class="si-form">
+      <input type="hidden" name="provider" value="{{ c.key }}">
+      <label>URL <input type="url" name="url" placeholder="{{ c.url or c.placeholder }}" autocomplete="off"{% if not c.connected %} required{% endif %}></label>
+      <small class="muted">{% if c.connected %}Saved as {{ c.url }}. Leave blank to keep it. {% endif %}{{ c.help }}</small>
+      <fieldset class="si-events"><legend>Send me</legend>
+        {% for key, label in events.items() %}<label><input type="checkbox" name="events" value="{{ key }}"{% if key in c.events %} checked{% endif %}><span>{{ label }}</span></label>{% endfor %}
+      </fieldset>
+      <label class="si-on"><input type="checkbox" name="enabled" value="1"{% if c.enabled %} checked{% endif %}><span>On</span></label>
+      {% if c.secret %}<p class="si-secret"><small class="muted">Signing secret</small> <code>{{ c.secret }}</code></p>{% endif %}
+      <div class="si-actions"><button type="submit">Save</button></div>
+    </form>
+    {% if c.connected %}
+    <div class="si-actions">
+      <form method="post" action="/staff/integrations/test"><input type="hidden" name="provider" value="{{ c.key }}"><button type="submit" class="secondary">Send a test</button></form>
+      <form method="post" action="/staff/integrations/remove" onsubmit="return confirm('Remove this integration?');"><input type="hidden" name="provider" value="{{ c.key }}"><button type="submit" class="secondary">Remove</button></form>
+    </div>
+    {% if c.last_status %}<p class="muted si-last">Last: {{ c.last_status }}{% if c.last_at %} ({{ c.last_at|int|timestamp_to_str }}){% endif %}</p>{% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+  </div>
+  <p class="muted">Providers (transcription, translation, voices) are managed on <a href="/staff/providers">Providers</a>.</p>
+</div>
+{% endblock %}

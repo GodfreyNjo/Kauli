@@ -33,6 +33,15 @@
       });
     })();
   </script>
+  <script>
+    // The words the page's scripts show (upload steps, the assistant, "5 min ago"...), translated for the reader's language by the server.
+    window.KAULI_I18N = {{ js_i18n()|tojson }};
+    window.kauliT = function (text, vars) {
+      var out = (window.KAULI_I18N && window.KAULI_I18N[text]) || text;
+      if (vars) { Object.keys(vars).forEach(function (k) { out = out.split("{" + k + "}").join(String(vars[k])); }); }
+      return out;
+    };
+  </script>
   <title>{% block title %}Kauli{% endblock %} - Kauli</title>
   <!-- Real, site-wide gap until now: no page anywhere declared a canonical
        URL, so a search engine had no explicit signal for which URL is the
@@ -102,6 +111,7 @@
           <img src="/static/kauli-logo-nav-light.png" alt="Kauli" class="topbar-logo" width="141" height="38">
         </picture>
       </a>
+      {% if user['role'] in ('staff', 'client') %}<button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar" aria-controls="sidebar">«</button>{% endif %}
     </div>
     {% if user['role'] == 'staff' %}
     <form method="get" action="/staff/search" class="topbar-search" role="search">
@@ -114,7 +124,7 @@
     <div class="topbar-right">
     <div class="notif-bell" id="notif-bell">
       <button type="button" class="notif-bell-trigger" id="notif-bell-trigger" aria-haspopup="true" aria-expanded="false" title="{{ t('menu_notifications') }}">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
           <path d="M12 3.5c-3.2 0-5 2.3-5 5.5v3.2c0 .9-.4 1.7-1.1 2.4L4.6 16c-.6.6-.2 1.5.6 1.5h13.6c.8 0 1.2-.9.6-1.5l-1.3-1.4c-.7-.7-1.1-1.5-1.1-2.4V9c0-3.2-1.8-5.5-5-5.5z"
                 stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
           <path d="M9.5 20a2.6 2.6 0 0 0 5 0" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
@@ -174,7 +184,7 @@
     {% if user %}
     <aside class="sidebar" id="sidebar" lang="{{ page_lang() }}">
       <div class="sidebar-top">
-        <button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">«</button>
+        {% if user['role'] not in ('staff', 'client') %}<button type="button" class="sidebar-collapse-btn" id="sidebar-collapse-btn" title="Collapse sidebar">«</button>{% endif %}
       </div>
       <nav class="sidebar-nav" aria-label="App">
         {% set sp = request.url.path %}
@@ -203,6 +213,7 @@
         {{ snav('/staff/leads', 'CRM', 'target', ['/staff/leads']) }}
         {{ snav('/staff/clients', 'Clients', 'users', ['/staff/clients'], [('/staff/engagement', 'Engagement', 'pulse', '/staff/engagement'), ('/staff/winback', 'Win-back', 'target', '/staff/winback'), ('/staff/exit-feedback', 'Exit feedback', 'message', '/staff/exit-feedback')]) }}
         {{ snav('/staff/support', 'Support', 'message', ['/staff/support']) }}
+        {{ snav('/staff/integrations', 'Integrations', 'puzzle', ['/staff/integrations']) }}
 
         <div class="snav-sec"><span>Insights</span></div>
         {{ snav('/staff/ops', 'Reports', 'bars', ['/staff/ops']) }}
@@ -621,10 +632,10 @@
       if (bell && bellTrigger && bellPanel) {
         function timeAgo(ts) {
           var s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
-          if (s < 60) return "just now";
-          if (s < 3600) return Math.floor(s / 60) + "m ago";
-          if (s < 86400) return Math.floor(s / 3600) + "h ago";
-          return Math.floor(s / 86400) + "d ago";
+          if (s < 60) return window.kauliT("just now");
+          if (s < 3600) return window.kauliT("{n} min ago", { n: Math.floor(s / 60) });
+          if (s < 86400) return window.kauliT("{n} h ago", { n: Math.floor(s / 3600) });
+          return window.kauliT("{n} d ago", { n: Math.floor(s / 86400) });
         }
         function renderNotifs(data) {
           if (data.unread_count > 0) {

@@ -1,3 +1,4 @@
+var kT = window.kauliT || function (s, v) { return s; };   // the words the scripts show, in the reader's language (see webapp/js_strings.py)
 /* Client job-submission wizard: 3 steps over one real <form> (still a
  * single POST to /client/orders - nothing here changes what the backend
  * receives, it just paces how much of the form is on screen at once).
@@ -67,13 +68,13 @@
     continueBtn.type = "button";
     continueBtn.className = "secondary";
     continueBtn.style.marginTop = "8px";
-    continueBtn.textContent = "Continue with this file";
+    continueBtn.textContent = kT("Continue with this file");
     const discardBtn = document.createElement("button");
     discardBtn.type = "button";
     discardBtn.className = "secondary";
     discardBtn.style.marginTop = "8px";
     discardBtn.style.marginLeft = "8px";
-    discardBtn.textContent = "Discard";
+    discardBtn.textContent = kT("Discard");
     banner.appendChild(continueBtn);
     banner.appendChild(discardBtn);
     dz.parentNode.insertBefore(banner, dz);
@@ -163,8 +164,8 @@
     set("rv-langs", showsTarget && wantsTranslation && tgt && tgt.selectedOptions[0]
         ? srcText + " \u2192 " + tgt.selectedOptions[0].text : srcText);
     const tier = $('input[name="review_tier"]:checked');
-    const tierName = tier ? (tier.value === "ai" ? "Instant AI" : "Human-reviewed") : "";
-    set("rv-service", (svc ? svc.dataset.name : "-") + (tierName ? " - " + tierName : ""));
+    const tierName = tier ? (tier.value === "ai" ? kT("Instant AI") : kT("Human-reviewed")) : "";
+    set("rv-service", (svc ? kT(svc.dataset.name) : "-") + (tierName ? " - " + tierName : ""));
     const total = $("#price-total");
     set("rv-total", total ? total.textContent : "-");
   }
@@ -173,11 +174,11 @@
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
     if (usingYoutube) {
       const url = $("#youtube-url-input").value.trim();
-      if (!url) { alert("Paste a YouTube link first."); return false; }
+      if (!url) { alert(kT("Paste a YouTube link first.")); return false; }
       return true;
     }
     const file = fileQueue[0];
-    if (!file && !resumedUploadKey) { alert("Choose a file first."); return false; }
+    if (!file && !resumedUploadKey) { alert(kT("Choose a file first.")); return false; }
     return true;
   }
 
@@ -298,7 +299,7 @@
     fileDurationMinutes = null;
     if (!fileQueue.length) {
       dz.classList.remove("has-file");
-      text.textContent = "Drag & drop files or click to upload";
+      text.textContent = kT("Drag & drop files or click to upload");
       updatePricing();
       return;
     }
@@ -446,13 +447,30 @@
     // the extra boxes are ticked for the customer while it is chosen and put back when it is not.
     const isStudio = tier === "studio";
     // Instant AI translation can target any of the wider languages (Lara).
-    const aiTranslating = laraOn && isAiTier && !!selected && selected.value === "translate";
-    const humanTranslating = !isAiTier && !!selected && selected.value !== "transcribe";
+    // Picking another language while Transcription is chosen turns the order into a translation, so those languages stay selectable then.
+    const aiTranslating = laraOn && isAiTier && !!selected && (selected.value === "translate" || selected.value === "transcribe");
+    const humanTranslating = !isAiTier && !!selected;
     $all("#target-lang-field option.ai-target").forEach((o) => {
       o.disabled = !(aiTranslating || (humanTranslating && extraLangs.includes(o.value)));
     });
     const targetSelect = $("#target-lang-field select");
-    if (targetSelect && targetSelect.selectedOptions[0] && targetSelect.selectedOptions[0].disabled) targetSelect.value = "en";
+    if (targetSelect && targetSelect.selectedOptions[0] && targetSelect.selectedOptions[0].disabled) targetSelect.value = "same";
+    // "Same language" is a plain transcript; any other language is a translation. The service follows the languages, and says so.
+    const switchNote = $("#translation-switch-note");
+    if (targetSelect) {
+      const srcNow = ($("#source-lang-select") || {}).value;
+      const svcNow = selected ? selected.value : "transcribe";
+      let switched = false;
+      if (svcNow === "transcribe" && targetSelect.value !== "same" && targetSelect.value !== srcNow) {
+        const tr = $('input[name="service_level"][value="translate"]');
+        if (tr && !tr.disabled) { tr.checked = true; selected = tr; switched = true; targetSelect.dataset.auto = "1"; } else targetSelect.value = "same";
+      } else if (svcNow !== "transcribe" && (targetSelect.value === "same" || targetSelect.value === srcNow)) {
+        const pick = srcNow === "en" ? "sw" : "en";
+        const opt = targetSelect.querySelector('option[value="' + pick + '"]');
+        if (opt && !opt.disabled) targetSelect.value = pick;
+      }
+      if (switchNote) { if (switched) switchNote.hidden = false; else if (!selected || selected.value === "transcribe" || targetSelect.value === "same") switchNote.hidden = true; }
+    }
     if (targetField) targetField.hidden = aiOnlyLang && !aiTranslating;
     // Per-service rate for the chosen tier, from the account's own price card.
     $all('input[name="service_level"]').forEach((r) => {
@@ -469,7 +487,7 @@
 
     const rate = selected ? Number(selected.dataset.rate) : 0;
     const serviceName = selected ? selected.dataset.name : "-";
-    $("#price-service").textContent = serviceName + (isAiTier ? " - Instant AI" : (isStudio ? " - Studio" : " - Human-reviewed"));
+    $("#price-service").textContent = kT(serviceName) + (isAiTier ? " - " + kT("Instant AI") : (isStudio ? " - " + kT("Studio") : " - " + kT("Human-reviewed")));
     // Mirrors billing.allowance_covers server-side - included minutes only ever
     // apply to an INSTANT AI order (transcription, and translation on paid plans), so the
     // estimate here has to match what create_order() will actually charge.
@@ -624,7 +642,7 @@
         select.innerHTML = "";
         if (!data.voices || !data.voices.length) {
           const o = document.createElement("option");
-          o.value = ""; o.textContent = "Premium voices are not available right now";
+          o.value = ""; o.textContent = kT("Premium voices are not available right now");
           select.appendChild(o);
           return;
         }
@@ -651,6 +669,18 @@
     const cleanupBoxEl = $("#audio-cleanup-checkbox");
     if (cleanupBoxEl) cleanupBoxEl.addEventListener("change", updatePricing);
     const targetSelEl = document.querySelector('select[name="target_lang"]');
+    // The client's explicit choice wins: choosing Transcription means "same language", and choosing "Same language" puts a service the
+    // wizard switched by itself back to Transcription. These run first (capture) so the sync above does not undo them.
+    document.addEventListener("change", (e) => {
+      const el = e.target;
+      if (!el || !targetSelEl) return;
+      if (el.name === "service_level" && el.value === "transcribe") { targetSelEl.value = "same"; delete targetSelEl.dataset.auto; }
+      if (el === targetSelEl && el.value === "same" && el.dataset.auto) {
+        const tr = $('input[name="service_level"][value="transcribe"]');
+        if (tr && !tr.disabled) tr.checked = true;
+        delete el.dataset.auto;
+      }
+    }, true);
     if (targetSelEl) targetSelEl.addEventListener("change", updatePricing);
     const rushBox = $("#rush-checkbox");
     if (rushBox) rushBox.addEventListener("change", updatePricing);
@@ -716,6 +746,15 @@
     // nobody thinks the page has frozen. For a file the steps move on a timer; for a YouTube link the first step (the
     // download) can take minutes, so it stays on that step until the server answers.
     let stepTimer = null;
+    // What the last step honestly says. An order that has to be paid for first is not "started" yet: it goes to payment. One that is free or
+    // covered by the plan does start. With a link whose length is not known yet there is no price to go by, so the step stays neutral.
+    function finalStepLabel() {
+      const el = $("#price-total");
+      const text = el ? el.textContent : "";
+      if (!text || /\/\s*min/i.test(text)) return kT("Confirming your order");
+      const amount = parseFloat(text.replace(/[^0-9.]/g, ""));
+      return amount > 0.004 ? kT("Preparing your payment") : kT("Starting your order");
+    }
     function startFinalizeSteps(first, auto) {
       let list = $("#wizard-finalize-steps");
       if (!list) {
@@ -723,7 +762,7 @@
         list.id = "wizard-finalize-steps"; list.className = "wizard-steps";
         progressWrap.appendChild(list);
       }
-      const labels = [first, "Checking your audio", "Working out your price", "Starting your order"];
+      const labels = [first, kT("Checking your audio"), kT("Working out your price"), finalStepLabel()];
       let i = auto ? 1 : 0;
       function paint() {
         list.textContent = "";
@@ -736,7 +775,7 @@
       }
       paint();
       progressFill.classList.add("indeterminate");
-      progressLabel.textContent = "Setting up your order";
+      progressLabel.textContent = kT("Setting up your order");
       clearInterval(stepTimer);
       if (auto) stepTimer = setInterval(() => { if (i < labels.length - 1) { i += 1; paint(); } }, 2200);
     }
@@ -760,8 +799,8 @@
       if (!up) return;
       if (!up.active && up.url) {
         progressWrap.hidden = false;
-        progressLabel.textContent = "Your last upload finished and the order has started. ";
-        const a = document.createElement("a"); a.href = up.url; a.textContent = "Open it";
+        progressLabel.textContent = kT("Your last upload finished and the order has started.") + " ";
+        const a = document.createElement("a"); a.href = up.url; a.textContent = kT("Open it");
         progressLabel.appendChild(a);
         up.reset();
         return;
@@ -785,7 +824,7 @@
     }
 
     function finalizeOrder(formData, first, auto) {
-      startFinalizeSteps(first || "Upload complete", auto !== false);
+      startFinalizeSteps(first || kT("Upload complete"), auto !== false);
       const xhr = new XMLHttpRequest();
       xhr.open("POST", form.action, true);
       xhr.onload = function () {
@@ -813,6 +852,14 @@
         if (landedUrl !== "/client") { clearResumableUpload(); logWizardEvent("submitted"); clearStaged(); kpUp({ active: false, url: landedUrl }); }
         else kpUp({ active: false, error: "Your order could not be started." });
         if (!stillHere(form)) return;               // they moved on: the tray tells them, and the page they are on is left alone
+        if (landedUrl !== "/client") {
+          // Success: the order exists and its page (the payment page, or the order itself) is an ordinary address. Go there the normal way, so this page
+          // stays exactly as it is until the next one is ready. Rewriting the whole document in place dropped the styles for a moment and let
+          // unsized icons fill the screen.
+          window.location.replace(landedUrl);
+          return;
+        }
+        // A problem with the form: the server answered with the form page itself, shown in place with the message.
         history.replaceState(null, "", landedUrl);
         document.open();
         document.write(xhr.responseText);
@@ -851,7 +898,7 @@
           if (!ev.lengthComputable) return;
           const pct = Math.round((ev.loaded / ev.total) * 100);
           progressFill.style.width = pct + "%";
-          progressLabel.textContent = "Uploading… " + pct + "%";
+          progressLabel.textContent = kT("Uploading… {pct}%", { pct: pct });
           kpUp({ pct: pct });
         });
         putXhr.onload = function () {
@@ -866,7 +913,7 @@
           saveResumableUpload(data.upload_key, file.name);
           formData.delete("audio");
           formData.set("upload_key", data.upload_key);
-          finalizeOrder(formData, "Upload complete", true);
+          finalizeOrder(formData, kT("Upload complete"), true);
         };
         putXhr.onerror = function () {
           uploadTransferActive = false;
@@ -916,7 +963,7 @@
       const bar = (done, cur) => {
         const pct = Math.round(((done + cur / 100) / files.length) * 100);
         progressFill.style.width = pct + "%";
-        kpUp({ pct: pct, label: "Uploading " + files.length + " files" });
+        kpUp({ pct: pct, label: kT("Uploading {n} files", { n: files.length }) });
       };
       progressFill.classList.remove("indeterminate");
       let okCount = 0, lastUrl = "";
@@ -924,7 +971,7 @@
       for (let i = 0; i < files.length; i++) {
         const f = files[i];
         const setRow = (text, tone) => { fileState.set(f, { text: text, tone: tone || "" }); renderQueue(); };
-        progressLabel.textContent = "Sending file " + (i + 1) + " of " + files.length;
+        progressLabel.textContent = kT("Sending file {i} of {n}", { i: i + 1, n: files.length });
         setRow("Uploading 0%", "busy");
         try {
           const pre = new FormData();
@@ -939,7 +986,7 @@
                                  { "Content-Type": f.type || "application/octet-stream" });
           uploadTransferActive = false;
           if (put.status < 200 || put.status >= 300) throw new Error("The upload did not finish.");
-          setRow("Starting your order", "busy");
+          setRow(finalStepLabel(), "busy");
           const fd = new FormData(form);
           fd.delete("audio");
           fd.set("upload_key", data.upload_key);
@@ -979,7 +1026,7 @@
       const youtubeActive = $('#source-switch [data-source="youtube"]').classList.contains("active");
       const usingFile = fileQueue.length > 0 && !youtubeActive;
       const formData = new FormData(form);
-      kpUp({ active: true, label: usingFile ? "Uploading " + (fileQueue.length > 1 ? fileQueue.length + " files" : fileQueue[0].name) : "Starting your order",
+      kpUp({ active: true, label: usingFile ? (fileQueue.length > 1 ? kT("Uploading {n} files", { n: fileQueue.length }) : kT("Uploading {name}", { name: fileQueue[0].name })) : finalStepLabel(),
              pct: 0, url: null, error: null });
 
       progressWrap.hidden = false;
@@ -997,10 +1044,10 @@
         progressFill.style.width = "100%";
         formData.delete("audio");
         formData.set("upload_key", resumedUploadKey);
-        finalizeOrder(formData, "Upload complete", true);
+        finalizeOrder(formData, kT("Upload complete"), true);
       } else {
         finalizeOrder(formData, "Fetching your video from YouTube", false);
-        progressLabel.textContent = "Fetching from YouTube. Longer videos take a few minutes, and it has not hung.";
+        progressLabel.textContent = kT("Fetching from YouTube. Longer videos take a few minutes, and it has not hung.");
       }
     });
 
@@ -1034,7 +1081,7 @@
       if (!files.length || fileQueue.length) return;
       addFiles(files, true);
       const note = $("#file-queue-note");
-      if (note) note.textContent = "Your file" + (files.length > 1 ? "s are" : " is") + " still here from before. Nothing is uploaded until you press Submit.";
+      if (note) note.textContent = files.length > 1 ? kT("Your files are still here from before. Nothing is uploaded until you press Submit.") : kT("Your file is still here from before. Nothing is uploaded until you press Submit.");
       applyPendingStep();
     });
   }

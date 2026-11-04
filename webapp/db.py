@@ -703,6 +703,22 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
 -- Kauli has no Slack app of its own to authorise). One per account. The URL
 -- is a credential: anyone holding it can post to that channel, so the UI only
 -- ever shows it masked.
+-- Staff integrations: where one staff member's alerts (a job to review, a failed job, a help request...) are also sent: their Slack channel, their
+-- Microsoft Teams channel, or any URL of their own (Zapier, Make, n8n). The URL is a credential, so it is shown masked once saved.
+CREATE TABLE IF NOT EXISTS staff_integrations (
+    user_id TEXT NOT NULL,
+    provider TEXT NOT NULL,                 -- slack, teams, webhook
+    url TEXT NOT NULL,
+    secret TEXT,                            -- webhook only: signs each request (X-Kauli-Signature)
+    events TEXT NOT NULL DEFAULT '[]',      -- JSON list of the event kinds this member wants here
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_status TEXT,
+    last_at REAL,
+    created_at REAL NOT NULL,
+    updated_at REAL NOT NULL,
+    PRIMARY KEY (user_id, provider)
+);
+
 CREATE TABLE IF NOT EXISTS client_slack (
     client_id TEXT PRIMARY KEY,
     webhook_url TEXT NOT NULL,
@@ -2691,6 +2707,54 @@ def notify_all_staff(kind: str, title: str, link: str | None = None) -> None:
             "INSERT INTO notifications (id, recipient_id, kind, title, link, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             (uuid.uuid4().hex, staff["id"], kind, title, link, now),
         )
+    conn.commit()
+    conn.close()
+    try:                                    # the same alert also goes to the Slack, Teams or webhook each staff member connected
+        from . import staff_integrations
+        staff_integrations.deliver_in_background(kind, title, link)
+    except Exception:  # noqa: BLE001 - an integration must never stop the alert itself
+        pass
+
+
+def get_staff_integrations(user_id: str) -> dict:
+    conn = get_conn()
+    rows = conn.execute("SELECT * FROM staff_integrations WHERE user_id = ?", (user_id,)).fetchall()
+    conn.close()
+    return {r["provider"]: r for r in rows}
+
+
+def all_staff_integrations() -> list:
+    """Every enabled staff integration, for the account that is still a staff account."""
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT i.* FROM staff_integrations i JOIN users u ON u.id = i.user_id WHERE i.enabled = 1 AND u.role = 'staff'").fetchall()
+    conn.close()
+    return rows
+
+
+def set_staff_integration(user_id: str, provider: str, url: str, events: list[str], secret: str | None = None, enabled: bool = True) -> None:
+    now = time.time()
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO staff_integrations (user_id, provider, url, secret, events, enabled, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(user_id, provider) DO UPDATE SET url = excluded.url, events = excluded.events, enabled = excluded.enabled,
+             secret = COALESCE(excluded.secret, staff_integrations.secret), updated_at = excluded.updated_at""",
+        (user_id, provider, url, secret, json.dumps(events), 1 if enabled else 0, now, now))
+    conn.commit()
+    conn.close()
+
+
+def delete_staff_integration(user_id: str, provider: str) -> None:
+    conn = get_conn()
+    conn.execute("DELETE FROM staff_integrations WHERE user_id = ? AND provider = ?", (user_id, provider))
+    conn.commit()
+    conn.close()
+
+
+def set_staff_integration_result(user_id: str, provider: str, status: str) -> None:
+    conn = get_conn()
+    conn.execute("UPDATE staff_integrations SET last_status = ?, last_at = ? WHERE user_id = ? AND provider = ?", (status[:200], time.time(), user_id, provider))
     conn.commit()
     conn.close()
 

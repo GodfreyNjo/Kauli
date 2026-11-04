@@ -54,3 +54,17 @@ def test_the_account_menu_for_a_customer_has_no_role_a_dark_mode_switch_and_a_fl
     for code in ("EN", "ES", "ZH", "AR", "FR", "PT", "DE", "HI", "JA", "KO", "SW"):
         assert f"<span>{code}</span>" in menu, code
     assert menu.count('class="lang-flag"') == 11 and "Sign out" in menu
+
+
+
+def test_the_home_tab_has_a_clickable_integrations_card_for_customers_and_staff(env):
+    home = env.client.get("/client/home").text
+    card = home.split('id="home-integrations"')[1].split("</a>")[0]
+    assert 'href="/client/integrations"' in home.split('id="home-integrations"')[0][-80:] and "Connect your tools" in card and "Slack, Google Docs, Notion and more" in card
+    from webapp import ui_text
+    for lang, catalog in ui_text.CATALOG.items():                                        # every language has the words
+        assert catalog.get("act_int_t") and catalog.get("act_int_s"), lang
+    env.db.get_or_create_user("s1", "staff@example.com", "staff")
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("s1")), "client_scope_id": "s1"})
+    staff_home = env.client.get("/staff").text
+    assert 'href="/staff/integrations" id="home-integrations"' in staff_home and "Send your alerts to Slack, Teams or a webhook" in staff_home

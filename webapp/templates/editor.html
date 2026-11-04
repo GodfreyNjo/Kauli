@@ -53,6 +53,31 @@
   </div>
   {% endif %}
 
+  <div class="modal-overlay" id="provider-redo-modal" data-kinds="{{ redo_kinds|join(',') }}" hidden>
+    <div class="modal-panel pr-panel" role="dialog" aria-modal="true" aria-labelledby="provider-redo-title">
+      <h2 id="provider-redo-title">Redo with a provider</h2>
+      <p class="muted pr-lede">Pick who does it, then Apply. Only the section you highlighted is redone, so you pay for that section and nothing else.</p>
+      <p class="muted pr-note" id="pr-note" role="status" hidden></p>
+      <fieldset class="pr-kinds" id="pr-kinds"{% if redo_kinds|length < 2 %} hidden{% endif %}>
+        <legend class="sr-only">What to redo</legend>
+        {% for k in redo_kinds %}<label><input type="radio" name="pr-kind" value="{{ k }}"><span>{{ kind_labels[k] }}</span></label>
+        {% endfor %}
+      </fieldset>
+      <fieldset class="pr-scope" id="pr-scope">
+        <legend class="sr-only">How much to redo</legend>
+        <label><input type="radio" name="pr-scope" value="section"><span id="pr-scope-section">Highlighted section</span></label>
+        <label><input type="radio" name="pr-scope" value="all"><span id="pr-scope-all">Whole file</span></label>
+      </fieldset>
+      <div id="pr-options" class="pr-options" role="radiogroup" aria-label="Provider"></div>
+      <p class="muted pr-estimate" id="pr-estimate" aria-live="polite"></p>
+      <div class="modal-actions">
+        <button type="button" class="secondary" id="pr-cancel">Cancel</button>
+        <button type="button" class="approve" id="pr-apply">Apply</button>
+      </div>
+      <span id="pr-status" class="muted" role="status" style="font-size:0.8rem;"></span>
+    </div>
+  </div>
+
   {% if order['tts'] != 'stub' %}
   <div class="modal-overlay" id="voice-direction-modal" hidden>
     <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="voice-direction-title">
@@ -356,6 +381,10 @@
         {% endfor %}
         {% endif %}
 
+        <p class="muted" style="margin:14px 0 4px; font-weight:650;">Providers</p>
+        {% if redo_kinds %}<button type="button" class="secondary" id="open-provider-redo">Redo with a provider&hellip;</button>{% else %}<p class="muted" style="font-size:0.8rem;">Nothing on this order was made by a provider that can be redone.</p>{% endif %}
+        <p class="muted" style="font-size:0.76rem; margin:4px 0 8px;">Highlight a section, then <kbd>alt</kbd>+<kbd>t</kbd> (transcription) or <kbd>alt</kbd>+<kbd>r</kbd> (translation): choose a provider and Apply. Only that section is redone. Nothing highlighted redoes the whole file.</p>
+
         <p class="muted" style="margin:14px 0 4px; font-weight:650;">Bulk actions</p>
         <form method="post" action="/staff/orders/{{ order['id'] }}/detect-gaps" style="margin-bottom:8px;">
           <button type="submit" class="secondary">Detect non-speech gaps</button>
@@ -391,8 +420,8 @@
         <div class="shortcut-row"><kbd>esc</kbd><span>Stop editing current cell</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>s</kbd><span>Save focused segment now (autosave also fires ~2s after you stop typing)</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>shift</kbd>+<kbd>s</kbd><span>Save + re-synthesize audio for this segment (target step)</span></div>
-        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>t</kbd><span>Re-transcribe the focused segment from its own audio (ASR missed/mangled it)</span></div>
-        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate the focused segment from its (corrected) source</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>t</kbd><span>Re-transcribe the highlighted section (or the focused segment) from its own audio, with a provider you pick</span></div>
+        <div class="shortcut-row"><kbd>alt</kbd>+<kbd>r</kbd><span>Re-translate the highlighted section (or the focused segment) from its (corrected) source, with a provider you pick</span></div>
         <div class="shortcut-row"><kbd>alt</kbd>+<kbd>v</kbd><span>Voice direction - slow down/speed up or spell out this segment's dub audio</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>p</kbd><span>Toggle prose preview of the current step</span></div>
         <div class="shortcut-row"><kbd>ctrl</kbd>+<kbd>/</kbd><span>Show this shortcuts panel</span></div>

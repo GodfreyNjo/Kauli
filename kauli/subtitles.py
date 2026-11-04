@@ -8,9 +8,11 @@ video and the live captions in the order preview):
 * each line at most 42 characters, spaces included (20 for Chinese, Japanese and Korean, which have no spaces);
 * a reading speed of about 20 characters a second, never asked to go past 30: a caption that would be read too fast
   stays up a little longer, but only into silence, never over the next caption;
-* a caption is on screen while it is being said, and goes when the speech does: nothing lingers, and no caption is ever
-  on screen for more than 6 seconds, so a long pause (or a sound tag such as [MUSIC PLAYING] over a long interlude) is
-  not covered by stale text;
+* an editor decides when a caption drops. A caption that ends a sentence (a full stop, question mark or exclamation mark) or
+  is followed by a paragraph break is closed: it goes when its speech does, once it has had time to be read. A caption the
+  editor has not closed (no sentence end, no paragraph break: a sound tag such as [MUSIC PLAYING], or the last words of the
+  dialogue) stays for its full 6 seconds, or until the next caption starts. No caption is ever on screen for more than 6
+  seconds, and none outlives the media, so a trailing 30 seconds of silence is never covered by stale text;
 * a long sentence is split into several captions that follow the speech, not squeezed into one;
 * no word is ever dropped: only the layout changes, never the text.
 """
@@ -42,9 +44,28 @@ def _ts(ms: int, sep: str = ",") -> str:
     return f"{h:02d}:{m:02d}:{s:02d}{sep}{ms:03d}"
 
 
+_SENTENCE_END = ".?!\u2026\u3002\uff1f\uff01"
+_CLOSERS = re.compile(r"(?:</i>|[\"'\u201d\u2019\u00bb)\]])+\s*$", re.I)
+
+
+def closes_caption(text: str) -> bool:
+    """True when an editor ended this text with a sentence end (. ? ! and their full-width forms): that is their way of saying "drop it here".
+    Closing quotes, brackets and an italics tag after the mark do not hide it, but a sound tag such as [MUSIC PLAYING] has no sentence end and
+    is therefore not closed."""
+    t = (text or "").strip()
+    if t.endswith("]") and not t.endswith(".]") and not t.endswith("!]") and not t.endswith("?]"):
+        return False
+    t = _CLOSERS.sub("", t).rstrip()
+    return t[-1:] in _SENTENCE_END if t else False
+
+
 def _display_end_ms(seg) -> int:
-    """The editor's view of one segment's caption window: its own end, never more than 6 seconds from its start."""
-    return min(seg.end_ms, seg.start_ms + MAX_CAPTION_DISPLAY_MS)
+    """The editor's view of one segment's caption window: a closed caption ends with its speech, one the editor has not closed stays its
+    full 6 seconds; never more than 6 seconds from the start."""
+    text = getattr(seg, "final_text", "") or ""
+    if closes_caption(text):
+        return min(seg.end_ms, seg.start_ms + MAX_CAPTION_DISPLAY_MS)
+    return seg.start_ms + MAX_CAPTION_DISPLAY_MS
 
 
 def _is_cjk(text: str) -> bool:
@@ -126,32 +147,48 @@ def build_cues(job: Job, source: bool = False) -> list[tuple[int, int, str]]:
     source_final_text, not source_transcript - a human's correction to the ASR output must win here too, same as
     final_text already does for the translated side."""
     raw: list[list] = []
-    for seg in job.segments:
-        if not _speaker_included(job, seg):
-            continue
+    included = [seg for seg in job.segments if _speaker_included(job, seg)]
+    for n, seg in enumerate(included):
         text = (seg.source_final_text if source else seg.final_text).strip()
         if not text:
             continue
-        groups = _groups(text)
-        if not groups:
+        # a paragraph break the editor put after this text (inside it, or right before the next segment) closes its caption
+        following = next((o for o in included[n + 1:] if (o.source_final_text if source else o.final_text).strip()), None)
+        break_after = bool(following is not None and getattr(following, "para_start_source" if source else "para_start_target", False))
+        paragraphs = [p for p in re.split(r"\n\n+", text) if p.strip()]
+        pieces: list[tuple[str, bool]] = []
+        for k, para in enumerate(paragraphs):
+            last_para = k == len(paragraphs) - 1
+            for j, g in enumerate(_groups(para)):
+                last_group = j == len(_groups(para)) - 1
+                closed = last_group and (not last_para or break_after or closes_caption(para))
+                closed = closed or (last_group and closes_caption(g))
+                pieces.append((g, closed))
+        if not pieces:
             continue
         span = max(seg.end_ms - seg.start_ms, MIN_CAPTION_MS)
-        weights = [max(1, len(g.replace("\n", ""))) for g in groups]
+        weights = [max(1, len(g.replace("\n", ""))) for g, _ in pieces]
         t = float(seg.start_ms)
-        for g, w in zip(groups, weights):
+        for (g, closed), w in zip(pieces, weights):
             share = span * w / sum(weights)
-            raw.append([round(t), round(t + share), g])
+            raw.append([round(t), round(t + share), g, closed])
             t += share
     raw.sort(key=lambda c: c[0])
+    media_end = int(getattr(job, "source_duration_ms", 0) or 0)
     cues: list[tuple[int, int, str]] = []
-    for i, (start, end, text) in enumerate(raw):
+    for i, (start, end, text, closed) in enumerate(raw):
         next_start = raw[i + 1][0] if i + 1 < len(raw) else None
-        chars = len(text.replace("\n", ""))
-        wanted = max(MIN_CAPTION_MS, math.ceil(chars / READING_CPS * 1000))     # time to read it comfortably
-        end = max(end, start + wanted)                                           # extend for reading ...
+        if closed:
+            chars = len(text.replace("\n", ""))
+            wanted = max(MIN_CAPTION_MS, math.ceil(chars / READING_CPS * 1000))     # time to read it comfortably
+            end = max(end, start + wanted)                                           # extend for reading ...
+        else:
+            end = start + MAX_CAPTION_DISPLAY_MS                                     # not closed by the editor: it stays its full time ...
         if next_start is not None:
-            end = min(end, max(start + 1, next_start - CUE_GAP_MS))              # ... but only into silence
-        end = min(end, start + MAX_CAPTION_DISPLAY_MS)                           # and never past 6 seconds
+            end = min(end, max(start + 1, next_start - CUE_GAP_MS))                  # ... but only into silence
+        end = min(end, start + MAX_CAPTION_DISPLAY_MS)                               # never past 6 seconds
+        if media_end and start < media_end:
+            end = min(end, media_end)                                                # and never past the end of the media
         cues.append((start, max(end, start + 1), text))
     return cues
 

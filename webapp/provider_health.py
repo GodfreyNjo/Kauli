@@ -195,6 +195,74 @@ def switchboard() -> list[dict]:
 # order column each kind of provider is stored in
 COLUMN = {"asr": "asr", "mt": "mt", "tts": "tts"}
 
+# What each step is called to a person, in the editor and on the Providers page.
+KIND_LABELS = {"asr": "Transcription", "mt": "Translation", "tts": "Dubbing"}
+DEFAULT_KEYS = {"asr": "provider_default_asr", "mt": "provider_default_mt", "tts": "provider_default_tts"}
+
+
+def default_name(kind: str) -> str:
+    """The provider staff pinned as the default for this step on the Providers page, or "" for automatic (the mode decides)."""
+    from . import db
+    if kind not in DEFAULT_KEYS:
+        return ""
+    try:
+        value = db.get_flag(DEFAULT_KEYS[kind], "") or ""
+    except Exception:  # noqa: BLE001 - a missing table must never take orders down
+        return ""
+    return value if value in TOGGLEABLE.get(kind, []) else ""
+
+
+def set_default(kind: str, name: str, by: str | None = None) -> str | None:
+    """Pin (or, with an empty name, unpin) the default provider for a step. None when saved, otherwise why not."""
+    from . import db
+    if kind not in DEFAULT_KEYS:
+        return "That step cannot have a default."
+    if name and name not in TOGGLEABLE[kind]:
+        return "That provider cannot be a default for this step."
+    db.set_flag(DEFAULT_KEYS[kind], name, by=by)
+    return None
+
+
+def default_for(kind: str, source_lang: str, target_lang: str) -> str | None:
+    """The pinned default, but only when it can really take this job now: connected, switched on, not set aside after a failure and able to
+    take the languages. Otherwise None, and the automatic routing carries on exactly as before."""
+    name = default_name(kind)
+    if not name or not usable(name) or is_paused(name):
+        return None
+    stub = {"source_lang": source_lang, "target_lang": target_lang, "asr": None, "mt": None, "tts": None}
+    row = next((a for a in alternatives(stub, kind) if a["name"] == name), None)
+    return name if row and row["fits"] else None
+
+
+def editor_kinds(order) -> list[str]:
+    """The steps an editor can redo with a provider on THIS order, in pipeline order. A step the order does not have is left out: a transcript
+    has no translation or voice, a translation made from a transcript the customer already had was never transcribed again, and a subtitle
+    job has no dub."""
+    return [k for k in ("asr", "mt", "tts") if alternatives(order, k)]
+
+
+def editor_options(order, kind: str) -> dict:
+    """What the editor's provider popup shows for one step of one order: every provider that could do it, what it costs us per audio-minute,
+    whether it can be chosen right now (and if not, why), which one the order is on, and which one staff pinned as the default."""
+    rows = alternatives(order, kind) if kind in COLUMN else []
+    pinned = default_name(kind)
+    options = []
+    for r in rows:
+        if not r["connected"]:
+            why = "Not connected on this server"
+        elif r.get("off"):
+            why = "Turned off on the Providers page"
+        elif not r["fits"]:
+            why = "Cannot take this language pair"
+        elif is_paused(r["name"]):
+            why = "Set aside after a recent failure"
+        else:
+            why = ""
+        options.append({"name": r["name"], "label": r["label"], "note": r["note"], "current": r["current"], "default": r["name"] == pinned,
+                        "cost_per_min": cost_per_min(r["name"]), "selectable": not why or why.startswith("Set aside"), "why": why})
+    return {"kind": kind, "title": KIND_LABELS.get(kind, kind), "available": bool(options), "current": order[COLUMN[kind]] if kind in COLUMN else None,
+            "default": pinned, "options": options}
+
 
 def _quota_reason(text: str) -> str | None:
     low = text.lower()

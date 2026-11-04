@@ -78,6 +78,30 @@ def label_speakers(pairs: list[tuple[str | None, str]]) -> list[tuple[str, str, 
     return out
 
 
+def apply_speaker_paragraphs(segments) -> bool:
+    """Every new speaker starts a new paragraph: where the speaker of a line is not the speaker of the line before it, a paragraph break is
+    put before it, in the source text and in the translation. The speaker is the name an editor typed ("AMARA:") or, with none, the
+    recogniser's label (SPK_2). The first speaker needs no break. Silent stretches are skipped. True when any break was added; a break that
+    is already there is left as it is."""
+    speech = [s for s in segments if getattr(s, "segment_type", "speech") != "gap" and (s.source_final_text or "").strip()]
+    named = label_speakers([(s.speaker_id, s.source_final_text) for s in speech])
+    changed = False
+    previous = None
+    for seg, (name, _rest, _tag) in zip(speech, named):
+        who = (name or seg.speaker_id or "").strip().upper()
+        if not who:
+            continue
+        if previous is not None and who != previous:
+            if not seg.para_start_source:
+                seg.para_start_source = True
+                changed = True
+            if not seg.para_start_target:
+                seg.para_start_target = True
+                changed = True
+        previous = who
+    return changed
+
+
 @dataclass
 class Word:
     text: str
@@ -237,6 +261,10 @@ class Job:
     # this - see their own docstrings for why this is a real filter, not
     # a re-transcription.
     speaker_subtitle_included: dict[str, bool] = field(default_factory=dict)
+
+    # Whether "every new speaker starts a new paragraph" has been applied to this job (see apply_speaker_paragraphs). It runs once, when the job
+    # is made or first opened, so a paragraph break an editor later takes away stays away.
+    speaker_paragraphs_applied: bool = False
 
     # ---- quality rollups ----
     @property

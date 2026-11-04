@@ -860,13 +860,21 @@
     </div>
   </section>
 
-  <section class="m-section" id="faq" style="background:var(--sidebar-bg);">
-    <div class="m-inner narrow">
-      <span class="m-section-eyebrow">FAQ</span>
-      <h2 class="m-h2">Common questions</h2>
+  <section class="m-section" id="faq">
+    <div class="m-inner faq-wrap">
+      <div class="faq-head">
+        <span class="m-section-eyebrow m-eyebrow-lined">FAQ</span>
+        <h2 class="m-h2">Common questions</h2>
+        <p class="m-lede">Straight answers about pricing, languages and human review.</p>
+        <div class="faq-ask">
+          <span class="faq-ask-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4"/></svg></span>
+          <div><strong>Still have a question?</strong><p>Our team replies within one business day.</p></div>
+          <div class="faq-ask-btns"><a href="/demo" class="btn cta-olive" data-cta="faq-talk">Talk to us</a><a href="mailto:{{ email }}" class="btn secondary">Email us</a></div>
+        </div>
+      </div>
       <div class="m-faq-list">
         {% for item in faq %}
-        <details class="m-faq-item">
+        <details class="m-faq-item"{% if loop.first %} open{% endif %}>
           <summary>{{ item.q }}</summary>
           <p>{{ item.a }}{% if item.link %} <a href="{{ item.link[0] }}">{{ item.link[1] }}</a>{% endif %}</p>
         </details>

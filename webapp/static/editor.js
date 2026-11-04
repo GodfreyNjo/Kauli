@@ -583,7 +583,7 @@
   // corrected) source. Surgically swaps just this segment's cells out of
   // the shared target flow, in place, rather than touching anything else
   // on the page.
-  async function retranslate(segmentId) {
+  async function retranslate(segmentId, provider, opts) {
     const targetFlow = $("#flow-target");
     const oldCells = $all(`[data-segment-id="${segmentId}"]`, targetFlow);
     if (!oldCells.length) return;
@@ -591,7 +591,7 @@
     const insertBefore = oldCells[oldCells.length - 1].nextSibling;
     oldCells.forEach((el) => el.classList.add("retranslating"));
     try {
-      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/retranslate`, { method: "POST" });
+      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/retranslate`, providerRequest(provider));
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "retranslate failed");
 
@@ -608,9 +608,11 @@
                  buildFlagTitle(segmentMeta[segmentId]), staleTranslationTitle(segmentMeta[segmentId]));
       parent.insertBefore(frag, insertBefore);
       updatePreviewSegment(segmentId, data.wrapped_caption, data.display_end_ms);
+      return { ok: true };
     } catch (err) {
-      alert("Re-translate failed: " + err.message);
+      if (!(opts && opts.quiet)) alert("Re-translate failed: " + err.message);
       oldCells.forEach((el) => el.classList.remove("retranslating"));
+      return { ok: false, error: err.message };
     }
   }
 
@@ -619,7 +621,7 @@
   // (fresh ASR text/timing) and, when the server auto-retranslated from it,
   // the target cells too - same "surgically replace just this segment,
   // don't touch anything else on the page" approach as retranslate().
-  async function retranscribe(segmentId) {
+  async function retranscribe(segmentId, provider, opts) {
     const sourceFlow = $("#flow-source");
     const targetFlow = $("#flow-target");
     const oldSourceCells = $all(`[data-segment-id="${segmentId}"]`, sourceFlow);
@@ -628,7 +630,7 @@
     const sourceInsertBefore = oldSourceCells[oldSourceCells.length - 1].nextSibling;
     oldSourceCells.forEach((el) => el.classList.add("retranslating"));
     try {
-      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/retranscribe`, { method: "POST" });
+      const res = await fetch(`/staff/orders/${ORDER_ID}/segments/${segmentId}/retranscribe`, providerRequest(provider));
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "re-transcribe failed");
 
@@ -665,13 +667,272 @@
         // stale (same rule editor_save_source uses for a manual correction).
         applyStaleTranslationUI(segmentId, data.translation_stale);
       }
-      if (data.retranslate_error) {
+      if (data.retranslate_error && !(opts && opts.quiet)) {
         alert("Transcript updated, but re-translating it failed: " + data.retranslate_error);
       }
+      return { ok: true, note: data.retranslate_error || "" };
     } catch (err) {
-      alert("Re-transcribe failed: " + err.message);
+      if (!(opts && opts.quiet)) alert("Re-transcribe failed: " + err.message);
       oldSourceCells.forEach((el) => el.classList.remove("retranslating"));
+      return { ok: false, error: err.message };
     }
+  }
+
+  // ------------------------------------------------ redo with a chosen provider ----
+  // Alt+R (translation) and Alt+T (transcription) open a popup for the highlighted section: pick a provider, Apply, and only that
+  // section is redone with it (nothing highlighted: the whole file, after a warning). The same popup does dubbing, from the sidebar button.
+  const PR_KINDS = ["asr", "mt", "tts"];
+  const prState = { kind: "asr", scope: "section", ids: [], cache: {}, busy: false };
+
+  function providerRequest(provider) {
+    return provider ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider }) } : { method: "POST" };
+  }
+
+  // The segments the highlight touches (any run of cells, in either column), else the segment of the focused cell.
+  function selectedSegmentIds() {
+    const ids = [];
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0);
+      const flow = [$("#flow-source"), $("#flow-target")].find((f) => f && f.contains(range.commonAncestorContainer));
+      if (flow) {
+        $all("[data-segment-id]", flow).forEach((el) => {
+          if (range.intersectsNode(el) && !ids.includes(el.dataset.segmentId)) ids.push(el.dataset.segmentId);
+        });
+      }
+    }
+    if (!ids.length) {
+      const cell = document.activeElement && document.activeElement.closest ? document.activeElement.closest("[data-segment-id]") : null;
+      if (cell && cell.dataset.segmentId) ids.push(cell.dataset.segmentId);
+    }
+    return ids;
+  }
+
+  function allSegmentIds() {
+    const flow = $("#flow-source") || $("#flow-target");
+    return Array.from(new Set($all("[data-segment-id]", flow).map((el) => el.dataset.segmentId)));
+  }
+
+  function isGapSegment(id) {
+    const cells = $all(`[data-segment-id="${id}"]`);
+    return cells.length > 0 && cells.every((el) => el.classList.contains("gapcell"));
+  }
+
+  // Seconds of audio the given segments cover, from the cells' own start and end times.
+  function audioSeconds(ids) {
+    let total = 0;
+    ids.forEach((id) => {
+      let a = Infinity, b = 0;
+      $all(`[data-segment-id="${id}"]`).forEach((el) => {
+        const s0 = Number(el.dataset.startMs), e0 = Number(el.dataset.endMs);
+        if (isFinite(s0) && s0 < a) a = s0;
+        if (isFinite(e0) && e0 > b) b = e0;
+      });
+      if (b > a) total += (b - a) / 1000;
+    });
+    return total;
+  }
+
+  function prHuman(seconds) {
+    if (seconds < 90) return Math.round(seconds) + " s";
+    return (seconds / 60).toFixed(1) + " min";
+  }
+
+  async function prLoad(kind) {
+    if (prState.cache[kind]) return prState.cache[kind];
+    const res = await fetch(`/staff/orders/${ORDER_ID}/provider-options?kind=${kind}`);
+    if (!res.ok) throw new Error("Could not load the providers");
+    prState.cache[kind] = await res.json();
+    return prState.cache[kind];
+  }
+
+  function prChosenProvider() {
+    const r = document.querySelector('#pr-options input[name="pr-provider"]:checked');
+    return r ? r.value : "";
+  }
+
+  function prCurrentScopeIds() {
+    return prState.scope === "all" ? allSegmentIds() : prState.ids;
+  }
+
+  function prUpdateEstimate() {
+    const out = $("#pr-estimate");
+    const data = prState.cache[prState.kind];
+    if (!out || !data) return;
+    const chosen = data.options.find((o) => o.name === prChosenProvider());
+    const ids = prCurrentScopeIds().filter((id) => prState.kind !== "asr" || !isGapSegment(id));
+    const secs = audioSeconds(ids);
+    let line = ids.length + " segment" + (ids.length === 1 ? "" : "s") + ", about " + prHuman(secs) + " of audio.";
+    if (chosen && chosen.cost_per_min != null && secs > 0) {
+      line += " Roughly $" + (chosen.cost_per_min * secs / 60).toFixed(4) + " with " + chosen.label + " (our cost estimate).";
+    } else if (chosen && chosen.cost_per_min == null) {
+      line += " " + chosen.label + " has no cost entered on the Providers page yet.";
+    }
+    out.textContent = line;
+  }
+
+  async function prRender() {
+    const box = $("#pr-options");
+    const status = $("#pr-status");
+    if (status) status.textContent = "";
+    PR_KINDS.forEach((k) => {
+      const radio = document.querySelector(`#pr-kinds input[value="${k}"]`);
+      if (radio) radio.checked = k === prState.kind;
+    });
+    const sectionRadio = document.querySelector('#pr-scope input[value="section"]');
+    const allRadio = document.querySelector('#pr-scope input[value="all"]');
+    const hasSection = prState.ids.length > 0;
+    if (sectionRadio) { sectionRadio.disabled = !hasSection; sectionRadio.checked = prState.scope === "section"; }
+    if (allRadio) allRadio.checked = prState.scope === "all";
+    const sectionLabel = $("#pr-scope-section");
+    if (sectionLabel) sectionLabel.textContent = hasSection ? "Highlighted section (" + prState.ids.length + " segment" + (prState.ids.length === 1 ? "" : "s") + ")" : "Highlighted section (nothing highlighted)";
+    const allLabel = $("#pr-scope-all");
+    if (allLabel) allLabel.textContent = "Whole file (" + allSegmentIds().length + " segments)";
+    box.textContent = "Loading providers…";
+    let data;
+    try { data = await prLoad(prState.kind); } catch (err) { box.textContent = err.message; return; }
+    box.textContent = "";
+    $("#pr-apply").disabled = true;
+    if (!data.available) {
+      const p = document.createElement("p");
+      p.className = "muted";
+      p.textContent = "This order has no " + data.title.toLowerCase() + " step to redo.";
+      box.appendChild(p);
+      return;
+    }
+    const usable = data.options.filter((o) => o.selectable);
+    const pick = (usable.find((o) => o.name === data.default) || usable.find((o) => o.current) || usable[0] || {}).name;
+    data.options.forEach((o) => {
+      const label = document.createElement("label");
+      label.className = "pr-option" + (o.selectable ? "" : " is-off");
+      const input = document.createElement("input");
+      input.type = "radio"; input.name = "pr-provider"; input.value = o.name; input.disabled = !o.selectable; input.checked = o.name === pick;
+      const body = document.createElement("span");
+      const title = document.createElement("strong");
+      title.textContent = o.label;
+      body.appendChild(title);
+      [["Default", o.default], ["Current", o.current]].forEach(([text, on]) => {
+        if (!on) return;
+        const tag = document.createElement("em");
+        tag.className = "pr-tag"; tag.textContent = text;
+        body.appendChild(tag);
+      });
+      const note = document.createElement("small");
+      note.textContent = o.why || [o.note, o.cost_per_min != null ? "$" + Number(o.cost_per_min).toFixed(4) + " per audio-minute" : "no cost entered yet"].filter(Boolean).join(" · ");
+      body.appendChild(note);
+      label.appendChild(input);
+      label.appendChild(body);
+      input.addEventListener("change", prUpdateEstimate);
+      box.appendChild(label);
+    });
+    $("#pr-apply").disabled = !pick;
+    prUpdateEstimate();
+  }
+
+  async function openProviderRedo(kind) {
+    const modal = $("#provider-redo-modal");
+    if (!modal || prState.busy) return;
+    // Only the steps this order really has: a translation made from a transcript we already had shows Translation alone, a transcript only
+    // Transcription. A shortcut for a step the order does not have opens the one it does, and says so.
+    const kinds = (modal.dataset.kinds || "").split(",").filter(Boolean);
+    const note = $("#pr-note");
+    if (!kinds.length) { alert("Nothing on this order was made by a provider that can be redone."); return; }
+    let message = "";
+    if (!kinds.includes(kind)) {
+      const names = { asr: "Transcription", mt: "Translation", tts: "Dubbing" };
+      message = "This order has no " + names[kind].toLowerCase() + " step to redo, so " + names[kinds[0]].toLowerCase() + " is shown.";
+      kind = kinds[0];
+    }
+    if (note) { note.textContent = message; note.hidden = !message; }
+    $all('#pr-kinds label').forEach((l) => { l.hidden = !kinds.includes(l.querySelector("input").value); });
+    prState.ids = selectedSegmentIds();
+    prState.kind = kind;
+    prState.scope = prState.ids.length ? "section" : "all";
+    modal.hidden = false;
+    await prRender();
+    const first = document.querySelector('#pr-options input:checked') || $("#pr-apply");
+    if (first) first.focus();
+  }
+
+  function closeProviderRedo() {
+    const modal = $("#provider-redo-modal");
+    if (modal && !prState.busy) modal.hidden = true;
+  }
+
+  async function applyProviderRedo() {
+    const provider = prChosenProvider();
+    const kind = prState.kind;
+    const status = $("#pr-status");
+    if (!provider || prState.busy) return;
+    const whole = prState.scope === "all";
+    let ids = prCurrentScopeIds();
+    if (kind === "asr") ids = ids.filter((id) => !isGapSegment(id));
+    if (!ids.length) { if (status) status.textContent = "Highlight a section first, or choose the whole file."; return; }
+    const data = prState.cache[kind];
+    const name = (data.options.find((o) => o.name === provider) || {}).label || provider;
+    if (whole && kind === "asr" && !window.confirm("Re-transcribe every speech segment with " + name + "? This replaces the source text of every segment, including corrections you made to it.")) return;
+    if (whole && kind === "tts" && !window.confirm("Re-render the whole dub with " + name + "? The order moves to this voice provider.")) return;
+    prState.busy = true;
+    const applyBtn = $("#pr-apply");
+    applyBtn.disabled = true;
+    let failed = "";
+    try {
+      if (whole && kind !== "tts") {
+        if (status) status.textContent = "Switching this order to " + name + "…";
+        const move = await fetch(`/staff/orders/${ORDER_ID}/use-provider`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, provider }),
+        });
+        if (!move.ok) throw new Error((await move.json()).error || "Could not switch the provider");
+      }
+      if (kind === "mt" && whole) {
+        // the existing whole-file re-translate skips lines a person already finished, then reloads the page
+        const form = document.querySelector('form[action$="/retranslate-all"]');
+        if (form) { form.submit(); return; }
+      }
+      if (kind === "tts") {
+        if (status) status.textContent = "Re-rendering the dub with " + name + "…";
+        const res = await fetch(`/staff/orders/${ORDER_ID}/redub`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(whole ? { provider, all: true } : { provider, segment_ids: ids }),
+        });
+        const out = await res.json();
+        if (!res.ok) throw new Error(out.error || "Dubbing failed");
+        if (status) status.textContent = "Done: " + out.redone + " segment" + (out.redone === 1 ? "" : "s") + " re-rendered with " + name + ".";
+      } else {
+        let done = 0;
+        for (const id of ids) {
+          if (status) status.textContent = (kind === "asr" ? "Transcribing " : "Translating ") + (done + 1) + " of " + ids.length + " with " + name + "…";
+          const result = kind === "asr" ? await retranscribe(id, provider, { quiet: true }) : await retranslate(id, provider, { quiet: true });
+          if (!result.ok) { failed = result.error; break; }
+          done += 1;
+        }
+        if (status) status.textContent = failed ? ("Stopped after " + done + " of " + ids.length + ": " + failed) : ("Done: " + done + " segment" + (done === 1 ? "" : "s") + " redone with " + name + ".");
+      }
+      prState.cache = {};                                                  // the provider list now shows the new current one
+    } catch (err) {
+      failed = err.message;
+      if (status) status.textContent = "Failed: " + err.message;
+    } finally {
+      prState.busy = false;
+      applyBtn.disabled = false;
+    }
+    if (!failed) setTimeout(closeProviderRedo, 900);
+  }
+
+  function bindProviderRedoModal() {
+    const modal = $("#provider-redo-modal");
+    if (!modal) return;
+    $("#pr-cancel").addEventListener("click", closeProviderRedo);
+    $("#pr-apply").addEventListener("click", applyProviderRedo);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeProviderRedo(); });
+    modal.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); closeProviderRedo(); }
+      else if (e.key === "Enter" && e.target.tagName !== "BUTTON") { e.preventDefault(); applyProviderRedo(); }
+    });
+    $all('#pr-kinds input[name="pr-kind"]').forEach((r) => r.addEventListener("change", () => { prState.kind = r.value; prRender(); }));
+    $all('#pr-scope input[name="pr-scope"]').forEach((r) => r.addEventListener("change", () => { prState.scope = r.value; prUpdateEstimate(); }));
+    const opener = $("#open-provider-redo");
+    if (opener) opener.addEventListener("click", () => openProviderRedo((modal.dataset.kinds || "asr").split(",")[0]));
   }
 
   // Ctrl+S: save the segment the focused cell belongs to, right now -
@@ -1747,14 +2008,12 @@
       }
       if (e.altKey && key === "r") {
         e.preventDefault();
-        const segmentId = active && active.dataset.segmentId;
-        if (segmentId) retranslate(segmentId);
+        openProviderRedo("mt");
         return;
       }
       if (e.altKey && key === "t") {
         e.preventDefault();
-        const segmentId = active && active.dataset.segmentId;
-        if (segmentId) retranscribe(segmentId);
+        openProviderRedo("asr");
         return;
       }
       if (e.altKey && key === "v") {
@@ -2133,6 +2392,7 @@
     loadDictionary();
     bindJobReturnModal();
     bindVoiceDirectionModal();
+    bindProviderRedoModal();
     bindApproveSplitButton();
     bindVoicePicker();
     bindItalicMode();

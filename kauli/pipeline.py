@@ -13,7 +13,7 @@ import wave
 from pathlib import Path
 
 from . import timing
-from .models import Job, Segment, split_off_speaker_tag
+from .models import Job, Segment, apply_speaker_paragraphs, split_off_speaker_tag
 from .mixer import build_timeline, extract_audio_window, extract_reference_clip, time_stretch, write_wav_mono
 from .providers import get_asr, get_mt, get_tts
 from .speaker_gender import AZURE_VOICE_BY_GENDER, estimate_speaker_genders
@@ -25,6 +25,25 @@ from .subtitles import to_srt, to_vtt
 # within one). Kept as a separate constant rather than imported - webapp
 # imports kauli, not the other way around.
 GAP_THRESHOLD_MS = 1000
+MAX_GAP_CELLS = 600          # a silence is cut into one cell per second, up to ten minutes of cells; any more is one last long cell
+
+
+def split_gap_span(start_ms: int, end_ms: int) -> list[tuple[int, int]]:
+    """A stretch of non-speech cut into one-second cells (the last one takes the remainder, so no cell is shorter than a second). An editor can
+    then put a sound tag on exactly the second it starts, and the caption for it drops by the same rules as any other."""
+    length = end_ms - start_ms
+    n = max(1, length // GAP_THRESHOLD_MS)
+    if n > MAX_GAP_CELLS:
+        cuts = [start_ms + i * GAP_THRESHOLD_MS for i in range(MAX_GAP_CELLS)]
+        return [(a, b) for a, b in zip(cuts, cuts[1:] + [end_ms])]
+    cuts = [start_ms + i * GAP_THRESHOLD_MS for i in range(n)]
+    return [(a, b) for a, b in zip(cuts, cuts[1:] + [end_ms])]
+
+
+def _gap_segments(start_ms: int, end_ms: int) -> list[Segment]:
+    return [Segment(segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0, start_ms=a, end_ms=b, segment_type="gap",
+                    source_confidence=1.0)          # genuinely no speech here, not a low-confidence ASR guess
+            for a, b in split_gap_span(start_ms, end_ms)]
 
 
 def _insert_non_speech_segments(segments: list[Segment], total_duration_ms: int) -> list[Segment]:
@@ -43,19 +62,11 @@ def _insert_non_speech_segments(segments: list[Segment], total_duration_ms: int)
     cursor = 0
     for seg in ordered:
         if seg.start_ms - cursor >= GAP_THRESHOLD_MS:
-            filled.append(Segment(
-                segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0,
-                start_ms=cursor, end_ms=seg.start_ms, segment_type="gap",
-                source_confidence=1.0,  # genuinely no speech here, not a low-confidence ASR guess
-            ))
+            filled.extend(_gap_segments(cursor, seg.start_ms))
         filled.append(seg)
         cursor = max(cursor, seg.end_ms)
     if total_duration_ms - cursor >= GAP_THRESHOLD_MS:
-        filled.append(Segment(
-            segment_id=f"gap-{uuid.uuid4().hex[:10]}", index=0,
-            start_ms=cursor, end_ms=total_duration_ms, segment_type="gap",
-            source_confidence=1.0,
-        ))
+        filled.extend(_gap_segments(cursor, total_duration_ms))
     for i, seg in enumerate(filled):
         seg.index = i
     return filled
@@ -331,10 +342,21 @@ def _protect_untranslatable(text: str) -> tuple[str, dict[str, str]]:
     for para in paragraphs:
         tag, remainder = split_off_speaker_tag(para.strip())
         piece = (_swap(tag) + " ") if tag else ""
+        # Italics (<i>..</i>) and a ">>" speaker-change mark are formatting an editor applied: the words inside are translated, the marks are not.
+        remainder = re.sub(r"</?i>", lambda m: " " + _swap(m.group(0)) + " ", remainder, flags=re.I)
+        remainder = re.sub(r">>\s*", lambda m: _swap(">>") + " ", remainder)
         piece += re.sub(r"\[[^\]]*\]", lambda m: _swap(m.group(0)), remainder)
         protected_paragraphs.append(piece)
     protected_text = (" " + _swap("\n\n") + " ").join(protected_paragraphs)
     return protected_text, placeholders
+
+
+def _tidy_italics(text: str) -> str:
+    """The spaces that were put around an italics mark while it was protected come off again: "<i> word </i>." reads "<i>word</i>."."""
+    text = re.sub(r"(<i>)\s+", r"\1", text, flags=re.I)
+    text = re.sub(r"\s+(</i>)", r"\1", text, flags=re.I)
+    text = re.sub(r"(</i>) +([.,;:!?])", r"\1\2", text, flags=re.I)
+    return re.sub(r" {2,}(</?i>)", r" \1", text, flags=re.I) if "<i>" in text.lower() else text
 
 
 def _restore_untranslatable(text: str | None, placeholders: dict[str, str]) -> str:
@@ -342,7 +364,7 @@ def _restore_untranslatable(text: str | None, placeholders: dict[str, str]) -> s
     for token, real_value in placeholders.items():
         text = text.replace(token, real_value)
     if not placeholders or "QQ" not in text:
-        return text
+        return _tidy_italics(text)
     # Real bug caught in production: LocalMT (MarianMT - a small, closed-
     # vocabulary NMT with no instruction-following ability, unlike
     # Lara/Claude - see LocalMT's own docstring) can subtly mangle an
@@ -367,7 +389,7 @@ def _restore_untranslatable(text: str | None, placeholders: dict[str, str]) -> s
                     return val
         return m.group(0)  # genuinely unmatched - leave it rather than guess wrong
 
-    return re.sub(r"QQ\w*QQ", _fuzzy_sub, text)
+    return _tidy_italics(re.sub(r"QQ\w*QQ", _fuzzy_sub, text))
 
 
 def _translate_bracket_tags(source_text: str, mt_provider, source_lang: str, target_lang: str) -> dict[str, str]:
@@ -394,6 +416,20 @@ def _translate_bracket_tags(source_text: str, mt_provider, source_lang: str, tar
             new = new[:1].upper() + new[1:]
         out[tag] = f"[{new}]"
     return out
+
+
+def translate_gap_tag(tag_text: str, mt_provider, source_lang: str, target_lang: str) -> str:
+    """The sound or music tag an editor typed into a silent stretch ("[MUZIKI YACHEZA]", "[MUSIC PLAYING]") in the target language, brackets kept.
+    Used by the main run and by the editor's re-translate, so a tag reads the same however it was reached. A tag that cannot be translated
+    keeps the editor's own wording."""
+    tag_text = (tag_text or "").strip()
+    if not tag_text:
+        return ""
+    found = _translate_bracket_tags(tag_text, mt_provider, source_lang, target_lang)
+    if not found and not tag_text.startswith("["):
+        bare = _translate_bracket_tags(f"[{tag_text}]", mt_provider, source_lang, target_lang)
+        found = {tag_text: v[1:-1] for v in bare.values()} if bare else {}
+    return _apply_tag_translations(tag_text, found) or tag_text
 
 
 def _apply_tag_translations(text: str | None, translations: dict[str, str]) -> str | None:
@@ -429,6 +465,8 @@ def translate_segment(seg, mt_provider, source_lang: str, target_lang: str, cps:
     # candidate fits best never re-exposes an un-restored placeholder.
     protected_text, placeholders = _protect_untranslatable(seg.source_final_text)
     r = mt_provider.translate(protected_text, target_chars, source_lang, target_lang)
+    from .providers.mt import clean_model_leak
+    r = {**r, **{k: clean_model_leak(r.get(k)) if r.get(k) else r.get(k) for k in ("literal", "spoken", "shorter", "longer")}}
     # The tags stay put while the translator works, then the words inside the [brackets] are translated too, so a [MUZIKI YACHEZA]
     # reads [MUSIC PLAYING] in the translated transcript. Speaker names are labels and stay exactly as the editor typed them.
     tag_words = _translate_bracket_tags(seg.source_final_text, mt_provider, source_lang, target_lang)
@@ -540,6 +578,7 @@ def run(
     # just because a DIFFERENT segment's TTS call happened to fail.
     resumed_segments = None
     resumed_cost_usd = 0.0
+    resumed_speakers: dict = {}
     manifest_path = out / "manifest.json"
     if resume and manifest_path.exists():
         try:
@@ -547,6 +586,9 @@ def run(
             if candidate.segments:
                 resumed_segments = candidate.segments
                 resumed_cost_usd = candidate.cost_usd or 0.0
+                resumed_speakers = {"speaker_voices": dict(candidate.speaker_voices), "speaker_voice_names": dict(candidate.speaker_voice_names),
+                                    "speaker_subtitle_included": dict(candidate.speaker_subtitle_included),
+                                    "speaker_paragraphs_applied": bool(candidate.speaker_paragraphs_applied)}
         except Exception:
             resumed_segments = None  # a corrupt/partial manifest - fall back to a real full run rather than crash
 
@@ -565,6 +607,8 @@ def run(
         log(f"[1/5] Resuming: reusing {len(resumed_segments)} already-transcribed segments (skipping {asr})")
         job.segments = resumed_segments
         job.status = "transcribing"
+        for key, value in resumed_speakers.items():            # who is who (voices, names, who is in the subtitles) is work a person did: it carries over
+            setattr(job, key, value)
     else:
         log(f"[1/5] Transcribing with {asr} ...")
         job.status = "transcribing"
@@ -635,6 +679,9 @@ def run(
                 log(f"      speaker labels skipped: {exc}")
         n_gaps = sum(1 for s in job.segments if s.segment_type == "gap")
         log(f"      {len(job.segments)} segments ({n_gaps} non-speech), {job.source_duration_ms/1000:.1f}s")
+    if not job.speaker_paragraphs_applied:                    # every new speaker starts a new paragraph, in the transcript and in what is translated from it
+        apply_speaker_paragraphs(job.segments)
+        job.speaker_paragraphs_applied = True
     job.save(out / "manifest.json")
 
     # ---------- 2. Translate + fit ----------
@@ -650,11 +697,7 @@ def run(
             # Whatever a human has already written for this stretch in the target language is final and is left alone.
             tag_text = (seg.source_final_text or "").strip()
             if tag_text and not seg.final_text.strip():
-                found = _translate_bracket_tags(tag_text, mt_provider, source_lang, target_lang)
-                if not found and not tag_text.startswith("["):
-                    found = _translate_bracket_tags(f"[{tag_text}]", mt_provider, source_lang, target_lang)
-                    found = {tag_text: v[1:-1] for v in found.values()} if found else {}
-                seg.spoken = _apply_tag_translations(tag_text, found) or tag_text
+                seg.spoken = translate_gap_tag(tag_text, mt_provider, source_lang, target_lang)
             continue
         if seg.spoken or seg.edited_text:
             continue  # resumed with a real translation already, or a person has written this line: it is final, and a retry never re-spends an MT call either

@@ -17,8 +17,22 @@ import re
 SOURCE_LANG_NAMES = {"sw": "Kenyan Kiswahili", "ki": "Kikuyu (Gikuyu)", "en": "English"}
 
 
-def _build_system_prompt(source_lang: str) -> str:
+# What the translator is told the target language is called. A code that is not here is passed as it is.
+TARGET_LANG_NAMES = {
+    "en": "English", "sw": "Kiswahili", "ki": "Kikuyu (Gikuyu)", "de": "German", "es": "Spanish", "fr": "French", "pt": "Portuguese",
+    "it": "Italian", "nl": "Dutch", "zh": "Chinese (Mandarin)", "ar": "Arabic", "hi": "Hindi", "ja": "Japanese", "ko": "Korean", "ru": "Russian",
+    "tr": "Turkish", "pl": "Polish", "uk": "Ukrainian", "id": "Indonesian", "vi": "Vietnamese", "th": "Thai", "he": "Hebrew", "fa": "Persian",
+    "bn": "Bengali", "ur": "Urdu", "am": "Amharic", "af": "Afrikaans", "so": "Somali", "zu": "Zulu", "yo": "Yoruba", "ha": "Hausa",
+}
+
+
+def _target_name(code: str) -> str:
+    return TARGET_LANG_NAMES.get(code, code)
+
+
+def _build_system_prompt(source_lang: str, target_lang: str = "en") -> str:
     lang_name = SOURCE_LANG_NAMES.get(source_lang, source_lang)
+    target_name = _target_name(target_lang)
     # The Swahili-clock offset ("saa kumi na moja jioni" = 17:00) is a
     # Swahili-specific convention - applying it to a different source
     # language would actively introduce a wrong-time bug, not just a
@@ -43,9 +57,10 @@ def _build_system_prompt(source_lang: str) -> str:
             "instead of producing a fluent-sounding guess. A human reviews anything you flag as uncertain; "
             "a confident-looking wrong translation is what actually reaches the client unreviewed."
         )
-    return f"""You translate {lang_name} speech into natural spoken English for dubbing.
+    return f"""You translate {lang_name} speech into natural spoken {target_name} for dubbing.
 
 Rules:
+- The target language is {target_name}, always, whatever language the source text is in. Never reply in another language, never ask a question, and never add commentary or notes outside the JSON object.
 - Kenyan context. Expect English borrowings (order, store, deposit) and Sheng or code-switching with Kiswahili where natural. These are normal speech, not errors.{clock_rule}{low_resource_note}
 - Preserve meaning and register. Never invent facts to fill time. Never drop facts to save time.
 - Keep names, places and brands as-is.
@@ -66,6 +81,57 @@ Return ONLY a JSON object, no markdown fences, no preamble:
 # directly (e.g. existing tests) - always the Kiswahili prompt, same text
 # as before this change.
 SYSTEM_PROMPT = _build_system_prompt("sw")
+
+
+def parse_model_json(raw: str) -> dict | None:
+    """The translation object inside a model's reply, however it is wrapped: after a preamble, inside a code fence, or followed by a note.
+    None when the reply holds no object with a "spoken" or "literal"."""
+    text = re.sub(r"^```(?:json)?|```$", "", raw or "", flags=re.MULTILINE).strip()
+    decoder = json.JSONDecoder()
+    for m in re.finditer(r"\{", text):
+        try:
+            obj, _ = decoder.raw_decode(text[m.start():])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(obj, dict) and ("spoken" in obj or "literal" in obj):
+            base = str(obj.get("spoken") or obj.get("literal") or "")
+            for key in ("literal", "spoken", "shorter", "longer"):
+                obj[key] = str(obj.get(key) or base) if key in ("literal", "spoken") else (obj.get(key) or None)
+            obj.setdefault("notes", None)
+            obj["confidence"] = float(obj.get("confidence") or 0.5)
+            obj["flags"] = list(obj.get("flags") or [])
+            return obj
+    return None
+
+
+_NOTE_PARA = re.compile(r"\n*\*\*Note:?\*\*.*?(?=\n\s*\n|\Z)", re.DOTALL)
+_IF_YOU_NEED = re.compile(r"\n*If you need [^\n]*?\(\d+ characters[^)]*\)\.?", re.DOTALL)
+
+
+def clean_model_leak(text: str | None) -> str:
+    """Take a model's own commentary out of text that was stored as a translation: an embedded {"literal": ..., "spoken": ...} object is replaced
+    by its spoken line, and "**Note:** ..." paragraphs (and the "If you need ..." follow-up) are removed. Text without any of that is returned
+    unchanged, so it is safe to run over every translation."""
+    if not text or ("{" not in text and "**Note" not in text):
+        return text or ""
+    out = text
+    decoder = json.JSONDecoder()
+    pos = 0
+    while True:
+        m = re.compile(r"\{\s*\"(?:literal|spoken)\"").search(out, pos)
+        if not m:
+            break
+        try:
+            obj, length = decoder.raw_decode(out[m.start():])
+        except json.JSONDecodeError:
+            pos = m.end()
+            continue
+        line = str(obj.get("spoken") or obj.get("literal") or "").strip() if isinstance(obj, dict) else ""
+        out = out[:m.start()] + line + out[m.start() + length:]
+        pos = m.start() + len(line)
+    out = _IF_YOU_NEED.sub("", out)
+    out = _NOTE_PARA.sub("", out)
+    return re.sub(r"[ \t]{2,}", " ", re.sub(r"\n{3,}", "\n\n", out)).strip()
 
 
 class MTProvider:
@@ -140,34 +206,36 @@ class ClaudeMT(MTProvider):
         return self._client
 
     def translate(self, text: str, target_chars: int, source_lang="sw", target_lang="en") -> dict:
-        lang_name = {"en": "English", "sw": "Kiswahili"}.get(target_lang, target_lang)
+        lang_name = _target_name(target_lang)
         user = (
             f"Source ({source_lang}): {text}\n"
             f"Target language: {lang_name}\n"
             f"Target length for 'spoken': about {target_chars} characters "
             f"(this is a hard timing budget for dubbing)."
         )
-        resp = self._c().messages.create(
-            model=self.model, max_tokens=self.max_tokens,
-            system=_build_system_prompt(source_lang), messages=[{"role": "user", "content": user}],
-        )
-        # Real usage from the response, not an estimate - this is what
-        # feeds the ops dashboard's daily-spend figure (see worker.py /
-        # staff_ops.html), which is the actual protection against a
-        # bugged retry loop or malicious automation quietly running up a
-        # bill unnoticed.
-        if resp.usage:
-            self.total_cost_usd += (resp.usage.input_tokens * self.PRICE_PER_INPUT_TOKEN +
-                                     resp.usage.output_tokens * self.PRICE_PER_OUTPUT_TOKEN)
-        self.total_calls += 1
-        raw = "".join(b.text for b in resp.content if b.type == "text").strip()
-        raw = re.sub(r"^```(?:json)?|```$", "", raw, flags=re.MULTILINE).strip()
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return {"literal": raw, "spoken": raw, "shorter": raw, "longer": raw,
-                    "notes": "MT returned unparseable output - review required.",
-                    "confidence": 0.3, "flags": ["unclear"]}
+        raw = ""
+        for attempt in range(2):
+            resp = self._c().messages.create(
+                model=self.model, max_tokens=self.max_tokens,
+                system=_build_system_prompt(source_lang, target_lang),
+                messages=[{"role": "user", "content": user + ("" if attempt == 0 else "\n\nReturn ONLY the JSON object described, with nothing before or after it.")}],
+            )
+            # Real usage from the response, not an estimate - this is what
+            # feeds the ops dashboard's daily-spend figure (see worker.py /
+            # staff_ops.html), which is the actual protection against a
+            # bugged retry loop or malicious automation quietly running up a
+            # bill unnoticed.
+            if resp.usage:
+                self.total_cost_usd += (resp.usage.input_tokens * self.PRICE_PER_INPUT_TOKEN +
+                                         resp.usage.output_tokens * self.PRICE_PER_OUTPUT_TOKEN)
+            self.total_calls += 1
+            raw = "".join(b.text for b in resp.content if b.type == "text").strip()
+            parsed = parse_model_json(raw)
+            if parsed is not None:
+                return parsed
+        # A reply that is not a translation is never stored as one: the caller falls back to another provider, or the order is retried,
+        # instead of the model's own commentary reaching the customer as their translated text.
+        raise ValueError("Claude replied with something that is not a translation: " + raw[:120].replace("\n", " "))
 
 
 class AwsTranslateMT(MTProvider):

@@ -712,7 +712,37 @@
       <button type="submit" class="secondary">Send</button>
     </form>
     {% endif %}
-    {% if upsell['upgrade'] and paystack_configured %}
+    {% if human_check and paystack_configured %}
+    <section class="hc-card" id="human-check" data-order="{{ order['id'] }}" aria-labelledby="hc-title">
+      <div class="hc-head">
+        <span class="hc-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.4"/><path d="M3 20c0-3.4 2.8-6 6-6 1.2 0 2.3.3 3.2.8"/><circle cx="17.5" cy="17" r="4.2" fill="currentColor" stroke="none"/><path d="m15.6 17 1.3 1.3 2.2-2.5" stroke="#fff"/></svg></span>
+        <div><h3 id="hc-title">Want a person to check this translation?</h3>
+          <p>Your automatic translation is ready. A dedicated human editor can verify it against the audio before you use it.</p></div>
+      </div>
+      <ul class="hc-benefits">
+        <li><strong>Fast</strong><span>Back to you {{ human_check['turnaround'] }}. You keep your current files in the meantime.</span></li>
+        <li><strong>Up to 99% accuracy</strong><span>Names, numbers and terms are checked against what was actually said.</span></li>
+        <li><strong>Context, not just words</strong><span>Idioms, tone and who is speaking are carried into {{ human_check['target'] }} the way a native reader expects.</span></li>
+        <li><strong>Marked ready only after review</strong><span>An editor signs it off, so you can publish or send it with confidence.</span></li>
+      </ul>
+      <form method="post" action="/client/orders/{{ order['id'] }}/upgrade-review" class="hc-buy"
+            onsubmit="return confirm('Add human review to this translation for ${{ "%.2f"|format(human_check['price']) }}? A dedicated editor will check it before it is marked final.');">
+        <input type="hidden" name="provider" value="paystack">
+        <div class="hc-price"><b>${{ "%.2f"|format(human_check['price']) }}</b><span>for this file{% if human_check['per_min'] %} &middot; +${{ "%.2f"|format(human_check['per_min']) }}/min on {{ human_check['minutes']|round(1) }} min{% endif %}. You pay only the difference from what you already paid.</span></div>
+        <div class="hc-actions"><button type="submit" data-cta="human-check">Add human review - ${{ "%.2f"|format(human_check['price']) }}</button>
+          <button type="button" class="secondary" id="hc-later">Not now</button></div>
+      </form>
+    </section>
+    <script>
+      (function () {
+        var card = document.getElementById("human-check"); if (!card) return;
+        var key = "kauli_hc_" + card.dataset.order;
+        try { var t = Number(localStorage.getItem(key)); if (t && Date.now() - t < 14 * 864e5) card.hidden = true; } catch (e) {}
+        var later = document.getElementById("hc-later");
+        if (later) later.addEventListener("click", function () { card.hidden = true; try { localStorage.setItem(key, String(Date.now())); } catch (e) {} });
+      })();
+    </script>
+    {% elif upsell['upgrade'] and paystack_configured %}
     <form method="post" action="/client/orders/{{ order['id'] }}/upgrade-review" class="od-upsell"
           onsubmit="return confirm('Add human review to this order for ${{ "%.2f"|format(upsell['upgrade']) }}? A dedicated editor will check it before it is marked final.');">
       <input type="hidden" name="provider" value="paystack">

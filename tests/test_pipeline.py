@@ -319,3 +319,40 @@ def test_a_line_a_person_has_written_is_never_translated_over(monkeypatch):
     assert got["s0"].edited_text == "Hello, my friend (final)" and got["s0"].final_text == "Hello, my friend (final)"      # the person's line is final
     assert got["s1"].spoken                                                                                              # the machine's line was translated
     assert got["gap-1"].final_text == "[MUSIC PLAYING]"                                                                # a tag in a silent stretch is translated too
+
+
+
+def test_a_sound_tag_typed_in_the_editor_is_translated_not_copied():
+    """[MUZIKI YACHEZA] typed into a silent stretch reads [MUSIC PLAYING] in the translation, and [MUSIC PLAYING] reads [MUSIK SPIELT]."""
+    from kauli.pipeline import translate_gap_tag
+
+    class _Tags:
+        words = {"MUZIKI YACHEZA": "MUSIC PLAYING", "MUSIC PLAYING": "MUSIK SPIELT", "Applause": "Applaus"}
+
+        def translate(self, text, target_chars, source_lang, target_lang):
+            return {"literal": self.words.get(text.strip(), text), "spoken": self.words.get(text.strip(), text), "confidence": 0.9}
+
+    mt = _Tags()
+    assert translate_gap_tag("[MUZIKI YACHEZA]", mt, "sw", "en") == "[MUSIC PLAYING]"
+    assert translate_gap_tag("[MUSIC PLAYING]", mt, "en", "de") == "[MUSIK SPIELT]"
+    assert translate_gap_tag("[Applause]", mt, "en", "de") == "[Applaus]"                                          # keeps its capital letter
+    assert translate_gap_tag("MUSIC PLAYING", mt, "en", "de") == "MUSIK SPIELT"                                    # typed without brackets
+    assert translate_gap_tag("[unknown tag]", mt, "en", "de") == "[unknown tag]"                                  # cannot be translated: the editor's words stay
+    assert translate_gap_tag("", mt, "en", "de") == ""
+
+
+def test_translated_sound_tags_reach_the_subtitles_and_captions_but_a_dub_never_speaks_them(monkeypatch):
+    """The same translation serves subtitles and dubbing: the tag reads in the target language in the SRT and VTT, and the voice is never given it."""
+    from kauli import pipeline
+    from kauli.models import Job
+    from kauli.subtitles import to_srt, to_vtt
+    sentence = Segment(segment_id="s0", index=0, start_ms=0, end_ms=3000, source_transcript="Habari yako [MUZIKI YACHEZA] rafiki.")
+    tag = Segment(segment_id="g0", index=1, start_ms=3000, end_ms=5000, segment_type="gap", source_edited_transcript="[MUZIKI YACHEZA]")
+    mt = _TagMT()
+    translate_segment(sentence, mt, "sw", "en", cps=16.94)
+    tag.spoken = pipeline.translate_gap_tag("[MUZIKI YACHEZA]", mt, "sw", "en")
+    job = Job(segments=[sentence, tag], providers={"asr": "reused", "mt": "stub", "tts": "stub"})
+    for text in (to_srt(job), to_vtt(job)):
+        assert "[MUSIC PLAYING]" in text and "MUZIKI" not in text
+    spoken = pipeline.strip_bracket_tags_for_tts(sentence.final_text)
+    assert "MUSIC" not in spoken and "[" not in spoken and spoken.strip()        # the words are voiced, the tag is not
