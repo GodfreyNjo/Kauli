@@ -7186,8 +7186,8 @@ html[data-theme="dark"] .lang-grid li a.is-current { background: #1d3a6b; }
 .dm-video-chip { padding: 8px 18px; border-radius: 999px; background: #eef3fb; color: #33445f; font-size: 0.9rem; }
 .dm-feats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .dm-feats li { display: grid; justify-items: center; gap: 10px; text-align: center; font-size: 0.9rem; color: #33445f; font-weight: 500; }
-.dm-feats li span { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; }
-.dm-feats .f-violet span { background: #efe9fd; color: #6a45d1; } .dm-feats .f-green span { background: #dff5e9; color: #1a9a55; } .dm-feats .f-orange span { background: #ffeed8; color: #e07a12; } .dm-feats .f-blue span { background: #e3edff; color: #1d5fd1; }
+.dm-feats li > span:first-child { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; }
+.dm-feats .f-violet > span:first-child { background: #efe9fd; color: #6a45d1; } .dm-feats .f-green > span:first-child { background: #dff5e9; color: #1a9a55; } .dm-feats .f-orange > span:first-child { background: #ffeed8; color: #e07a12; } .dm-feats .f-blue > span:first-child { background: #e3edff; color: #1d5fd1; }
 .dm-feats b { font-weight: 600; }
 .dm-dubhead[hidden] { display: none; } .dm-dubhead { text-align: center; margin-bottom: 18px; } .dm-dubhead h2 { margin: 0 0 6px; font-size: 1.6rem; color: #082848; } .dm-dubhead p { margin: 0; color: #52627a; }
 
@@ -7371,3 +7371,7 @@ html[data-theme="dark"] .lang-grid li a.is-current { background: #1d3a6b; }
 }
 body .cookie-notice .cookie-actions #cookie-notice-manage { background: transparent; color: #fff; border: 1px solid rgba(255, 255, 255, 0.4); }
 body .cookie-notice .cookie-actions #cookie-notice-manage:hover { background: rgba(255, 255, 255, 0.08); }
+/* demo video: keep the real 16:9 picture (the width/height attributes must not stretch it) and keep the icon tiles to the icons only */
+.dm-video-main video { height: auto; aspect-ratio: 16 / 9; object-fit: contain; }
+/* the free-minutes badge sits in the flow under the intro line, so it can never cover the headline */
+.pz-gift { position: static; width: max-content; max-width: 100%; margin: 0 auto 22px; }
