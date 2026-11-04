@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Podcast{% endblock %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top"><div>
+    <h1>Podcast page</h1>
+    <p class="muted">Episodes shown on <a href="/podcast" target="_blank" rel="noopener">/podcast</a> (Resources &rarr; Podcast). Pull them from any podcast feed or add a Spotify link, then make a transcript with Kauli: it arrives on the episode by itself through Kauli's webhook.</p>
+  </div></div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="hub-card" id="pod-webhook">
+    <h2>Webhook</h2>
+    {% if not publisher %}
+    <p class="muted">No publishing account yet. Transcripts are ordered by a Kauli client account: set <code>PODCAST_PUBLISHER_EMAIL</code> on the server (or add that address to <code>KAULI_TEST_CLIENT_EMAILS</code>), and sign up with it first.</p>
+    {% else %}
+    <p class="muted">Transcripts are ordered by <strong>{{ publisher['email'] }}</strong>. Their finished orders are sent to <code>{{ hook_url }}</code>: {% if hook_ready %}<strong>connected</strong>{% else %}<strong>not connected yet</strong>{% endif %}.</p>
+    <form method="post" action="/staff/podcast/webhook/connect"><button type="submit" class="btn"{% if hook_ready %} disabled{% endif %}>{{ 'Connected' if hook_ready else 'Connect the webhook' }}</button></form>
+    {% endif %}
+  </section>
+
+  <section class="hub-card" id="pod-add">
+    <h2>Add a podcast</h2>
+    <div class="si-grid">
+      <form method="post" action="/staff/podcast/shows" class="si-form">
+        <input type="hidden" name="kind" value="feed">
+        <label>Podcast feed link <input type="url" name="url" required placeholder="https://example.com/feed.xml"></label>
+        <small class="muted">Any host's RSS feed works: Spotify for Creators, Buzzsprout, Libsyn, or our own <code>/podcast.xml</code>. Episodes play from their audio files.</small>
+        <label>Name <span class="muted">(optional)</span> <input type="text" name="title" maxlength="200"></label>
+        <button type="submit" class="btn">Pull episodes</button>
+      </form>
+      <form method="post" action="/staff/podcast/shows" class="si-form">
+        <input type="hidden" name="kind" value="spotify">
+        <label>Spotify link <input type="url" name="url" required placeholder="https://open.spotify.com/show/..."></label>
+        <small class="muted">A show link puts Spotify's player at the top of the page. An episode link adds that episode with Spotify's player.</small>
+        <label>Name <span class="muted">(for an episode)</span> <input type="text" name="title" maxlength="300"></label>
+        <button type="submit" class="btn">Add from Spotify</button>
+      </form>
+    </div>
+    <form method="post" action="/staff/podcast/pull"><button type="submit" class="secondary">Check every feed for new episodes</button></form>
+  </section>
+
+  <section class="hub-card" id="pod-shows">
+    <h2>Shows</h2>
+    {% if not shows %}<p class="muted">Nothing added yet.</p>{% endif %}
+    <ul class="pod-admin">
+      {% for s in shows %}
+      <li><strong>{{ s.title }}</strong> <span class="muted">{{ 'feed' if s.kind == 'feed' else 'Spotify' }}{% if s.url %} &middot; {{ s.url }}{% endif %}</span>
+        <form method="post" action="/staff/podcast/shows/{{ s.id }}/remove" onsubmit="return confirm('Remove this show and its episodes from the page?');" style="display:inline"><button type="submit" class="ig-link">Remove</button></form></li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="hub-card" id="pod-episodes">
+    <h2>Episodes</h2>
+    {% if not episodes %}<p class="muted">No episodes yet.</p>{% endif %}
+    <div class="ds-scroll"><table class="ds-table">
+      <thead><tr><th>Episode</th><th>Transcript</th><th></th></tr></thead>
+      <tbody>
+      {% for e in episodes %}
+      <tr>
+        <td><a href="/podcast/{{ e.id }}" target="_blank" rel="noopener">{{ e.title }}</a>{% if e.hidden %} <span class="pf-tag">hidden</span>{% endif %}<br><small class="muted">{{ e.show_title or '' }}{% if not e.audio_url %} &middot; no audio file{% endif %}</small></td>
+        <td>{% if e.transcript_status == 'published' %}<span class="pf-tag ok">On the page</span>
+            {% elif e.transcript_status == 'working' %}<span class="pf-tag">Working{% if e.order_status %}: {{ e.order_status.replace('_', ' ') }}{% endif %}</span>
+            {% elif e.transcript_status == 'failed' %}<span class="pf-tag">Failed</span> <small class="muted">{{ e.transcript_error }}</small>
+            {% else %}<span class="muted">None yet</span>{% endif %}</td>
+        <td>
+          {% if e.audio_url and e.transcript_status != 'published' %}
+          <form method="post" action="/staff/podcast/episodes/{{ e.id }}/transcribe" class="pod-inline">
+            <select name="source_lang" aria-label="Language spoken">{% for code, label in languages %}<option value="{{ code }}"{% if code == 'en' %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+            <button type="submit" class="btn">{{ 'Try again' if e.transcript_status in ('failed', 'working') else 'Make transcript' }}</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/staff/podcast/episodes/{{ e.id }}/hide" class="pod-inline"><input type="hidden" name="hidden" value="{{ 0 if e.hidden else 1 }}"><button type="submit" class="ig-link">{{ 'Show' if e.hidden else 'Hide' }}</button></form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</div>
+{% endblock %}

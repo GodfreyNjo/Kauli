@@ -76,12 +76,16 @@
           <a href="/developers#slack">Slack</a>
           <a href="/developers#teams">Microsoft Teams</a>
           <a href="/developers#notion">Notion</a>
+          <a href="/login?next=/client/integrations">Discord</a>
+          <a href="/login?next=/client/integrations">Google &amp; Outlook Calendar</a>
+          {% if meetings_enabled() %}<a href="/login?next=/client/meetings">Zoom</a>
+          <a href="/login?next=/client/meetings">Google Meet</a>{% endif %}
           <a href="{{ home }}#integrations">YouTube captions</a>
         </div>
         <div class="m-nav-dropdown-col">
           <span class="m-nav-dropdown-heading">Coming soon</span>
-          <span class="m-nav-dropdown-soon">Zoom<em>Soon</em></span>
-          <span class="m-nav-dropdown-soon">Google Meet<em>Soon</em></span>
+          {% if not meetings_enabled() %}<span class="m-nav-dropdown-soon">Zoom<em>Soon</em></span>
+          <span class="m-nav-dropdown-soon">Google Meet<em>Soon</em></span>{% endif %}
           <span class="m-nav-dropdown-soon">Google Drive<em>Soon</em></span>
           <span class="m-nav-dropdown-soon">Dropbox<em>Soon</em></span>
           <span class="m-nav-dropdown-soon">HubSpot<em>Soon</em></span>
@@ -98,6 +102,7 @@
       </button>
       <div class="m-nav-dropdown-menu">
         <a href="/blog">Blog</a>
+        <a href="/podcast">Podcast</a>
         <a href="{{ home }}#faq">FAQ</a>
         <a href="{{ home }}#demo">Hear a demo</a>
         <a href="/human-review">Human review</a>

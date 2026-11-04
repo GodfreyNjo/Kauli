@@ -2,6 +2,7 @@
 {% block theme %}dark{% endblock %}
 {% block title %}Review {{ order['id'] }}{% endblock %}
 {% block content %}
+{% set switch_next = '/staff/orders/' ~ order['id'] %}{% include '_provider_switch.html' %}
 {% macro provider_panel(f) %}
 {% if f %}
 <div class="pf-panel">

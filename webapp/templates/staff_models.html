@@ -24,6 +24,7 @@
 </table></div>{% endif %}
 {% endmacro %}
 {% block content %}
+{% set switch_next = '/staff/models' %}{% include '_provider_switch.html' %}
 {% set h = s.human %}
 {% set own = s.own %}
 <div class="hub" lang="en">

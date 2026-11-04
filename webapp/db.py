@@ -762,6 +762,37 @@ CREATE TABLE IF NOT EXISTS calendar_auto_meetings (
     created_at REAL NOT NULL,
     PRIMARY KEY (client_id, event_id)
 );
+-- The Podcast page (webapp/podcast.py): the shows pulled from feeds or linked from Spotify, their episodes, and each episode's transcript as it
+-- arrives from Kauli's own webhook.
+CREATE TABLE IF NOT EXISTS podcast_shows (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    kind TEXT NOT NULL,                      -- 'feed' | 'spotify'
+    url TEXT,
+    spotify_id TEXT,
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS podcast_episodes (
+    id TEXT PRIMARY KEY,
+    show_id TEXT NOT NULL,
+    guid TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    published_at REAL,
+    audio_url TEXT,
+    page_url TEXT,
+    spotify_id TEXT,
+    duration_s INTEGER,
+    transcript_order_id TEXT,
+    transcript_text TEXT,
+    transcript_status TEXT,                  -- NULL | 'working' | 'published' | 'failed'
+    transcript_error TEXT,
+    transcript_at REAL,
+    hidden INTEGER NOT NULL DEFAULT 0,
+    created_at REAL NOT NULL,
+    UNIQUE (show_id, guid)
+);
+CREATE INDEX IF NOT EXISTS idx_podcast_episodes_order ON podcast_episodes(transcript_order_id);
 
 CREATE TABLE IF NOT EXISTS client_teams (
     client_id TEXT PRIMARY KEY,

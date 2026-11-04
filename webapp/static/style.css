@@ -7491,3 +7491,21 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .ig-paste { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
 .ig-paste input { flex: 1 1 200px; min-width: 0; padding: 8px 10px; border: 1px solid var(--border, #cfd8e8); border-radius: 8px; font: inherit; }
 .ig-paste small { flex: 1 0 100%; color: var(--muted, #6b7690); font-size: 0.78rem; line-height: 1.4; }
+
+/* Podcast page */
+.pod { max-width: 820px; }
+.pod-list { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 16px; }
+.pod-card { border: 1px solid var(--border, #dbe3f1); border-radius: 14px; padding: 18px 20px; background: var(--surface, #fff); }
+.pod-card h2 { margin: 4px 0 6px; font-size: 1.15rem; }
+.pod-card h2 a { color: inherit; text-decoration: none; }
+.pod-meta { color: var(--muted, #6b7690); font-size: 0.82rem; }
+.pod-desc { margin: 0 0 12px; color: var(--muted, #52607a); }
+.pod-audio { width: 100%; margin: 6px 0 0; }
+.pod-show { margin: 20px 0; }
+.pod-transcript { margin-top: 12px; }
+.pod-transcript summary { cursor: pointer; font-weight: 600; }
+.pod-text p { margin: 0 0 12px; line-height: 1.65; }
+.pod-h { margin-top: 28px; }
+.pod-foot { margin-top: 22px; }
+.pod-admin { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.pod-inline { display: inline-flex; gap: 6px; align-items: center; margin: 0 6px 4px 0; }

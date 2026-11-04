@@ -1,0 +1,20 @@
+{# The model switch: which provider each step uses by default. Needs `switch_next` (the page to come back to). #}
+<section class="hub-card pf-switch" id="model-switch">
+  <h2>Models in use</h2>
+  <p class="muted">Pick the provider each step uses for new jobs. Transkriptor and Azure Translator are the house choice until you change them; Automatic hands the choice back to the routing. An editor can still pick another provider for one section in the editor.</p>
+  <div class="pf-defaults">
+    {% for s in provider_switch() %}
+    <form method="post" action="/staff/providers/default" class="pf-default">
+      <input type="hidden" name="kind" value="{{ s.kind }}">
+      <input type="hidden" name="next" value="{{ switch_next }}">
+      <label>{{ s.label }}{% if s.house %} <small class="muted">(house choice)</small>{% endif %}
+        <select name="name" onchange="this.form.submit()" aria-label="{{ s.label }} provider">
+          <option value="">Automatic</option>
+          {% for o in s.options %}<option value="{{ o.name }}"{% if s.current == o.name %} selected{% endif %}>{{ o.label }}{{ o.note }}</option>{% endfor %}
+        </select>
+      </label>
+      <noscript><button type="submit">Save</button></noscript>
+    </form>
+    {% endfor %}
+  </div>
+</section>

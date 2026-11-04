@@ -198,6 +198,10 @@ COLUMN = {"asr": "asr", "mt": "mt", "tts": "tts"}
 # What each step is called to a person, in the editor and on the Providers page.
 KIND_LABELS = {"asr": "Transcription", "mt": "Translation", "tts": "Dubbing"}
 DEFAULT_KEYS = {"asr": "provider_default_asr", "mt": "provider_default_mt", "tts": "provider_default_tts"}
+# The house choice, in force until staff pick something else on the Providers, Models or Review tab: Transkriptor is the first choice for
+# turning speech into text, and Azure Translator for translating the automatic (Instant AI) jobs. A step staff have set to Automatic stays
+# Automatic: only a step nobody has ever touched uses these.
+FACTORY_DEFAULTS = {"asr": "transkriptor", "mt": "azure-translate"}
 
 
 def default_name(kind: str) -> str:
@@ -206,10 +210,31 @@ def default_name(kind: str) -> str:
     if kind not in DEFAULT_KEYS:
         return ""
     try:
-        value = db.get_flag(DEFAULT_KEYS[kind], "") or ""
+        value = db.get_flag(DEFAULT_KEYS[kind], None)
     except Exception:  # noqa: BLE001 - a missing table must never take orders down
         return ""
+    if value is None:                                                       # never set by anyone: the house choice
+        value = FACTORY_DEFAULTS.get(kind, "")
     return value if value in TOGGLEABLE.get(kind, []) else ""
+
+
+def is_house_default(kind: str) -> bool:
+    """True while this step is on the house choice because staff have never picked anything for it."""
+    from . import db
+    try:
+        return kind in FACTORY_DEFAULTS and db.get_flag(DEFAULT_KEYS[kind], None) is None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def switch_panel() -> list[dict]:
+    """For the model switch on the Models and Review tabs: per step, what is in use now and every provider that can be picked."""
+    out = []
+    for kind in ("asr", "mt", "tts"):
+        options = [{"name": n, "label": NAMES.get(n, n), "note": "" if configured(n) and is_enabled(n) else (" (turned off)" if configured(n) else " (not connected)")}
+                   for n in TOGGLEABLE[kind]]
+        out.append({"kind": kind, "label": KIND_LABELS[kind], "current": default_name(kind), "house": is_house_default(kind), "options": options})
+    return out
 
 
 def set_default(kind: str, name: str, by: str | None = None) -> str | None:
@@ -223,11 +248,12 @@ def set_default(kind: str, name: str, by: str | None = None) -> str | None:
     return None
 
 
-def default_for(kind: str, source_lang: str, target_lang: str) -> str | None:
+def default_for(kind: str, source_lang: str, target_lang: str, explicit_only: bool = False) -> str | None:
     """The pinned default, but only when it can really take this job now: connected, switched on, not set aside after a failure and able to
-    take the languages. Otherwise None, and the automatic routing carries on exactly as before."""
+    take the languages. Otherwise None, and the automatic routing carries on exactly as before. explicit_only ignores the house choice, for a
+    job it should not decide (a paid plan's translation upgrade) while still honouring a provider staff picked on purpose."""
     name = default_name(kind)
-    if not name or not usable(name) or is_paused(name):
+    if not name or not usable(name) or is_paused(name) or (explicit_only and is_house_default(kind)):
         return None
     stub = {"source_lang": source_lang, "target_lang": target_lang, "asr": None, "mt": None, "tts": None}
     row = next((a for a in alternatives(stub, kind) if a["name"] == name), None)

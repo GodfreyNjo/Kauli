@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -1530,6 +1530,7 @@ templates.env.globals["first_name"] = _first_name
 templates.env.globals["hours_suffix"] = billing.hours_suffix
 templates.env.globals["billing_saving"] = lambda plan: int(round((1 - plan["price_usd_year"] / (plan["price_usd"] * 12)) * 100)) if plan["price_usd"] else 0
 templates.env.globals["meetings_enabled"] = meeting_bot.configured
+templates.env.globals["provider_switch"] = provider_health.switch_panel      # the model switch on the Models and Review tabs
 # the landing page's integration badges follow what really works: Discord (paste a channel link) and the calendars (private link) need nothing from
 # us, the file stores and Google Docs switch on when Kauli's app for that service is set up
 templates.env.globals["integration_state"] = lambda pid: "live" if (pid in ("discord", "calendar") or connections.configured(pid)) else "soon"
@@ -1587,7 +1588,7 @@ def _ui_lang(request, user=None) -> str:
 
 # ---- every page in the visitor's language (the engine is webapp/page_translate.py)
 _LOCALIZE_SKIP = ("/static/", "/api/", "/webhooks/", "/staff", "/actor", "/lang/", "/avatar/", "/blog-cover/", "/media", "/download", "/s/", "/r/",
-                  "/healthz", "/status", "/sitemap", "/robots", "/llms", "/feed", "/podcast", "/mcp", "/.well-known", "/favicon", "/sw.js", "/logout")
+                  "/healthz", "/status", "/sitemap", "/robots", "/llms", "/feed", "/podcast.xml", "/mcp", "/.well-known", "/favicon", "/sw.js", "/logout")
 _PREFIXED_PATH = re.compile(r"^/([a-z]{2})(/.+)$")
 _FILE_LIKE = re.compile(r"\.(png|jpe?g|webp|gif|svg|ico|css|js|json|xml|txt|pdf|mp3|mp4|webm|woff2?|zip|docx|srt|vtt)$", re.I)
 _OG_LOCALE = {"es": "es_ES", "zh": "zh_CN", "ar": "ar_AR", "fr": "fr_FR", "pt": "pt_BR", "de": "de_DE", "hi": "hi_IN", "ja": "ja_JP", "ko": "ko_KR", "sw": "sw_KE", "en": "en_US"}
@@ -1820,7 +1821,9 @@ def _pick_mt(source_lang: str, target_lang: str, plan_mt: str, review_tier: str,
     Claude-first rule, and the original local/Azure fallbacks are kept for
     anything Lara can't take - so nothing changes for an account until Lara's
     keys are actually set."""
-    pinned = provider_health.default_for("mt", source_lang, target_lang)           # staff's default on the Providers page, when it can take this pair
+    # staff's default (Providers, Models or Review tab), when it can take this pair. The house choice, Azure, is for the automatic jobs only: a paid
+    # plan's Claude upgrade and anything a human reviews are left to the routing below unless staff picked a provider on purpose.
+    pinned = provider_health.default_for("mt", source_lang, target_lang, explicit_only=(review_tier != "ai" or plan_mt == "claude"))
     if pinned:
         return pinned, None
     lara_ok = _lara_configured() and not provider_health.blocked("lara")
@@ -2820,7 +2823,9 @@ def sitemap(request: Request):
         (f"{base}/demo", "0.6"),
         (f"{base}/try", "0.7"),
         (f"{base}/human-review", "0.8"),
+        (f"{base}/podcast", "0.6"),
     ]
+    static_urls += [(f"{base}/podcast/{e['id']}", "0.5") for e in podcast.list_episodes(True, 200)]
     static_urls += [(f"{base}/human-review/{slug}", "0.7") for slug in human_review_content.ORDER]
     static_urls += [(f"{base}/locations/{slug}", "0.6") for slug in locations.OFFICES]
     static_urls += [(f"{base}/solutions/{slug}", "0.8") for slug in SOLUTION_PAGES]
@@ -10933,19 +10938,21 @@ def staff_provider_mode(request: Request, mode: str = Form("")):
 
 
 @app.post("/staff/providers/default")
-def staff_provider_default(request: Request, kind: str = Form(""), name: str = Form("")):
+def staff_provider_default(request: Request, kind: str = Form(""), name: str = Form(""), next: str = Form("")):
     """Pin the default provider for one step (transcription, translation or dubbing), or go back to automatic. New orders use it when it can take
     the job, and the editor's provider popup opens on it."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
+    back = next if next.startswith("/staff/") and "//" not in next and "\\" not in next and "\n" not in next else "/staff/providers"       # only ever back to a staff page
+    sep = "&" if "?" in back else "?"
     problem = provider_health.set_default(kind, name.strip(), by=user["id"])
     if problem:
-        return RedirectResponse("/staff/providers?error=" + quote(problem), status_code=303)
+        return RedirectResponse(f"{back}{sep}error=" + quote(problem), status_code=303)
     _provider_log(user, f"default {kind} = {name.strip() or 'automatic'}")
     label = provider_health.KIND_LABELS[kind]
     said = provider_health.NAMES.get(name.strip(), name.strip()) if name.strip() else "automatic (follows the mode above)"
-    return RedirectResponse("/staff/providers?notice=" + quote(f"{label} default: {said}. It applies to new orders and to the editor's provider popup."), status_code=303)
+    return RedirectResponse(f"{back}{sep}notice=" + quote(f"{label} default: {said}. It applies to new orders and to the editor's provider popup."), status_code=303)
 
 
 @app.post("/staff/providers/set")
@@ -12137,6 +12144,7 @@ blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
 connections.register(sys.modules[__name__])
 meeting_notes.register(sys.modules[__name__])
+podcast.register(sys.modules[__name__])               # the Podcast page, its staff tools and the transcript webhook
 calendar_auto.register(sys.modules[__name__])      # Kauli joins the meetings on a connected calendar by itself
 staff_integrations.register(sys.modules[__name__])
 account_closure.register(sys.modules[__name__])
