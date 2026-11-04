@@ -1,0 +1,15 @@
+{% set ub = usage_banner(user) %}{% set ps = pro_savings(user) %}
+{% if ub %}
+<div class="nudge nudge-usage level-{{ ub.level }}" role="status">
+  <strong>{% if ub.level >= 80 %}You have {{ '%g'|format(ub.left) }} free minutes left this month.{% else %}You have used half of your free minutes this month.{% endif %}</strong>
+  <span>{{ '%g'|format(ub.used) }} of {{ '%g'|format(ub.total) }} used. They start again every month. After that, pay as you go, with the price shown before you order.</span>
+  <a href="/client/billing#change-plan">See your options</a>
+</div>
+{% endif %}
+{% if ps %}
+<div class="nudge nudge-pro" role="status">
+  <strong>A monthly plan would have cost you less.</strong>
+  <span>Your last {{ ps.orders }} orders cost ${{ '%.2f'|format(ps.paid) }}. On Pro (${{ ps.pro_price }} a month) those {{ '%g'|format(ps.minutes) }} minutes of Instant AI are included, a difference of ${{ '%.2f'|format(ps.saved) }}.</span>
+  <a href="/client/billing#change-plan">Compare plans</a>
+</div>
+{% endif %}

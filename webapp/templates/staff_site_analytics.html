@@ -211,6 +211,26 @@
     </section>
   </div>
 
+  <div class="sx-row sx-row-2">
+    <section class="sa-card" aria-labelledby="sx-exit-h">
+      <header class="sa-card-head"><div><h2 id="sx-exit-h">Why people stop at the review step</h2><p>From "Not ready? Tell us why" on the last step before submitting.</p></div></header>
+      {% if d.exit_reasons %}
+      {% set top_n = d.exit_reasons[0].n %}
+      <ul class="sa-bars sa-bars-wide">{% for r in d.exit_reasons %}<li><span>{{ {'price': 'The price', 'accuracy': 'Not sure it is accurate enough', 'language': 'Needs another language or service', 'speed': 'Needs it faster', 'just_looking': 'Only looking', 'other': 'Something else'}.get(r.reason, r.reason) }}</span><em class="muted">{{ r.n }}</em><i><u style="width: {{ 100 * r.n / top_n }}%"></u></i><b></b></li>{% endfor %}</ul>
+      {% if d.exit_notes %}<h4>In their words</h4><ul class="sx-bullets">{% for n in d.exit_notes %}<li>{{ n.note }}</li>{% endfor %}</ul>{% endif %}
+      {% else %}<p class="muted">No answers yet. They appear here as people use the prompt.</p>{% endif %}
+    </section>
+    <section class="sa-card" aria-labelledby="sx-trial-h">
+      <header class="sa-card-head"><div><h2 id="sx-trial-h">Try-before-signup</h2><p>People who transcribed a short file from the home page without an account.</p></div></header>
+      <div class="sx-tiles">
+        <div class="tone-blue"><span>Started a trial</span><strong>{{ d.trials.started }}</strong></div>
+        <div class="tone-green"><span>Saved it with an email</span><strong>{{ d.trials.saved }}</strong></div>
+      </div>
+      <p class="sa-fine">Trials are not counted as sign-ups. A trial that is saved becomes a real sign-up with its order attached.</p>
+      <p><a class="sx-btn" href="/staff/analytics/kpi">Weekly numbers email</a></p>
+    </section>
+  </div>
+
   <section class="sa-card sx-utm" aria-labelledby="sx-utm-h">
     <header class="sa-card-head"><div><h2 id="sx-utm-h">Tag a link</h2><p>Every link you share should say where it was posted, so the traffic stops showing up as "Direct".</p></div></header>
     <form class="sx-utm-form" onsubmit="return false">

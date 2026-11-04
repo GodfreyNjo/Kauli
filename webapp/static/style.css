@@ -6799,3 +6799,21 @@ html[dir="rtl"] .sidebar { border-right: 0; border-left: 1px solid var(--chrome-
 .sx-utm { margin: 0 0 16px; } .sx-utm-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; } .sx-utm-form label { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; color: #5a6b85; }
 .sx-utm-form input { margin: 0; } .sx-utm-out { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #f3f7fd; }
 .sx-utm-out output { flex: 1; min-width: 200px; word-break: break-all; font-size: 0.86rem; color: #0b2447; }
+
+/* try before signing up, the magic link, and the kind words about free minutes */
+.tk-try { cursor: default; } .tk-try .tk-drop { cursor: pointer; }
+.tk-try-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 12px 0 6px; } .tk-try-lang { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; flex: 1; min-width: 180px; } .tk-try-lang select { margin: 0; }
+.tk-try-progress { display: flex; gap: 10px; align-items: center; margin: 8px 0; } .tk-try-progress progress { flex: 1; height: 10px; }
+.tk-try-msg { min-height: 1.2em; margin: 4px 0; font-size: 0.9rem; } .tk-try-fine { margin: 8px 0 0; font-size: 0.82rem; }
+.auth-magic { margin: 12px 0 4px; display: grid; gap: 8px; } .auth-magic-btn { width: 100%; } .auth-magic-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+.guest-banner .guest-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; width: 100%; } .guest-banner .guest-form span { flex: 1; min-width: 240px; } .guest-banner input[type=email] { margin: 0; max-width: 260px; }
+.nudge { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 12px 16px; margin: 0 0 14px; border-radius: 12px; border: 1px solid #d7e4fb; background: #f2f7ff; font-size: 0.92rem; } .nudge strong { color: #0b2447; }
+.nudge span { flex: 1; min-width: 240px; color: #3b4a63; } .nudge a { font-weight: 700; white-space: nowrap; }
+.nudge-usage.level-80 { background: #fff7e8; border-color: #f2d19a; } .nudge-pro { background: #effaf3; border-color: #bfe5cd; }
+.exit-prompt { margin: 12px 0 0; font-size: 0.9rem; } .exit-prompt-toggle { background: none; border: 0; padding: 0; color: var(--accent-text, #1d5fd1); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.exit-reasons { border: 0; padding: 0; margin: 10px 0; display: grid; gap: 6px; } .exit-reasons label, .exit-note { display: flex; gap: 8px; align-items: center; font-weight: 500; } .exit-reasons input { width: auto; margin: 0; }
+.exit-note { margin: 6px 0 10px; flex-wrap: wrap; } .exit-note input { flex: 1; min-width: 220px; margin: 0; } #exit-thanks { margin-left: 10px; color: var(--muted); }
+
+.guest-order { max-width: 680px; margin: 24px auto; } .guest-progress { display: flex; gap: 12px; align-items: center; margin: 14px 0; } .guest-progress progress { flex: 1; height: 12px; }
+.guest-card { padding: 20px; border: 1px solid #d7e4fb; border-radius: 16px; background: #f6f9ff; } .guest-card h2 { margin: 0 0 6px; }
+.guest-form-big { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; } .guest-form-big input { flex: 1; min-width: 220px; margin: 0; }

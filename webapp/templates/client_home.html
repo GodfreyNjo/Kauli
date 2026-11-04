@@ -2,6 +2,7 @@
 {% set translated = true %}
 {% block title %}{{ t('nav_dashboard') }}{% endblock %}
 {% block content %}
+{% include "_nudges.html" %}
 {% from "_ds.html" import ico, file_ic, status_pill, svc_cell, langs_cell with context %}
 {% from "_pager.html" import pager %}
 

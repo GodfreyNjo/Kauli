@@ -114,8 +114,7 @@
   <section class="tk-hero">
     <div class="tk-hero-inner">
       <h1>Accurate transcripts and subtitles in 76+ languages. Human-checked when it has to be right.</h1>
-      <p class="tk-hero-sub">Instant AI in 76+ languages. Add a real human editor in {{ human_review_languages }}. Word, TXT, SRT and VTT downloads. First {{ free_minutes|int }} minutes free every month.</p>
-      <p class="tk-hero-proof">Every human-reviewed transcript is checked against the audio by a dedicated editor before it is marked ready.</p>
+      <p class="tk-hero-sub">Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it.</p>
       <details class="tk-more">
         <summary>
           <span>Learn more</span>
@@ -123,6 +122,8 @@
         </summary>
         <div class="tk-more-body">
           <p class="tk-more-lede">Instantly with AI, or human-reviewed in selected languages. <a href="/human-review">See which</a>.</p>
+          <p class="tk-more-promise">Instant AI in 76+ languages. Add a real human editor in {{ human_review_languages }}. Word, TXT, SRT and VTT downloads. First {{ free_minutes|int }} minutes free every month.</p>
+          <p class="tk-more-proof">Every human-reviewed transcript is checked against the audio by a dedicated editor before it is marked ready.</p>
           <ul class="tk-more-grid">
             <li><strong>Instant AI</strong>
               Ready in minutes. Transcription and translation in 76+ languages. Clearly labelled as AI-generated, not reviewed by a person.</li>
@@ -147,8 +148,8 @@
 
     <section class="tk-langs" aria-labelledby="langs-title">
       <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
-      <h2 id="langs-title">Transcribe audio to text in {{ ((ai_only_languages|length + source_languages|length - 1) // 10) * 10 }}+ languages</h2>
-      <p class="tk-langs-sub">Instant AI transcribes {{ language_total }} languages today, including Chinese (Mandarin), Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
+      <h2 id="langs-title">Transcribe audio to text in 76+ languages</h2>
+      <p class="tk-langs-sub">Instant AI transcribes 76+ languages today, including Chinese (Mandarin), Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
       <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
         {% for copy in (1, 2) %}
         <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
@@ -161,7 +162,7 @@
         {% endfor %}
       </div>
       <ul class="tk-legend" aria-label="Language availability">
-        <li><span class="tk-tag now">Available now</span> Instant AI transcription in {{ language_total }} languages</li>
+        <li><span class="tk-tag now">Available now</span> Instant AI transcription in 76+ languages</li>
           <li><span class="tk-tag now">Available now</span> Human review and dubbing in selected languages. <a href="/human-review">See which</a></li>
           <li><span class="tk-tag soon">Coming soon</span> Human review and dubbing in more languages</li>
         </ul>
@@ -180,17 +181,61 @@
     </section>
 
     <div class="tk-cards">
-      <a class="tk-card" href="/login?mode=signup" data-cta="hero-upload">
+      <div class="tk-card tk-try" id="try-card">
         <div class="tk-card-head">
           <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
-          <h2>Upload to convert audio or video to text</h2>
+          <h2>Try it now: no account needed</h2>
         </div>
-        <div class="tk-drop">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
-          <span>Click to upload and transcribe for free</span>
+        <input type="file" id="try-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
+        <label class="tk-drop" for="try-file" id="try-drop" tabindex="0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4m0 0 4 4m-4-4L8 8M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+          <span id="try-label">Choose a recording (up to 30 minutes). It is transcribed free, and the result is kept in your free account.</span>
+        </label>
+        <div class="tk-try-row">
+          <label class="tk-try-lang"><span>Language spoken</span>
+            <select id="try-lang" aria-label="Language spoken in the recording">
+              {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
+              {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+            </select></label>
+          <button type="button" class="btn cta-olive" id="try-go" disabled data-cta="hero-try">Transcribe it</button>
         </div>
+        <div class="tk-try-progress" id="try-progress" hidden><progress id="try-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="try-pct">0%</span></div>
+        <p class="tk-try-msg" id="try-msg" role="status" aria-live="polite"></p>
         <ul class="tk-chips" aria-label="Accepted formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
-      </a>
+        <p class="tk-try-fine">Your file is used only to make this transcript, and you see it inside your account. <a href="/login?mode=signup" data-cta="hero-upload">Create a free account instead</a>.</p>
+      </div>
+      <script>
+        (function () {
+          var file = document.getElementById("try-file"), go = document.getElementById("try-go"), label = document.getElementById("try-label"), msg = document.getElementById("try-msg"),
+              bar = document.getElementById("try-bar"), pct = document.getElementById("try-pct"), prog = document.getElementById("try-progress"), lang = document.getElementById("try-lang"),
+              drop = document.getElementById("try-drop");
+          if (!file) return;
+          drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+          file.addEventListener("change", function () {
+            var f = file.files[0]; msg.textContent = "";
+            if (!f) { go.disabled = true; return; }
+            if (f.size > 100 * 1024 * 1024) { msg.textContent = "That file is over 100 MB. Create a free account to upload larger files."; go.disabled = true; return; }
+            label.textContent = f.name; go.disabled = false;
+          });
+          go.addEventListener("click", function () {
+            var f = file.files[0]; if (!f) return;
+            var fd = new FormData(); fd.append("audio", f); fd.append("source_lang", lang.value);
+            var xhr = new XMLHttpRequest(); xhr.open("POST", "/try/start");
+            go.disabled = true; prog.hidden = false; msg.textContent = "Uploading...";
+            xhr.upload.onprogress = function (e) { if (e.lengthComputable) { var p = Math.round(100 * e.loaded / e.total); bar.value = p; pct.textContent = p + "%"; } };
+            xhr.onload = function () {
+              var d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+              if (xhr.status === 200 && d.redirect) { msg.textContent = "Starting your transcript..."; window.location.href = d.redirect; return; }
+              prog.hidden = true; go.disabled = false;
+              msg.innerHTML = ""; msg.appendChild(document.createTextNode((d.error || "Something went wrong. Please try again.") + " "));
+              if (d.signup) { var a = document.createElement("a"); a.href = d.signup; a.textContent = "Create a free account"; msg.appendChild(a); }
+              if (window.kpToast) kpToast(d.error || "Something went wrong.", "error");
+            };
+            xhr.onerror = function () { prog.hidden = true; go.disabled = false; msg.textContent = "Could not reach Kauli. Check your connection and try again."; };
+            xhr.send(fd);
+          });
+        })();
+      </script>
       <a class="tk-card" href="/login?mode=signup" data-cta="hero-link">
         <div class="tk-card-head">
           <span class="tk-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>

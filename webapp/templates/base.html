@@ -224,7 +224,17 @@
     {% endif %}
     <div class="app-main">
       <main id="main-content" tabindex="-1">
-        {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user)
+        {% if user is defined and user and user['role'] == 'client' and user['is_guest'] %}
+        <div class="plan-banner guest-banner" role="status">
+          <form method="post" action="/client/save-guest" class="guest-form">
+            <input type="hidden" name="next" value="{{ request.url.path }}">
+            <span><strong>Save your transcript.</strong> Give your email and we send a link; your transcript and your free minutes are kept in a free account.</span>
+            <input type="email" name="email" placeholder="you@example.com" required aria-label="Your email address" autocomplete="email">
+            <button type="submit" class="btn">Email me the link</button>
+          </form>
+        </div>
+        {% endif %}
+        {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user) and not user['is_guest']
               and request.url.path not in ['/client/billing'] %}
         <div class="plan-banner" role="status">
           <span><strong>Subscribe to the Free plan (pay as you go) to download and edit your files.</strong> You can read the start of your results now. <a href="/client/billing?choose_plan=1">See how it works</a></span>

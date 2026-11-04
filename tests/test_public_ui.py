@@ -243,11 +243,12 @@ def test_use_case_menu_replaces_solutions_and_links_real_pages(client):
 def test_hero_subtitle_is_short_with_a_learn_more_that_holds_the_rest(client):
     html = client.get("/").text
     sub = re.search(r'<p class="tk-hero-sub">(.*?)</p>', html, re.S).group(1).strip()
-    assert sub.startswith("Instant AI in 76+ languages. Add a real human editor in") and sub.endswith("First 30 minutes free every month.")   # the one canonical promise
-    assert "Accurate transcripts and subtitles in 76+ languages. Human-checked when it has to be right." in html
+    assert sub == "Turn audio and video into accurate text in minutes, then translate it, add subtitles or dub it."
     more = re.search(r'<details class="tk-more">.*?</details>', html, re.S).group(0)
     assert "<summary" in more and "Learn more" in more and "<details class=\"tk-more\" open" not in html   # closed by default
     assert "Instantly with AI, or human-reviewed in selected languages." in more and 'href="/human-review"' in more
+    assert "Instant AI in 76+ languages. Add a real human editor in" in more and "First 30 minutes free every month." in more          # the canonical promise lives under Learn more
+    assert "Every human-reviewed transcript is checked against the audio by a dedicated editor before it is marked ready." in more
     for topic in ("Instant AI", "Human-reviewed", "Transcripts, subtitles and dubbing", "Simple pricing"):
         assert topic in more
     assert "Starting at $0" in more and "per audio-minute" not in more and "not reviewed by a person" in more

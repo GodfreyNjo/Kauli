@@ -1285,6 +1285,25 @@ def staff_translations_warm(request: Request):
     return RedirectResponse("/staff/translations", status_code=303)
 
 
+@router.get("/staff/analytics/kpi", response_class=HTMLResponse)
+def staff_kpi(request: Request, notice: str | None = None):
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    from . import weekly_kpi
+    return A.templates.TemplateResponse(request, "staff_kpi.html", {"user": user, "theme": "light", "report": weekly_kpi.build(), "recipient": weekly_kpi.recipient(), "notice": notice})
+
+
+@router.post("/staff/analytics/kpi/send")
+def staff_kpi_send(request: Request):
+    user = _staff(request)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    from . import weekly_kpi
+    ok, detail = weekly_kpi.send(A._site_base(request), mailer.send_email, mailer.wrap_email_html)
+    return RedirectResponse(f"/staff/analytics/kpi?notice={quote('Sent to ' + weekly_kpi.recipient() + '.' if ok else 'Could not send: ' + str(detail))}", status_code=303)
+
+
 @router.get("/staff/analytics/export.csv")
 def site_analytics_export(request: Request, days: int = 28):
     """The headline numbers and the day-by-day visitors, sign-ups-free of any personal data, as a spreadsheet."""

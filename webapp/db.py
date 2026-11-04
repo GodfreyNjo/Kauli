@@ -498,6 +498,27 @@ CREATE TABLE IF NOT EXISTS app_flags (
 );
 
 -- Our own cookie-free page views (see site_analytics.py): a visitor is a daily-rotating hash, never a cookie, an address or a person.
+CREATE TABLE IF NOT EXISTS guest_claims (
+    email TEXT NOT NULL,
+    guest_id TEXT NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (email, guest_id)
+);
+CREATE TABLE IF NOT EXISTS exit_reasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    step TEXT,
+    reason TEXT NOT NULL,
+    note TEXT,
+    created_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS usage_prompts (
+    user_id TEXT NOT NULL,
+    period TEXT NOT NULL,
+    level INTEGER NOT NULL,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (user_id, period, level)
+);
 CREATE TABLE IF NOT EXISTS ui_translations (
     h TEXT NOT NULL,
     lang TEXT NOT NULL,
@@ -1080,6 +1101,10 @@ def init_db() -> None:
         # "two-factor is on" without an extra Supabase API round-trip on
         # every page load. Kept in sync at enroll/disable time.
         conn.execute("ALTER TABLE users ADD COLUMN mfa_enabled_at REAL")
+    if "is_guest" not in existing_user_cols:
+        # A try-before-you-sign-up visitor: a real account row with no email of its own, made when someone transcribes a short file from the
+        # home page. It is turned into (or merged into) a real account when they give an email and open the link we send.
+        conn.execute("ALTER TABLE users ADD COLUMN is_guest INTEGER NOT NULL DEFAULT 0")
     if "is_internal" not in existing_user_cols:
         # Team, test and friends-and-family accounts. They are left out of every business number (sign-ups, active users, churn, revenue,
         # funnel) so the dashboard shows real customers only. Set automatically for the addresses in KAULI_INTERNAL_EMAILS / _DOMAINS and
@@ -1712,6 +1737,95 @@ def delete_pending_auth_state(token: str | None) -> None:
     conn.execute("DELETE FROM pending_auth_state WHERE token = ?", (token,))
     conn.commit()
     conn.close()
+
+
+def create_guest_user() -> str:
+    """A throwaway account for someone trying Kauli before signing up. Counted as internal so it never inflates sign-ups; its orders move to the
+    real account when they save their transcript (claim_guest_orders)."""
+    gid = "guest-" + uuid.uuid4().hex[:12]
+    get_or_create_user(gid, f"{gid}@guest.invalid", "client", display_name="Guest")
+    conn = get_conn()
+    conn.execute("UPDATE users SET is_guest = 1, is_internal = 1 WHERE id = ?", (gid,))
+    conn.commit()
+    conn.close()
+    return gid
+
+
+def guest_trials_today() -> int:
+    conn = get_conn()
+    try:
+        return conn.execute("SELECT COUNT(*) AS n FROM users WHERE is_guest = 1 AND created_at >= ?", (time.time() - 86400,)).fetchone()["n"]
+    finally:
+        conn.close()
+
+
+def add_guest_claim(email: str, guest_id: str) -> None:
+    conn = get_conn()
+    conn.execute("INSERT OR REPLACE INTO guest_claims (email, guest_id, created_at) VALUES (?, ?, ?)", (email.strip().lower(), guest_id, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def claim_guest_orders(email: str, new_user_id: str) -> float:
+    """When someone who tried Kauli as a guest signs in with the email they gave: their orders (and notices) move to the real account, and the
+    minutes the trial used are counted against its free minutes. Returns the minutes moved."""
+    conn = get_conn()
+    moved = 0.0
+    try:
+        for claim in conn.execute("SELECT guest_id FROM guest_claims WHERE email = ?", (email.strip().lower(),)).fetchall():
+            gid = claim["guest_id"]
+            if gid == new_user_id:
+                continue
+            for o in conn.execute("SELECT duration_minutes FROM orders WHERE client_id = ?", (gid,)).fetchall():
+                moved += o["duration_minutes"] or 0.0
+            conn.execute("UPDATE orders SET client_id = ? WHERE client_id = ?", (new_user_id, gid))
+            conn.execute("UPDATE notifications SET recipient_id = ? WHERE recipient_id = ?", (new_user_id, gid))
+            conn.execute("UPDATE users SET account_status = 'closed' WHERE id = ?", (gid,))
+        conn.execute("DELETE FROM guest_claims WHERE email = ?", (email.strip().lower(),))
+        if moved:
+            conn.execute("UPDATE subscriptions SET minutes_used_this_period = COALESCE(minutes_used_this_period, 0) + ? WHERE user_id = ?", (moved, new_user_id))
+        conn.commit()
+    finally:
+        conn.close()
+    return moved
+
+
+def add_exit_reason(user_id: str | None, step: str, reason: str, note: str) -> None:
+    conn = get_conn()
+    conn.execute("INSERT INTO exit_reasons (user_id, step, reason, note, created_at) VALUES (?, ?, ?, ?, ?)", (user_id, step, reason, note, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def exit_reason_counts(since: float) -> list[dict]:
+    conn = get_conn()
+    try:
+        return [dict(r) for r in conn.execute("SELECT reason, COUNT(*) AS n FROM exit_reasons WHERE created_at >= ? GROUP BY reason ORDER BY n DESC", (since,)).fetchall()]
+    except Exception:  # noqa: BLE001
+        return []
+    finally:
+        conn.close()
+
+
+def recent_exit_notes(limit: int = 6) -> list[dict]:
+    conn = get_conn()
+    try:
+        return [dict(r) for r in conn.execute("SELECT reason, note, created_at FROM exit_reasons WHERE COALESCE(note, '') != '' ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()]
+    except Exception:  # noqa: BLE001
+        return []
+    finally:
+        conn.close()
+
+
+def mark_usage_prompt(user_id: str, period: str, level: int) -> bool:
+    """True the first time this level is recorded for this account this month (so the notice and email go out once)."""
+    conn = get_conn()
+    try:
+        cur = conn.execute("INSERT OR IGNORE INTO usage_prompts (user_id, period, level, created_at) VALUES (?, ?, ?, ?)", (user_id, period, level, time.time()))
+        conn.commit()
+        return cur.rowcount == 1
+    finally:
+        conn.close()
 
 
 def is_internal_email(email: str) -> bool:

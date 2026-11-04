@@ -9,7 +9,7 @@
 
   <div class="auth-card" style="text-align:center;">
     <div id="oauth-working">
-      <p class="auth-sub" style="margin:0;">Signing you in with Google&hellip;</p>
+      <p class="auth-sub" style="margin:0;">Signing you in&hellip;</p>
     </div>
     <div id="oauth-error" hidden>
       {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -25,6 +25,7 @@
   <input type="hidden" name="access_token" id="oauth-access-token">
   <input type="hidden" name="refresh_token" id="oauth-refresh-token">
   <input type="hidden" name="next" id="oauth-next">
+  <input type="hidden" name="via" id="oauth-via">
 </form>
 <script>
   (function () {
@@ -62,6 +63,7 @@
       document.getElementById("oauth-access-token").value = accessToken;
       document.getElementById("oauth-refresh-token").value = refreshToken;
       document.getElementById("oauth-next").value = nextParam;
+      document.getElementById("oauth-via").value = queryParams.get("via") || "";
       // Don't leave the real tokens sitting in the visible URL/history any
       // longer than needed - same real reasoning as reset_password.html.
       history.replaceState(null, "", window.location.pathname + window.location.search);

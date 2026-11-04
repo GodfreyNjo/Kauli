@@ -268,6 +268,17 @@ def change_password(email: str, current_password: str, new_password: str):
         return False, str(exc)
 
 
+def send_magic_link(email: str, redirect_to: str) -> str | None:
+    """Emails a one-time sign-in link (Supabase sends it). It signs in an existing account or makes a new one, so one email field is the whole
+    form. Returns an error message, or None. The caller shows the same message whatever happens, so nobody can find out which emails have
+    accounts. `redirect_to` must be on the project's Redirect URLs list (the Google sign-in callback already is)."""
+    try:
+        get_client().auth.sign_in_with_otp({"email": email, "options": {"email_redirect_to": redirect_to, "should_create_user": True}})
+        return None
+    except Exception as exc:  # noqa: BLE001
+        return str(exc)
+
+
 def request_password_reset(email: str, redirect_to: str) -> None:
     """Fire-and-forget - deliberately swallows every error. Surfacing
     "no account with that email" would let anyone enumerate which emails

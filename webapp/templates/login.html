@@ -40,6 +40,7 @@
           {% include "_google_g_icon.svg" %}
           {{ t('lg_google') }}
         </a>
+        {% include "_magic_link.html" %}
         <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/login">
           <input type="hidden" name="next" value="{{ next or '' }}">
@@ -71,6 +72,7 @@
           {% include "_google_g_icon.svg" %}
           {{ t('lg_google') }}
         </a>
+        {% include "_magic_link.html" %}
         <div class="auth-divider"><span>{{ t('lg_or') }}</span></div>
         <form method="post" action="/signup" id="signup-form">
           <input type="hidden" name="next" value="{{ next or '' }}">

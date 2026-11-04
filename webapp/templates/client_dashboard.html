@@ -402,6 +402,42 @@
       </details>
     </div>
 
+    <div class="exit-prompt" id="exit-prompt" hidden>
+      <button type="button" class="exit-prompt-toggle" id="exit-toggle" aria-expanded="false" aria-controls="exit-panel">Not ready? Tell us why</button>
+      <div id="exit-panel" hidden>
+        <fieldset class="exit-reasons">
+          <legend class="sr-only">Why are you not ready to submit?</legend>
+          <label><input type="radio" name="exit-reason" value="price"> The price</label>
+          <label><input type="radio" name="exit-reason" value="accuracy"> I am not sure it will be accurate enough</label>
+          <label><input type="radio" name="exit-reason" value="language"> I need a different language or service</label>
+          <label><input type="radio" name="exit-reason" value="speed"> I need it faster</label>
+          <label><input type="radio" name="exit-reason" value="just_looking"> I am only looking</label>
+          <label><input type="radio" name="exit-reason" value="other"> Something else</label>
+        </fieldset>
+        <label class="exit-note">Anything you want us to know? <input type="text" id="exit-note" maxlength="500" placeholder="Optional"></label>
+        <button type="button" class="secondary" id="exit-send">Send</button>
+        <span id="exit-thanks" role="status" aria-live="polite"></span>
+      </div>
+    </div>
+    <script>
+      (function () {
+        var box = document.getElementById("exit-prompt"), steps = document.getElementById("wizard-steps"); if (!box || !steps) return;
+        function onReview() { return !!steps.querySelector('.wizard-step[data-step="3"].active'); }
+        function sync() { box.hidden = !onReview(); }
+        new MutationObserver(sync).observe(steps, { attributes: true, subtree: true, attributeFilter: ["class"] }); sync();
+        var toggle = document.getElementById("exit-toggle"), panel = document.getElementById("exit-panel"), thanks = document.getElementById("exit-thanks");
+        toggle.addEventListener("click", function () { var open = panel.hidden; panel.hidden = !open; toggle.setAttribute("aria-expanded", open ? "true" : "false"); });
+        document.getElementById("exit-send").addEventListener("click", function () {
+          var picked = document.querySelector('input[name="exit-reason"]:checked');
+          if (!picked) { thanks.textContent = "Choose one of the reasons first."; return; }
+          fetch("/client/exit-reason", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reason: picked.value, note: document.getElementById("exit-note").value, step: "review" }) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { var ok = !!d.ok; thanks.textContent = ok ? "Thank you. That helps us make this better." : (d.error || "Could not send."); if (ok && window.kpToast) kpToast("Thank you. That helps us.", "success"); })
+            .catch(function () { thanks.textContent = "Could not send. Check your connection."; });
+        });
+      })();
+    </script>
     <div class="wizard-upload-progress" id="wizard-upload-progress" hidden>
       <div class="wizard-upload-progress-label" id="wizard-upload-progress-label">Uploading… 0%</div>
       <div class="wizard-upload-progress-bar"><div class="wizard-upload-progress-fill" id="wizard-upload-progress-fill"></div></div>

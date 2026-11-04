@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Weekly numbers{% endblock %}
+{% block content %}
+<div class="ds-page">
+  <header class="ds-head">
+    <div><h1>Weekly numbers</h1><p>The email that arrives every Monday: real customers only, next to the day-30 targets from the growth plan.</p></div>
+    <div class="ds-head-actions">
+      <form method="post" action="/staff/analytics/kpi/send"><button type="submit" class="ds-btn" {{ 'disabled' if not recipient else '' }}>Send it now{% if recipient %} to {{ recipient }}{% endif %}</button></form>
+    </div>
+  </header>
+  {% if notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
+  {% if not recipient %}<p class="hub-flash bad" role="alert">No address is set. Add KAULI_KPI_EMAIL (or INTERNAL_NOTIFY_EMAIL) on the server.</p>{% endif %}
+  <section class="ds-card">
+    <p class="muted">{{ report.generated }}. {{ report.internal_excluded }} internal or test account{{ '' if report.internal_excluded == 1 else 's' }} left out.</p>
+    <table class="ds-table"><thead><tr><th>Measure</th><th class="num">This week</th><th class="num">Day-30 target</th><th>Status</th></tr></thead><tbody>
+      {% for r in report.rows %}<tr><td>{{ r.label }}</td><td class="num"><strong>{{ r.value }}</strong>{% if r.detail %}<br><small class="muted">{{ r.detail }}</small>{% endif %}</td><td class="num">{{ r.target }}</td>
+        <td><span class="ds-pill {{ {'good': 'ok', 'behind': 'err', 'none': ''}[r.status] }}">{{ {'good': 'On target', 'behind': 'Behind', 'none': 'Not enough data'}[r.status] }}</span></td></tr>{% endfor %}
+    </tbody></table>
+    <p class="muted">Judge progress by the counts while the numbers are small. Targets are the day-30 column of the growth plan.</p>
+  </section>
+</div>
+{% endblock %}

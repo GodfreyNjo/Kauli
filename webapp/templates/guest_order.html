@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Your transcript{% endblock %}
+{% block content %}
+<div class="guest-order">
+  <h1 id="go-title">{% if failed %}We could not finish this one{% elif ready %}Your transcript is ready{% else %}Your transcript is being made{% endif %}</h1>
+  <p class="muted"><strong>{{ order['original_filename'] }}</strong>{% if minutes %} &middot; {{ '%g'|format(minutes) }} min{% endif %}</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+  {% if notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
+  {% if failed %}
+  <p>Something went wrong with this recording. <a href="/login?mode=signup">Create a free account</a> and we will help you get it done.</p>
+  {% else %}
+  <div class="guest-progress" aria-live="polite">
+    <progress id="go-bar" max="100" value="{{ 100 if ready else 15 }}" aria-label="Progress"></progress>
+    <span id="go-status">{{ 'Ready.' if ready else 'Working on it. This usually takes a few minutes.' }}</span>
+  </div>
+  <section class="guest-card">
+    <h2>See your transcript in your free account</h2>
+    <p>Results are shown inside your account. Give your email and we send a link; open it and your transcript is there, along with your {{ max_minutes }} free minutes each month.</p>
+    <form method="post" action="/client/save-guest" class="guest-form-big">
+      <input type="hidden" name="next" value="/client/orders/{{ order['id'] }}">
+      <input type="email" name="email" placeholder="you@example.com" required aria-label="Your email address" autocomplete="email">
+      <button type="submit" class="btn cta-olive">Email me the link</button>
+    </form>
+    <p class="muted">No password needed. We only use your email to send the link and to tell you when results are ready.</p>
+  </section>
+  {% endif %}
+</div>
+{% if not ready and not failed %}
+<script>
+  (function () {
+    var bar = document.getElementById("go-bar"), status = document.getElementById("go-status"), title = document.getElementById("go-title");
+    function poll() {
+      fetch("/client/orders/{{ order['id'] }}/progress", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d && typeof d.pct === "number") bar.value = Math.max(10, Math.min(100, d.pct));
+        if (d && d.done) { bar.value = 100; status.textContent = "Ready."; title.textContent = "Your transcript is ready"; return; }
+        setTimeout(poll, 4000);
+      }).catch(function () { setTimeout(poll, 8000); });
+    }
+    setTimeout(poll, 3000);
+  })();
+</script>
+{% endif %}
+{% endblock %}

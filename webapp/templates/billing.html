@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Billing and plans{% endblock %}
 {% block content %}
+{% include "_nudges.html" %}
 {% from "_ds.html" import ico with context %}
 {% macro plan_action(key, p) %}
   {% set is_owner = user['client_scope_id'] == user['id'] %}

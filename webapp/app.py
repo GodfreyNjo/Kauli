@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages  # noqa: E402
+from . import locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -359,7 +359,7 @@ def _is_large_body_exempt(path: str) -> bool:
     suffix against request.url.path, NOT the route-template strings
     ("/client/orders/{order_id}/resume") those never equal - a request's
     actual path always has the real id substituted in."""
-    if path in ("/client/orders", "/settings", "/api/v1/orders"):
+    if path in ("/client/orders", "/settings", "/api/v1/orders", "/try/start"):
         return True
     if path.startswith("/client/orders/") and path.endswith("/resume"):
         return True
@@ -1679,6 +1679,8 @@ def _ts_ui(ctx, ts):
 templates.env.globals.update(t=_t, ui_lang=_ui_lang_global, page_lang=_page_lang, page_dir=_page_dir,
                               ui_languages=[(c, ui_text.NATIVE[c]) for c in ui_text.LANGS], ui_native=ui_text.NATIVE)
 templates.env.filters["ts_ui"] = _ts_ui
+templates.env.globals["usage_banner"] = usage_prompts.banner
+templates.env.globals["pro_savings"] = lambda u: savings.pro_savings(u["client_scope_id"]) if u and u["role"] == "client" else None
 templates.env.filters["blog_ctas"] = lambda body, post: Markup(seo_pages.add_blog_ctas(str(body), post["title"], post["slug"]))
 templates.env.globals["site_verification"] = lambda: {"google": os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip(), "bing": os.environ.get("BING_SITE_VERIFICATION", "").strip()}
 def _human_minutes_left(u):
@@ -3401,6 +3403,7 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
         marketing_consent=marketing_consent, consent_ip=request.client.host if request.client else None,
         referred_by_blog_post_id=request.session.get("last_blog_post_id"),
     )
+    db.claim_guest_orders(email, user["id"])                     # a short file tried before signing up becomes theirs
     db.log_security_event(
         "signup" if was_new else "login_success", user_id=user["id"], email=email,
         ip_address=rate_limit.client_ip(request), user_agent=request.headers.get("user-agent"),
@@ -3681,6 +3684,135 @@ def signup(request: Request, email: str = Form(...), password: str = Form(...),
     return _complete_auth_session(request, session, next, marketing_consent=bool(marketing_consent))
 
 
+
+# ---------------------------------------------------------- magic-link sign-in and the try-before-signup flow ----
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+GUEST_TRIAL_MAX_MINUTES = float(billing.FREE_MINUTES_PER_MONTH)         # the free minutes: a guest can send up to this much
+GUEST_TRIAL_MAX_BYTES = 100 * 1024 * 1024
+GUEST_TRIALS_PER_DAY = int(os.environ.get("KAULI_GUEST_TRIALS_PER_DAY", "60"))
+
+
+def _magic_redirect(request: Request, next_url: str) -> str:
+    url = _public_base_url(request) + "/auth/google/callback?via=magic"          # the callback already on the sign-in redirect list
+    return url + (f"&next={quote(_safe_next(next_url), safe='')}" if next_url else "")
+
+
+@app.post("/login/magic")
+def login_magic(request: Request, email: str = Form(...), next: str = Form("")):
+    """One email field: we send a link that signs them in (or makes the account). The answer is the same whether or not the address has an account."""
+    email = email.strip().lower()
+    ip = rate_limit.client_ip(request)
+    ok_user, _ = rate_limit.check(f"magic:{email}", limit=3, window_s=600)
+    ok_ip, _ = rate_limit.check(f"magic-ip:{ip}", limit=10, window_s=600)
+    if not (ok_user and ok_ip):
+        return templates.TemplateResponse(request, "login.html", {"error": "Too many requests - try again in a few minutes.", "notice": None, "mode": "signin",
+                                                                  "next": _safe_next(next)}, status_code=429)
+    if _EMAIL_RE.match(email):
+        supabase_auth.send_magic_link(email, _magic_redirect(request, next))
+        db.log_security_event("magic_link_sent", email=email, ip_address=ip, user_agent=request.headers.get("user-agent"))
+    return templates.TemplateResponse(request, "login.html", {
+        "error": None, "notice": "If that email address is valid, a sign-in link is on its way. It works once and expires soon.", "mode": "signin", "next": _safe_next(next)})
+
+
+@app.post("/try/start")
+def guest_trial_start(request: Request, audio: UploadFile = File(...), source_lang: str = Form("en")):
+    """Try Kauli before signing up: up to the free minutes (30) of a file are transcribed with no account. The result is only ever shown inside an
+    account: the guest page asks for an email, and the transcript appears once they open the link (see /client/save-guest). Limited per address
+    and per day, and the file is the only thing asked for."""
+    user = current_user(request)
+    if user and not (user["is_guest"] if "is_guest" in user.keys() else 0):
+        return JSONResponse({"redirect": "/client#new-project"})
+    ip = rate_limit.client_ip(request)
+    allowed, _ = rate_limit.check(f"guest-trial:{ip}", limit=3, window_s=86400)
+    if not allowed or db.guest_trials_today() >= GUEST_TRIALS_PER_DAY:
+        return JSONResponse({"error": "We have reached today's limit for trying without an account. Create a free account to continue.", "signup": "/login?mode=signup"}, status_code=429)
+    if source_lang not in LANGUAGE_NAMES:
+        source_lang = "en"
+    import shutil
+    import tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="guest-"))
+    try:
+        name = Path(audio.filename or "recording").name
+        src = tmp / name
+        size = 0
+        with open(src, "wb") as out:
+            while chunk := audio.file.read(1 << 20):
+                size += len(chunk)
+                if size > GUEST_TRIAL_MAX_BYTES:
+                    return JSONResponse({"error": "That file is over 100 MB. Create a free account to upload larger files."}, status_code=413)
+                out.write(chunk)
+        try:
+            minutes = probe_duration_minutes(str(src))
+        except Exception:  # noqa: BLE001
+            return JSONResponse({"error": "We could not read that recording. Try an MP3, WAV, M4A or MP4 file."}, status_code=400)
+        final = src
+        if minutes > GUEST_TRIAL_MAX_MINUTES:
+            final = tmp / "free-minutes.mp3"                                        # only the free minutes are transcribed
+            subprocess.run(["ffmpeg", "-y", "-i", str(src), "-vn", "-t", str(int(GUEST_TRIAL_MAX_MINUTES * 60)), "-ac", "1", "-ar", "16000", "-b:a", "64k", str(final)],
+                           capture_output=True, timeout=120, check=True)
+        guest_id = db.create_guest_user()
+        guest = dict(db.get_user(guest_id))
+        guest["client_scope_id"] = guest_id
+        request.state.api_user = guest
+        from starlette.datastructures import UploadFile as _Upload
+        with open(final, "rb") as fh:
+            upload = _Upload(file=fh, filename=final.name if final is not src else name)
+            try:
+                resp = create_order(
+                    request, audio=upload, upload_key="", youtube_url="", source_lang=source_lang, target_lang=source_lang, service_level="transcribe",
+                    addon_video_deliverables="", addon_human_voice_over="", addon_premium_voice="", premium_voice_id="", addon_audio_cleanup="",
+                    instr_speaker_ids="", instr_verbatim_level="clean_read", instr_transcribe_lyrics="", instr_use_italics="", instr_existing_subs="ignore",
+                    instr_no_audio="tag", instr_wrong_language="tag", instr_instrumental_only="tag", instr_notes="", style_guide=None, idempotency_key="",
+                    folder_name="", voice_clone_consent="", rush="", review_tier="ai")
+            except ApiOrderError as exc:
+                return JSONResponse({"error": str(exc)}, status_code=400)
+        loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
+        if not re.match(r"^/client/orders/[0-9a-f]+$", loc):
+            return JSONResponse({"error": "We could not start that transcript. Create a free account to try again.", "signup": "/login?mode=signup"}, status_code=400)
+        request.session["user_id"] = guest_id
+        ga_events.send_event(ga_events.client_id_from_request(request), "guest_trial_started", {"minutes": round(min(minutes, GUEST_TRIAL_MAX_MINUTES), 1)})
+        return JSONResponse({"redirect": loc, "trimmed": minutes > GUEST_TRIAL_MAX_MINUTES})
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+@app.post("/client/save-guest")
+def guest_save(request: Request, email: str = Form(...), next: str = Form("/client")):
+    """A guest gives an email to keep and download their transcript: we send a sign-in link, and their orders move to the account it opens."""
+    user = current_user(request)
+    if not user or not (user["is_guest"] if "is_guest" in user.keys() else 0):
+        return RedirectResponse("/client", status_code=303)
+    email = email.strip().lower()
+    ip = rate_limit.client_ip(request)
+    ok_user, _ = rate_limit.check(f"magic:{email}", limit=3, window_s=600)
+    ok_ip, _ = rate_limit.check(f"magic-ip:{ip}", limit=10, window_s=600)
+    back = _safe_next(next)
+    if not _EMAIL_RE.match(email):
+        return RedirectResponse(f"{back}?error={quote('Please enter a valid email address.')}", status_code=303)
+    if not (ok_user and ok_ip):
+        return RedirectResponse(f"{back}?error={quote('Too many requests - try again in a few minutes.')}", status_code=303)
+    db.add_guest_claim(email, user["id"])
+    supabase_auth.send_magic_link(email, _magic_redirect(request, back))
+    return RedirectResponse(f"{back}?notice={quote('We sent a link to ' + email + '. Open it and your transcript is saved to your account.')}", status_code=303)
+
+
+@app.post("/client/exit-reason")
+async def exit_reason(request: Request):
+    """The review step's "Not ready? Tell us why": one tap, optional note. It explains the drop-off between review and submit."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Please sign in."}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        return JSONResponse({"error": "Bad request."}, status_code=400)
+    reason = str(body.get("reason") or "")[:40]
+    if reason not in ("price", "accuracy", "language", "speed", "just_looking", "other"):
+        return JSONResponse({"error": "Choose one of the reasons."}, status_code=400)
+    db.add_exit_reason(user["id"], str(body.get("step") or "review")[:20], reason, str(body.get("note") or "").strip()[:500])
+    return JSONResponse({"ok": True})
+
+
 @app.get("/login/google")
 def login_google(request: Request, next: str = ""):
     """Redirects to Supabase's own OAuth entry point, not Google directly -
@@ -3717,7 +3849,7 @@ def google_callback_page(request: Request):
 
 @app.post("/auth/google/callback")
 def google_callback_submit(request: Request, access_token: str = Form(""), refresh_token: str = Form(""),
-                            next: str = Form("")):
+                            next: str = Form(""), via: str = Form("")):
     if not access_token or not refresh_token:
         return templates.TemplateResponse(request, "oauth_callback.html", {
             "error": "That didn't come back from Google correctly - please try again.",
@@ -3727,7 +3859,7 @@ def google_callback_submit(request: Request, access_token: str = Form(""), refre
         return templates.TemplateResponse(request, "oauth_callback.html", {
             "error": error or "That sign-in didn't work - please try again.",
         }, status_code=400)
-    return _complete_auth_session(request, session, next, login_kind="google_oauth")
+    return _complete_auth_session(request, session, next, login_kind="magic_link" if via == "magic" else "google_oauth")
 
 
 @app.post("/auth/google/one-tap")
@@ -6353,6 +6485,11 @@ def create_order(
     ga_events.send_event(ga_events.client_id_from_request(request), "order_submitted", {
         "service_level": service_level, "is_rush": is_rush, "value": round(cost["total_usd"], 2),
     })
+    if cost["free_minutes_applied"] > 0 and not (user["is_guest"] if "is_guest" in user.keys() else 0):
+        try:
+            usage_prompts.check(user["client_scope_id"], str(request.base_url), _queue_and_send)
+        except Exception as exc:  # noqa: BLE001 - a kind word must never stop an order
+            api_log.warning("usage prompt failed", extra={"error": str(exc)})
 
     if cost["total_usd"] <= 0:
         # Fully covered by this month's free allowance - no payment step,
@@ -6630,6 +6767,11 @@ def client_order_detail(request: Request, order_id: str, error: str | None = Non
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
+    if "is_guest" in user.keys() and user["is_guest"]:
+        return templates.TemplateResponse(request, "guest_order.html", {
+            "user": user, "order": order, "ready": order["status"] in ("ready_for_delivery", "delivered"),
+            "failed": order["status"] in ("failed", "dead_letter"), "error": error, "notice": notice,
+            "max_minutes": int(GUEST_TRIAL_MAX_MINUTES), "minutes": round(order["duration_minutes"] or 0.0, 1)})
 
     job = _load_job(order)
     # include_internal=False here is load-bearing, not decorative - this is
@@ -11552,6 +11694,7 @@ def _winback_loop() -> None:
             dunning.expire_backstop()
             site_analytics.prune()
             engagement.sweep_once(_base)
+            weekly_kpi.send_if_due(_base, mailer.send_email, mailer.wrap_email_html)
         except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the loop forever
             api_log.warning("winback sweep failed", extra={"error": str(exc)})
 

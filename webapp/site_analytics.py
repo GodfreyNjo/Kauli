@@ -545,6 +545,8 @@ def extras(days: int, now: float, visitors: int, signups: int, paid: int, includ
                              "FROM users WHERE role = 'client' AND created_at >= ? GROUP BY ch ORDER BY n DESC", (start,)):
             quality.append({"name": r["ch"], "signups": r["n"], "paid": r["paid"] or 0, "rate": _pct(r["paid"] or 0, r["n"])})
 
+        trials = {"started": _rows(conn, "SELECT COUNT(*) AS n FROM main.users WHERE is_guest = 1 AND created_at >= ?", (start,))[0]["n"],
+                  "saved": _rows(conn, "SELECT COUNT(DISTINCT guest_id) AS n FROM main.guest_claims WHERE created_at >= ?", (start,))[0]["n"]}
         grid = [[0] * 24 for _ in range(7)]
         for r in _rows(conn, "SELECT CAST(strftime('%w', ts, 'unixepoch') AS INTEGER) AS dow, CAST(strftime('%H', ts, 'unixepoch') AS INTEGER) AS hr, "
                              "COUNT(DISTINCT session) AS n FROM site_hits WHERE ts >= ? GROUP BY dow, hr", (start,)):
@@ -554,6 +556,7 @@ def extras(days: int, now: float, visitors: int, signups: int, paid: int, includ
     peak = max((v for row in grid for v in row), default=0)
     slots = sorted(((v, d, h) for d, row in enumerate(grid) for h, v in enumerate(row) if v), reverse=True)[:3]
     return {"live": live, "funnel": funnel, "activity": activity, "quality": quality,
+            "exit_reasons": db.exit_reason_counts(start), "exit_notes": db.recent_exit_notes(), "trials": trials,
             "heat": {"grid": grid, "peak": peak, "best": [f"{WEEKDAYS[d]} {h:02d}:00" for _, d, h in slots]}}
 
 
