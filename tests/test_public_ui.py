@@ -183,11 +183,13 @@ def test_developer_docs_page_is_public_and_linked(client):
 def test_integrations_section_is_honest_about_what_exists(client):
     html = client.get("/").text
     block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
-    # what is really built is marked Available and linked to its docs...
-    for name in ("API", "MCP server", "Webhooks", "Slack", "Microsoft Teams", "Notion"):
+    # what is really built is marked Available: the developer tools link to their docs, the rest to the customer's own integrations page...
+    for name in ("API", "MCP server", "Webhooks"):
         assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
+    for name in ("Slack", "Microsoft Teams", "Notion", "Discord", "Google Calendar", "Outlook Calendar"):
+        assert re.search(rf'<a href="/login\?next=/client/integrations" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S), name
     # ...and nothing unbuilt is ever presented as available
-    for name in ("Zoom", "Google Drive", "HubSpot", "Salesforce"):
+    for name in ("Zoom", "Google Drive", "Dropbox", "OneDrive", "Google Docs", "HubSpot", "Salesforce"):
         m = re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge (\w+)">', block)
         assert m and m.group(1) == "soon", name
 

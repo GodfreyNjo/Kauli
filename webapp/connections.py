@@ -23,7 +23,7 @@ import time
 from urllib.parse import quote, urlencode
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from . import db
@@ -145,7 +145,15 @@ def setup_status(base: str) -> list[dict]:
         g["redirects"].append(f"{base}/client/integrations/{key}/callback")
         if spec["scopes"]:
             g["scopes"].append(spec["scopes"])
-    return [{**g, "title": " / ".join(g["names"]), "scopes": " ".join(dict.fromkeys(" ".join(g["scopes"]).split()))} for g in groups.values()]
+    out = [{**g, "title": " / ".join(g["names"]), "scopes": " ".join(dict.fromkeys(" ".join(g["scopes"]).split())), "quick": None} for g in groups.values()]
+    for g in out:
+        if g["id_env"] == "SLACK_CLIENT_ID":                              # Slack can create the app, filled in, from one link
+            manifest = {"display_information": {"name": "Kauli", "description": "Posts a message in your channel when a transcript is ready.", "background_color": "#0b2b57"},
+                        "features": {"bot_user": {"display_name": "Kauli", "always_online": False}},
+                        "oauth_config": {"redirect_urls": g["redirects"], "scopes": {"bot": ["incoming-webhook"]}},
+                        "settings": {"org_deploy_enabled": False, "socket_mode_enabled": False, "token_rotation_enabled": False}}
+            g["quick"] = {"label": "Create the Slack app in one click", "url": "https://api.slack.com/apps?new_app=1&manifest_json=" + quote(json.dumps(manifest, separators=(",", ":")))}
+    return out
 
 
 def get_connection(client_id: str, provider: str):
@@ -296,6 +304,41 @@ def _dropbox_label(token: str) -> str:
         return httpx.post("https://api.dropboxapi.com/2/users/get_current_account", headers={"Authorization": f"Bearer {token}"}, timeout=10).json().get("email", "")
     except Exception:  # noqa: BLE001
         return ""
+
+
+DISCORD_HOOK = re.compile(r"^https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/\d{5,25}/[A-Za-z0-9_\-]{20,100}$")
+
+
+@router.post("/client/integrations/discord/paste")
+def discord_paste(request: Request, url: str = Form("")):
+    """Discord without Kauli having to register an app first: the customer pastes their channel's webhook link (Discord makes one in two
+    clicks) and Kauli proves it works by posting a first message there."""
+    user, client_id = _owner_id(request)
+    if not user:
+        return RedirectResponse("/login?next=/client/integrations", status_code=303)
+
+    def back(kind: str, text: str):
+        return RedirectResponse(f"/client/integrations?{kind}={quote(text)}", status_code=303)
+
+    if user["client_scope_id"] != user["id"]:
+        return back("notice", "Only the account owner can connect integrations.")
+    link = (url or "").strip()
+    if not DISCORD_HOOK.match(link):
+        return back("notice", "That does not look like a Discord webhook link. In Discord open the channel's settings, choose Integrations, then Webhooks, then New Webhook and Copy Webhook URL.")
+    try:
+        r = httpx.post(link, json={"content": "\u2705 Kauli is connected to this channel. You will see a message here when a transcript is ready."}, timeout=15)
+        if r.status_code >= 300:
+            raise RuntimeError(r.status_code)
+    except Exception:  # noqa: BLE001
+        return back("notice", "Discord did not accept that link, so nothing was connected. Copy it again from the webhook's page.")
+    prior = get_connection(client_id, "discord")
+    conn = db.get_conn()
+    conn.execute("""INSERT OR REPLACE INTO integration_connections
+        (client_id, provider, token_enc, refresh_enc, expires_at, account_label, target_enc, settings_json, connected_at) VALUES (?, 'discord', NULL, NULL, NULL, ?, ?, ?, ?)""",
+                 (client_id, "Discord channel", _enc(link), prior["settings_json"] if prior else "{}", time.time()))
+    conn.commit()
+    conn.close()
+    return back("notice", "Discord is connected. A first message is waiting in your channel.")
 
 
 def _graph_label(token: str) -> str:

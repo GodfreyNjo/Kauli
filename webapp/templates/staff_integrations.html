@@ -43,6 +43,7 @@
     {% for a in apps %}
       <div class="si-card">
         <header class="si-head"><h3>{{ a.title }}</h3>{% if a.ready %}<span class="pf-tag ok">Ready</span>{% else %}<span class="pf-tag">Needs setup</span>{% endif %}</header>
+        {% if a.quick %}<p><a class="btn" href="{{ a.quick.url }}" target="_blank" rel="noopener">{{ a.quick.label }}</a></p>{% endif %}
         <p class="muted">Register at <a href="{{ a.console }}" target="_blank" rel="noopener">{{ a.console_name }}</a>. Redirect address{{ 'es' if a.redirects|length > 1 else '' }}:</p>
         <ul>{% for r in a.redirects %}<li><code>{{ r }}</code></li>{% endfor %}</ul>
         {% if a.scopes %}<p class="muted">Access to ask for: <code>{{ a.scopes }}</code></p>{% endif %}

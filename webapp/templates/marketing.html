@@ -468,6 +468,7 @@
       <h2 class="m-h2">Connect Kauli to your tools</h2>
       <p class="m-lede">Bring your tools together and get more done.</p>
       {% set meet_state = 'live' if meetings_enabled() else 'soon' %}{% set meet_href = '/login?next=/client/meetings' if meetings_enabled() else None %}
+      {% set mine = '/login?next=/client/integrations' %}{% set st = integration_state %}
       {% set integrations = [
         ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12", "Integrate with your developer tools and automate your workflow.",
           [("API", "live", "/developers", "api"), ("MCP server", "live", "/developers#mcp", "mcp"),
@@ -476,17 +477,17 @@
         ("Video conferencing", "M3 7h11v10H3zM14 11l7-4v10l-7-4", "Work seamlessly with your meeting and collaboration tools.",
           [("Zoom", meet_state, meet_href, "zoom"), ("Teams meetings", meet_state, meet_href, "microsoftteams"), ("Google Meet", meet_state, meet_href, "googlemeet")]),
         ("Storage", "M3 7l3-3h12l3 3v12H3zM3 7h18", "Access and manage your files from anywhere.",
-          [("Google Drive", "soon", None, "googledrive"), ("Dropbox", "soon", None, "dropbox"), ("OneDrive", "soon", None, "microsoftonedrive")]),
+          [("Google Drive", st('gdrive'), mine if st('gdrive') == 'live' else None, "googledrive"), ("Dropbox", st('dropbox'), mine if st('dropbox') == 'live' else None, "dropbox"), ("OneDrive", st('onedrive'), mine if st('onedrive') == 'live' else None, "microsoftonedrive")]),
         ("Notes &amp; documents", "M7 3h8l4 4v14H7zM15 3v4h4M10 12h6M10 16h6", "Turn your notes and documents into structured content.",
-          [("Notion", "live", "/developers#notion", "notion"), ("Google Docs", "soon", None, "googledocs")]),
+          [("Notion", "live", mine, "notion"), ("Google Docs", st('gdocs'), mine if st('gdocs') == 'live' else None, "googledocs")]),
         ("Collaboration", "M4 5h16v11H9l-5 4z", "Team up and get more done together.",
-          [("Slack", "live", "/developers#slack", "slack"), ("Microsoft Teams", "live", "/developers#teams", "microsoftteams"), ("Discord", "soon", None, "discord")]),
+          [("Slack", "live", mine, "slack"), ("Microsoft Teams", "live", mine, "microsoftteams"), ("Discord", st('discord'), mine, "discord")]),
         ("CRM", "M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0zM4 21c0-4 3.5-6 8-6s8 2 8 6", "Keep your customer relationships in sync.",
           [("HubSpot", "soon", None, "hubspot"), ("Salesforce", "soon", None, "salesforce")]),
         ("Project management", "M4 5h6v6H4zM14 5h6v6h-6zM4 15h6v4H4zM14 15h6v4h-6z", "Turn ideas into actionable plans.",
           [("Asana", "soon", None, "asana"), ("Trello", "soon", None, "trello")]),
         ("Calendar", "M4 6h16v14H4zM4 10h16M8 3v4M16 3v4", "Schedule and stay on track.",
-          [("Google Calendar", "soon", None, "googlecalendar"), ("Outlook Calendar", "soon", None, "microsoftoutlook")]),
+          [("Google Calendar", st('calendar'), mine, "googlecalendar"), ("Outlook Calendar", st('calendar'), mine, "microsoftoutlook")]),
       ] %}
       {% set ns = namespace(live=0, soon=0) %}
       {% for title, icon, desc, tools in integrations %}{% for t in tools %}{% if t[1] == 'live' %}{% set ns.live = ns.live + 1 %}{% else %}{% set ns.soon = ns.soon + 1 %}{% endif %}{% endfor %}{% endfor %}

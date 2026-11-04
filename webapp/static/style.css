@@ -7486,3 +7486,8 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
   body.staff-ui:has(.sidebar.collapsed) .topbar-brand .sidebar-collapse-btn { position: static; transform: none; }
 }
 @media (max-width: 860px) { .topbar-brand .sidebar-collapse-btn { display: none; } }
+
+/* paste-a-link connection (Discord) */
+.ig-paste { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.ig-paste input { flex: 1 1 200px; min-width: 0; padding: 8px 10px; border: 1px solid var(--border, #cfd8e8); border-radius: 8px; font: inherit; }
+.ig-paste small { flex: 1 0 100%; color: var(--muted, #6b7690); font-size: 0.78rem; line-height: 1.4; }

@@ -354,7 +354,8 @@ def valid(secret, timestamp, body, header):
 <h2>Step 1: Send Kauli to your session</h2>
 <p>Open Meetings in your Kauli account and paste the meeting link.</p>
 <p>Choose the language that will be spoken, then pick Join now or schedule a start time up to 30 days ahead.</p>
-<p>Kauli joins as "Kauli Notetaker", so everyone can see in the participant list that a recorder is present.</p>
+<p>Kauli joins as "Kauli Notetaker" and posts a message in the meeting chat saying that it is recording.</p>
+<p>Anyone who does not want to be recorded should tell the host, who can remove the notetaker from the meeting at any time.</p>
 <p>The host may need to admit it from the waiting room, so let your co-host know before you start.</p>
 <p>Sending Kauli to a call is available on Pro and Premium, and the minutes come out of your plan.</p>
 

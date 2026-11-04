@@ -778,10 +778,12 @@ def integrations_page(request: Request, notice: str | None = None):
     mine = connections.connections_for(user["client_scope_id"])
     for i in items:
         i["color"] = BRAND.get(i["id"], "#2563eb")
-        if i["id"] in connections.PROVIDERS and (i["id"] == "gdocs" or connections.configured(i["id"])):
+        if i["id"] in connections.PROVIDERS and (i["id"] in ("gdocs", "discord") or connections.configured(i["id"])):
             i["connect"], i["connectable"] = i["id"], connections.configured(i["id"])
             i["connected"] = i["id"] in mine
             i["account"] = mine.get(i["id"], {}).get("label", "")
+            if i["id"] == "discord" and not i["connectable"]:             # no Kauli app yet: pasting the channel's link works today
+                i["paste"] = True
     calendars = []
     for c in CALENDARS:
         prov = {"google_calendar": "gcal", "outlook_calendar": "outlook"}[c["id"]]

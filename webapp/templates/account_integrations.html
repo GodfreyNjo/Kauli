@@ -62,6 +62,12 @@
           {% elif i.connectable %}
             <button type="button" class="btn" data-connect="{{ i.connect }}">Connect</button>
             {% if i.import %}<a class="ig-link" href="/client#order-form">Import a file</a>{% endif %}
+          {% elif i.paste %}
+            <form method="post" action="/client/integrations/discord/paste" class="ig-paste">
+              <input type="url" name="url" placeholder="Paste your Discord channel's webhook link" required aria-label="Discord webhook link" autocomplete="off">
+              <button type="submit" class="btn">Connect</button>
+              <small>In Discord: channel settings &rarr; Integrations &rarr; Webhooks &rarr; New Webhook &rarr; Copy Webhook URL.</small>
+            </form>
           {% else %}
             <span class="ig-via">Coming soon</span>
           {% endif %}

@@ -21,7 +21,8 @@ from urllib.parse import urlparse
 import httpx
 
 BOT_NAME = "Kauli Notetaker"
-JOIN_MESSAGE = "Hi, I'm Kauli Notetaker. I'm recording and transcribing this meeting so notes and action items can be shared afterwards. Please say so if you'd rather I did not."
+JOIN_MESSAGE = ("Hi, I'm Kauli Notetaker. I'm recording and transcribing this meeting so notes and action items can be shared afterwards. "
+                "If anyone would rather not be recorded, please tell the host, who can remove me from the meeting at any time.")
 MIN_MEETING_MINUTES = 30.0          # minutes a client must have left (plan allowance plus credits) before a bot is sent
 MAX_ACTIVE_MEETINGS = 3
 MAX_SCHEDULE_DAYS = 30

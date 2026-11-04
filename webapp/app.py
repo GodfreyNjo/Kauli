@@ -1510,6 +1510,9 @@ templates.env.globals["first_name"] = _first_name
 templates.env.globals["hours_suffix"] = billing.hours_suffix
 templates.env.globals["billing_saving"] = lambda plan: int(round((1 - plan["price_usd_year"] / (plan["price_usd"] * 12)) * 100)) if plan["price_usd"] else 0
 templates.env.globals["meetings_enabled"] = meeting_bot.configured
+# the landing page's integration badges follow what really works: Discord (paste a channel link) and the calendars (private link) need nothing from
+# us, the file stores and Google Docs switch on when Kauli's app for that service is set up
+templates.env.globals["integration_state"] = lambda pid: "live" if (pid in ("discord", "calendar") or connections.configured(pid)) else "soon"
 templates.env.globals["bank_ok"] = _bank_transfer_ok
 templates.env.globals["mpesa_ok"] = _mobile_money_ok
 templates.env.globals["pending_count"] = lambda u: db.pending_orders_count(u["client_scope_id"]) if (u and u["role"] == "client") else 0
