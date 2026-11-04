@@ -782,7 +782,11 @@ def integrations_page(request: Request, notice: str | None = None):
             i["connect"], i["connectable"] = i["id"], connections.configured(i["id"])
             i["connected"] = i["id"] in mine
             i["account"] = mine.get(i["id"], {}).get("label", "")
-    return _render(request, "account_integrations.html", user, items=items, categories=CATEGORIES, calendars=CALENDARS,
+    calendars = []
+    for c in CALENDARS:
+        prov = {"google_calendar": "gcal", "outlook_calendar": "outlook"}[c["id"]]
+        calendars.append({**c, "provider": prov, "oneclick": connections.configured(prov), "connected": prov in mine, "account": mine.get(prov, {}).get("label", "")})
+    return _render(request, "account_integrations.html", user, items=items, categories=CATEGORIES, calendars=calendars,
                    interest=calendar_interest(user["client_scope_id"]), notice=notice)
 
 

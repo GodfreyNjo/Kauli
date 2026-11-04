@@ -1,4 +1,5 @@
 """The public pages point people to the podcast on Spotify."""
+import json
 import sys
 from pathlib import Path
 
@@ -19,6 +20,13 @@ def test_the_footer_links_to_the_podcast_on_spotify(env):
     page = env.client.get("/blog").text
     assert f'href="{SHOW}"' in page and "Podcast on Spotify" in page
     assert 'rel="noopener"' in page.split(SHOW, 1)[1][:80]
+
+
+def test_the_home_page_tells_search_engines_which_profiles_are_ours(env):
+    env.monkeypatch.setattr(env.app, "current_user", lambda request: None)                  # the public home page, as a visitor sees it
+    ld = [json.loads(b.split("</script>")[0]) for b in env.client.get("/").text.split('<script type="application/ld+json">')[1:]]
+    org = next(d for d in ld if d.get("@type") == "Organization")
+    assert "https://www.linkedin.com/company/106627832/" in org["sameAs"] and "https://www.youtube.com/@kauli-forgemedia" in org["sameAs"]
 
 
 def test_the_footer_links_to_the_youtube_channel(env):

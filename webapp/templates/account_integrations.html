@@ -14,13 +14,21 @@
   <section class="hub-card cal" aria-labelledby="cal-h">
     <div>
       <h2 id="cal-h">Connect your calendar</h2>
-      <p class="muted">See your coming meetings and send Kauli to the ones you want recorded and transcribed. Connect with your calendar's private link: no sign-in to share, and you can disconnect any time.</p>
+      <p class="muted">Connect your calendar and Kauli Notetaker joins your Zoom, Google Meet and Teams calls by itself, then sends you the transcript and notes. It can only read your events, and you can disconnect any time.</p>
     </div>
     <div class="cal-cards">
       {% for c in calendars %}
       <div class="cal-card">
         <span class="ws-badge">{{ c.name[0] }}</span><strong>{{ c.name }}</strong>
-        <a class="btn" href="/client/calendar">Connect</a>
+        {% if c.connected %}
+          <span class="ig-on">Connected{% if c.account %} &middot; {{ c.account }}{% endif %}</span>
+          <button type="button" class="btn" data-settings="{{ c.provider }}">Settings</button>
+          <button type="button" class="ig-link" data-disconnect="{{ c.provider }}">Disconnect</button>
+        {% elif c.oneclick %}
+          <button type="button" class="btn" data-connect="{{ c.provider }}">Connect</button>
+        {% else %}
+          <a class="btn" href="/client/calendar">Connect</a>
+        {% endif %}
       </div>
       {% endfor %}
     </div>

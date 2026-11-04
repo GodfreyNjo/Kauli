@@ -135,7 +135,7 @@ def test_an_expired_token_is_refreshed_before_sending(env, monkeypatch):
 def test_calendars_are_connections_but_never_a_place_to_send_transcripts(env, wav_bytes, monkeypatch):
     _link(env, monkeypatch, "gcal", {"access_token": "t", "refresh_token": "r", "expires_in": 3600})
     d = env.client.get("/client/integrations/gcal/settings").json()
-    assert {o["key"] for o in d["options"]} == {"auto", "only_mine", "email_notes", "tell_attendees"}
+    assert {o["key"] for o in d["options"]} == {"auto", "only_mine", "tell_attendees"}
     sent = []
     monkeypatch.setattr(connections.httpx, "post", lambda url, **k: sent.append(url) or Reply({}))
     connections.deliver_order_ready(_order(env, wav_bytes), "https://kauli.test")

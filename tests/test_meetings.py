@@ -111,7 +111,8 @@ def test_a_client_who_is_nearly_out_of_minutes_cannot_send_the_bot(meet):
 def test_sending_the_bot_records_the_meeting_and_lists_it(meet):
     r = _send(meet)
     assert r.status_code == 303 and "notice=" in r.headers["location"]
-    assert meet.state.posts == [{"meeting_url": "https://zoom.us/j/123456789", "bot_name": "Kauli Notetaker"}]
+    assert len(meet.state.posts) == 1 and meet.state.posts[0]["meeting_url"] == "https://zoom.us/j/123456789" and meet.state.posts[0]["bot_name"] == "Kauli Notetaker"
+    assert "recording" in meet.state.posts[0]["chat"]["on_bot_join"]["message"]                    # the room is told
     rows = meet.env.db.list_meetings_for_client("u1")
     assert len(rows) == 1 and rows[0]["platform"] == "zoom" and rows[0]["provider_bot_id"] == "bot-1"
     page = meet.env.client.get("/client/meetings").text

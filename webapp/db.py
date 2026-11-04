@@ -751,6 +751,17 @@ CREATE TABLE IF NOT EXISTS meeting_bots (
 );
 CREATE INDEX IF NOT EXISTS idx_meeting_bots_client ON meeting_bots(client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_meeting_bots_provider ON meeting_bots(provider_bot_id);
+-- Calendar events Kauli has already acted on (webapp/calendar_auto.py), so one event never sends a second bot, even after the customer
+-- cancels it. attendees is the invite list as JSON, kept only so the notes can be emailed to them if the customer asked for that.
+CREATE TABLE IF NOT EXISTS calendar_auto_meetings (
+    client_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    meeting_id TEXT,
+    attendees TEXT,
+    note TEXT,
+    created_at REAL NOT NULL,
+    PRIMARY KEY (client_id, event_id)
+);
 
 CREATE TABLE IF NOT EXISTS client_teams (
     client_id TEXT PRIMARY KEY,
@@ -3701,6 +3712,43 @@ def get_meeting_by_provider(provider_bot_id: str):
     row = conn.execute("SELECT * FROM meeting_bots WHERE provider_bot_id = ?", (provider_bot_id,)).fetchone()
     conn.close()
     return row
+
+
+def get_meeting_by_order(order_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM meeting_bots WHERE order_id = ?", (order_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def calendar_event_seen(client_id: str, event_id: str) -> bool:
+    conn = get_conn()
+    row = conn.execute("SELECT 1 FROM calendar_auto_meetings WHERE client_id = ? AND event_id = ?", (client_id, event_id)).fetchone()
+    conn.close()
+    return row is not None
+
+
+def calendar_event_mark(client_id: str, event_id: str, meeting_id: str | None, attendees: list[str], note: str = "") -> None:
+    conn = get_conn()
+    conn.execute("INSERT OR IGNORE INTO calendar_auto_meetings (client_id, event_id, meeting_id, attendees, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                 (client_id, event_id, meeting_id, json.dumps(attendees), note, time.time()))
+    conn.commit()
+    conn.close()
+
+
+def calendar_event_for_meeting(meeting_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM calendar_auto_meetings WHERE meeting_id = ?", (meeting_id,)).fetchone()
+    conn.close()
+    return row
+
+
+def list_calendar_clients() -> list[str]:
+    """Accounts with a connected calendar (the only ones the auto-join loop has to look at)."""
+    conn = get_conn()
+    rows = conn.execute("SELECT DISTINCT client_id FROM integration_connections WHERE provider IN ('gcal', 'outlook')").fetchall()
+    conn.close()
+    return [r["client_id"] for r in rows]
 
 
 def list_meetings_for_client(client_id: str, limit: int = 30):

@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -5522,11 +5522,14 @@ def client_meetings(request: Request, error: str | None = None, notice: str | No
     if enabled:
         meetings = db.list_meetings_for_client(user["client_scope_id"])
     ok, why, minutes = _meeting_gate(user) if enabled else (False, "", 0.0)
+    mine = connections.connections_for(user["client_scope_id"])
+    auto_join = [connections.PROVIDERS[p]["name"] + (f" ({mine[p]['label']})" if mine[p]["label"] else "") for p in ("gcal", "outlook") if p in mine and mine[p]["settings"].get("auto")]
     page, pages, meetings = _paginate(list(meetings), page, LIST_PAGE_SIZE)
     return templates.TemplateResponse(request, "client_meetings.html", {
         "user": user, "enabled": enabled, "meetings": meetings, "page": page, "pages": pages, "can_send": ok, "why_not": why, "minutes_left": int(minutes),
         "min_minutes": int(meeting_bot.MIN_MEETING_MINUTES), "status_text": _MEETING_STATUS_TEXT, "platform_names": meeting_bot.PLATFORM_NAMES,
         "languages": sorted(LANGUAGE_NAMES.items(), key=lambda kv: kv[1]), "error": error, "notice": notice,
+        "auto_join": auto_join, "calendar_connect": connections.configured("gcal") or connections.configured("outlook"),
     })
 
 
@@ -5557,7 +5560,7 @@ def client_meeting_create(request: Request, meeting_url: str = Form(""), title: 
     allowed, _retry = rate_limit.check(f"meeting:{cid}", limit=10, window_s=600)
     if not allowed:
         return back("error", "Too many requests just now. Try again in a few minutes.")
-    join_ts, join_iso = None, None
+    join_ts = None
     if join_at.strip():
         try:
             when = datetime.fromisoformat(join_at.strip().replace("Z", "+00:00"))
@@ -5566,12 +5569,22 @@ def client_meeting_create(request: Request, meeting_url: str = Form(""), title: 
             return back("error", "That start time was not understood.")
         if join_ts < time.time() - 300 or join_ts > time.time() + meeting_bot.MAX_SCHEDULE_DAYS * 86400:
             return back("error", f"Choose a start time within the next {meeting_bot.MAX_SCHEDULE_DAYS} days.")
-        join_iso = datetime.fromtimestamp(join_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if join_ts > time.time() + 60 else None
-    made = meeting_bot.create_bot(url, join_iso)
+    made = _send_bot(url, platform, title, source_lang, cid, join_ts, minutes)
     if "error" in made:
         return back("error", made["error"])
-    db.create_meeting(uuid.uuid4().hex, cid, url, platform, (title or "").strip()[:120], source_lang, made["id"], join_ts, minutes)
     return back("notice", "Kauli will join your meeting. Tell everyone in it that the meeting is being recorded.")
+
+
+def _send_bot(url: str, platform: str, title: str, source_lang: str, client_id: str, join_ts: float | None, minutes: float) -> dict:
+    """Send the notetaker to a meeting (now, or at join_ts) and record it. {"id": meeting id} or {"error": ...}. Shared by the
+    Meetings page and the calendar auto-join, so both follow exactly the same recorder."""
+    join_iso = datetime.fromtimestamp(join_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ") if join_ts and join_ts > time.time() + 60 else None
+    made = meeting_bot.create_bot(url, join_iso)
+    if "error" in made:
+        return made
+    meeting_id = uuid.uuid4().hex
+    db.create_meeting(meeting_id, client_id, url, platform, (title or "").strip()[:120], source_lang, made["id"], join_ts, minutes)
+    return {"id": meeting_id}
 
 
 @app.post("/client/meetings/{meeting_id}/cancel")
@@ -10990,6 +11003,7 @@ def _on_instant_ai_order_ready(order) -> None:
     one that just auto-delivered: the client's order.ready webhook (needs a
     public base URL for the signed download links - skipped if
     KAULI_PUBLIC_BASE_URL isn't set) and any paid video-deliverable render."""
+    order = meeting_notes.prepare(order)                  # a meeting's notes are written first, so connected tools receive them too
     if worker.PUBLIC_BASE_URL:
         _fire_client_webhook(_PublicBaseRequest(worker.PUBLIC_BASE_URL), order, "order.ready")
     _maybe_auto_render_video_deliverables(order)
@@ -12098,6 +12112,8 @@ account_hub.register(sys.modules[__name__])
 blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
 connections.register(sys.modules[__name__])
+meeting_notes.register(sys.modules[__name__])
+calendar_auto.register(sys.modules[__name__])      # Kauli joins the meetings on a connected calendar by itself
 staff_integrations.register(sys.modules[__name__])
 account_closure.register(sys.modules[__name__])
 winback.register(sys.modules[__name__])

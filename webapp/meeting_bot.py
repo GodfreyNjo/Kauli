@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 import httpx
 
 BOT_NAME = "Kauli Notetaker"
+JOIN_MESSAGE = "Hi, I'm Kauli Notetaker. I'm recording and transcribing this meeting so notes and action items can be shared afterwards. Please say so if you'd rather I did not."
 MIN_MEETING_MINUTES = 30.0          # minutes a client must have left (plan allowance plus credits) before a bot is sent
 MAX_ACTIVE_MEETINGS = 3
 MAX_SCHEDULE_DAYS = 30
@@ -69,7 +70,11 @@ def create_bot(meeting_url: str, join_at_iso: str | None = None) -> dict:
     if join_at_iso:
         body["join_at"] = join_at_iso
     try:
-        r = httpx.post(f"{_base()}/api/v1/bot/", headers=_headers(), json=body, timeout=30)
+        # Kauli tells the room it is there and recording, the way Otter and Fireflies do: nobody is recorded without being told.
+        # If the meeting service does not accept that field the bot is sent without it rather than not at all.
+        r = httpx.post(f"{_base()}/api/v1/bot/", headers=_headers(), json={**body, "chat": {"on_bot_join": {"send_to": "everyone", "message": JOIN_MESSAGE}}}, timeout=30)
+        if r.status_code >= 400:
+            r = httpx.post(f"{_base()}/api/v1/bot/", headers=_headers(), json=body, timeout=30)
         data = r.json()
     except Exception as exc:  # noqa: BLE001
         return {"error": f"Could not reach the meeting service: {exc}"}

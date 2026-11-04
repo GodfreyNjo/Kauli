@@ -90,7 +90,7 @@ PROVIDERS = {
     },
 }
 _CAL = [("auto", "Send Kauli to my meetings automatically", True), ("only_mine", "Only meetings I organize", False),
-        ("email_notes", "Email me the notes when a meeting ends", True), ("tell_attendees", "Also email the notes to everyone invited", False)]
+        ("tell_attendees", "Email the notes to everyone invited", False)]
 PROVIDERS["gcal"] = {**_GOOGLE, "name": "Google Calendar", "scopes": "https://www.googleapis.com/auth/calendar.events.readonly openid email",
                      "blurb": "Kauli joins your Zoom, Meet and Teams calls on its own and sends you the notes.", "settings": _CAL, "calendar": True}
 PROVIDERS["outlook"] = {**PROVIDERS["onedrive"], "name": "Outlook Calendar", "scopes": "Calendars.Read offline_access User.Read",

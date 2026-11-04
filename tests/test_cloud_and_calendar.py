@@ -301,4 +301,4 @@ def test_the_integrations_page_shows_real_connections_and_comes_alive_when_a_ser
     assert "Coming soon" in page and "Import a file" not in page
     monkeypatch.setenv("DROPBOX_APP_KEY", "dk")
     live = env.client.get("/client/integrations").text
-    assert "Import a file" in live and "Pick a recording from Dropbox" in live
+    assert "Import a file" in live and "pick recordings from it when you upload" in live

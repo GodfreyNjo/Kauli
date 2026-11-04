@@ -10,6 +10,20 @@
   {% if not enabled %}
   <section class="ch-files"><div class="ch-empty"><p>Sending Kauli to your meetings is coming soon. You will find it here.</p></div></section>
   {% else %}
+  <section class="ch-files mt-auto" id="mt-auto">
+    <h2>Let Kauli join for you</h2>
+    {% if auto_join %}
+    <p class="mt-lede">Kauli Notetaker is on your calendar ({{ auto_join|join(', ') }}). It joins your Zoom, Google Meet and Teams calls by itself, and you get the transcript and notes when each one ends. Cancel any meeting below if you do not want it recorded.</p>
+    <p><a class="btn secondary" href="/client/integrations#cal-h">Calendar settings</a></p>
+    {% elif calendar_connect %}
+    <p class="mt-lede">Connect your calendar once and Kauli Notetaker joins your Zoom, Google Meet and Teams calls by itself, then sends you the transcript and notes.</p>
+    <p><a class="btn cta-olive" href="/client/integrations#cal-h">Connect my calendar</a></p>
+    {% else %}
+    <p class="mt-lede">Paste a meeting link below to send Kauli to a call, or connect your calendar so it can join every call on its own.</p>
+    <p><a class="btn secondary" href="/client/integrations#cal-h">Connect my calendar</a></p>
+    {% endif %}
+  </section>
+
   <section class="ch-files mt-send">
     <h2>Send Kauli to a meeting</h2>
     <p class="mt-lede">Kauli joins as "Kauli Notetaker", records the meeting and gives you the transcript when it ends. It works on Zoom, Google Meet and Microsoft Teams, and uses the minutes in your plan.</p>
