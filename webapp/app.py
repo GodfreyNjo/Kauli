@@ -2859,6 +2859,13 @@ def robots_txt(request: Request):
     return Response(content=body, media_type="text/plain")
 
 
+@app.get("/google5dd3b740dee7aa1f.html")
+def google_search_console_verification():
+    """Google Search Console's file verification for this site: the file must answer with exactly this line. Served as plain
+    text so the page-translation layer never touches it."""
+    return Response(content="google-site-verification: google5dd3b740dee7aa1f.html", media_type="text/plain")
+
+
 def _llms_text(request: Request, full: bool) -> str:
     """A plain-text map of the business for a language model to read: what Kauli does, what it costs, where, and in which
     languages, with a link for every claim. Built from the same tables the site itself uses, so it cannot drift."""
