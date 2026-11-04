@@ -224,7 +224,7 @@ def _plain_preview(body_html: str, n: int = 110) -> str:
 
 
 @router.get("/client/notes", response_class=HTMLResponse)
-def notes_page(request: Request, id: str | None = None, q: str = ""):
+def notes_page(request: Request, id: str | None = None, q: str = "", page: int = 1):
     user = _client(request)
     if not user:
         return _to_login(request)
@@ -234,9 +234,10 @@ def notes_page(request: Request, id: str | None = None, q: str = ""):
     needle = q.strip().lower()
     shown = [r for r in rows if not needle or needle in r["title"].lower() or needle in " ".join(note_lines(r["body_html"])).lower()]
     current = next((r for r in rows if r["id"] == id), None) if id else None
+    page, pages, shown = A._paginate(shown, page, A.LIST_PAGE_SIZE)
     return _render(request, "account_notes.html", user, notes=[{"row": r, "preview": _plain_preview(r["body_html"]),
                                                                 "when": datetime.fromtimestamp(r["updated_at"]).strftime("%b %d, %H:%M")} for r in shown],
-                   current=current, q=q, total=len(rows))
+                   current=current, q=q, total=len(rows), page=page, pages=pages, note_id=id or "")
 
 
 @router.post("/client/notes/new")
@@ -510,11 +511,13 @@ def _parse_vocab_lines(raw: str) -> list[tuple[str, str]]:
 
 
 @router.get("/client/vocabulary", response_class=HTMLResponse)
-def vocabulary_page(request: Request, error: str | None = None, notice: str | None = None):
+def vocabulary_page(request: Request, error: str | None = None, notice: str | None = None, page: int = 1):
     user = _client(request)
     if not user:
         return _to_login(request)
-    return _render(request, "account_vocabulary.html", user, terms=list_vocab(user["client_scope_id"]), error=error, notice=notice, limit=MAX_VOCAB_TERMS)
+    all_terms = list(list_vocab(user["client_scope_id"]))
+    page, pages, terms = A._paginate(all_terms, page, A.LIST_PAGE_SIZE)
+    return _render(request, "account_vocabulary.html", user, terms=terms, terms_total=len(all_terms), page=page, pages=pages, error=error, notice=notice, limit=MAX_VOCAB_TERMS)
 
 
 @router.post("/client/vocabulary/add")
@@ -673,14 +676,15 @@ def plans_page(request: Request):
 
 # ================================================================================================ WORKSPACE
 @router.get("/client/workspace", response_class=HTMLResponse)
-def workspace_page(request: Request):
+def workspace_page(request: Request, members_page: int = 1):
     user = _client(request)
     if not user:
         return _to_login(request)
     owner_id = user["client_scope_id"]
     owner = db.get_user(owner_id) or user
-    members = list(db.list_team_members(owner_id))
-    orders = list(db.list_orders_for_client(owner_id))[:8]
+    members = [m for m in db.list_team_members(owner_id) if m["status"] != "removed"]
+    members_page, members_pages, members = A._paginate(members, members_page, A.LIST_PAGE_SIZE - 1)       # the owner takes the first row
+    orders = list(db.list_orders_for_client(owner_id))[:A.LIST_PAGE_SIZE]
     conn = db.get_conn()
     notes = conn.execute("SELECT id, title, updated_at, author_id FROM notes WHERE client_id = ? ORDER BY updated_at DESC LIMIT 5", (owner_id,)).fetchall()
     conn.close()
@@ -693,7 +697,7 @@ def workspace_page(request: Request):
         {"name": "Dropbox", "state": "soon", "note": "Import from Dropbox", "href": "/client/integrations"},
     ]
     return _render(request, "account_workspace.html", user, owner=owner, members=members, orders=orders, notes=notes, is_owner=_owner(user),
-                   sources=sources, when=lambda ts: datetime.fromtimestamp(_epoch(ts)).strftime("%b %d, %H:%M"))
+                   members_page=members_page, members_pages=members_pages, sources=sources, when=lambda ts: datetime.fromtimestamp(_epoch(ts)).strftime("%b %d, %H:%M"))
 
 
 # ================================================================================================ INTEGRATIONS

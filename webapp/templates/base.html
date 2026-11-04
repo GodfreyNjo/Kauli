@@ -19,8 +19,18 @@
     // being silently overridden by a stale saved preference.
     (function () {
       if (document.documentElement.getAttribute("data-theme-locked") === "1") return;
-      var t = localStorage.getItem("kauli_theme");
-      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      // One theme for the whole account: the saved choice wins on every page; with no choice saved every page is light, whatever
+      // default the page itself was written with (some staff and editor pages were written dark, so a signed-in person's pages
+      // disagreed with each other).
+      var t = null;
+      try { t = localStorage.getItem("kauli_theme"); } catch (e) {}
+      document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+      // a theme switched in another open tab applies here at once
+      window.addEventListener("storage", function (ev) {
+        if (ev.key !== "kauli_theme") return;
+        document.documentElement.setAttribute("data-theme", ev.newValue === "dark" ? "dark" : "light");
+        document.dispatchEvent(new Event("kauli-theme"));
+      });
     })();
   </script>
   <title>{% block title %}Kauli{% endblock %} - Kauli</title>
@@ -81,6 +91,7 @@
   <!-- End Cloudflare Web Analytics -->
 </head>
 <body class="{% block body_class %}{% endblock %}{% if user and user['role'] == 'staff' %} staff-ui{% elif user and user['role'] == 'client' %} staff-ui client-ui{% endif %}">
+  {% macro am_chev() %}<svg class="am-chev" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5L7.5 6 4 9.5"/></svg>{% endmacro %}
   <a href="#main-content" class="skip-link">{% if translated %}{{ t('skip') }}{% else %}Skip to main content{% endif %}</a>
   {% if user %}
   <header class="topbar" lang="{{ page_lang() }}">
@@ -135,20 +146,25 @@
         <svg class="chevron" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5"/></svg>
       </button>
       <div class="account-menu-panel" id="account-menu-panel" hidden>
-        <div class="account-menu-identity">
-          <div class="user-name">{{ user['display_name'] }}</div>
-          <div class="user-role">{{ user['role'] }}</div>
+        <div class="account-menu-identity am-id">
+          {% if user['avatar_path'] %}<img class="am-id-av" src="/avatar/{{ user['id'] }}" alt="" onerror="this.style.display='none'">{% else %}<span class="am-id-av am-id-initial">{{ user['display_name'][0]|upper }}</span>{% endif %}
+          <div class="am-id-text">
+            <div class="user-name">{{ user['display_name'] }}</div>
+            {% if user['role'] != 'client' %}<div class="user-role">{{ 'Staff' if user['role'] == 'staff' else user['role']|replace('_', ' ') }}</div>{% endif %}
+          </div>
         </div>
-        <button type="button" class="account-menu-item" id="theme-toggle">
-          <span class="icon">T</span><span id="theme-toggle-label"{% if ui_lang() == 'en' %} data-dyn="1"{% endif %}>{{ t('menu_theme') }}</span>
-        </button>
-        <a href="/settings" class="account-menu-item"><span class="icon">S</span>{{ t('nav_settings') }}</a>
-        {% if user['role'] == 'client' %}
-        <a href="/help" class="account-menu-item"><span class="icon">?</span>{{ t('nav_help') }}</a>
-        <a href="mailto:{{ contact_email }}" class="account-menu-item"><span class="icon">@</span>{{ t('menu_email') }}</a>
-        {{ lang_menu(request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}
-        {% endif %}
-        <a href="/logout" class="account-menu-item account-menu-item-danger"><span class="icon">O</span>{{ t('menu_signout') }}</a>
+        <div class="am-list">
+          <button type="button" class="account-menu-item am-row" id="theme-toggle" role="switch" aria-checked="false">
+            <span class="am-ic">{{ nav_icon('moon') }}</span><span class="am-lbl" id="theme-toggle-label"{% if ui_lang() == 'en' %} data-dyn="1"{% endif %}>{{ t('menu_theme') }}</span><span class="am-switch" aria-hidden="true"><i></i></span>
+          </button>
+          <a href="/settings" class="account-menu-item am-row"><span class="am-ic">{{ nav_icon('gear') }}</span><span class="am-lbl">{{ t('nav_settings') }}</span>{{ am_chev() }}</a>
+          {% if user['role'] == 'client' %}
+          <a href="/help" class="account-menu-item am-row"><span class="am-ic">{{ nav_icon('help') }}</span><span class="am-lbl">{{ t('nav_help') }}</span>{{ am_chev() }}</a>
+          <a href="mailto:{{ contact_email }}" class="account-menu-item am-row"><span class="am-ic">{{ nav_icon('mail') }}</span><span class="am-lbl">{{ t('menu_email') }}</span>{{ am_chev() }}</a>
+          {% endif %}
+        </div>
+        {% if user['role'] == 'client' %}{{ lang_menu(request.url.path ~ ('?' ~ request.url.query if request.url.query else '')) }}{% endif %}
+        <a href="/logout" class="account-menu-item account-menu-item-danger am-out"><span class="am-ic">{{ nav_icon('logout') }}</span><span class="am-lbl">{{ t('menu_signout') }}</span></a>
       </div>
     </div>
     </div>
@@ -293,12 +309,15 @@
          actual Google Analytics specifics stay fully named at /privacy#
          cookies (linked right below) where someone reading the details
          would look, not stripped from disclosure entirely. -->
-    <p><span class="cookie-notice-full">We use one necessary cookie to keep you signed in. With your consent, we
-       may also use non-essential cookies to analyze site traffic and improve your
-       experience.</span><span class="cookie-notice-short">One necessary cookie. With consent, we may also
-       analyze site traffic.</span> See our <a href="/privacy#cookies">Cookie Policy</a>, or
-       <a href="#" data-cookie-prefs-open>set your preferences</a>.</p>
-    <button type="button" id="cookie-notice-accept" class="btn">Accept</button>
+    <span class="cookie-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 9 9 4 4 0 0 1-4-4 4 4 0 0 1-4-4 1 1 0 0 0-1-1z"/><circle cx="8.5" cy="11" r="1" fill="currentColor"/><circle cx="12.5" cy="15.5" r="1" fill="currentColor"/><circle cx="15.5" cy="12" r="0.8" fill="currentColor"/></svg></span>
+    <div class="cookie-text">
+      <strong>We use cookies</strong>
+      <p>One cookie keeps you signed in. With your consent, we may also analyze site traffic and improve your experience. <a href="/privacy#cookies">Learn more</a></p>
+    </div>
+    <div class="cookie-actions">
+      <button type="button" class="btn secondary" id="cookie-notice-manage" data-cookie-prefs-open>Manage preferences</button>
+      <button type="button" id="cookie-notice-accept" class="btn">Accept all</button>
+    </div>
   </div>
 
   <div class="cookie-prefs-overlay" id="cookie-prefs-overlay" hidden>
@@ -547,17 +566,18 @@
       var themeBtn = document.getElementById("theme-toggle");
       var themeLabel = document.getElementById("theme-toggle-label");
       function paintThemeLabel() {
-        if (!themeLabel || !themeLabel.dataset.dyn) return;      // only English has the dark/light wording
         var current = document.documentElement.getAttribute("data-theme");
-        themeLabel.textContent = current === "dark" ? "Switch to light" : "Switch to dark";
+        if (themeBtn) themeBtn.setAttribute("aria-checked", current === "dark" ? "true" : "false");
+        if (themeLabel && themeLabel.dataset.dyn) themeLabel.textContent = "Dark mode";      // only English carries this wording; other languages keep their catalog text
       }
       paintThemeLabel();
+      document.addEventListener("kauli-theme", paintThemeLabel);
       if (themeBtn) {
         themeBtn.addEventListener("click", function () {
           var current = document.documentElement.getAttribute("data-theme");
           var next = current === "dark" ? "light" : "dark";
           document.documentElement.setAttribute("data-theme", next);
-          localStorage.setItem("kauli_theme", next);
+          try { localStorage.setItem("kauli_theme", next); } catch (e) {}
           paintThemeLabel();
         });
       }

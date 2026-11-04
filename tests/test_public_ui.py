@@ -198,7 +198,7 @@ def test_integrations_nav_dropdown_and_section_wording(client):
     assert "Send work in and pull results out with our API, MCP server and webhooks today." in nav
     assert "Available now" in nav and "Coming soon" in nav and "See all integrations" in nav
     section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
-    assert "Send work in and pull results out with our API, MCP server and webhooks today." in section
+    assert "Bring your tools together and get more done." in section and "Available" in section and "Coming soon" in section      # every tool carries its honest status
     assert "are on the way" not in section and "One-click" not in section
 
 

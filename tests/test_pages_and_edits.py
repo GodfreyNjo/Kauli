@@ -23,14 +23,16 @@ def test_the_recent_files_have_numbered_pages_instead_of_view_all(env, wav_bytes
         env.order_from(env.place(wav_bytes))
     first = _home(env)
     assert "View all" not in first and 'class="ch-all"' not in first
-    assert _rows(first) == 8 and 'class="pager"' in first
-    assert 'aria-current="page">1<' in first and 'href="/client/home?page=2"' in first and 'href="/client/home?page=3"' in first
+    assert _rows(first) == 6 and 'class="pager"' in first
+    assert 'aria-current="page">1<' in first and 'href="/client/home?page=2"' in first and 'href="/client/home?page=4"' in first
     second = _home(env, "?page=2")
-    assert _rows(second) == 8 and 'aria-current="page">2<' in second and 'rel="prev"' in second and 'rel="next"' in second
+    assert _rows(second) == 6 and 'aria-current="page">2<' in second and 'rel="prev"' in second and 'rel="next"' in second
     third = _home(env, "?page=3")
-    assert _rows(third) == 3 and 'rel="next"' not in third
-    assert _rows(_home(env, "?page=99")) == 3 and 'aria-current="page">3<' in _home(env, "?page=99")      # past the end shows the last page
-    assert _rows(_home(env, "?page=0")) == 8 and _rows(_home(env, "?page=-4")) == 8
+    assert _rows(third) == 6 and 'rel="next"' in third and 'href="/client/home?page=4"' in third
+    fourth = _home(env, "?page=4")
+    assert _rows(fourth) == 1 and 'rel="next"' not in fourth
+    assert _rows(_home(env, "?page=99")) == 1 and 'aria-current="page">4<' in _home(env, "?page=99")      # past the end shows the last page
+    assert _rows(_home(env, "?page=0")) == 6 and _rows(_home(env, "?page=-4")) == 6
 
 
 def test_a_short_list_has_no_pager_and_search_covers_every_page(env, wav_bytes):
@@ -39,8 +41,8 @@ def test_a_short_list_has_no_pager_and_search_covers_every_page(env, wav_bytes):
     for _ in range(12):
         env.order_from(env.place(wav_bytes))
     hit = _home(env, "?q=clip")
-    assert _rows(hit) == 8 and "q=clip" in hit and 'href="/client/home?q=clip&amp;page=2"' in hit or 'href="/client/home?q=clip&page=2"' in hit
-    assert _rows(_home(env, "?q=clip&page=2")) == 5
+    assert _rows(hit) == 6 and "q=clip" in hit and 'href="/client/home?q=clip&amp;page=2"' in hit or 'href="/client/home?q=clip&page=2"' in hit
+    assert _rows(_home(env, "?q=clip&page=2")) == 6 and _rows(_home(env, "?q=clip&page=3")) == 1
     nothing = _home(env, "?q=zzz")
     assert _rows(nothing) == 0 and "No files match that search." in nothing and 'class="pager"' not in nothing
 
@@ -57,8 +59,8 @@ def test_the_pending_list_is_paginated_too(env, wav_bytes):
     for _ in range(13):
         env.order_from(env.place(wav_bytes, review_tier="human"))                         # all wait for payment
     page1 = env.client.get("/client/pending").text
-    assert len(re.findall(r"/pay\"", page1)) == 10 and 'href="/client/pending?page=2"' in page1
-    assert len(re.findall(r"/pay\"", env.client.get("/client/pending?page=2").text)) == 3
+    assert len(re.findall(r"/pay\"", page1)) == 6 and 'href="/client/pending?page=2"' in page1
+    assert len(re.findall(r"/pay\"", env.client.get("/client/pending?page=3").text)) == 1
 
 
 # ------------------------------------------------------------------------------------------------ editing the transcript
@@ -205,18 +207,18 @@ def test_the_order_list_has_numbered_pages_that_keep_the_filters(env, wav_bytes)
     for _ in range(4):
         env.order_from(env.place(wav_bytes, folder_name="Calls"))
     first = _orders_page(env)
-    assert _order_rows(first) == 10 and 'class="pager"' in first and 'aria-current="page">1<' in first
-    assert 'href="/client?page=2"' in first and 'href="/client?page=3"' in first
-    assert _order_rows(_orders_page(env, "?page=3")) == 7 and _order_rows(_orders_page(env, "?page=99")) == 7      # past the end: the last page
-    assert _order_rows(_orders_page(env, "?page=0")) == 10 and "View all" not in first
+    assert _order_rows(first) == 6 and 'class="pager"' in first and 'aria-current="page">1<' in first
+    assert 'href="/client?page=2"' in first and 'href="/client?page=5"' in first
+    assert _order_rows(_orders_page(env, "?page=3")) == 6 and _order_rows(_orders_page(env, "?page=99")) == 3      # past the end: the last page
+    assert _order_rows(_orders_page(env, "?page=0")) == 6 and "View all" not in first
     calls = _orders_page(env, "?folder=Calls")
     assert _order_rows(calls) == 4 and 'class="pager"' not in calls
     podcast = _orders_page(env, "?folder=Podcast&page=2")
-    assert _order_rows(podcast) == 10 and "folder=Podcast" in podcast and 'aria-current="page">2<' in podcast
-    assert _order_rows(_orders_page(env, "?status=in_progress")) == 10 and "status=in_progress" in _orders_page(env, "?status=in_progress")
+    assert _order_rows(podcast) == 6 and "folder=Podcast" in podcast and 'aria-current="page">2<' in podcast
+    assert _order_rows(_orders_page(env, "?status=in_progress")) == 6 and "status=in_progress" in _orders_page(env, "?status=in_progress")
     assert _order_rows(_orders_page(env, "?status=ready")) == 0 and "No orders match" in _orders_page(env, "?status=ready")
     assert _order_rows(_orders_page(env, "?q=clip&folder=Calls")) == 4 and _order_rows(_orders_page(env, "?q=zzz")) == 0
-    assert _order_rows(_orders_page(env, "?status=bogus")) == 10                              # an unknown filter is ignored
+    assert _order_rows(_orders_page(env, "?status=bogus")) == 6                              # an unknown filter is ignored
 
 
 def test_the_order_rows_are_short(env, wav_bytes):
@@ -230,3 +232,29 @@ def test_the_order_rows_are_short(env, wav_bytes):
     for dropped in ("Due date", "Transcription only", "Trial credit", "Analysis in progress"):
         assert dropped not in table, dropped
     assert re.search(r"[A-Z][a-z]{2} \d{2}, 20\d\d", row)                                       # a short date such as Oct 29, 2026
+
+
+# ------------------------------------------------------------------------------------------------ six to a page everywhere in the account
+def test_files_notes_and_words_show_six_to_a_page_with_numbered_pages(env, wav_bytes):
+    for _ in range(14):
+        env.order_from(env.place(wav_bytes))
+    page = env.client.get("/client/files").text
+    assert page.count('class="ds-file"') == 6 and 'href="/client/files?page=3"' in page
+    assert env.client.get("/client/files?page=3").text.count('class="ds-file"') == 2
+    for _ in range(8):
+        env.client.post("/client/notes/new")
+    notes = env.client.get("/client/notes").text
+    assert notes.count('class="nt-item') == 6 and 'href="/client/notes?page=2"' in notes
+    assert env.client.get("/client/notes?page=2").text.count('class="nt-item') == 2
+    for i in range(9):
+        env.client.post("/client/vocabulary/add", data={"entries": f"Word{i}"})
+    vocab = env.client.get("/client/vocabulary").text
+    assert vocab.count("<li><span><strong>") == 6 and 'href="/client/vocabulary?page=2"' in vocab
+    assert env.client.get("/client/vocabulary?page=2").text.count("<li><span><strong>") == 3
+
+
+def test_the_pager_can_use_its_own_page_name_so_two_lists_on_a_page_do_not_clash():
+    from jinja2 import Environment, FileSystemLoader
+    jenv = Environment(loader=FileSystemLoader(str(Path(__file__).parent.parent / "webapp" / "templates")), autoescape=True)
+    html = jenv.from_string('{% from "_pager.html" import pager %}{{ pager(2, 3, "/client/billing", {}, "payments_page", "payment-history") }}').render()
+    assert 'href="/client/billing?payments_page=3#payment-history"' in html and 'href="/client/billing?payments_page=1#payment-history"' in html and "?page=" not in html

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pager.html" import pager %}
 {% set translated = true %}
 {% block title %}Notes{% endblock %}
 {% block content %}
@@ -29,6 +30,7 @@
         </a></li>
         {% endfor %}
       </ul>
+      {{ pager(page, pages, '/client/notes', {'q': q, 'id': note_id}) }}
     </aside>
 
     <section class="nt-editor" aria-label="Note editor">

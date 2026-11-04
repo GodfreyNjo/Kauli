@@ -282,10 +282,10 @@ def test_services_show_transcription_starting_from_zero_without_hiding_the_real_
     html = studio.client.get("/").text
     section = html.split('id="services"')[1].split("</section>")[0]
     assert "m-eyebrow-lined" in section and "Everything your video or audio needs to travel" in section
-    assert "and selected languages can add human review." in section and 'href="/human-review"' in section
-    prices = [p.strip() for p in __import__("re").findall(r'<span class="svc-price">(.*?)</span>', section, __import__("re").S)]
-    assert prices[0].startswith("Starting at $0") and "first 30 minutes free" in prices[0] and "/min" not in prices[0]
-    assert prices[1].startswith("Pay as you go") and prices[2].startswith("Pay as you go")                   # translation and dubbing: priced when you order
+    assert "Choose a service or combine them. Available instantly with AI." in section and 'href="/human-review"' in section       # the languages link sits in the dubbing card
+    for name in ("Transcription", "Subtitles &amp; translation", "Video dubbing"):
+        assert f"<h3>{name}</h3>" in section
+    assert section.count("Learn more") == 3 and "svc-price" not in section                                    # short cards: the prices live in the pricing section
 
 
 # ------------------------------------------------------------------ the integrations section
@@ -294,7 +294,7 @@ def test_integrations_section_has_descriptions_chevrons_and_honest_statuses(stud
     monkeypatch.setattr(studio.app, "current_user", lambda request: None)
     html = studio.client.get("/").text
     section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
-    assert "m-eyebrow-lined" in section and "Connect Kauli to the tools you already use" in section
+    assert "m-eyebrow-lined" in section and "Connect Kauli to your tools" in section and "Bring your tools together and get more done." in section
     for desc in ("Integrate with your developer tools and automate your workflow.", "Publish and distribute your content automatically.",
                  "Keep your customer relationships in sync.", "Schedule and stay on track."):
         assert desc in section

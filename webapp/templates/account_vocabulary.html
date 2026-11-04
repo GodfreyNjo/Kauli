@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pager.html" import pager %}
 {% set translated = true %}
 {% block title %}Vocabulary{% endblock %}
 {% block content %}
@@ -24,7 +25,7 @@
     </section>
 
     <section class="hub-card" aria-labelledby="vc-list">
-      <h2 id="vc-list">Your words <span class="muted">({{ terms|length }} of {{ limit }})</span></h2>
+      <h2 id="vc-list">Your words <span class="muted">({{ terms_total }} of {{ limit }})</span></h2>
       {% if terms %}
       <ul class="vc-terms">
         {% for t in terms %}
@@ -32,6 +33,7 @@
           <form method="post" action="/client/vocabulary/delete"><input type="hidden" name="term_id" value="{{ t['id'] }}"><button type="submit" class="secondary" aria-label="Remove {{ t['term'] }}">Remove</button></form></li>
         {% endfor %}
       </ul>
+      {{ pager(page, pages, '/client/vocabulary') }}
       {% else %}<p class="muted">No words yet. Add the names people say most in your recordings.</p>{% endif %}
     </section>
   </div>

@@ -5275,7 +5275,7 @@ def avatar(request: Request, user_id: str):
 
 # -------------------------------------------------------------- client ----
 @app.get("/client/files", response_class=HTMLResponse)
-def client_files(request: Request, type: str = "", q: str = ""):
+def client_files(request: Request, type: str = "", q: str = "", page: int = 1):
     """A real cross-order file view - every order's source file plus
     whatever's actually deliverable for it, in one place, instead of
     having to open each order individually to find a download link.
@@ -5313,8 +5313,9 @@ def client_files(request: Request, type: str = "", q: str = ""):
     type = type if type in ("audio", "video", "other") else ""
     needle = (q or "").strip().lower()[:100]
     shown = [r for r in rows if (not type or r["kind"] == type) and (not needle or needle in (r["order"]["original_filename"] or "").lower())]
+    page, pages, shown = _paginate(shown, page, LIST_PAGE_SIZE)
     return templates.TemplateResponse(request, "client_files.html", {"user": user, "rows": shown, "counts": counts, "type": type, "q": needle,
-                                                                      "all_count": len(rows)})
+                                                                      "all_count": len(rows), "page": page, "pages": pages})
 
 
 @app.get("/client/messages", include_in_schema=False)
@@ -5413,7 +5414,7 @@ _MEETING_STATUS_TEXT = {"scheduled": "Scheduled", "joining": "Joining", "recordi
 
 
 @app.get("/client/meetings", response_class=HTMLResponse)
-def client_meetings(request: Request, error: str | None = None, notice: str | None = None):
+def client_meetings(request: Request, error: str | None = None, notice: str | None = None, page: int = 1):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
@@ -5424,8 +5425,9 @@ def client_meetings(request: Request, error: str | None = None, notice: str | No
     if enabled:
         meetings = db.list_meetings_for_client(user["client_scope_id"])
     ok, why, minutes = _meeting_gate(user) if enabled else (False, "", 0.0)
+    page, pages, meetings = _paginate(list(meetings), page, LIST_PAGE_SIZE)
     return templates.TemplateResponse(request, "client_meetings.html", {
-        "user": user, "enabled": enabled, "meetings": meetings, "can_send": ok, "why_not": why, "minutes_left": int(minutes),
+        "user": user, "enabled": enabled, "meetings": meetings, "page": page, "pages": pages, "can_send": ok, "why_not": why, "minutes_left": int(minutes),
         "min_minutes": int(meeting_bot.MIN_MEETING_MINUTES), "status_text": _MEETING_STATUS_TEXT, "platform_names": meeting_bot.PLATFORM_NAMES,
         "languages": sorted(LANGUAGE_NAMES.items(), key=lambda kv: kv[1]), "error": error, "notice": notice,
     })
@@ -5531,13 +5533,14 @@ def client_pending(request: Request, page: int = 1, tab: str = ""):
     counts = {"": len(rows), "needs": sum(1 for _o, k in rows if k in ("pay", "input", "charge")), "progress": sum(1 for _o, k in rows if k in ("review", "progress"))}
     tab = tab if tab in ("needs", "progress") else ""
     shown_rows = [r for r in rows if not tab or (r[1] in ("pay", "input", "charge")) == (tab == "needs")]
-    page, pages, shown = _paginate(shown_rows, page, FILES_PER_PAGE + 2)
+    page, pages, shown = _paginate(shown_rows, page, FILES_PER_PAGE)
     return templates.TemplateResponse(request, "client_pending.html", {
         "user": user, "rows": shown, "page": page, "pages": pages, "tab": tab, "counts": counts,
     })
 
 
-FILES_PER_PAGE = 8
+LIST_PAGE_SIZE = 6   # every list in a customer account shows at most this many rows, then numbered pages
+FILES_PER_PAGE = LIST_PAGE_SIZE
 
 
 def _paginate(items: list, page: int, per_page: int) -> tuple[int, int, list]:
@@ -5574,7 +5577,7 @@ def client_home(request: Request, page: int = 1, q: str = "", status: str = ""):
     })
 
 
-ORDERS_PER_PAGE = 10
+ORDERS_PER_PAGE = LIST_PAGE_SIZE
 _ORDER_BUCKETS = {
     "processing": ("queued", "processing"),
     "in_review": ("awaiting_review", "editor_returned"),
@@ -7142,7 +7145,7 @@ def client_grant_voice_clone_consent(request: Request, order_id: str):
 # -------------------------------------------------------------- billing ----
 @app.get("/client/billing", response_class=HTMLResponse)
 def billing_page(request: Request, upgrade_for: str | None = None, notice: str | None = None,
-                  error: str | None = None, choose_plan: str | None = None):
+                  error: str | None = None, choose_plan: str | None = None, payments_page: int = 1):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse(f"/login?next={quote(request.url.path)}")
@@ -7150,7 +7153,9 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     plan = billing.effective_plan(user, subscription)
     is_test_account = plan == "enterprise" and user["email"].strip().lower() in billing.test_client_emails()
     bonus_minutes = (subscription["bonus_minutes"] or 0.0) if subscription else 0.0
-    payments = db.list_payments_for_user(user["client_scope_id"])
+    payments = list(db.list_payments_for_user(user["client_scope_id"]))
+    payments_total = len(payments)
+    pay_page, pay_pages, payments = _paginate(payments, payments_page, LIST_PAGE_SIZE)
     receipts_by_payment = {
         r["payment_id"]: r for r in db.list_receipts_for_client(user["client_scope_id"])
     }
@@ -7169,7 +7174,7 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
         "plan_is_chosen": _plan_chosen(user["client_scope_id"]), "choose_plan": choose_plan, "addons": billing.ADDONS,
         "free_plan_charge": None if _plan_chosen(user["client_scope_id"]) else _free_plan_charge(user["client_scope_id"]),
         "subscription": subscription, "is_test_account": is_test_account,
-        "payments": payments, "receipts_by_payment": receipts_by_payment,
+        "payments": payments, "payments_total": payments_total, "pay_page": pay_page, "pay_pages": pay_pages, "receipts_by_payment": receipts_by_payment,
         "total_spent_usd": client_stats["total_spent_usd"], "outstanding_usd": outstanding_usd,
         "upgrade_for": upgrade_for, "notice": notice, "error": error,
         "paystack_configured": billing.paystack_configured(),

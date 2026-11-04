@@ -35,28 +35,42 @@
     var words = [];
     text.split("\n").forEach(function (line, i) {
       var turn = document.createElement("span");
-      turn.className = "hd-turn";
+      turn.className = "dm-turn";
       var label = null;
       (names || []).forEach(function (n) { if (line.indexOf(n + ": ") === 0) label = n; });
       if (label) {
         var b = document.createElement("b");
-        b.className = "hd-spk";
-        b.textContent = ((D.labels || {})[lang] || {})[label] || label;      // "Speaker 1" reads "Hablante 1" in Spanish and so on
+        b.className = "dm-spk";
+        var full = ((D.labels || {})[lang] || {})[label] || label;      // "Speaker 1" reads "Hablante 1" in Spanish and so on
+        var num = (label.match(/\d+/) || [""])[0];
+        var shortName = document.createElement("span");
+        shortName.setAttribute("aria-hidden", "true");
+        shortName.textContent = "S" + num;                              // the round badge reads S1, S2; the full name is for screen readers and the tooltip
+        var longName = document.createElement("span");
+        longName.className = "sr-only";
+        longName.textContent = full;
+        b.title = full;
+        b.appendChild(shortName);
+        b.appendChild(longName);
         turn.appendChild(b);
         if (starts && starts[i] != null) {
           var ts = document.createElement("small");
-          ts.className = "hd-ts";
+          ts.className = "dm-ts";
           ts.textContent = fmt(starts[i]);
           turn.appendChild(ts);
         }
       }
+      var said = document.createElement("span");
+      said.className = "dm-said";
       pieces(label ? line.slice(label.length + 2) : line, lang).forEach(function (p) {
         var s = document.createElement("span");
         s.className = "w";
         s.textContent = p;
-        turn.appendChild(s);
+        said.appendChild(s);
         words.push(s);
       });
+      if (!label) turn.className += " dm-solo";
+      turn.appendChild(said);
       el.appendChild(turn);
     });
     el._words = words;
@@ -111,9 +125,7 @@
     }
     box.hidden = false;
     if (vid.getAttribute("src") !== url) { vid.pause(); vid.setAttribute("poster", url.replace(/\.mp4$/, ".jpg")); vid.setAttribute("src", url); }
-    $("hd-video-sub").textContent = dubbed
-      ? "The video dubbed in " + L.name + ", with " + L.name + " captions burned into the picture."
-      : "The original audio with " + L.name + " subtitles burned into the picture.";
+    $("hd-video-sub").textContent = dubbed ? "Video dubbed in " + L.name : "Video with live " + L.name + " subtitles";
   }
 
   function render() {
@@ -123,15 +135,15 @@
     var inText = toEn ? s.tr[state.lang] : s.en, inLang = toEn ? state.lang : "en";
     var outText = toEn ? s.en : s.tr[state.lang], outLang = toEn ? "en" : state.lang;
     var dubbed = s.service === "dub";
-    document.querySelector(".hd").classList.toggle("is-dub", dubbed);
+    document.querySelector(".dm").classList.toggle("is-dub", dubbed);
     $("hd-dubhead").hidden = !dubbed;
     $("hd-chip-in").textContent = dubbed ? "Original (" + (toEn ? L.name : "English") + ")" : "Original Audio";
     $("hd-service").textContent = dubbed ? "Dubbed (" + (toEn ? "English" : L.name) + ")" : "Translated Output";
     $("hd-dur-in").textContent = clipLength(clipFor("in"));
     $("hd-dur-out").textContent = clipLength(dubbed ? clipFor("out") : clipFor("in"));
-    $("hd-headline").textContent = toEn ? (s.headline_en || s.headline) : s.headline;
-    $("hd-in-title").textContent = s.label + " (" + (toEn ? L.name : "English") + ")";
-    $("hd-out-title").textContent = (toEn ? "English" : L.name) + (dubbed ? " dubbing" : " translation");
+    $("hd-in-title").textContent = toEn ? L.name : "English";
+    $("hd-out-title").textContent = toEn ? "English" : L.name;
+    setPair(L, toEn);
     $("hd-feat-lang").textContent = toEn ? "English" : L.name;
     $("hd-dir-lang").textContent = L.name;
     var names = s.multi ? s.cast : [];
@@ -141,30 +153,22 @@
     buildWave($("hd-wave-out"), dubbed ? 11 : 3);
     $("hd-time-in").textContent = "0:00";
     $("hd-time-out").textContent = "0:00";
-    $("hd-lang-name").textContent = toEn ? "English" : L.name;
-    $("hd-speaker").textContent = s.speaker;
-    var transcript = s.service === "transcribe";
-    $("hd-transcript").hidden = !transcript;
-    $("hd-speaker").closest(".hd-line").hidden = !!s.multi;           // with several speakers each line carries its own ID
-    paint($("hd-text-src"), inText, inLang, names, startsIn);
-    // transcription shows the transcript plus its translation; the other two show the translated text as captions
+    // the left card holds the original lines, the right card the same lines in the other language (or the captions of the dub)
     paint($("hd-text-out"), outText, outLang, names, startsOut);
-    $("hd-text-out").className = "hd-text hd-text-out" + (transcript ? " hd-translated" : "");
     var play = $("hd-play-out");
     play.setAttribute("aria-label", dubbed ? "Play the dubbed " + (toEn ? "English" : L.name) + " audio" : "Play the audio with " + (toEn ? "English" : L.name) + " captions");
     showVideo(s, L, dubbed, toEn);
     var avail = $("hd-avail");
     if (dubbed && !toEn) {
       var live = !!L.dub_live;
-      avail.textContent = live ? "Available now" : "Voice preview - " + L.name + " dubbing coming soon";
-      avail.className = "hd-avail " + (live ? "now" : "soon");
+      avail.textContent = live ? "Live demo" : "Voice preview - " + L.name + " dubbing coming soon";
+      avail.className = "dm-live " + (live ? "now" : "soon");
     } else {
-      avail.textContent = "Available now";
-      avail.className = "hd-avail now";
+      avail.textContent = "Live demo";
+      avail.className = "dm-live now";
     }
     var r = D.rates[s.service];
     $("hd-rate").innerHTML = "<strong>" + s.service_label + "</strong> from <b>$" + r.ai + "</b> per audio-minute with Instant AI, or <b>$" + r.human + "</b> human-reviewed.";
-    $("hd-picked").textContent = pickedLine();
     if (window.location.pathname !== "/try") return;     // the home page keeps its own address
     try {
       var u = new URL(window.location.href);
@@ -175,7 +179,16 @@
     } catch (e) { /* the page works without it */ }
   }
 
-  function pickedLine() { return ""; }          // the suggestion is shown as a "Recommended" badge, not as a sentence about the visitor
+  // The language pair in the dropdown's button: a flag and a name on each side of the arrow.
+  function flagOf(code) {
+    var L = code === "en" ? { flag: "flag-en" } : D.languages[code];
+    return L && L.flag ? '<i class="lang-flag ' + L.flag + '" aria-hidden="true"></i>' : '<i class="lang-dot tone-3" aria-hidden="true">' + code.toUpperCase() + "</i>";
+  }
+  function setPair(L, toEn) {
+    var from = toEn ? state.lang : "en", to = toEn ? "en" : state.lang;
+    $("dm-from").innerHTML = flagOf(from) + "<span>" + (toEn ? L.name : "English") + "</span>";
+    $("dm-to").innerHTML = flagOf(to) + "<span>" + (toEn ? "English" : L.name) + "</span>";
+  }
 
   function track(name, params) { if (window.kauliTrack) window.kauliTrack(name, params); }
 
@@ -202,7 +215,6 @@
     if (w === "in") { highlight($("hd-text-in"), frac); }
     else {
       var s = scenario();
-      if (s.service === "transcribe") { highlight($("hd-text-src"), frac); }
       highlight($("hd-text-out"), frac);
     }
   }
@@ -219,10 +231,12 @@
     r.addEventListener("change", function () { state.scenario = r.value; track("demo_scenario", { scenario: r.value }); render(); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-lang"]'), function (r) {
-    r.addEventListener("change", function () { state.lang = r.value; track("demo_language", { language: r.value }); render(); });
+    r.addEventListener("change", function () { state.lang = r.value; track("demo_language", { language: r.value }); render(); $("dm-pair").removeAttribute("open"); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-dir"]'), function (r) {
-    r.addEventListener("change", function () { state.dir = r.value; render(); });
+    r.addEventListener("change", function () { state.dir = r.value; render(); $("dm-pair").removeAttribute("open"); });
   });
+  document.addEventListener("click", function (e) { var d = $("dm-pair"); if (d && d.open && !d.contains(e.target)) d.removeAttribute("open"); });
+  document.addEventListener("keydown", function (e) { var d = $("dm-pair"); if (e.key === "Escape" && d && d.open) { d.removeAttribute("open"); d.querySelector("summary").focus(); } });
   render();
 })();

@@ -32,7 +32,7 @@ def test_the_try_page_hands_the_videos_to_the_player_and_serves_them():
     from webapp import app as app_mod
     client = TestClient(app_mod.app)
     page = client.get("/try").text
-    assert 'id="hd-video-box"' in page and 'id="hd-video"' in page and "Watch it as a video" in page
+    assert 'id="hd-video-box"' in page and 'id="hd-video"' in page and "Watch the demo" in page
     data = __import__("json").loads(re.search(r'<script type="application/json" id="hd-data">(.*?)</script>', page, re.S).group(1))
     for key, s in data["scenarios"].items():
         assert set(s["video"]) == {"en", "es", "de", "zh", "sw"}, key
@@ -111,7 +111,7 @@ def test_the_demo_page_hands_the_cast_and_timing_to_the_player():
     interview = data["scenarios"]["interview"]
     assert interview["multi"] is True and interview["cast"] == ["Speaker 1", "Speaker 2"]
     assert data["scenarios"]["news"]["multi"] is False and "src-interview.mp3" in data["timing"]
-    assert "Speaker 1: " in interview["en"] and "hd-spk" in client.get("/static/style.css").text
+    assert "Speaker 1: " in interview["en"] and "dm-spk" in client.get("/static/style.css").text
 
 
 def test_every_demo_file_is_committed_so_it_reaches_the_server():

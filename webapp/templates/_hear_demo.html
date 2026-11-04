@@ -8,109 +8,111 @@
   'field': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>',
   'video': '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3z"/>'
 } %}
-{% set _tabs = {'meeting': 'Meetings & Calls', 'call': 'Call Centers', 'interview': 'Interviews', 'podcast': 'Podcasts', 'course': 'Courses & Training', 'news': 'News & Broadcast', 'field': 'NGO & Field Work', 'video': 'Creator Videos'} %}
-<div class="hd" role="region" aria-label="Interactive demo">
-  <p class="hd-picked" id="hd-picked" aria-live="polite"></p>
-  <header class="hd-dubhead" id="hd-dubhead" hidden>
-    <span class="hd-dubpill"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg>AI Dubbing Demo</span>
+{% set _tabs = {'meeting': 'Meetings & Calls', 'call': 'Call Centers', 'interview': 'Interviews', 'podcast': 'Podcasts', 'course': 'Courses', 'news': 'News', 'field': 'Field Work', 'video': 'Creator Videos'} %}
+<div class="dm" role="region" aria-label="Interactive demo">
+  <header class="dm-dubhead" id="hd-dubhead" hidden>
     <h2>See your video in another language</h2>
-    <p>Upload or try our sample to hear the same video, spoken in a new language.</p>
+    <p>Try our sample to hear the same video, spoken in a new language.</p>
   </header>
 
-  <fieldset class="hd-fieldset hd-tabs-set">
-    <legend class="sr-only">What are you making?</legend>
-    <div class="hd-tabs">
-      {% for key, s in demo.scenarios.items() %}
-      <label class="hd-tab"><input type="radio" name="hd-scenario" value="{{ key }}"{% if key == demo.scenario %} checked{% endif %}>
-        <span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ (_icons.get(key) or _icons['meeting'])|safe }}</svg>{{ _tabs.get(key, s.label) }}</span></label>
-      {% endfor %}
-    </div>
-  </fieldset>
-
-  <fieldset class="hd-fieldset hd-langbar">
-    <legend class="hd-langbar-label">Translate into</legend>
-    <div class="hd-options hd-langs">
-      {% for code, l in demo.languages.items() %}
-      <label class="hd-option hd-lang"><input type="radio" name="hd-lang" value="{{ code }}"{% if code == demo.language %} checked{% endif %}>
-        <span>{% if l.flag %}<i class="lang-flag {{ l.flag }}" aria-hidden="true"></i>{% else %}<i class="lang-dot tone-3" aria-hidden="true">{{ code|upper }}</i>{% endif %}
-          <strong>{{ l.native }}</strong><small>{{ l.name }}</small>
-          {% if code == demo.suggested %}<em class="hd-badge">Recommended</em>{% endif %}</span></label>
-      {% endfor %}
-    </div>
-    <div class="hd-dir" role="radiogroup" aria-label="Final language">
-      <label><input type="radio" name="hd-dir" value="from"{% if demo.dir != 'to' %} checked{% endif %}><span>Into <b id="hd-dir-lang">{{ demo.languages[demo.language].name }}</b></span></label>
-      <label><input type="radio" name="hd-dir" value="to"{% if demo.dir == 'to' %} checked{% endif %}><span>Into English</span></label>
-    </div>
-  </fieldset>
-
-  <div class="hd-stage">
-    <article class="hd-card hd-in" aria-labelledby="hd-in-title">
-      <header><span class="hd-chip" id="hd-chip-in">Original Audio</span><span class="hd-dur" id="hd-dur-in"></span><h2 id="hd-in-title">English, as recorded</h2></header>
-      <div class="hd-player">
-        <button type="button" class="hd-play" id="hd-play-in" aria-label="Play the original English audio"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg></button>
-        <div class="hd-wave" id="hd-wave-in" aria-hidden="true"></div>
-        <span class="hd-time" id="hd-time-in">0:00</span>
+  <div class="dm-bar">
+    <fieldset class="dm-fieldset">
+      <legend class="sr-only">What are you making?</legend>
+      <div class="dm-tabs">
+        {% for key, s in demo.scenarios.items() %}
+        <label class="dm-tab"><input type="radio" name="hd-scenario" value="{{ key }}"{% if key == demo.scenario %} checked{% endif %}>
+          <span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ (_icons.get(key) or _icons['meeting'])|safe }}</svg>{{ _tabs.get(key, s.label) }}</span></label>
+        {% endfor %}
       </div>
-      <p class="hd-text" id="hd-text-in"></p>
+    </fieldset>
+
+    <details class="dm-pair" id="dm-pair">
+      <summary aria-label="Choose the language"><span class="dm-side" id="dm-from"></span><svg class="dm-to-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h16M14 6l6 6-6 6"/></svg><span class="dm-side" id="dm-to"></span><svg class="dm-chev" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4.5l3.5 3.5 3.5-3.5"/></svg></summary>
+      <div class="dm-pair-panel">
+        <fieldset class="dm-fieldset">
+          <legend class="dm-pair-label">Language</legend>
+          <div class="dm-langs">
+            {% for code, l in demo.languages.items() %}
+            <label class="dm-lang"><input type="radio" name="hd-lang" value="{{ code }}"{% if code == demo.language %} checked{% endif %}>
+              <span>{% if l.flag %}<i class="lang-flag {{ l.flag }}" aria-hidden="true"></i>{% else %}<i class="lang-dot tone-3" aria-hidden="true">{{ code|upper }}</i>{% endif %}
+                <strong>{{ l.native }}</strong>{% if code == demo.suggested %}<em class="dm-badge">Recommended</em>{% endif %}</span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="dm-dir" role="radiogroup" aria-label="Direction">
+          <label><input type="radio" name="hd-dir" value="from"{% if demo.dir != 'to' %} checked{% endif %}><span>English &rarr; <b id="hd-dir-lang">{{ demo.languages[demo.language].name }}</b></span></label>
+          <label><input type="radio" name="hd-dir" value="to"{% if demo.dir == 'to' %} checked{% endif %}><span>Into English</span></label>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="dm-stage">
+    <article class="dm-card dm-in" aria-labelledby="hd-chip-in">
+      <header class="dm-ch">
+        <span class="dm-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg></span>
+        <div class="dm-ht"><h2 id="hd-chip-in">Original Audio</h2><span id="hd-in-title">English</span></div>
+        <span class="dm-dur" id="hd-dur-in"></span>
+      </header>
+      <div class="dm-player">
+        <button type="button" class="dm-play" id="hd-play-in" aria-label="Play the original audio"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg></button>
+        <div class="dm-wave" id="hd-wave-in" aria-hidden="true"></div>
+        <span class="dm-time" id="hd-time-in">0:00</span>
+      </div>
+      <p class="dm-text" id="hd-text-in"></p>
     </article>
 
-    <div class="hd-arrow" aria-hidden="true">
-      <span class="hd-arrow-dot"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></span>
+    <div class="dm-mid" aria-hidden="true">
+      <span class="dm-mid-dot"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h16M14 6l6 6-6 6"/></svg></span>
       <picture>
         <source srcset="/static/kauli-logo-nav-sm.webp" type="image/webp">
-        <img src="/static/kauli-logo-nav-sm.png" alt="" class="hd-arrow-logo" width="124" height="34" loading="lazy">
+        <img src="/static/kauli-logo-nav-sm.png" alt="" class="dm-mid-logo" width="124" height="34" loading="lazy">
       </picture>
-      <ul class="hd-checks">
+      <ul class="dm-checks">
         <li>Transcribes</li>
         <li>Identifies speakers</li>
         <li>Translates instantly</li>
       </ul>
     </div>
 
-    <article class="hd-card hd-out" aria-labelledby="hd-out-title" aria-live="polite">
-      <header><span class="hd-chip hd-chip-olive" id="hd-service">Translated Output</span><span class="hd-dur" id="hd-dur-out"></span><span class="hd-avail" id="hd-avail"></span><h2 id="hd-out-title">What you get</h2></header>
-      <p class="hd-headline" id="hd-headline"></p>
-      <div class="hd-player">
-        <button type="button" class="hd-play hd-play-out" id="hd-play-out" aria-label="Play the Kauli result"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg></button>
-        <div class="hd-wave" id="hd-wave-out" aria-hidden="true"></div>
-        <span class="hd-time" id="hd-time-out">0:00</span>
+    <article class="dm-card dm-out" aria-labelledby="hd-service" aria-live="polite">
+      <header class="dm-ch">
+        <span class="dm-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h9M8.5 4v2M6 6c.5 3 2.5 5.5 5.5 7M12 6c-.5 3-3 5.5-7 7"/><path d="m12.5 20 4-9 4 9M13.9 17h5.2"/></svg></span>
+        <div class="dm-ht"><h2 id="hd-service">Translated Output</h2><span id="hd-out-title">Swahili</span></div>
+        <span class="dm-live" id="hd-avail"></span>
+        <span id="hd-dur-out" hidden></span>
+      </header>
+      <div class="dm-player">
+        <button type="button" class="dm-play" id="hd-play-out" aria-label="Play the Kauli result"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path class="i-play" d="M8 5v14l11-7z" fill="currentColor"/><path class="i-pause" d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></svg></button>
+        <div class="dm-wave" id="hd-wave-out" aria-hidden="true"></div>
+        <span class="dm-time" id="hd-time-out">0:00</span>
       </div>
-      <div class="hd-transcript" id="hd-transcript" hidden>
-        <p class="hd-line"><span class="hd-ts">00:00</span> <strong id="hd-speaker">Speaker 1</strong></p>
-        <p class="hd-text" id="hd-text-src"></p>
-        <p class="hd-sub">Translated into <span id="hd-lang-name"></span> <small>(Instant AI translation)</small></p>
-      </div>
-      <p class="hd-text hd-text-out" id="hd-text-out"></p>
-      <ul class="hd-files" aria-label="Files you can download"><li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>Text</li><li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>Word</li><li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10 10.2a2.2 2.2 0 1 0 0 3.6M16 10.2a2.2 2.2 0 1 0 0 3.6"/></svg>SRT subtitles</li></ul>
+      <p class="dm-text dm-text-out" id="hd-text-out"></p>
     </article>
   </div>
 
-  <div class="hd-video" id="hd-video-box" role="region" aria-labelledby="hd-video-title" hidden>
-    <div class="hd-video-main"><video id="hd-video" controls playsinline preload="metadata" width="960" height="540"></video></div>
-    <div class="hd-video-info">
-      <span class="hd-chip hd-chip-plain">Video demo</span>
-      <h2 id="hd-video-title">Watch it as a video</h2>
-      <p class="hd-video-sub" id="hd-video-sub"></p>
-      <ul class="hd-feats">
-        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2c2.6.2 4.5 2.3 4.5 5.1"/></svg>Speaker IDs</li>
-        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Timestamps</li>
-        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>Live translation</li>
-        <li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 14h3M7 10.5h6M13 14h4"/></svg><span id="hd-feat-lang">Subtitles</span> subtitles</li>
+  <div class="dm-video" id="hd-video-box" role="region" aria-labelledby="hd-video-title" hidden>
+    <div class="dm-video-main"><video id="hd-video" controls playsinline preload="metadata" width="960" height="540"></video></div>
+    <div class="dm-video-info">
+      <div class="dm-video-top"><h2 id="hd-video-title">Watch the demo</h2><span class="dm-video-chip" id="hd-video-sub"></span></div>
+      <ul class="dm-feats">
+        <li class="f-violet"><span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2c2.6.2 4.5 2.3 4.5 5.1"/></svg></span>Speaker IDs</li>
+        <li class="f-green"><span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Timestamps</li>
+        <li class="f-orange"><span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg></span>Live translation</li>
+        <li class="f-blue"><span><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 14h3M7 10.5h6M13 14h4"/></svg></span><span class="dm-ft"><b id="hd-feat-lang">Subtitles</b> subtitles</span></li>
       </ul>
     </div>
   </div>
 
   <audio id="hd-audio" preload="none"></audio>
 
-  <div class="hd-convert">
-    <div>
-      <p class="hd-rate" id="hd-rate"></p>
-    </div>
-    <div class="hd-ctas">
+  <div class="dm-convert">
+    <p class="dm-rate" id="hd-rate"></p>
+    <div class="dm-ctas">
       <a href="/login?mode=signup" class="btn cta-olive" data-cta="try-signup">Try it on your own file - first {{ free_minutes|int }} minutes free</a>
       <a href="/demo" class="btn secondary" data-cta="try-book">Book a live demo</a>
     </div>
   </div>
 </div>
 <script type="application/json" id="hd-data">{{ demo|tojson }}</script>
-<script src="/static/hear_demo.js?v=8" defer></script>
+<script src="/static/hear_demo.js?v=9" defer></script>

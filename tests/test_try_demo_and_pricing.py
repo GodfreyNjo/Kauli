@@ -160,4 +160,4 @@ def test_the_demo_can_end_in_english_for_every_language_and_service(client):
     html = client.get("/try").text
     assert 'name="hd-dir"' in html and "Into English" in html
     js = (ROOT / "webapp/static/hear_demo.js").read_text(encoding="utf-8")
-    assert 'state.dir === "to"' in js and "headline_en" in js and 'u.searchParams.set("dir"' in js
+    assert 'state.dir === "to"' in js and 'u.searchParams.set("dir"' in js

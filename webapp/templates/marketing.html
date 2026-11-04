@@ -217,9 +217,9 @@
     </ul>
 
     <section class="tk-langs" aria-labelledby="langs-title">
-      <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Supported languages</span>
-      <h2 id="langs-title">Transcribe audio to text in 76+ languages</h2>
-      <p class="tk-langs-sub">Instant AI transcribes 76+ languages today, including Chinese (Mandarin), Spanish, Arabic, Hindi, French, Swahili and many more. More languages are coming soon.</p>
+      <span class="tk-langs-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>76+ Languages</span>
+      <h2 id="langs-title">Transcribe audio to text <span class="tk-grad">in 76+ languages</span></h2>
+      <p class="tk-langs-sub">From speech to text, everywhere in the world.</p>
       <div class="tk-marquee" id="lang-marquee" role="group" aria-label="Some of the supported languages">
         {% for copy in (1, 2) %}
         <ul class="tk-marquee-track"{% if copy == 2 %} aria-hidden="true"{% endif %}>
@@ -227,15 +227,15 @@
           <li><a href="{{ l.href }}" class="tk-pill{{ ' is-first' if loop.first else '' }}"{% if copy == 2 %} tabindex="-1"{% endif %}>
             {% if l.flag %}<span class="lang-flag {{ l.flag }}" aria-hidden="true"></span>{% else %}<span class="lang-dot tone-{{ l.tone }}" aria-hidden="true">{{ l.code|upper }}</span>{% endif %}{{ l.name }}</a></li>
           {% endfor %}
-          <li><a href="/languages" class="tk-pill tk-pill-more"{% if copy == 2 %} tabindex="-1"{% endif %}><span aria-hidden="true">+</span> more</a></li>
+          <li><a href="/languages" class="tk-pill tk-pill-more"{% if copy == 2 %} tabindex="-1"{% endif %}><span aria-hidden="true">+</span> More</a></li>
         </ul>
         {% endfor %}
       </div>
-      <ul class="tk-legend" aria-label="Language availability">
-        <li><span class="tk-tag now">Available now</span> Instant AI transcription in 76+ languages</li>
-          <li><span class="tk-tag now">Available now</span> Human review and dubbing in selected languages. <a href="/human-review">See which</a></li>
-          <li><span class="tk-tag soon">Coming soon</span> Human review and dubbing in more languages</li>
-        </ul>
+      <ul class="tk-legend tk-feats" aria-label="What is available">
+        <li><span class="tk-fi fi-green"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg></span>AI transcription</li>
+        <li><span class="tk-fi fi-violet"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c0-4 3.1-6.2 7-6.2s7 2.2 7 6.2"/></svg></span><a href="/human-review">Human review</a></li>
+        <li><span class="tk-fi fi-amber"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span>More languages coming</li>
+      </ul>
         <button type="button" class="tk-marquee-toggle" id="lang-marquee-toggle" aria-controls="lang-marquee" aria-pressed="false">Pause</button>
       <script>
         (function () {
@@ -395,28 +395,25 @@
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Services</span>
       <h2 class="m-h2">Everything your video or audio needs to travel</h2>
-      <p class="m-lede">Pick one service or combine them. Each is available instantly with AI, and selected languages can add human review. <a href="/human-review">See which</a>.</p>
+      <p class="m-lede">Choose a service or combine them. Available instantly with AI.</p>
       <div class="svc-grid">
-        <article class="svc-card">
+        <article class="svc-card svc-blue">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 12h6M10 16h6"/></svg></span>
           <h3>Transcription</h3>
-          <p>Accurate, time-stamped transcripts for audio and video, as Word, text or SRT.</p>
-          <span class="svc-price">Starting at $0 <small>first {{ free_minutes|int }} minutes free every month</small></span>
-          <a class="svc-link" href="/solutions/audio-to-text">Learn more →</a>
+          <p>Accurate, time-stamped transcripts for audio and video.</p>
+          <a class="svc-link" href="/solutions/audio-to-text">Learn more <i aria-hidden="true">&rarr;</i></a>
         </article>
-        <article class="svc-card">
+        <article class="svc-card svc-violet">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 12h3M8 15h8M14 12h2"/></svg></span>
           <h3>Subtitles &amp; translation</h3>
-          <p>Synchronized subtitles and translated text in {{ ai_only_languages|length + source_languages|length - 1 }} languages, ready for YouTube and video players.</p>
-          <span class="svc-price">Pay as you go <small>price shown before you order</small></span>
-          <a class="svc-link" href="/solutions/video-translation">Learn more →</a>
+          <p>Synchronized subtitles in {{ ai_only_languages|length + source_languages|length - 1 }} languages.</p>
+          <a class="svc-link" href="/solutions/video-translation">Learn more <i aria-hidden="true">&rarr;</i></a>
         </article>
-        <article class="svc-card">
+        <article class="svc-card svc-green">
           <span class="svc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
           <h3>Video dubbing</h3>
-          <p>Dubbed voice tracks in selected languages, with human review and consent for any voice cloning. <a href="/human-review">See which</a>.</p>
-          <span class="svc-price">Pay as you go <small>price shown before you order</small></span>
-          <a class="svc-link" href="/solutions/video-dubbing">Learn more →</a>
+          <p>Natural-sounding voiceovers in <a href="/human-review">selected languages</a>.</p>
+          <a class="svc-link" href="/solutions/video-dubbing">Learn more <i aria-hidden="true">&rarr;</i></a>
         </article>
       </div>
       <div class="svc-wide">
@@ -442,16 +439,24 @@
     </div>
   </section>
 
-  <section class="m-section tk-dark" id="why">
+  <section class="m-section" id="why">
     <div class="m-inner">
-      <span class="m-section-eyebrow">Why Kauli</span>
+      <span class="m-section-eyebrow m-eyebrow-lined">Why Kauli</span>
       <h2 class="m-h2">Built for work you put your name on</h2>
-      <p class="m-lede">Fast when you want a draft, careful when it has to be right.</p>
+      <p class="m-lede">Fast when you want a draft. Reliable when it has to be right.</p>
       <div class="why-grid">
-        <div class="why-item"><h3>Human review when you need it</h3><p>Choose Human-reviewed and a dedicated editor checks the result before delivery. Instant AI is clearly labelled as AI-generated.</p></div>
-        <div class="why-item"><h3>Transparent pricing</h3><p>Published per-minute rates, shown before you order. No hidden fees.</p></div>
-        <div class="why-item"><h3>Consent-based voice cloning</h3><p>Where dubbing offers it, a voice is only cloned after the speaker's consent is confirmed.</p></div>
-        <div class="why-item"><h3>Human review in selected languages</h3><p>Real editors, plus Instant AI transcription in {{ ai_only_languages|length + source_languages|length }} languages. <a href="/human-review">See the languages</a>.</p></div>
+        <div class="why-card">
+          <span class="why-ic w-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.6"/><path d="M3.5 20c0-3.6 3-6 6.5-6 1.2 0 2.3.3 3.2.8"/><circle cx="17.5" cy="17" r="4" fill="currentColor" stroke="none"/><path d="m15.6 17 1.3 1.3 2.2-2.4" stroke="#fff"/></svg></span>
+          <h3>Human review when you need it</h3><p>A real editor checks before delivery.</p></div>
+        <div class="why-card">
+          <span class="why-ic w-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M16.5 7.5c-.8-1.3-2.4-2-4.5-2-2.6 0-4.3 1.2-4.3 3.1 0 4.4 9 2 9 6.4 0 2-1.9 3.2-4.7 3.2-2.3 0-4-.8-4.9-2.3"/></svg></span>
+          <h3>Transparent pricing</h3><p>Per-minute rates, shown upfront.</p></div>
+        <div class="why-card">
+          <span class="why-ic w-orange"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></span>
+          <h3>Consent-based voice cloning</h3><p>A voice is cloned only with the speaker's consent.</p></div>
+        <div class="why-card">
+          <span class="why-ic w-violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg></span>
+          <h3>Human review in selected languages</h3><p>Real editors. <a href="/human-review">See the languages</a>.</p></div>
       </div>
     </div>
   </section>
@@ -459,8 +464,8 @@
   <section class="m-section" id="integrations">
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Integrations</span>
-      <h2 class="m-h2">Connect Kauli to the tools you already use</h2>
-      <p class="m-lede">Send work in and pull results out with our API, MCP server and webhooks today.</p>
+      <h2 class="m-h2">Connect Kauli to your tools</h2>
+      <p class="m-lede">Bring your tools together and get more done.</p>
       {% set meet_state = 'live' if meetings_enabled() else 'soon' %}{% set meet_href = '/login?next=/client/meetings' if meetings_enabled() else None %}
       {% set integrations = [
         ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12", "Integrate with your developer tools and automate your workflow.",
@@ -496,15 +501,16 @@
         {% for title, icon, desc, tools in integrations %}
         <article class="int-card" style="--i:{{ loop.index0 }}">
           <div class="int-head">
-            <span class="int-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>
+            <span class="int-icon ic-{{ loop.index0 % 6 }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{ icon }}"/></svg></span>
             <div class="int-head-text">
               <h3><button type="button" class="int-toggle" id="int-btn-{{ loop.index0 }}" aria-expanded="true" aria-controls="int-panel-{{ loop.index0 }}">{{ title|safe }}</button></h3>
-              <p>{{ desc }}</p>
-              <span class="int-peek" aria-hidden="true">{% for t in tools %}{% for part in t[3].split('+') %}<img src="/static/integrations/{{ part }}.svg" alt="" width="20" height="20" loading="lazy">{% endfor %}{% endfor %}<em>{{ tools|length }} tool{{ '' if tools|length == 1 else 's' }}</em></span>
+              {% set logos = [] %}{% for t in tools %}{% for part in t[3].split('+') %}{% set _ = logos.append(part) %}{% endfor %}{% endfor %}
+              <span class="int-peek" aria-hidden="true">{% for part in logos[:3] %}<img src="/static/integrations/{{ part }}.svg" alt="" width="20" height="20" loading="lazy">{% endfor %}{% if logos|length > 3 %}<em>+{{ logos|length - 3 }}</em>{% endif %}</span>
             </div>
             <svg class="int-caret" viewBox="0 0 12 12" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4.5l4 4 4-4"/></svg>
           </div>
           <div class="int-panel" id="int-panel-{{ loop.index0 }}" role="region" aria-labelledby="int-btn-{{ loop.index0 }}"><div class="int-panel-in">
+          <p class="int-desc">{{ desc }}</p>
           <ul class="int-list">
             {% for name, state, href, logo in tools %}
             <li data-state="{{ state }}">
@@ -617,32 +623,40 @@
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Pricing</span>
       <h2 class="m-h2">Simple pricing. Pay only for what you use.</h2>
-      <p class="m-lede">No subscription required. You see the exact price before you order. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month, to process and read; to download or edit a result you pay for that order.</p>
+      <p class="m-lede">No subscription required. See the exact price before you order. Your first {{ free_minutes|int }} minutes of Instant AI transcription are free every month.</p>
+      <div class="pz-gift"><span aria-hidden="true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="1.6"/><rect x="2.4" y="6" width="19.2" height="3.6" rx="1.2"/><path d="M12 6v15M12 6C10 6 8 5 8 3.6S10.2 2.6 12 6zM12 6c2 0 4-1 4-2.4S13.8 2.6 12 6z"/></svg></span><div><strong>{{ free_minutes|int }} minutes free</strong><small>Every month</small></div></div>
 
       {% set in_kenya = (request.headers.get('cf-ipcountry', '') | upper) == 'KE' %}
       <div class="pz-panel" id="pz">
-        <p class="pz-label">Pay as you go</p>
-        <fieldset class="pz-services">
-          <legend class="sr-only">What do you need?</legend>
-          {% set short = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
-          {% for key, sl in service_levels.items() %}
-          <label class="pz-service"><input type="radio" name="pz-service" value="{{ key }}"
-                 data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}" data-human="{{ '%.2f'|format(price_card[key]['human']) }}"{% if key == 'transcribe' %} checked{% endif %}>
-            <span>{{ short.get(key, sl['name']) }}</span></label>
-          {% endfor %}
-        </fieldset>
+        <div class="pz-controls">
+        <div class="pz-ask">
+          <p class="pz-q" aria-hidden="true">What do you need?</p>
+          <fieldset class="pz-services">
+            <legend class="sr-only">What do you need?</legend>
+            {% set short = {'transcribe': 'Transcription', 'translate': 'Transcription + translation', 'dub': 'Full dubbing'} %}
+            {% set sico = {'transcribe': '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>', 'translate': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>', 'dub': '<circle cx="12" cy="12" r="9"/><path d="m10 8.5 6 3.5-6 3.5z"/>'} %}
+            {% for key, sl in service_levels.items() %}
+            <label class="pz-service"><input type="radio" name="pz-service" value="{{ key }}"
+                   data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}" data-human="{{ '%.2f'|format(price_card[key]['human']) }}"{% if key == 'transcribe' %} checked{% endif %}>
+              <span><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ (sico.get(key) or sico['transcribe'])|safe }}</svg>{{ short.get(key, sl['name']) }}</span></label>
+            {% endfor %}
+          </fieldset>
+        </div>
         <div class="pz-minutes">
-          <label for="pz-min">How long is your audio?</label>
-          <span class="pz-minutes-field"><input type="number" id="pz-min" min="0" step="1" value="10" inputmode="numeric"> <span>minutes</span></span>
-          <span class="pz-chips" role="group" aria-label="Quick lengths">
-            <button type="button" data-min="10">10 min</button><button type="button" data-min="60">1 hour</button><button type="button" data-min="300">5 hours</button>
-          </span>
+          <label for="pz-min" class="pz-q">How long is your audio?</label>
+          <div class="pz-minutes-row">
+            <span class="pz-minutes-field"><input type="number" id="pz-min" min="0" step="1" value="10" inputmode="numeric"> <span>minutes</span></span>
+            <span class="pz-chips" role="group" aria-label="Quick lengths">
+              <button type="button" data-min="10">10 min</button><button type="button" data-min="60">1 hour</button><button type="button" data-min="300">5 hours</button>
+            </span>
+          </div>
+        </div>
         </div>
         <h3 class="sr-only">Estimate your cost</h3>
 
         <div class="pz-cards" aria-live="polite">
           <article class="pz-card">
-            <header><h4>Instant AI</h4><span class="pz-free">First {{ free_minutes|int }} min free</span></header>
+            <header><span class="pz-cic ci-green" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg></span><div class="pz-ctitle"><h4>Instant AI</h4><span>Fast, accurate results</span></div><span class="pz-free">First {{ free_minutes|int }} min free</span></header>
             <p class="pz-price"><b id="pz-rate-ai">$0.00</b><span>/ audio-minute</span></p>
             <p class="pz-est" id="pz-est-ai"></p>
             <ul class="pz-list">
@@ -654,7 +668,7 @@
             <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-ai">Try it free</a>
           </article>
           <article class="pz-card featured">
-            <header><h4>Human-reviewed</h4><span class="pz-flag">Checked by an expert</span></header>
+            <header><span class="pz-cic ci-blue" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2c2.6.2 4.5 2.3 4.5 5.1"/></svg></span><div class="pz-ctitle"><h4>Human-reviewed</h4><span>Extra accuracy, professional quality</span></div><span class="pz-flag">Checked by an expert</span></header>
             <p class="pz-price"><b id="pz-rate-human">$0.00</b><span>/ audio-minute</span></p>
             <p class="pz-est" id="pz-est-human"></p>
             <ul class="pz-list">
@@ -666,7 +680,7 @@
             <a href="/login?mode=signup" class="btn cta-olive" data-cta="pricing-human">Order human review</a>
           </article>
         </div>
-        <p class="pz-fine">All prices are in US dollars per audio-minute. Free minutes apply to Instant AI transcription only.
+        <p class="pz-fine">All prices are in US dollars per audio-minute. Free minutes apply to Instant AI transcription only, to process and read; to download or edit a result you pay for that order.
           {% if in_kenya %}In Kenya you can pay in KES with M-Pesa at checkout. {% endif %}Need an invoice or volume pricing? <a href="/demo">Talk to us</a>.</p>
       </div>
 
@@ -681,7 +695,7 @@
           <div><strong>No lock-in</strong><span>Pay as you go. A subscription is optional and never required.</span></div></li>
       </ul>
 
-      <details class="pz-more">
+      <details class="pz-more" open>
         <summary><span><strong>Optional extras</strong> <em>added per order, only if you want them</em></span></summary>
         <div class="price-extras">
           <div class="price-extra"><div><strong>Video deliverables</strong><span class="small">Burned-in captions and a dubbed video file</span></div><span class="amt">+${{ "%.2f"|format(addons['video_deliverables']['rate_per_min']) }}/min</span></div>
@@ -759,6 +773,7 @@
             document.getElementById('pz-est-ai').textContent = m + ' min = ' + money(Math.max(0, m - freeApplied) * ai) +
               (freeApplied > 0 ? ' (first ' + freeApplied + ' free)' : '');
             document.getElementById('pz-est-human').textContent = m + ' min = ' + money(m * hu);
+            [].forEach.call(panel.querySelectorAll('.pz-chips button'), function (b) { b.classList.toggle('is-on', Number(b.getAttribute('data-min')) === m); });
           }
           min.addEventListener('input', update);
           [].forEach.call(radios, function (x) { x.addEventListener('change', update); });
@@ -773,20 +788,34 @@
 
   <section class="m-section" id="how" style="background:var(--sidebar-bg);">
     <div class="m-inner">
-      <span class="m-section-eyebrow">How it works</span>
+      <span class="m-section-eyebrow m-eyebrow-lined">How it works</span>
       <h2 class="m-h2">From file to finished in four steps</h2>
-      <p class="m-lede">The same simple flow for a five-minute clip or a full episode.</p>
+      <p class="m-lede">Upload. Get a price. We process. You download.</p>
       <ol class="how-grid" id="how-steps" style="list-style:none; padding:0; margin:0;">
-        <li class="how-step"><div class="how-num" aria-hidden="true"><span>1</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Choose service and languages</h3><p>Pick transcription, subtitles or dubbing, and the languages you need.</p>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>1</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+          <span class="how-ic hi-blue" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.8" fill="currentColor" stroke="none"/><rect x="13" y="3" width="7" height="7" rx="1.8" opacity=".5" fill="currentColor" stroke="none"/><rect x="3" y="13" width="7" height="7" rx="1.8" fill="currentColor" stroke="none"/><path d="M14 14l6 2.6-2.6.9-.9 2.6z" fill="currentColor"/></svg></span>
+          <h3>Choose your service</h3><p>Pick transcription, subtitles or dubbing and your languages.</p>
           <div class="how-vis" aria-hidden="true"><span class="how-chip on">Transcription</span><span class="how-chip">Subtitles</span><span class="how-chip">Dubbing</span></div></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true"><span>2</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Upload or paste a link</h3><p>Add an audio or video file, or a YouTube link for a video you have the rights to use.</p>
-          <div class="how-vis" aria-hidden="true"><div class="how-file"><b>interview.mp4</b><i class="how-bar"><u></u></i></div></div></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true"><span>3</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Review price and submit</h3><p>See the exact price and what is included before you confirm.</p>
-          <div class="how-vis" aria-hidden="true"><div class="how-price"><span>Price shown first</span><b>Confirm order</b></div></div></li>
-        <li class="how-step"><div class="how-num" aria-hidden="true"><span>4</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><h3>Track and download</h3><p>Follow progress in your workspace, then download Word, text, SRT or VTT files.</p>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>2</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+          <span class="how-ic hi-blue" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.5h8l4.5 4.5v14.5H6z" fill="currentColor" stroke="none"/><path d="M12 17v-6M9.5 13l2.5-2.5 2.5 2.5" stroke="#fff" stroke-width="2"/></svg></span>
+          <h3>Upload or paste a link</h3><p>Add your file or a YouTube link you have the rights to.</p>
+          <div class="how-vis" aria-hidden="true"><div class="how-file"><b>interview.mp4</b><i class="how-bar"><u></u></i></div><div class="how-link">or paste a link &middot; youtube.com/...</div></div></li>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>3</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+          <span class="how-ic hi-green" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-2.3-1.6L14.4 21 12 19.4 9.6 21l-2.3-1.6L5 21z" fill="currentColor" stroke="none"/><path d="M12 7v7M14.2 8.6c-.5-.7-1.3-1-2.2-1-1.2 0-2 .6-2 1.5 0 2.2 4.4 1 4.4 3.1 0 .9-.9 1.5-2.2 1.5-1 0-1.9-.4-2.4-1.1" stroke="#fff" stroke-width="1.5"/></svg></span>
+          <h3>Review and confirm</h3><p>See the exact price and what is included before you pay.</p>
+          <div class="how-vis" aria-hidden="true"><div class="how-price"><span>Price shown first</span><b>Confirm and pay &rarr;</b></div></div></li>
+        <li class="how-step"><div class="how-num" aria-hidden="true"><span>4</span><svg class="how-tick" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+          <span class="how-ic hi-green" aria-hidden="true"><svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.5h4.5l1.5 2.5h4l1.5-2.5H20V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" fill="currentColor" stroke="none"/><path d="M8 3h8v7l-4 4-4-4z" fill="currentColor" stroke="none"/><path d="m9.8 8.2 2.2 2.2 2.2-2.2" stroke="#fff" stroke-width="1.8"/></svg></span>
+          <h3>Track and download</h3><p>We process your file and notify you when it is ready.</p>
           <div class="how-vis" aria-hidden="true"><div class="how-status"><span class="how-s-run">Processing...</span><span class="how-s-done">Ready</span></div>
             <div class="how-files"><span>Word</span><span>Text</span><span>SRT</span><span>VTT</span></div></div></li>
       </ol>
+      <ul class="how-strip" aria-label="What you can count on">
+        <li><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg>Fast turnaround</li>
+        <li><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 2.5 20 6v5.5c0 4.6-3.2 8.4-8 10-4.8-1.6-8-5.4-8-10V6z"/><path d="m8.6 12 2.4 2.4 4.4-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Secure &amp; private</li>
+        <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>76+ languages</li>
+        <li><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="16.5" r="4" fill="currentColor" stroke="none"/><path d="m15.7 16.5 1.2 1.2 2-2.2" stroke="#fff"/></svg>Human review option</li>
+      </ul>
       <script>
         (function () {
           var sec = document.getElementById("how"), list = document.getElementById("how-steps");
@@ -815,14 +844,19 @@
 
   <section class="m-section" id="languages">
     <div class="m-inner">
-      <span class="m-section-eyebrow">Languages</span>
-      <h2 class="m-h2">Transcription in {{ ai_only_languages|length + source_languages|length }} languages</h2>
-      <p class="m-lede">Instant AI transcribes and translates between them (except Kikuyu). Dubbing and human review are available in selected languages (<a href="/human-review">see which</a>), with more coming soon.</p>
+      <span class="lg-badge"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>Languages</span>
+      <h2 class="m-h2">Transcription in <span class="lg-num">{{ ai_only_languages|length + source_languages|length }}</span> languages</h2>
+      <p class="m-lede">Instantly transcribe and translate between languages.</p>
       <div class="lang-strip">
-        {% for code, label in source_languages.items() %}<span class="m-lang-pill" style="border-color:var(--accent);">{{ label }}</span>{% endfor %}
+        {% for code, label in source_languages.items() %}<span class="m-lang-pill{{ ' is-first' if loop.first else '' }}">{{ label }}</span>{% endfor %}
         {% for code, label in (ai_only_languages.items()|sort(attribute='1'))[:14] %}<span class="m-lang-pill">{{ label }}</span>{% endfor %}
-        <a class="m-lang-pill m-lang-more" href="/languages">+ {{ ai_only_languages|length - 14 }} more - see all languages</a>
       </div>
+      <p class="lg-more"><a class="m-lang-pill m-lang-more" href="/languages"><span aria-hidden="true">+</span> {{ ai_only_languages|length - 14 }} more languages <span aria-hidden="true">&rarr;</span></a></p>
+      <ul class="lg-feats" aria-label="What each language can do">
+        <li><span class="lg-fi"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg></span>Transcribe instantly</li>
+        <li><span class="lg-fi"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h9M8.5 4v2M6 6c.5 3 2.5 5.5 5.5 7M12 6c-.5 3-3 5.5-7 7"/><path d="m12.5 20 4-9 4 9M13.9 17h5.2"/></svg></span><span>Translate seamlessly<small>except Kikuyu</small></span></li>
+        <li><span class="lg-fi"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 2.5c.6 4.6 2.9 6.9 7.5 7.5-4.6.6-6.9 2.9-7.5 7.5-.6-4.6-2.9-6.9-7.5-7.5 4.6-.6 6.9-2.9 7.5-7.5z"/></svg></span><span>Dubbing &amp; human review<small>in <a href="/human-review">selected languages</a></small></span></li>
+      </ul>
     </div>
   </section>
 

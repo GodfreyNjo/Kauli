@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pager.html" import pager %}
 {% set translated = true %}
 {% block title %}Workspace{% endblock %}
 {% block content %}
@@ -30,11 +31,12 @@
       <h2 id="ws-team">Team</h2>
       <ul class="ws-members">
         <li><span class="ws-av">{{ (owner['display_name'] or owner['email'])[0]|upper }}</span><span><strong>{{ owner['display_name'] or owner['email'] }}</strong><small class="muted">Owner</small></span></li>
-        {% for m in members if m['status'] != 'removed' %}
+        {% for m in members %}
         <li><span class="ws-av">{{ m['invited_email'][0]|upper }}</span><span><strong>{{ m['invited_email'] }}</strong><small class="muted">{{ 'Member' if m['status'] == 'accepted' else 'Invite sent' }}</small></span>
           {% if is_owner %}<form method="post" action="/settings/team/remove"><input type="hidden" name="member_id" value="{{ m['id'] }}"><button class="secondary" type="submit" aria-label="Remove {{ m['invited_email'] }}">Remove</button></form>{% endif %}</li>
         {% endfor %}
       </ul>
+      {{ pager(members_page, members_pages, '/client/workspace', {}, 'members_page') }}
       {% if is_owner %}
       <form method="post" action="/settings/team/invite" class="ws-invite">
         <input type="email" name="email" placeholder="teammate@company.com" required aria-label="Teammate's email">

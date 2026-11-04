@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pager.html" import pager %}
 {% block title %}Billing and plans{% endblock %}
 {% block content %}
 {% include "_nudges.html" %}
@@ -211,7 +212,7 @@
   </section>
 {% if payments %}
   <details class="ds-card collapsible-card" id="payment-history" open>
-  <summary><h2>Payment history <span class="muted collapsible-count">({{ payments|length }})</span></h2></summary>
+  <summary><h2>Payment history <span class="muted collapsible-count">({{ payments_total }})</span></h2></summary>
   <div class="ds-scroll"><table class="ds-table">
     <thead><tr><th>Date</th><th>For</th><th>Amount</th><th class="hide-sm">Method</th><th>Status</th><th><span class="sr-only">Receipt</span></th></tr></thead>
     <tbody>
@@ -227,6 +228,7 @@
       {% endfor %}
     </tbody>
   </table></div>
+  <div class="ds-pager">{{ pager(pay_page, pay_pages, '/client/billing', {}, 'payments_page', 'payment-history') }}</div>
 </details>
 {% else %}
 <div class="ds-card ds-empty">

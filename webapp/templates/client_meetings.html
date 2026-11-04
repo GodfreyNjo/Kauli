@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pager.html" import pager %}
 {% block title %}Meetings{% endblock %}
 {% block content %}
 <div class="ch mt">
@@ -52,7 +53,8 @@
         <form method="post" action="/client/meetings/{{ m['id'] }}/cancel" style="margin:0;"><button type="submit" class="btn secondary ch-act">Cancel</button></form>{% endif %}
       </div></li>
       {% endfor %}
-    </ul>{% endif %}
+    </ul>
+    <div class="ds-pager">{{ pager(page, pages, '/client/meetings') }}</div>{% endif %}
   </section>
   <script>
     (function () {

@@ -8,9 +8,23 @@
   <ul>{{ _links(back) }}</ul>
 </details>
 {% endmacro %}
+{% macro _flag(code) %}<svg class="lang-flag" viewBox="0 0 40 40" width="40" height="40" aria-hidden="true"><defs><clipPath id="lf-{{ code }}"><circle cx="20" cy="20" r="20"/></clipPath></defs><g clip-path="url(#lf-{{ code }})">
+{%- if code == 'en' -%}<rect width="40" height="40" fill="#fff"/>{% for y in [0, 6, 12, 18, 24, 30, 36] %}<rect y="{{ y }}" width="40" height="3.1" fill="#d33a3a"/>{% endfor %}<rect width="19" height="21.5" fill="#2a4a9c"/><circle cx="6" cy="6" r="1.3" fill="#fff"/><circle cx="12" cy="6" r="1.3" fill="#fff"/><circle cx="9" cy="11" r="1.3" fill="#fff"/><circle cx="15" cy="11" r="1.3" fill="#fff"/><circle cx="6" cy="16" r="1.3" fill="#fff"/><circle cx="12" cy="16" r="1.3" fill="#fff"/>
+{%- elif code == 'es' -%}<rect width="40" height="40" fill="#c8312d"/><rect y="10" width="40" height="20" fill="#f4c20d"/>
+{%- elif code == 'zh' -%}<rect width="40" height="40" fill="#de2910"/><polygon points="11,6 13.2,12.6 20,12.6 14.5,16.6 16.6,23 11,19 5.4,23 7.5,16.6 2,12.6 8.8,12.6" fill="#ffde00"/>
+{%- elif code == 'ar' -%}<rect width="40" height="40" fill="#1f7a3d"/><rect x="9" y="17" width="22" height="2.4" rx="1.2" fill="#fff"/><rect x="11" y="22" width="18" height="1.6" rx="0.8" fill="#fff"/><rect x="12" y="12" width="16" height="2.6" rx="1.3" fill="#fff" opacity=".85"/>
+{%- elif code == 'fr' -%}<rect width="40" height="40" fill="#fff"/><rect width="13.4" height="40" fill="#2a4a9c"/><rect x="26.6" width="13.4" height="40" fill="#d33a3a"/>
+{%- elif code == 'pt' -%}<rect width="40" height="40" fill="#1d9a47"/><polygon points="20,6 36,20 20,34 4,20" fill="#f7d417"/><circle cx="20" cy="20" r="7" fill="#2a4a9c"/>
+{%- elif code == 'de' -%}<rect width="40" height="40" fill="#d33a3a"/><rect width="40" height="13.4" fill="#222"/><rect y="26.6" width="40" height="13.4" fill="#f4c20d"/>
+{%- elif code == 'hi' -%}<rect width="40" height="40" fill="#fff"/><rect width="40" height="13.4" fill="#f59a2b"/><rect y="26.6" width="40" height="13.4" fill="#1d9a47"/><circle cx="20" cy="20" r="4" fill="none" stroke="#2a4a9c" stroke-width="1.6"/>
+{%- elif code == 'ja' -%}<rect width="40" height="40" fill="#fff"/><circle cx="20" cy="20" r="9" fill="#d33a3a"/>
+{%- elif code == 'ko' -%}<rect width="40" height="40" fill="#fff"/><path d="M11 20a9 9 0 0118 0z" fill="#d33a3a"/><path d="M11 20a9 9 0 0018 0z" fill="#2a4a9c"/><rect x="4" y="6" width="7" height="1.6" fill="#222"/><rect x="29" y="32" width="7" height="1.6" fill="#222"/>
+{%- elif code == 'sw' -%}<rect width="40" height="40" fill="#fff"/><rect width="40" height="11" fill="#222"/><rect y="14.5" width="40" height="11" fill="#c8312d"/><rect y="29" width="40" height="11" fill="#1d9a47"/>
+{%- else -%}<rect width="40" height="40" fill="#8aa0c4"/>
+{%- endif -%}</g></svg>{% endmacro %}
 {% macro lang_menu(back) %}
 <div class="lang-menu" role="group" aria-label="{{ t('menu_language') }}">
   <div class="lang-menu-title">{{ _globe() }}{{ t('menu_language') }}</div>
-  <ul>{{ _links(back) }}</ul>
+  <ul class="lang-grid">{% for code, name in ui_languages %}<li><a href="/lang/{{ code }}?next={{ back|urlencode }}" rel="nofollow" lang="{{ code }}" hreflang="{{ code }}" title="{{ name }}"{% if code == ui_lang() %} aria-current="true" class="is-current"{% endif %}>{{ _flag(code) }}<span>{{ code|upper }}</span></a></li>{% endfor %}</ul>
 </div>
 {% endmacro %}

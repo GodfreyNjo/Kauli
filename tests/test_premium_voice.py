@@ -288,8 +288,8 @@ def visitor(env, monkeypatch):
 def test_languages_flow_across_the_home_page_in_a_loop(visitor):
     html = visitor.client.get("/").text
     section = re.search(r'<section class="tk-langs".*?</section>', html, re.S).group(0)
-    assert "Supported languages" in section
-    assert re.search(r"in \d+\+ languages", section) and "More languages are coming soon" in section
+    assert "76+ Languages" in section and "From speech to text, everywhere in the world." in section
+    assert re.search(r"in \d+\+ languages", section) and "AI transcription" in section and "Human review" in section and "More languages coming" in section
     tracks = re.findall(r'<ul class="tk-marquee-track"([^>]*)>', section)
     assert len(tracks) == 2 and 'aria-hidden="true"' in tracks[1] and 'aria-hidden' not in tracks[0]
     second = section.split('<ul class="tk-marquee-track" aria-hidden="true">')[1].split("</ul>")[0]      # just the copied track
@@ -298,7 +298,7 @@ def test_languages_flow_across_the_home_page_in_a_loop(visitor):
     assert len(pills) >= 12
     for name in ("English", "Kiswahili", "Kikuyu", "Français", "Español", "العربية", "Português", "Deutsch"):
         assert name in section
-    assert "lang-flag flag-en" in section and "+</span> more" in section
+    assert "lang-flag flag-en" in section and "+</span> More" in section
     assert 'id="lang-marquee-toggle"' in section and 'aria-pressed="false"' in section        # a visible pause control
 
 
