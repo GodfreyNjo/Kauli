@@ -61,10 +61,12 @@
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Product",
+  "@type": "Service",
   "name": "Kauli",
+  "serviceType": "Transcription, translation, subtitling and dubbing",
   "description": "Instant AI transcription in 76+ languages, plus translation, dubbing and subtitles, with optional human review in {{ human_review_languages }}. Priced per audio-minute.",
-  "brand": { "@type": "Brand", "name": "Forge Media Services" },
+  "provider": { "@id": "{{ site_origin() }}/#organization" },
+  "areaServed": "Worldwide",
   "offers": [
     {% for key, sl in service_levels.items() %}
     { "@type": "Offer", "name": "{{ sl['name'] }} - Instant AI (per audio-minute)", "priceCurrency": "USD", "price": "{{ '%.2f'|format(price_card[key]['ai']) }}" },
