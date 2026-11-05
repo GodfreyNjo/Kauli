@@ -27,7 +27,7 @@ from kauli.pipeline import run as kauli_run  # noqa: E402
 from kauli.models import Job  # noqa: E402
 from kauli import screen_text  # noqa: E402
 from kauli.subtitles import to_vtt  # noqa: E402
-from . import account_hub, db, logging_setup, mailer, notifications, provider_health, transcript_reuse  # noqa: E402
+from . import account_hub, db, lifecycle, logging_setup, mailer, notifications, provider_health, transcript_reuse  # noqa: E402
 
 log = logging_setup.get_logger("worker")
 
@@ -88,7 +88,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
     )
     html = mailer.wrap_email_html(inner, cta_text="View & download your files" if link else None,
                                    cta_url=link, base_url=link_base)
-    mailer.send_email(client["email"], "Your Kauli order is ready", html, body)
+    mailer.send_as("orders", client["email"], "Your Kauli order is ready", html, body)
     db.create_notification(client["id"], "order_ready", f"{order['original_filename']} is ready",
                             link=f"/client/orders/{order['id']}")
 
@@ -187,6 +187,11 @@ def _run_job(order_id: str, is_retry: bool = False) -> None:
     db.update_order_status(order_id, "processing")
     db.set_processing_stage(order_id, "prepare")
     log.info("job started", extra={"job_id": order_id, "user_id": order["client_id"], "is_retry": is_retry})
+    if not is_retry:
+        try:
+            lifecycle.order_received(order)                       # "we have your order", from Kauli Orders
+        except Exception:  # noqa: BLE001 - an email must never hold up the work
+            log.warning("order confirmation failed", extra={"job_id": order_id}, exc_info=True)
     resume = is_retry
     if not is_retry and "reuse_of" in order.keys() and order["reuse_of"]:
         try:

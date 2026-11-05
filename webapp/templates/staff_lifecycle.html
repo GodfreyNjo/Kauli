@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Lifecycle emails{% endblock %}
+{% macro when(ts) %}{{ ts|int|timestamp_to_str if ts else 'never' }}{% endmacro %}
+{% block content %}
+<div class="hub" lang="en">
+  <div class="hub-top"><div>
+    <h1>Lifecycle emails</h1>
+    <p class="muted">The messages that follow a sale. Nobody is emailed twice, and anyone who unsubscribed is left out. Except the order confirmation, every automation is off until you switch it on: look at who would get it, send yourself a test, then decide.</p>
+  </div></div>
+  {% if notice %}<p class="hub-flash ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
+  {% if not email_ready %}<p class="hub-flash bad" role="alert">Email sending is not set up on this server, so nothing below can be delivered yet.</p>{% endif %}
+
+  <section class="hub-card" id="lc-switches">
+    <h2>Automations</h2>
+    <div class="si-grid">
+      {% for a in automations %}
+      <div class="si-card">
+        <header class="si-head"><h3>{{ a.title }}</h3><span class="pf-tag{{ ' ok' if a.on else '' }}">{{ 'On' if a.on else 'Off' }}</span></header>
+        <p class="muted">{{ a.text }}</p>
+        <div class="si-actions">
+          <form method="post" action="/staff/lifecycle/switch"><input type="hidden" name="key" value="{{ a.key }}"><input type="hidden" name="on" value="{{ 0 if a.on else 1 }}"><button type="submit" class="btn">{{ 'Turn off' if a.on else 'Turn on' }}</button></form>
+          <form method="post" action="/staff/lifecycle/test"><input type="hidden" name="kind" value="{{ 'confirm' if a.key == 'confirm' else a.key }}"><button type="submit" class="secondary">Send me a sample</button></form>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted">Who each email comes from, by what it is about:
+      {% for k, v in senders.items() %}<span class="pf-tag">{{ k }}: {{ v }}</span> {% endfor %}</p>
+  </section>
+
+  <section class="hub-card" id="lc-trustpilot">
+    <h2>Trustpilot reviews</h2>
+    <p class="muted">Each review request carries your Trustpilot review link and, in the same email, a private way to tell us what went wrong. A request goes out {{ limits.after }} days after a delivery (and not after {{ limits.window }} days), at most once every {{ limits.repeat }} days per customer.</p>
+    <p class="hub-flash" role="note"><strong>Trustpilot's rule:</strong> ask every customer on the same terms. Inviting only the ones who seem happy, or leaving out the ones who complained, is not allowed and can get the profile flagged. The automation picks by timing only. If you tick customers by hand below, do not choose them by how they feel about Kauli.</p>
+    <form method="post" action="/staff/lifecycle/trustpilot" class="si-form">
+      <label>Review link <input type="url" name="url" value="{{ '' if trustpilot_default else trustpilot }}" placeholder="{{ trustpilot }}"></label>
+      <small class="muted">{% if trustpilot_default %}Using the standard link for kauli-forgemedia.com. Paste your profile's own review link if it differs (Trustpilot, Invite customers, Business-generated link).{% else %}Saved. Leave blank to go back to the standard link.{% endif %}</small>
+      <div class="si-actions"><button type="submit" class="btn">Save link</button></div>
+    </form>
+
+    <h3>Would get a request on the next run ({{ review_due|length }})</h3>
+    {% if not review_due %}<p class="muted">Nobody right now.</p>{% else %}
+    <ul class="pod-admin">{% for c in review_due[:15] %}<li>{{ c.user['display_name'] or c.user['email'] }} <span class="muted">&middot; {{ c.user['email'] }} &middot; delivered {{ when(c.order['status_changed_at'] or c.order['updated_at'] or c.order['created_at']) }}</span></li>{% endfor %}</ul>
+    <form method="post" action="/staff/lifecycle/send-due"><input type="hidden" name="kind" value="review"><button type="submit" class="secondary" onclick="return confirm('Send a review request to all {{ review_due|length }} now?');">Send to everyone listed now</button></form>
+    {% endif %}
+
+    <h3>Or tick customers yourself</h3>
+    <form method="post" action="/staff/lifecycle/review-selected">
+      <div class="ds-scroll"><table class="ds-table">
+        <thead><tr><th></th><th>Customer</th><th>Latest delivery</th><th>Last asked</th></tr></thead>
+        <tbody>
+        {% for c in choices %}
+        <tr><td><input type="checkbox" name="customer" value="{{ c.user['id'] }}" aria-label="Ask {{ c.user['email'] }}"></td>
+            <td>{{ c.user['display_name'] or '' }} <small class="muted">{{ c.user['email'] }}</small></td>
+            <td>{{ when(c.order['status_changed_at'] or c.order['updated_at'] or c.order['created_at']) }}</td><td>{{ when(c.asked) }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table></div>
+      {% if not choices %}<p class="muted">No customer has had work delivered yet.</p>{% else %}<button type="submit" class="btn">Send the review request to the ticked customers</button>{% endif %}
+    </form>
+  </section>
+
+  <section class="hub-card" id="lc-rebook">
+    <h2>Come-back reminders</h2>
+    <p class="muted">When a customer's usual time between orders has passed (their own typical gap, between 2 weeks and 3 months, a month for a single order) and nothing is in progress. Due now: <strong>{{ rebook_due|length }}</strong>.</p>
+    {% if rebook_due %}<ul class="pod-admin">{% for c in rebook_due[:15] %}<li>{{ c.user['display_name'] or c.user['email'] }} <span class="muted">&middot; usually every {{ c.gap }} days, quiet for {{ c.quiet }} &middot; {{ c.orders }} order(s)</span></li>{% endfor %}</ul>
+    <form method="post" action="/staff/lifecycle/send-due"><input type="hidden" name="kind" value="rebook"><button type="submit" class="secondary" onclick="return confirm('Send to everyone due now?');">Send to everyone listed now</button></form>{% endif %}
+  </section>
+
+  <section class="hub-card" id="lc-vip">
+    <h2>Regulars</h2>
+    <p class="muted">Customers with {{ limits.vip_orders }} or more deliveries in {{ limits.vip_days }} days. No money off: what they get is attention. Their replies are read first and they hear about new things first, so please keep that promise. Due now: <strong>{{ vip_due|length }}</strong>.</p>
+    {% if vip_due %}<ul class="pod-admin">{% for c in vip_due[:15] %}<li>{{ c.user['display_name'] or c.user['email'] }} <span class="muted">&middot; {{ c.orders }} deliveries</span></li>{% endfor %}</ul>
+    <form method="post" action="/staff/lifecycle/send-due"><input type="hidden" name="kind" value="vip"><button type="submit" class="secondary" onclick="return confirm('Send to everyone due now?');">Send to everyone listed now</button></form>{% endif %}
+    {% if vips %}<h3>Already told ({{ vips|length }})</h3><ul class="pod-admin">{% for v in vips %}<li>{{ v['display_name'] or v['email'] }} <span class="muted">&middot; {{ v['email'] }} &middot; {{ when(v['sent_at']) }}</span></li>{% endfor %}</ul>{% endif %}
+  </section>
+
+  <section class="hub-card" id="lc-log">
+    <h2>Recently sent</h2>
+    {% if not log %}<p class="muted">Nothing yet.</p>{% else %}
+    <ul class="pod-admin">{% for r in log %}<li><strong>{{ r['kind'].replace('_', ' ') }}</strong> <span class="muted">&middot; {{ r['email'] or 'unknown' }} &middot; {{ when(r['sent_at']) }}</span></li>{% endfor %}</ul>{% endif %}
+  </section>
+</div>
+{% endblock %}

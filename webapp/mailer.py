@@ -41,6 +41,24 @@ BRAND_CARD_BG = "#ffffff"
 BRAND_BORDER = "#e7e3dc"
 
 
+# Who an email comes from, by what it is about. It is the same real sending address every time (only the name beside it changes), so a customer's
+# inbox shows "Kauli Orders" for an order, "Kauli Billing" for a receipt and "Kauli Customer Support" for a reply from the team.
+SENDERS = {
+    "orders": "Kauli Orders", "billing": "Kauli Billing", "support": "Kauli Customer Support", "success": "Kauli Customer Success",
+    "team": "Kauli Team", "marketing": "Kauli Marketing", "operations": "Kauli Operations",
+}
+
+
+def sender(purpose: str) -> str:
+    return SENDERS.get(purpose, SENDERS["operations"])
+
+
+def send_as(purpose: str, *args, **kwargs):
+    """send_email from the named sender (see SENDERS)."""
+    kwargs.setdefault("sender_name", sender(purpose))
+    return send_email(*args, **kwargs)
+
+
 def email_configured() -> bool:
     return bool(os.environ.get("BREVO_API_KEY")) and bool(os.environ.get("BREVO_FROM_EMAIL"))
 

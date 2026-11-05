@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -2507,7 +2507,7 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
     if mailer.email_configured():
         inner = html_inner if html_inner is not None else mailer.text_to_html_paragraphs(body)
         html = mailer.wrap_email_html(inner, cta_text=cta_text, cta_url=cta_url, base_url=base_url)
-        ok, detail = mailer.send_email(user["email"], subject, html, body)
+        ok, detail = mailer.send_as("success", user["email"], subject, html, body)
         db.set_onboarding_message_email_result(message_id, ok, detail)
 
 
@@ -2670,7 +2670,7 @@ def _queue_first_payment_message(user, base_url: str = "") -> None:
         inner += rating_row
         inner += f'<p style="margin:20px 0 0;">Talk soon,<br>{TEAM_NAME}</p>'
         html = mailer.wrap_email_html(inner, base_url=base_url)
-        ok, detail = mailer.send_email(user["email"], subject, html, body)
+        ok, detail = mailer.send_as("success", user["email"], subject, html, body)
         db.set_onboarding_message_email_result(message_id, ok, detail)
 
 
@@ -4851,7 +4851,7 @@ def settings_team_invite(request: Request, email: str = Form(...)):
         )
         html = mailer.wrap_email_html(inner, cta_text="Sign up for Kauli", cta_url=str(request.base_url).rstrip("/") + "/login",
                                        base_url=str(request.base_url))
-        mailer.send_email(email, f"{user['display_name'] or 'A Kauli client'} invited you to their team", html, inner)
+        mailer.send_as("team", email, f"{user['display_name'] or 'A Kauli client'} invited you to their team", html, inner)
     except Exception:
         pass  # the invite row itself is what matters - acceptance is checked at login regardless of this email landing
     return RedirectResponse("/settings?tab=team&team_notice=Invite+sent.", status_code=303)
@@ -5068,7 +5068,7 @@ def _notify_actor_of_assignment(actor: dict, order, base_url: str) -> None:
           f'it\'s ready.</p>'
     )
     html = mailer.wrap_email_html(inner, cta_text=action_line, cta_url=login_url, base_url=base_url)
-    mailer.send_email(actor["email"], subject, html, text)
+    mailer.send_as("team", actor["email"], subject, html, text)
 
 
 @app.post("/staff/orders/{order_id}/assign-actor")
@@ -6639,7 +6639,7 @@ def create_order(
             )
             html = mailer.wrap_email_html(inner, cta_text="Top up your credits", cta_url=billing_url,
                                            base_url=str(request.base_url))
-            mailer.send_email(user["email"], "Running low on prepaid Kauli credits", html, body)
+            mailer.send_as("billing", user["email"], "Running low on prepaid Kauli credits", html, body)
             db.mark_wallet_low_alert_sent(user["id"])
 
     db.set_job_instructions(
@@ -7673,7 +7673,7 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
         text = (f"Hi {payer['display_name']},\n\nYour Kauli payment has been received.\n"
                 f"{description} - Total: ${payment['amount_usd']:.2f}\n"
                 + (f"View your receipt: {receipt_url}\n" if receipt_url else ""))
-        ok, detail = mailer.send_email(payer["email"], "Your Kauli receipt", html, text)
+        ok, detail = mailer.send_as("billing", payer["email"], "Your Kauli receipt", html, text)
         db.set_receipt_email_result(receipt_id, ok, detail)
     # GA4's own recommended e-commerce event - the real "money actually
     # cleared" moment, not just a checkout attempt. transaction_id is this
@@ -7823,7 +7823,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
             f"real receipt the moment it's confirmed.</p>",
             base_url=str(request.base_url),
         )
-        mailer.send_email(user["email"], f"Kauli bank transfer - reference {payment_id}", client_html)
+        mailer.send_as("billing", user["email"], f"Kauli bank transfer - reference {payment_id}", client_html)
         staff_html = mailer.wrap_email_html(
             f"<p>{user['display_name']} ({user['email']}) requested a bank transfer for ${amount_usd:.2f} - "
             f"reference {payment_id}. Watch for it and confirm at /staff/billing once it lands.</p>",
@@ -8557,7 +8557,7 @@ def staff_email_lead(request: Request, lead_id: str, subject: str = Form(...), b
     if not lead:
         return HTMLResponse("Lead not found.", status_code=404)
     html = mailer.wrap_email_html(f"<p>{body}</p>".replace("\n", "</p><p>"), base_url=str(request.base_url))
-    ok, detail = mailer.send_email(lead["email"], subject.strip(), html, body.strip())
+    ok, detail = mailer.send_as("marketing", lead["email"], subject.strip(), html, body.strip())
     note = (
         f"Email sent - \"{subject.strip()}\"\n\n{body.strip()}" if ok
         else f"Email FAILED to send - \"{subject.strip()}\": {detail}"
@@ -9370,7 +9370,7 @@ async def client_share_transcript(request: Request, order_id: str):
         html = mailer.wrap_email_html(
             mailer.text_to_html_paragraphs(f"{sender} shared the transcript of \"{name}\" with you. The link is read-only."),
             cta_text="Open the transcript", cta_url=url, base_url=_site_base(request))
-        ok, detail = mailer.send_email(to, f"{sender} shared a transcript with you", html,
+        ok, detail = mailer.send_as("team", to, f"{sender} shared a transcript with you", html,
                                        text_body=f"{sender} shared the transcript of \"{name}\" with you: {url}", tags=["share"])
         if not ok:
             return JSONResponse({"error": "Could not send that email. Copy the link instead."}, status_code=502)
@@ -9955,7 +9955,7 @@ def staff_newsletter_send(request: Request, subject: str = Form(...), blog_post_
             footer_note=f'You\'re getting this because you opted in to Kauli updates. '
                         f'<a href="{unsub_url}" style="color:{mailer.BRAND_MUTED};">Unsubscribe</a> anytime.',
         )
-        ok, _ = mailer.send_email(client["email"], subject, html, tags=[send_tag])
+        ok, _ = mailer.send_as("marketing", client["email"], subject, html, tags=[send_tag])
         if ok:
             sent_count += 1
 
@@ -10654,7 +10654,7 @@ def staff_send_message(request: Request, order_id: str,
                     cta_text="View your order →", cta_url=str(request.base_url).rstrip("/") + f"/client/orders/{order_id}",
                     base_url=str(request.base_url),
                 )
-                mailer.send_email(client["email"], f"Update on your Kauli order - {order['original_filename']}",
+                mailer.send_as("orders", client["email"], f"Update on your Kauli order - {order['original_filename']}",
                                    html, body.strip())
     return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
 
@@ -10751,7 +10751,7 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
             )
             html = mailer.wrap_email_html(inner, cta_text="View order & resume", cta_url=link,
                                            base_url=str(request.base_url))
-            mailer.send_email(client["email"], "Action needed on your Kauli order", html, body)
+            mailer.send_as("orders", client["email"], "Action needed on your Kauli order", html, body)
     elif action == "resume":
         db.update_order_status(order_id, "awaiting_review")
         db.create_message(order_id, user["id"], "internal", "Resolved - back in the review queue.")
@@ -12132,6 +12132,7 @@ def _winback_loop() -> None:
             dunning.expire_backstop()
             site_analytics.prune()
             engagement.sweep_once(_base)
+            lifecycle.sweep_once()                                # review requests, come-back reminders and regulars, for whichever staff switched on
             weekly_kpi.send_if_due(_base, mailer.send_email, mailer.wrap_email_html)
         except Exception as exc:  # noqa: BLE001 - one bad sweep must not kill the loop forever
             api_log.warning("winback sweep failed", extra={"error": str(exc)})
@@ -12144,6 +12145,7 @@ blog_audio.register(sys.modules[__name__])
 cloud_import.register(sys.modules[__name__])
 connections.register(sys.modules[__name__])
 meeting_notes.register(sys.modules[__name__])
+lifecycle.register(sys.modules[__name__])             # the messages after a sale, and their staff page
 podcast.register(sys.modules[__name__])               # the Podcast page, its staff tools and the transcript webhook
 calendar_auto.register(sys.modules[__name__])      # Kauli joins the meetings on a connected calendar by itself
 staff_integrations.register(sys.modules[__name__])

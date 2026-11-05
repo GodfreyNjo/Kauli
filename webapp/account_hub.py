@@ -1178,7 +1178,7 @@ def staff_support_reply(request: Request, thread_id: str, body: str = Form(...),
         try:
             if target and mailer.email_configured():
                 inner = f"<p>{html.escape(text)}</p><p>You can reply from the help assistant in your Kauli account.</p>"
-                mailer.send_email(target["email"], "Reply from the Kauli team", mailer.wrap_email_html(inner, cta_text="Open Kauli", cta_url=f"{A._site_base(request)}/client/home"), tags=["support"])
+                mailer.send_as("support", target["email"], "Reply from the Kauli team", mailer.wrap_email_html(inner, cta_text="Open Kauli", cta_url=f"{A._site_base(request)}/client/home"), tags=["support"])
         except Exception:  # noqa: BLE001
             pass
     if close:

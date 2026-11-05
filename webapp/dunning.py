@@ -73,7 +73,7 @@ def _send(user, subject: str, lines: list[str], base_url: str, cta_text: str | N
         + '<p style="margin:0;">Talk soon,<br>Kauli Team</p>'
     try:
         if mailer.email_configured():
-            mailer.send_email(user["email"], subject, mailer.wrap_email_html(inner, cta_text=cta_text, cta_url=cta_url, base_url=base_url), text)
+            mailer.send_as("billing", user["email"], subject, mailer.wrap_email_html(inner, cta_text=cta_text, cta_url=cta_url, base_url=base_url), text)
     except Exception:  # noqa: BLE001 - a failed email must never break the webhook
         pass
 

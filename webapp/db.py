@@ -793,6 +793,16 @@ CREATE TABLE IF NOT EXISTS podcast_episodes (
     UNIQUE (show_id, guid)
 );
 CREATE INDEX IF NOT EXISTS idx_podcast_episodes_order ON podcast_episodes(transcript_order_id);
+-- The messages that follow a sale (webapp/lifecycle.py): one row per message sent, so none ever goes twice.
+CREATE TABLE IF NOT EXISTS lifecycle_messages (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,                      -- 'order_received' | 'review_request' | 'rebook' | 'vip'
+    ref TEXT NOT NULL DEFAULT '',
+    sent_at REAL NOT NULL,
+    UNIQUE (user_id, kind, ref)
+);
+CREATE INDEX IF NOT EXISTS idx_lifecycle_user ON lifecycle_messages(user_id, kind, sent_at);
 
 CREATE TABLE IF NOT EXISTS client_teams (
     client_id TEXT PRIMARY KEY,

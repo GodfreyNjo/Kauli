@@ -184,7 +184,7 @@ def send_nudge(c: dict, base_url: str) -> bool:
     inner = f'<p style="margin:0 0 14px;">Hi {html.escape(name)},</p>' + "".join(f'<p style="margin:0 0 14px;">{html.escape(x)}</p>' for x in lines) + '<p style="margin:0;">Talk soon,<br>Kauli Team</p>'
     try:
         if mailer.email_configured():
-            mailer.send_email(u["email"], subject, mailer.wrap_email_html(inner, cta_text=cta, cta_url=link, footer_note=f'<a href="{unsub}">Stop these emails</a>', base_url=base_url), text)
+            mailer.send_as("success", u["email"], subject, mailer.wrap_email_html(inner, cta_text=cta, cta_url=link, footer_note=f'<a href="{unsub}">Stop these emails</a>', base_url=base_url), text)
     except Exception:  # noqa: BLE001
         pass
     return True

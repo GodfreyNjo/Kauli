@@ -119,7 +119,7 @@ def close_account(request: Request, confirm_text: str = Form(""), reason: str = 
     try:
         if mailer.email_configured():
             subject, inner, body = _confirmation_email(user, facts)
-            mailer.send_email(user["email"], subject, mailer.wrap_email_html(inner, base_url=A._site_base(request)), body)
+            mailer.send_as("support", user["email"], subject, mailer.wrap_email_html(inner, base_url=A._site_base(request)), body)
     except Exception:  # noqa: BLE001 - closing must never fail because an email did
         pass
     request.session.clear()

@@ -137,7 +137,7 @@ def send_offer(user, segment: str, base_url: str) -> bool:
     try:
         if mailer.email_configured():
             subject, inner, text = _email(user, segment, plan, code, link)
-            mailer.send_email(user["email"], subject, mailer.wrap_email_html(inner, cta_text="Get my free month", cta_url=link, base_url=base_url), text)
+            mailer.send_as("success", user["email"], subject, mailer.wrap_email_html(inner, cta_text="Get my free month", cta_url=link, base_url=base_url), text)
     except Exception:  # noqa: BLE001 - the offer still shows in their account
         pass
     return True
