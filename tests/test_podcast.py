@@ -30,7 +30,15 @@ def _staff(env, user_id="s1"):
 
 
 # ------------------------------------------------ the house defaults and the switch
+def _house(env):
+    conn = env.db.get_conn()
+    conn.execute("DELETE FROM app_flags WHERE key IN ('provider_default_asr', 'provider_default_mt')")          # as on a server where nobody has picked anything
+    conn.commit()
+    conn.close()
+
+
 def test_transkriptor_and_azure_are_the_house_choice_until_staff_pick_something_else(env):
+    _house(env)
     assert provider_health.default_name("asr") == "transkriptor" and provider_health.default_name("mt") == "azure-translate" and provider_health.default_name("tts") == ""
     assert provider_health.is_house_default("asr") and not provider_health.is_house_default("tts")
     provider_health.set_default("asr", "", by="s1")                                           # staff chose Automatic on purpose: it stays Automatic
@@ -40,6 +48,7 @@ def test_transkriptor_and_azure_are_the_house_choice_until_staff_pick_something_
 
 
 def test_azure_takes_the_automatic_jobs_but_not_a_paid_upgrade_or_a_human_reviewed_job_unless_staff_chose_it(env, monkeypatch):
+    _house(env)
     monkeypatch.setattr(provider_health, "usable", lambda name: True)
     monkeypatch.setattr(provider_health, "is_paused", lambda name: False)
     assert env.app._pick_mt("en", "sw", "", "ai")[0] == "azure-translate"                       # an Instant AI job
@@ -53,6 +62,8 @@ def test_azure_takes_the_automatic_jobs_but_not_a_paid_upgrade_or_a_human_review
 def test_staff_can_switch_models_on_the_models_and_review_tabs_and_come_back_to_the_same_tab(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes))                                              # a customer places it first, then staff look
     _staff(env)
+    page = env.client.get("/staff/models").text
+    _house(env)
     page = env.client.get("/staff/models").text
     assert "Models in use" in page and 'name="next" value="/staff/models"' in page and "Azure Translator" in page and "(house choice)" in page
     r = env.client.post("/staff/providers/default", data={"kind": "mt", "name": "claude", "next": "/staff/models"}, follow_redirects=False)

@@ -50,7 +50,7 @@ def _keys(env, **keys):
 # ---------------------------------------------------------------------------------------------- the defaults
 def test_only_staff_pin_a_default_and_only_a_provider_that_belongs_to_the_step(env):
     assert env.client.post("/staff/providers/default", data={"kind": "mt", "name": "lara"}, follow_redirects=False).status_code in (302, 303, 307)
-    assert provider_health.default_name("mt") == provider_health.FACTORY_DEFAULTS["mt"]            # a customer changed nothing: still the house choice
+    assert provider_health.default_name("mt") == ""                                                # a customer changed nothing: it is still Automatic (the tests start there)
     _staff(env)
     assert "error=" in env.client.post("/staff/providers/default", data={"kind": "mt", "name": "groq-whisper"}, follow_redirects=False).headers["location"]
     assert "error=" in env.client.post("/staff/providers/default", data={"kind": "nope", "name": "lara"}, follow_redirects=False).headers["location"]

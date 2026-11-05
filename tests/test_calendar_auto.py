@@ -142,6 +142,9 @@ def test_an_order_that_is_not_from_a_meeting_is_left_alone(env, wav_bytes, monke
 
 
 def test_the_calendar_cards_and_the_meetings_page_offer_one_click(env, monkeypatch):
+    for key in ("GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "DROPBOX_APP_KEY", "DROPBOX_APP_SECRET", "ONEDRIVE_CLIENT_ID", "ONEDRIVE_CLIENT_SECRET",
+                "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "NOTION_CLIENT_ID", "NOTION_CLIENT_SECRET", "RECALL_API_KEY"):
+        monkeypatch.delenv(key, raising=False)                                                  # a page that depends on what is set up starts from nothing set up
     monkeypatch.setenv("RECALL_API_KEY", "k")
     page = env.client.get("/client/integrations").text
     assert 'data-connect="gcal"' not in page and 'href="/client/calendar"' in page                 # no keys yet: the private-link way still works

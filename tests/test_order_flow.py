@@ -49,6 +49,8 @@ def env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(db, "DB_PATH", tmp_path / "test.db")
     db.init_db()
+    for kind_key in ("provider_default_asr", "provider_default_mt"):             # the house choice (Transkriptor, Azure) is tested on its own; the routing tests start from Automatic
+        db.set_flag(kind_key, "")
     monkeypatch.setattr(app_mod, "UPLOAD_DIR", tmp_path / "uploads")
     monkeypatch.setattr(app_mod, "OUTPUT_DIR", tmp_path / "output")
     submitted = []

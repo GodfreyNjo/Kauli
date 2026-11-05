@@ -180,7 +180,10 @@ def test_developer_docs_page_is_public_and_linked(client):
     assert "/developers" in client.get("/sitemap.xml").text
 
 
-def test_integrations_section_is_honest_about_what_exists(client):
+def test_integrations_section_is_honest_about_what_exists(client, monkeypatch):
+    for key in ("GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "DROPBOX_APP_KEY", "DROPBOX_APP_SECRET", "ONEDRIVE_CLIENT_ID", "ONEDRIVE_CLIENT_SECRET",
+                "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "NOTION_CLIENT_ID", "NOTION_CLIENT_SECRET", "RECALL_API_KEY"):
+        monkeypatch.delenv(key, raising=False)                                                  # a page that depends on what is set up starts from nothing set up
     html = client.get("/").text
     block = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     # what is really built is marked Available: the developer tools link to their docs, the rest to the customer's own integrations page...

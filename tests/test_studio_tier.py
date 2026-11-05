@@ -300,8 +300,8 @@ def test_integrations_section_has_descriptions_chevrons_and_honest_statuses(stud
         assert desc in section
     assert section.count('class="int-card"') == 9 and section.count('class="int-go"') == section.count('class="int-chip"')
     live = re.findall(r'<span class="int-name">([^<]+)</span>\s*<span class="int-badge live">', section)
-    assert set(live) == {"API", "MCP server", "Webhooks", "Zapier, Make, n8n", "YouTube captions", "Notion", "Slack", "Microsoft Teams"}
-    for name in ("Zoom", "Google Drive", "Dropbox", "HubSpot", "Salesforce", "Asana", "Trello", "Discord"):
+    assert set(live) == {"API", "MCP server", "Webhooks", "Zapier, Make, n8n", "YouTube captions", "Notion", "Slack", "Microsoft Teams", "Discord", "Google Calendar", "Outlook Calendar"}
+    for name in ("Zoom", "Google Drive", "Dropbox", "HubSpot", "Salesforce", "Asana", "Trello"):
         assert re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge soon">', section), name
 
 
@@ -330,10 +330,10 @@ def test_the_integrations_section_is_dynamic(studio, monkeypatch):
     section = re.search(r'<section class="m-section" id="integrations">.*?</section>', html, re.S).group(0)
     live = len(re.findall(r'<li data-state="live">', section))
     soon = len(re.findall(r'<li data-state="soon">', section))
-    assert live == 8 and soon == 14 and live + soon == section.count('class="int-chip"')
+    assert live == 11 and soon == 11 and live + soon == section.count('class="int-chip"')
     # the counts on the filter buttons are computed from the data, so they can never drift from what is shown
     counts = re.findall(r'data-filter="(\w+)" aria-pressed="(?:true|false)">[^<]*<span>(\d+)</span>', section)
-    assert counts == [("all", "22"), ("live", "8"), ("soon", "14")]
+    assert counts == [("all", "22"), ("live", "11"), ("soon", "11")]
     assert section.count('aria-pressed="true"') == 1 and 'role="status" aria-live="polite"' in section
     assert section.count("--i:") == 9 and "IntersectionObserver" in section and "prefers-reduced-motion" in section
     css = (Path(__file__).parent.parent / "webapp" / "static" / "style.css").read_text(encoding="utf-8")
