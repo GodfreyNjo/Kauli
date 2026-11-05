@@ -4,7 +4,7 @@
     python scripts/reset_test_account.py someone@example.com --yes      # does it (after backing the database up)
 
 On the live server (the script is piped in, nothing to install):
-    Get-Content -Raw scripts\\reset_test_account.py | ssh -i ~/.ssh/kauli_deploy root@169.58.238.219 "docker exec -i kauli python3 - someone@example.com --yes"
+    Get-Content -Raw scripts\\reset_test_account.py | ssh -i ~/.ssh/kauli_deploy root@$env:KAULI_SSH_HOST "docker exec -i kauli python3 - someone@example.com --yes"
 
 Kept: the sign-in itself (same email and id, so the same Google or password login works), display name, picture, language and two-step
 sign-in. Removed: orders and everything attached to them, folders, notes, vocabulary, integrations, API keys, webhooks, rewards,

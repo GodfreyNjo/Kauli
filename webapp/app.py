@@ -45,6 +45,7 @@ from starlette.middleware.sessions import SessionMiddleware
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from . import web_security  # noqa: E402
 from . import billing, db, supabase_auth, worker, upload_security, logging_setup, rate_limit, medium_publish, devto_publish, blog_ai_assist, order_ai_assist, youtube_poll, mailer, notifications, tat, r2_uploads, ip_intel, ga_events, nav_icons, youtube_captions, lead_playbook, charts, transcript_export, mcp_server, notion_export  # noqa: E402
 from kauli import caption_formats, timing  # noqa: E402
 from kauli.models import Job, Segment, Word, apply_speaker_paragraphs, label_speakers, split_off_speaker_tag  # noqa: E402
@@ -308,7 +309,12 @@ IDLE_TIMEOUT_SECONDS = 30 * 60  # log out after 30 minutes of no requests
 
 _PROCESS_STARTED_AT = time.time()  # for /status's uptime figure - real, not a fabricated SLA number
 
-app = FastAPI(title="Kauli - demo platform")
+# The interactive API explorer and the machine-readable route list (/docs, /redoc, /openapi.json) are off in production:
+# they publish every route in the app, the staff ones included. The customer-facing API guide is /docs/api. Set
+# KAULI_ENABLE_API_EXPLORER=1 on a developer's machine to get them back.
+_explorer = os.environ.get("KAULI_ENABLE_API_EXPLORER") == "1"
+app = FastAPI(title="Kauli - demo platform", docs_url="/docs" if _explorer else None,
+              redoc_url="/redoc" if _explorer else None, openapi_url="/openapi.json" if _explorer else None)
 # max_age here is a SLIDING idle timeout, not a fixed session lifetime:
 # Starlette's SessionMiddleware re-signs the cookie (with a fresh timestamp)
 # on every request where the session gets written to, and current_user()
@@ -538,11 +544,16 @@ _CSP = (
 
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
-    response = await call_next(request)
+    if web_security.cross_site_post(request):           # a browser posting from someone else's page: refused before any route runs
+        response = JSONResponse({"error": "This request came from another site and was refused."}, status_code=403)
+    else:
+        response = await call_next(request)
+    web_security.keep_private(request.url.path, response)
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
     response.headers["Content-Security-Policy"] = _CSP
     # HSTS only means anything - and is only safe to send - once this is
     # actually served over real HTTPS. request.url.scheme is NOT that check
@@ -2885,6 +2896,12 @@ def robots_txt(request: Request):
     body += "".join(f"\nUser-agent: {bot}\nAllow: /\n" for bot in ai_bots)
     body += f"\nSitemap: {base}/sitemap.xml\n"
     return Response(content=body, media_type="text/plain")
+
+
+@app.get("/.well-known/security.txt")
+def security_txt(request: Request):
+    """Where a security researcher reports a problem (RFC 9116). Plain text, answered on the site's own address."""
+    return Response(content=web_security.security_txt(_site_base(request), CONTACT_EMAIL), media_type="text/plain")
 
 
 @app.get("/google5dd3b740dee7aa1f.html")
@@ -8201,8 +8218,16 @@ async def calendly_webhook(request: Request):
     with an HMAC (a Signing Key from the same dashboard where the webhook
     subscription is created); add that check once you have the key, the
     same way billing.paystack_verify_webhook_signature does it."""
-    body = await request.json()
-    if body.get("event") != "invitee.created":
+    raw = await request.body()
+    # Only a call signed with the Calendly signing key is believed; with no key set up, the endpoint is closed.
+    if not web_security.calendly_signature_ok(raw, request.headers.get("calendly-webhook-signature", ""),
+                                              os.environ.get("CALENDLY_WEBHOOK_SIGNING_KEY", "")):
+        return JSONResponse({"error": "unsigned"}, status_code=401)
+    try:
+        body = json.loads(raw or b"{}")
+    except ValueError:
+        return JSONResponse({"error": "unrecognised payload"}, status_code=400)
+    if not isinstance(body, dict) or body.get("event") != "invitee.created":
         return JSONResponse({"ok": True})  # scheduling-page views, cancellations, etc. - not a new lead
     payload = body.get("payload", {})
     name = (payload.get("name") or "").strip()

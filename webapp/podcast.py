@@ -126,7 +126,7 @@ def fetch_feed(url: str) -> bytes:
 
 def parse_feed(data: bytes) -> tuple[str, list[dict]]:
     """(show title, episodes newest first) from an RSS podcast feed. Refuses XML that declares entities."""
-    if re.search(rb"<!(DOCTYPE|ENTITY)", data[:4096] + data[-512:], re.I):
+    if re.search(rb"<!(DOCTYPE|ENTITY)", data, re.I):
         raise ValueError("That file is not a podcast feed.")
     try:
         root = ET.fromstring(data)

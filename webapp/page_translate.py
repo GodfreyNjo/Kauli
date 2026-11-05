@@ -52,7 +52,7 @@ _OTHER_STOP = {
 
 
 def _h(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()
+    return hashlib.sha1(text.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 # ------------------------------------------------------------------------------------------------------- what is worth translating

@@ -121,7 +121,7 @@ def parse_events(ics_text: str, now: datetime | None = None, days: int = LOOKAHE
             continue
         title = str(ev.get("SUMMARY", "") or "Meeting").strip()[:120]
         url = meeting_link(str(ev.get("X-GOOGLE-CONFERENCE", "")), str(ev.get("LOCATION", "")), str(ev.get("URL", "")), str(ev.get("DESCRIPTION", "")))
-        key = hashlib.sha1(f"{ev.get('UID', '')}|{start.isoformat()}".encode()).hexdigest()[:16]
+        key = hashlib.sha1(f"{ev.get('UID', '')}|{start.isoformat()}".encode(), usedforsecurity=False).hexdigest()[:16]
         out.append({"key": key, "title": title, "start": start.astimezone(timezone.utc), "end": end.astimezone(timezone.utc) if isinstance(end, datetime) else None,
                     "url": url, "platform": meeting_bot.platform_for(url) if url else None})
     out.sort(key=lambda e: e["start"])
