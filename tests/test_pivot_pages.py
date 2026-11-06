@@ -43,9 +43,7 @@ def test_the_ninety_nine_percent_claim_is_always_tied_to_human_review(env):
 def test_the_course_page_has_a_demo_and_the_podcast_page_explains_webhooks(env):
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
     course = env.client.get("/solutions/e-learning").text
-    assert "/try?use=course" in course                                                      # the link to the full demo
-    assert 'id="demo"' in course and 'id="hd-data"' in course and '"scenario": "course"' in course   # the playable demo, on this page's own recording type
-    assert "hero-tour" not in course                                                        # no animated mock-up
+    assert "/try?use=course" in course and "module_3_lesson.mp4" in course                # the hero tour plus the full demo
     podcast = env.client.get("/solutions/podcast-transcription").text
     assert "webhook" in podcast.lower() and "podcast-transcripts-to-your-website-with-webhooks" in repr(env.app.SOLUTION_PAGES["podcast-transcription"]["guides"])
     meetings = env.app.SOLUTION_PAGES["interview-transcription"]["choose"]
