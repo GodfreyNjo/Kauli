@@ -2207,11 +2207,13 @@ def solution_page(request: Request, slug: str):
         post = db.get_blog_post_by_slug(slug_for, published_only=True) if slug_for else None
         choose.append({**option, "guide": {"slug": slug_for, "title": post["title"]} if post else None})
     extra = {}
-    if page.get("real_demo"):                          # the home page's playable demo instead of the animated mock-up
+    scenario = page.get("real_demo") or page.get("demo")     # the home page's playable demo, started on this service's own recording type
+    if scenario:
         demo_ctx = _try_context(request)
-        if request.query_params.get("use") not in demo_ctx["scenarios"] and page["real_demo"] in demo_ctx["scenarios"]:
-            demo_ctx["scenario"] = page["real_demo"]
+        if request.query_params.get("use") not in demo_ctx["scenarios"] and scenario in demo_ctx["scenarios"]:
+            demo_ctx["scenario"] = scenario
         extra["demo"] = demo_ctx
+        extra["demo_copy"] = solution_pages.demo_copy(slug)
     return templates.TemplateResponse(request, "solution_page.html",
         {**_marketing_context(home="/", market=_display_market(request)), "page": page, "related_pages": related_pages,
          "guides": guides, "choose": choose, **extra})

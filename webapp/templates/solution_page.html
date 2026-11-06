@@ -244,12 +244,12 @@
 
   {# The real demo from the home page ("See Kauli in action": original audio, then the same words translated, playable) on the pages
      that set real_demo, in place of the animated mock-up. The samples are pre-recorded, so playing them costs nothing. #}
-  {% if page.real_demo and demo %}
+  {% if demo and demo_copy %}
   <section class="m-section" id="demo">
     <div class="m-inner">
       <span class="m-section-eyebrow m-eyebrow-lined">Demos</span>
-      <h2 class="m-h2">See Kauli translate</h2>
-      <p class="m-lede">Play the original audio, then the same words translated. Pick a recording type and a language to try it.</p>
+      <h2 class="m-h2">{{ demo_copy[0] }}</h2>
+      <p class="m-lede">{{ demo_copy[1] }}</p>
       {% include "_hear_demo.html" %}
     </div>
   </section>

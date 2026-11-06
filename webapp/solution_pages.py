@@ -245,7 +245,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Check a sample with your accessibility team",
             "cta_body": f"Upload a real recording, review the result with the people who will sign it off, and add human review to what will be published. Your first {free:.0f} minutes every month are free.",
             "related": ["captioning", "e-learning", "video-transcription"],
-            "tour": {"mode": "upload", "filename": "lecture_recording.mp4"},
             "faq": [
                 {"q": "Do captions from Kauli make us compliant?",
                  "a": "Captions are one requirement among several. Accessible video can also need audio description where the pictures carry information, "
@@ -457,7 +456,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Transcribe a real recording",
             "cta_body": "Upload a file or paste a link. Your first minutes are free.",
             "related": ["captioning", "video-translation", "interview-transcription"],
-            "tour": {"mode": "upload", "filename": "deposition_recording.mp4"},
             "faq": [
                 {"q": "How accurate is it?",
                  "a": f"Instant AI depends on audio quality, accents and background noise, and is labelled as machine-generated. {QUALITY}."},
@@ -500,7 +498,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Try it on your last upload",
             "cta_body": "Paste the link, or connect your channel for ongoing import.",
             "related": ["video-dubbing", "captioning", "voice-over"],
-            "tour": {"mode": "link"},
             "faq": [
                 {"q": "Do I have to download my video first?",
                  "a": "No. Paste the YouTube URL and we fetch the audio directly."},
@@ -543,7 +540,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Talk to us about your next deadline",
             "cta_body": "Book a call, or start with a real clip to see the quality and turnaround.",
             "related": ["video-dubbing", "captioning", "voice-over"],
-            "tour": {"mode": "upload", "filename": "evening_bulletin_segment.mp4"},
             "faq": [
                 {"q": "Can you meet a same-day deadline?",
                  "a": "Instant AI delivers in minutes. Human-reviewed orders show a delivery estimate when confirmed, and Enterprise adds a faster dedicated tier. Tell us about your deadline."},
@@ -586,7 +582,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Run a lesson through Kauli",
             "cta_body": "Upload one module and see the transcript, subtitles and translation. Your first minutes are free.",
             "related": ["video-translation", "video-transcription", "video-localization"],
-            "tour": {"mode": "upload", "filename": "module_3_lesson.mp4"},
             "faq": [
                 {"q": "Can I localize an entire course?",
                  "a": "Yes. Upload each lesson, or connect a YouTube playlist, and choose the languages. Pro and Premium minutes cover transcription and translation."},
@@ -629,7 +624,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "See the quality on your own material",
             "cta_body": "Upload a real clip or paste a YouTube link. Your first minutes are free.",
             "related": ["video-translation", "video-transcription", "captioning"],
-            "tour": {"mode": "upload", "filename": "field_report.mp4"},
             "faq": [
                 {"q": "Will our recordings stay confidential?",
                  "a": "We do not share your data with anyone else and do not run ad tracking on this site. Files are currently kept until you delete them: ask us, or use the Your data section in Settings, to delete a file or your account data at any time."},
@@ -681,7 +675,6 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "cta_heading": "Try it on one of your own calls",
             "cta_body": "Upload a recording, or ask us for a pilot on a batch of calls. Your first minutes are free.",
             "related": ["video-transcription", "interview-transcription", "audio-to-text"],
-            "tour": {"mode": "upload", "filename": "support_call.mp3"},
             "faq": [
                 {"q": "Does it separate the agent from the customer?",
                  "a": "Yes. Transcripts label who is speaking and when, so you can read the agent and the customer separately. Speaker labels are most reliable on clear recordings with distinct voices."},
@@ -792,3 +785,25 @@ def guide_slug_for(option: dict, page_slug: str = "") -> str | None:
         if all(w in both for w in words) and words[0] in ("human", "translat"):
             return slug
     return None
+
+
+# The heading and line above the playable demo on each service page (the demo itself is the home page's, started on the scenario
+# in page["demo"]). The wording matches what the page sells, and says only what the demo shows: the original, then the result.
+_DEMO_TRANSCRIPT = ("See a transcript", "Play the recording, then read the transcript with speaker labels and timestamps. Pick a language to see it translated too.")
+DEMO_COPY = {
+    "video-translation": ("See Kauli translate", "Play the original audio, then the same words translated. Pick a recording type and a language to try it."),
+    "video-dubbing": ("Hear a dub", "Play the original video, then the same video dubbed into a new language by AI. Pick a language to try it."),
+    "voice-over": ("Hear the voices", "Play the original, then the same words voiced in another language. Pick a language to try it."),
+    "video-localization": ("See Kauli localize", "Play the original, then the result: a transcript, a translation and a dub. Pick a language to try it."),
+    "captioning": ("See captions and transcripts", "Play the original audio, then read the captions text with timestamps, and its translation. Pick a language to try it."),
+    "accessibility-compliance": ("See captions and transcripts", "Play the original audio, then read the transcript with timestamps. Pick a language to see it translated too."),
+    "youtubers": ("See it on a creator video", "Play a video, then the same video in another language. Pick a language to try it."),
+    "media-broadcast": ("See it on a news clip", "Play the clip, then read the transcript and its translation. Pick a language to try it."),
+    "e-learning": ("See it on a lesson", "Play a lesson, then read the transcript and its translation. Pick a language to try it."),
+    "ngos": ("See it on a field recording", "Play a field recording, then read the transcript and its translation. Pick a language to try it."),
+    "call-centers": ("See it on a call", "Play a call, then read the transcript with the agent and the customer separated. Pick a language to see it translated too."),
+}
+
+
+def demo_copy(slug: str) -> tuple[str, str]:
+    return DEMO_COPY.get(slug, _DEMO_TRANSCRIPT)
