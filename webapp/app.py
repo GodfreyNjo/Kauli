@@ -2206,9 +2206,15 @@ def solution_page(request: Request, slug: str):
         slug_for = solution_pages.guide_slug_for(option, slug)
         post = db.get_blog_post_by_slug(slug_for, published_only=True) if slug_for else None
         choose.append({**option, "guide": {"slug": slug_for, "title": post["title"]} if post else None})
+    extra = {}
+    if page.get("real_demo"):                          # the home page's playable demo instead of the animated mock-up
+        demo_ctx = _try_context(request)
+        if request.query_params.get("use") not in demo_ctx["scenarios"] and page["real_demo"] in demo_ctx["scenarios"]:
+            demo_ctx["scenario"] = page["real_demo"]
+        extra["demo"] = demo_ctx
     return templates.TemplateResponse(request, "solution_page.html",
         {**_marketing_context(home="/", market=_display_market(request)), "page": page, "related_pages": related_pages,
-         "guides": guides, "choose": choose})
+         "guides": guides, "choose": choose, **extra})
 
 
 def _display_market(request: Request) -> str:

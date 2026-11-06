@@ -27,24 +27,40 @@ DEMO_FOR = {
 }
 
 
+def _count(names: str) -> int:
+    """How many languages a list like "Swahili, Kikuyu and English" names."""
+    return len([n for n in names.replace(" and ", ", ").split(",") if n.strip()])
+
+
 def build(billing, hr_names: str, dub_names: str) -> dict:
     free = billing.FREE_MINUTES_PER_MONTH
     pro, prem = billing.PLANS["pro"], billing.PLANS["premium"]
     video_rate = billing.ADDONS["video_deliverables"]["rate_per_min"]
 
     def plans(for_free, for_pro, for_prem, for_ent):
+        # plan / for / detail are the full text (kept under "Learn more"); the rest is the short card of the design:
+        # tagline, feats (icon + words), price + unit, the button, and an optional badge. Figures come from billing.py.
         return [
-            {"plan": "Free", "for": for_free,
-             "detail": f"{free:.0f} Instant AI transcription minutes free every month, then pay per minute."},
-            {"plan": "Pro", "for": for_pro,
+            {"plan": "Free", "for": for_free, "icon": "play", "tagline": "Try it out",
+             "detail": f"{free:.0f} Instant AI transcription minutes free every month, then pay per minute.",
+             "feats": [{"icon": "bolt", "text": f"{free:.0f} AI minutes monthly"}],
+             "price": "$0", "unit": "", "cta": "Start free", "href": "/login?mode=signup"},
+            {"plan": "Pro", "for": for_pro, "icon": "bolt", "tagline": "For regular use", "featured": True, "badge": "Most popular",
              "detail": f"${pro['price_usd']}/month: {pro['included_ai_minutes']:.0f} Instant AI minutes every month for "
-                       f"transcription and translation."},
-            {"plan": "Premium", "for": for_prem,
+                       f"transcription and translation.",
+             "feats": [{"icon": "bolt", "text": f"{pro['included_ai_minutes']:,.0f} AI minutes monthly"}],
+             "price": f"${pro['price_usd']}", "unit": "/month", "cta": "Get Pro", "href": "/login?mode=signup"},
+            {"plan": "Premium", "for": for_prem, "icon": "crown", "tagline": "For video at scale",
              "detail": f"${prem['price_usd']}/month: {prem['included_ai_minutes']:,.0f} Instant AI minutes{billing.hours_suffix(prem['included_ai_minutes'])} every month for "
                        f"transcription and translation, burned-in captions "
-                       "and dubbed video included."},
-            {"plan": "Enterprise", "for": for_ent,
-             "detail": "Negotiated volume rate, invoicing, a dedicated account manager and faster turnaround."},
+                       "and dubbed video included.",
+             "feats": [{"icon": "bolt", "text": f"{prem['included_ai_minutes']:,.0f} AI minutes monthly"},
+                       {"icon": "video", "text": "Captions & dubbed video"}],
+             "price": f"${prem['price_usd']}", "unit": "/month", "cta": "Get Premium", "href": "/login?mode=signup"},
+            {"plan": "Enterprise", "for": for_ent, "icon": "team", "tagline": "For teams",
+             "detail": "Negotiated volume rate, invoicing, a dedicated account manager and faster turnaround.",
+             "feats": [{"icon": "check", "text": "Custom volume & pricing"}, {"icon": "check", "text": "Invoicing & dedicated manager"}],
+             "price": "Custom", "unit": "", "cta": "Contact Sales", "href": "/demo?interest=enterprise"},
         ]
 
     pricing = {"title": "Transparent per-minute pricing",
@@ -66,16 +82,24 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
             "intro": "Upload a file or paste a link and get a translated transcript, subtitles or a dubbed track back. Instant AI "
                      "translates between more than 70 languages in minutes, and a human review pass takes the result up to 99% accuracy "
                      "when it has to be right.",
-            "why_heading": "Built for translation you can actually publish",
+            # On screen: the short heading, line and four short cards of the design (card_title / short); the full, search-friendly
+            # text (why_long and each point's title and body) stays on the page under "Learn more".
+            "why_heading": "Translation you can actually publish",
+            "why_accent": "actually publish",
+            "why_long": "Built for translation you can actually publish",
+            "why_sub": "Translate, transcribe and dub — with human-level accuracy.",
+            "benefit_cta": "Start Translating Now",
+            "kb_assure": ["No credit card required", "Get results in minutes", "Trusted by creators & teams"],
             "points": [
-                {"title": "Translate between 76+ languages",
+                {"title": "Translate between 76+ languages", "card_title": "76+ Languages", "short": "Translate audio and video in one go.",
                  "body": "Transcribe the speech and translate it in one order. Instant AI is machine translation and is labelled "
                          "as not reviewed by a person."},
-                {"title": "Human review for up to 99% accuracy",
+                {"title": "Human review for up to 99% accuracy", "card_title": "Up to 99% Accuracy", "short": "Human review for professional quality.",
                  "body": f"On a Human-reviewed order a dedicated editor checks every line against the source audio. Available in {hr_names}, with more languages coming soon."},
-                {"title": "Transcript, subtitles or a full dub",
+                {"title": "Transcript, subtitles or a full dub", "card_title": "Transcripts, Subtitles & Dubbing", "short": "Get a transcript, SRT/VTT, or a dubbed video.",
                  "body": f"Pick the deliverable your video needs: a translated transcript to read, SRT or VTT subtitles to upload, or a dubbed track (dubbing is available in {dub_names})."},
-                {"title": "Minutes included on every paid plan",
+                {"title": "Minutes included on every paid plan", "card_title": "Generous Minutes",
+                 "short": f"Pro: {pro['included_ai_minutes']:,.0f} min/mo  |  Premium: {prem['included_ai_minutes']:,.0f} min/mo.",
                  "body": f"Pro and Premium include {pro['included_ai_minutes']:.0f} and {prem['included_ai_minutes']:,.0f}{billing.hours_suffix(prem['included_ai_minutes'])} Instant AI minutes a month, and they cover translation as well as transcription."},
             ],
             "choose": [
@@ -84,13 +108,28 @@ def build(billing, hr_names: str, dub_names: str) -> dict:
                 {"name": "Translation plus a dub", "best": "Viewers who would rather listen than read.",
                  "get": f"The translated script voiced in a new language. Dubbing is available in {dub_names}; pick a premium AI voice for the most natural result."},
             ],
+            # The three short option cards of the design; the full "Choose what fits" text stays under "Learn more".
+            "plans_sub": "Transcribe and translate video, from quick tests to team-scale needs.",
+            "choose_ui": {
+                "pill": "Translation & Dubbing", "heading": "Get your content in any language",
+                "sub": "Choose the option that fits your goal.", "cta": "Get started",
+                "cards": [
+                    {"icon": "spark", "tone": "blue", "name": "Instant AI translation", "line": "Quick, affordable translation for internal use.",
+                     "chips": [{"icon": "clock", "text": "Minutes"}, {"icon": "globe", "text": "76+ languages"}]},
+                    {"icon": "review", "tone": "violet", "name": "Human-reviewed translation", "line": "Publication-ready subtitles and transcripts.",
+                     "chips": [{"icon": "target", "text": "Up to 99% accurate"}, {"icon": "globe", "text": f"{_count(hr_names)} languages"}],
+                     "featured": True, "badge": "Most accurate"},
+                    {"icon": "mic", "tone": "green", "name": "Translation plus a dub", "line": "A natural voiceover in a new language.",
+                     "chips": [{"icon": "wave", "text": "Natural AI voices"}, {"icon": "globe", "text": f"{_count(dub_names)} languages"}]},
+                ],
+            },
             "demo": "video",
             "guides": ["add-subtitles-to-video-in-another-language", "translate-video-chinese-spanish-to-english",
                        "ai-vs-human-transcription-which-do-you-need"],
             "cta_heading": "Translate your next video",
             "cta_body": "Upload a real clip or paste a YouTube link. Your first minutes are free.",
             "related": ["captioning", "video-dubbing", "video-localization"],
-            "tour": {"mode": "upload", "filename": "interview_clip.mp4"},
+            "real_demo": "podcast",    # the home page's playable translation demo, starting on this recording type (replaces the animated mock-up)
             "faq": [
                 {"q": "How many languages can you translate between?",
                  "a": "Instant AI translates between more than 70 languages. The full list is on the languages page, and each language has a page of its own."},

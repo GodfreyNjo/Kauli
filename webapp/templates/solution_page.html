@@ -155,6 +155,19 @@
     {% endif %}
   </section>
 
+  {# The real demo from the home page ("See Kauli in action": original audio, then the same words translated, playable) on the pages
+     that set real_demo, in place of the animated mock-up. The samples are pre-recorded, so playing them costs nothing. #}
+  {% if page.real_demo and demo %}
+  <section class="m-section" id="demo">
+    <div class="m-inner">
+      <span class="m-section-eyebrow m-eyebrow-lined">Demos</span>
+      <h2 class="m-h2">See Kauli translate</h2>
+      <p class="m-lede">Play the original audio, then the same words translated. Pick a recording type and a language to try it.</p>
+      {% include "_hear_demo.html" %}
+    </div>
+  </section>
+  {% endif %}
+
   {# Key benefits: one card per point, an icon chosen from the card's own title, the same look on every solution and language page.
      All the words are real text (never CSS content), so the per-language page translation picks them up. #}
   {% set kb_icons = {
@@ -171,7 +184,8 @@
   <section class="m-section kb" id="why-you">
     <div class="m-inner">
       <span class="kb-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['spark']|safe }}</svg>Key benefits</span>
-      <h2 class="m-h2">{{ page.why_heading }}</h2>
+      {% set wh = page.why_heading %}{% set wa = page.why_accent %}
+      <h2 class="m-h2">{% if wa and wa in wh %}{{ wh.split(wa)[0] }}<span class="kb-accent">{% set wa_parts = wa.rsplit(' ', 1) %}{% if wa_parts|length > 1 %}{{ wa_parts[0] }} <span class="kb-u">{{ wa_parts[1] }}</span>{% else %}<span class="kb-u">{{ wa }}</span>{% endif %}</span>{{ wh.split(wa)[1] }}{% else %}{{ wh }}{% endif %}</h2>
       {% if page.why_sub %}<p class="kb-sub">{{ page.why_sub }}</p>{% endif %}
       <div class="kb-grid">
         {% for point in page.points %}
@@ -193,16 +207,24 @@
         </article>
         {% endfor %}
       </div>
+      <div class="kb-cta"><a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{{ page.benefit_cta or page.cta_label or page.cta_heading }} &rarr;</a></div>
+      {% if page.kb_assure %}
+      <ul class="kb-assure">
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>{{ page.kb_assure[0] }}</li>
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['spark']|safe }}</svg>{{ page.kb_assure[1] }}</li>
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['shield']|safe }}</svg>{{ page.kb_assure[2] }}</li>
+      </ul>
+      {% endif %}
       <details class="sp-readmore sp-readmore-kb">
-        <summary>Read more</summary>
+        <summary>Learn more</summary>
         <div class="sp-readmore-body">
+          {% if page.why_long %}<p><strong>{{ page.why_long }}</strong></p>{% endif %}
           {% for point in page.points %}
           <h3>{{ point.title }}</h3>
           <p>{{ point.body }}</p>
           {% endfor %}
         </div>
       </details>
-      <div class="kb-cta"><a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{{ page.benefit_cta or page.cta_label or page.cta_heading }} &rarr;</a></div>
     </div>
   </section>
 
@@ -250,8 +272,40 @@
   {% endif %}
 
   {% if choose %}
-  <section class="m-section" id="choose">
+  {% set cu = page.choose_ui %}
+  {% set ch_icons = {
+    'spark': '<path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/>',
+    'review': '<circle cx="9.5" cy="8" r="3.6"/><path d="M3.5 20c0-3.6 2.7-6 6-6 1.3 0 2.4.3 3.4.9"/><path d="m14.5 18 2.2 2.2 4-4.4"/>',
+    'mic': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+    'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>',
+    'target': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+    'wave': '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/>',
+    'star': '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'} %}
+  <section class="m-section{{ ' ch' if cu else '' }}" id="choose">
     <div class="m-inner">
+      {% if cu %}
+      <span class="ch-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons['globe']|safe }}</svg>{{ cu.pill }}</span>
+      <h2 class="m-h2">{{ cu.heading }}</h2>
+      <p class="kb-sub">{{ cu.sub }}</p>
+      <div class="ch-grid">
+        {% for c in cu.cards %}
+        <article class="ch-card ch-{{ c.tone }}{{ ' is-featured' if c.featured else '' }}">
+          {% if c.badge %}<span class="ch-badge"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">{{ ch_icons['star']|safe }}</svg>{{ c.badge }}</span>{% endif %}
+          <span class="ch-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ ch_icons[c.icon]|safe }}</svg></span>
+          <h3>{{ c.name }}</h3>
+          <p>{{ c.line }}</p>
+          <ul class="ch-chips">
+            {% for chip in c.chips %}<li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons[chip.icon]|safe }}</svg>{{ chip.text }}</li>{% endfor %}
+          </ul>
+          <a href="/login?mode=signup" class="ch-btn" data-cta="solution-choose">{{ cu.cta }} <span aria-hidden="true">&rarr;</span></a>
+        </article>
+        {% endfor %}
+      </div>
+      <details class="sp-readmore sp-readmore-ch">
+        <summary>Learn more</summary>
+        <div class="sp-readmore-body">
+      {% endif %}
       <h2 class="m-h2">Choose what fits</h2>
       <p class="m-lede">Every job is different. Here is what each option gets you, so you can pick the one that fits yours.</p>
       <div class="m-choose-grid">
@@ -269,6 +323,10 @@
         <a href="/human-review">How human review works</a>
         <a href="/#pricing">Plans and pricing</a>
       </p>
+      {% if cu %}
+        </div>
+      </details>
+      {% endif %}
     </div>
   </section>
   {% endif %}
@@ -321,20 +379,67 @@
         </div>
       </details>
 
-      {% if page.fit_guide %}
-      <h3 style="margin-top:36px; font-size:1.05rem;">Which plan actually fits you</h3>
-      <div class="m-fit-guide">
-        {% for f in page.fit_guide %}
-        <div class="m-fit-card">
-          <span class="m-fit-plan">{{ f.plan }}</span>
-          <p class="m-fit-for">{{ f.for }}</p>
-          <p class="m-fit-detail">{{ f.detail }}</p>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
     </div>
   </section>
+
+  {# Plans: four short cards (Free, Pro, Premium, Enterprise) with the figures from billing.py; the "which plan fits you"
+     text stays under "Learn more". #}
+  {% if page.fit_guide %}
+  {% set pl_icons = {
+    'play': '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="m10 8.5 5.5 3.5-5.5 3.5z"/>',
+    'bolt': '<path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/>',
+    'crown': '<path d="m3.5 8 4.5 4 4-7 4 7 4.5-4-1.6 10.5H5.1z"/><path d="M5.5 20.5h13"/>',
+    'team': '<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16.5 14.2c2.6.2 4.5 2.3 4.5 5.1"/>',
+    'video': '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3z"/>',
+    'check': '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    'card': '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
+    'ok': '<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8L16 9.5"/>',
+    'shield': '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+    'star': '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'} %}
+  <section class="m-section pl" id="plans">
+    <div class="m-inner">
+      <span class="pl-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ pl_icons['bolt']|safe }}</svg>Plans &amp; Pricing</span>
+      <h2 class="m-h2">Choose the plan that <span class="pl-accent">fits you</span></h2>
+      <p class="kb-sub">{{ page.plans_sub or 'From quick tests to team-scale needs.' }}</p>
+      <div class="pl-grid">
+        {% for f in page.fit_guide %}
+        <article class="pl-card{{ ' is-featured' if f.featured else '' }}">
+          {% if f.badge %}<span class="pl-badge"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">{{ pl_icons['star']|safe }}</svg>{{ f.badge }}</span>{% endif %}
+          <div class="pl-head">
+            <span class="pl-ic pl-ic-{{ f.plan|lower }}" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ pl_icons[f.icon]|safe }}</svg></span>
+            <div><h3>{{ f.plan }}</h3><span class="pl-tag">{{ f.tagline }}</span></div>
+          </div>
+          <ul class="pl-feats">
+            {% for ft in f.feats %}<li class="pl-f-{{ ft.icon }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ pl_icons[ft.icon]|safe }}</svg>{{ ft.text }}</li>{% endfor %}
+          </ul>
+          <p class="pl-price"><b>{{ f.price }}</b>{% if f.unit %}<span>{{ f.unit }}</span>{% endif %}</p>
+          <a href="{{ f.href }}" class="pl-btn" data-cta="solution-plan-{{ f.plan|lower }}">{{ f.cta }}</a>
+        </article>
+        {% endfor %}
+      </div>
+      <ul class="kb-assure pl-assure">
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ pl_icons['card']|safe }}</svg>No credit card required</li>
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ pl_icons['ok']|safe }}</svg>Cancel anytime</li>
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ pl_icons['shield']|safe }}</svg>Secure &amp; reliable</li>
+      </ul>
+      <details class="sp-readmore sp-readmore-pl">
+        <summary>Learn more</summary>
+        <div class="sp-readmore-body">
+          <h3>Which plan actually fits you</h3>
+          <div class="m-fit-guide">
+            {% for f in page.fit_guide %}
+            <div class="m-fit-card">
+              <span class="m-fit-plan">{{ f.plan }}</span>
+              <p class="m-fit-for">{{ f.for }}</p>
+              <p class="m-fit-detail">{{ f.detail }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+  {% endif %}
 
   {% if page.faq %}
   <section class="m-section" id="faq">
