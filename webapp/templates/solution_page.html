@@ -86,8 +86,8 @@
         <input type="file" id="sp-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
         <label class="sp-drop" for="sp-file" id="sp-dropzone" tabindex="0">
           <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 8"/><path d="M12 21v-9M8.8 14.7 12 11.5l3.2 3.2"/></svg>
-          <b>Upload audio</b>
-          <span id="sp-label">or drag and drop</span>
+          <div class="sp-drop-text"><b>Upload audio</b>
+          <span id="sp-label">or drag and drop</span></div>
         </label>
         {% if page.try_lang %}
         <input type="hidden" id="sp-lang" value="{{ page.try_lang }}">

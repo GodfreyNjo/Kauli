@@ -7669,3 +7669,12 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .m-hero.sp-hero .m-hero-ctas button.btn { border: 0; cursor: pointer; font-family: inherit; }
 .m-hero.sp-hero .m-hero-ctas button.btn:disabled { opacity: .7; cursor: progress; }
 @media (max-width: 640px) { .kb-sub { font-size: 1rem; } }
+
+/* the upload box is the same size as the one on the home page (.hx-drop): icon beside the words, a compact card */
+.sp-try { width: min(100%, 420px); padding: 10px; border-radius: 18px; }
+.sp-drop { flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; padding: 18px; border-radius: 14px; text-align: left; border-color: #9db8e3; }
+.sp-drop svg { flex: none; width: 34px; height: 34px; }
+.sp-drop b { font-size: 1rem; margin-top: 0; display: block; }
+.sp-drop span { font-size: 0.8rem; margin-top: 2px; display: block; }
+.sp-stage { margin: 26px auto 24px; }
+.sp-drop-text { min-width: 0; }
