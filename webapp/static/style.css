@@ -7509,3 +7509,136 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .pod-foot { margin-top: 22px; }
 .pod-admin { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
 .pod-inline { display: inline-flex; gap: 6px; align-items: center; margin: 0 6px 4px 0; }
+
+/* ---- Solution pages: "Transparent per-minute pricing" (sp-*) ----
+   One calm card: three promises, a three-row price table with the Instant AI column picked out,
+   two facts, one button. Colours are all theme tokens, so it follows light and dark. */
+.sp-price { background: linear-gradient(180deg, var(--bg) 0%, var(--panel) 100%); }
+.sp-price .m-h2 { margin-bottom: 22px; }
+.sp-ic { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 10px;
+  background: var(--accent-soft); color: var(--accent-text); }
+.sp-points { list-style: none; margin: 0 0 30px; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 0; }
+.sp-points li { display: inline-flex; align-items: center; gap: 10px; padding: 0 22px; color: var(--ink); font-weight: 500; font-size: 0.98rem; }
+.sp-points li + li { border-left: 1px solid var(--border); }
+
+.sp-card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 20px; padding: 10px 14px 14px;
+  box-shadow: 0 18px 40px -22px color-mix(in srgb, var(--heading-ink) 40%, transparent); }
+.sp-table { border-collapse: separate; border-spacing: 0; font-size: 1rem; }
+.sp-table th, .sp-table td { border-bottom: 1px solid var(--border-subtle); padding: 16px 18px; vertical-align: middle; }
+.sp-table tbody tr:hover { background: none; }
+.sp-table thead th { background: var(--bg); border-bottom: 0; color: var(--heading-ink); font-size: 0.92rem; font-weight: 650;
+  text-transform: none; letter-spacing: 0; text-align: center; padding: 13px 18px; }
+.sp-table thead th:first-child { text-align: left; border-radius: 12px 0 0 12px; }
+.sp-table thead th:last-child { border-radius: 0 12px 12px 0; }
+.sp-table tbody th { text-align: left; text-transform: none; letter-spacing: 0; font-size: 1rem; color: var(--heading-ink); font-weight: 400; }
+.sp-table tbody th .sp-ic { vertical-align: middle; margin-right: 12px; }
+.sp-svc { display: inline-block; vertical-align: middle; max-width: 24em; line-height: 1.3; }
+.sp-svc b { font-weight: 650; }
+.sp-svc small { color: var(--muted); font-size: 0.82rem; margin-left: 5px; }
+.sp-table td { text-align: center; white-space: nowrap; color: var(--heading-ink); }
+.sp-table td b { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.01em; }
+.sp-table td span { color: var(--muted); font-size: 0.92rem; }
+.sp-table .sp-ai { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.sp-table thead .sp-ai { background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent-text); border-radius: 12px 12px 0 0; }
+.sp-table td.sp-ai b { color: var(--accent-text); }
+.sp-table tbody tr:last-child th, .sp-table tbody tr:last-child td { border-bottom: 0; }
+.sp-table tbody tr:last-child .sp-ai { border-radius: 0 0 12px 12px; }
+
+.sp-facts { list-style: none; margin: 26px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 0; }
+.sp-facts li { display: inline-flex; align-items: center; gap: 10px; padding: 0 26px; color: var(--ink); }
+.sp-facts li + li { border-left: 1px solid var(--border); }
+.sp-facts b { font-weight: 650; color: var(--heading-ink); }
+.sp-tick { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+.sp-gift { display: inline-grid; place-items: center; color: var(--accent-text); }
+
+.sp-cta { display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 28px; }
+.sp-cta .btn { padding: 14px 36px; font-size: 1.05rem; font-weight: 650; border-radius: 12px; }
+.sp-more { color: var(--muted); font-size: 0.92rem; text-decoration: none; }
+.sp-more:hover { color: var(--accent-text); text-decoration: underline; }
+.sp-fine { color: var(--muted); font-size: 0.8rem; line-height: 1.55; text-align: center; max-width: 620px; margin: 26px auto 0; }
+
+@media (max-width: 640px) {
+  .sp-points { gap: 8px 0; margin-bottom: 22px; }
+  .sp-points li { padding: 0 10px; font-size: 0.88rem; gap: 7px; }
+  .sp-points .sp-ic { width: 28px; height: 28px; border-radius: 8px; }
+  .sp-points .sp-ic svg { width: 16px; height: 16px; }
+  .sp-points li + li { border-left: 0; }
+  .sp-card { padding: 6px 6px 10px; border-radius: 16px; }
+  .sp-table th, .sp-table td { padding: 12px 8px; }
+  .sp-table thead th { font-size: 0.8rem; padding: 10px 6px; }
+  .sp-table tbody th { font-size: 0.9rem; }
+  .sp-table tbody th .sp-ic { display: none; }
+  .sp-svc small { display: block; margin: 2px 0 0; font-size: 0.74rem; }
+  .sp-table td b { font-size: 1.05rem; }
+  .sp-table td span { display: block; font-size: 0.72rem; margin-top: 1px; }
+  .sp-facts li { padding: 0 12px; }
+  .sp-facts li + li { border-left: 0; }
+}
+
+/* ---- Solution + language pages: "Key benefits" (kb-*) ----
+   A pill, the heading, then one soft card per point (icon tile, title, text) in two columns and one button.
+   The same section is used by every solution and every language page, so they all look alike. */
+.kb { background: linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%); text-align: center; }
+.kb-pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 18px; border-radius: 999px; margin-bottom: 18px;
+  background: var(--accent-soft); color: var(--accent-text); font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.kb .m-h2 { margin-bottom: 34px; }
+.kb-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; text-align: left; max-width: 1000px; margin: 0 auto; }
+.kb-card { display: flex; align-items: flex-start; gap: 18px; padding: 22px 24px; background: var(--surface); border: 1px solid var(--border-subtle);
+  border-radius: 18px; box-shadow: 0 14px 32px -22px color-mix(in srgb, var(--heading-ink) 45%, transparent);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.kb-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--accent) 35%, var(--border-subtle));
+  box-shadow: 0 18px 36px -20px color-mix(in srgb, var(--accent) 45%, transparent); }
+.kb-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.kb-ic { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 16%, var(--surface)), color-mix(in srgb, var(--accent) 7%, var(--surface)));
+  color: var(--accent-text); }
+.kb-card h3 { margin: 0 0 4px; font-size: 1.1rem; font-weight: 700; color: var(--heading-ink); line-height: 1.3; }
+.kb-card p { margin: 0; color: var(--muted); font-size: 0.96rem; line-height: 1.55; }
+.kb-cta { margin-top: 34px; }
+.kb-cta .btn { padding: 15px 38px; font-size: 1.05rem; font-weight: 650; border-radius: 999px; }
+@media (max-width: 720px) {
+  .kb-grid { grid-template-columns: 1fr; gap: 12px; }
+  .kb-card { padding: 16px 16px; gap: 14px; border-radius: 16px; }
+  .kb-ic { width: 46px; height: 46px; border-radius: 13px; }
+  .kb-ic svg { width: 22px; height: 22px; }
+  .kb-cta .btn { width: 100%; padding: 14px 18px; }
+}
+@media (prefers-reduced-motion: reduce) { .kb-card { transition: none; } .kb-card:hover { transform: none; } }
+
+/* ---- Solution + language pages: hero (sp-hero) ----
+   Same hero on every page: pill row, headline, one upload door flanked by a soft sound wave, two buttons, three facts. */
+.m-hero.sp-hero { padding: 40px 24px 56px; background: radial-gradient(120% 90% at 50% 0%, #ffffff 0%, #eef3fc 60%, #e6edfb 100%); }
+.sp-hero-top { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 14px; margin-bottom: 26px; }
+.sp-hero .m-breadcrumb-back, .sp-hero .kicker { margin: 0; }
+.sp-hero .kicker { padding: 7px 18px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.07em; }
+.sp-hero h1 { max-width: 920px; margin-left: auto; margin-right: auto; }
+.sp-hero .m-hero-sub { max-width: 640px; margin-left: auto; margin-right: auto; }
+
+.sp-stage { position: relative; display: flex; align-items: center; justify-content: center; gap: 22px; max-width: 1120px; margin: 34px auto 30px; }
+.sp-drop { flex: none; width: min(100%, 440px); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 30px 24px 28px;
+  border-radius: 26px; text-decoration: none; text-align: center;
+  background: color-mix(in srgb, #ffffff 78%, transparent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, #ffffff);
+  box-shadow: 0 22px 44px -26px rgba(8, 56, 120, 0.45); color: var(--accent); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.m-hero .sp-drop { color: var(--accent); }
+.sp-drop:hover { transform: translateY(-2px); border-style: solid; border-color: var(--accent); box-shadow: 0 26px 48px -24px rgba(8, 120, 200, 0.55); }
+.sp-drop b { color: #082848; font-size: 1.35rem; font-weight: 700; margin-top: 4px; }
+.sp-drop span { color: #52627a; font-size: 0.95rem; }
+
+.sp-hero .m-hero-ctas { gap: 14px; }
+.m-hero.sp-hero .m-hero-ctas .btn { display: inline-flex; align-items: center; gap: 9px; padding: 15px 34px; font-size: 1.05rem; font-weight: 650; border-radius: 999px; }
+.m-hero.sp-hero .m-hero-ctas .btn.secondary { padding: 15px 28px; }
+.sp-trust { list-style: none; margin: 30px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 12px 0; color: #082848; font-weight: 550; }
+.sp-trust li { display: inline-flex; align-items: center; gap: 10px; padding: 0 28px; }
+.sp-trust li + li { border-left: 1px solid #c9d5e6; }
+.sp-trust svg { color: var(--accent); flex: none; }
+.sp-trust li:nth-child(2) svg { color: var(--cta-on-navy); }
+
+@media (max-width: 640px) {
+  .m-hero.sp-hero { padding: 28px 18px 44px; }
+  .sp-drop { padding: 24px 18px; border-radius: 20px; }
+  .m-hero.sp-hero .m-hero-ctas .btn { width: 100%; justify-content: center; }
+  .sp-trust li { padding: 0 14px; }
+  .sp-trust li + li { border-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .sp-drop { transition: none; } .sp-drop:hover { transform: none; } }
