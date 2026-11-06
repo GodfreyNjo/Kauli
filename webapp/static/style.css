@@ -7951,3 +7951,17 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 @media (max-width: 900px) { .ch-radio .ch-card, .ch-has-top .ch-card { margin-top: 6px; } }
 @media (max-width: 560px) { .ch-links a { padding: 0 12px; } .ch-demo { padding: 15px 28px; } }
 .sp-hero .m-hero-tour { margin-top: 34px; }
+
+/* the upload box is the same size and layout as the home page's (.hx-drop): icon beside the words, a compact card */
+.sp-h-inline .sp-try, .sp-h-stack .sp-try { width: min(100%, 420px); padding: 10px; border-radius: 18px; }
+.sp-h-split .sp-try { max-width: 460px; padding: 10px; border-radius: 18px; }
+.sp-h-inline .sp-drop, .sp-h-stack .sp-drop { flex-direction: row; justify-content: flex-start; align-items: center; gap: 14px; padding: 18px; border-radius: 14px; text-align: left; border-color: #9db8e3; background: #f7faff; }
+.sp-h-inline .sp-drop .sp-drop-ic, .sp-h-stack .sp-drop .sp-drop-ic { display: block; width: auto; height: auto; margin: 0; background: none; border-radius: 0; flex: none; }
+.sp-h-inline .sp-drop .sp-drop-ic svg, .sp-h-stack .sp-drop .sp-drop-ic svg, .sp-h-split .sp-drop-btn svg { width: 34px; height: 34px; }
+.sp-h-inline .sp-drop-text, .sp-h-stack .sp-drop-text { min-width: 0; }
+.sp-h-inline .sp-drop-text b, .sp-h-stack .sp-drop-text b { font-size: 1rem; }
+.sp-h-inline .sp-drop-text span, .sp-h-stack .sp-drop-text span { font-size: 0.8rem; margin-top: 2px; }
+.sp-h-inline .sp-row, .sp-h-stack .sp-row { margin-top: 10px; }
+.sp-h-inline .sp-row .sp-go { padding: 12px 14px; font-size: 1rem; }
+.sp-h-stack .sp-go { padding: 12px 14px; font-size: 1rem; }
+.sp-h-inline .sp-sel select, .sp-h-stack .sp-sel select, .sp-h-split .sp-sel select { padding-top: 12px; padding-bottom: 12px; }
