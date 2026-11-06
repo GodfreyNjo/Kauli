@@ -60,30 +60,93 @@
 <div class="marketing-page">
   {% include "_nav.html" %}
 
-  {# Hero, the same on every solution and language page: back link + topic pill, the headline, one big "upload" door, two buttons,
-     three plain facts. The upload door is a sign-up link (a file cannot be carried across a page change), so it says so honestly. #}
+  {# Hero, the same on every solution and language page, worded exactly as in the design brief: back link + topic pill, a short headline and
+     line, the try-it-now upload box, "Transcribe Now" + "Talk to Us", three facts. The upload works like the one on the home page
+     (POST /try/start, no account needed; the result is kept in a free account) and starts on this page's own language. The long,
+     search-friendly headline and introduction are kept on the page under "Read more". #}
+  {% set intro_parts = page.intro.split('. ', 1) %}
   <section class="m-hero sp-hero">
     <div class="sp-hero-top">
       <a href="/" class="m-breadcrumb-back">&larr; Back to Kauli</a>
       <span class="kicker">{{ page.kicker }}</span>
     </div>
-    <h1>{{ page.h1|safe }}</h1>
-    <p class="m-hero-sub">{{ page.intro }}</p>
+    <h1>{% if page.hero_h1 %}{{ page.hero_h1 }}{% else %}{{ page.h1|safe }}{% endif %}</h1>
+    <p class="m-hero-sub">{% if page.hero_sub %}{{ page.hero_sub }}{% elif intro_parts|length > 1 %}{{ intro_parts[0] }}.{% else %}{{ page.intro }}{% endif %}</p>
+    {% if page.hero_sub or intro_parts|length > 1 %}
+    <details class="sp-readmore sp-readmore-hero">
+      <summary>Read more</summary>
+      <div class="sp-readmore-body">
+        {% if page.hero_h1 %}<p><strong>{{ page.h1|safe }}</strong></p>{% endif %}
+        <p>{% if page.hero_sub %}{{ page.intro }}{% else %}{{ intro_parts[1] }}{% endif %}</p>
+      </div>
+    </details>
+    {% endif %}
     <div class="sp-stage">
-      <a href="/login?mode=signup" class="sp-drop" data-cta="solution-upload">
-        <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 8"/><path d="M12 21v-9M8.8 14.7 12 11.5l3.2 3.2"/></svg>
-        <b>Upload audio</b>
-        <span>Free account, first {{ free_minutes|int }} minutes free</span>
-      </a>
+      <div class="sp-try" id="sp-try">
+        <input type="file" id="sp-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
+        <label class="sp-drop" for="sp-file" id="sp-dropzone" tabindex="0">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 8"/><path d="M12 21v-9M8.8 14.7 12 11.5l3.2 3.2"/></svg>
+          <b>Upload audio</b>
+          <span id="sp-label">or drag and drop</span>
+        </label>
+        {% if page.try_lang %}
+        <input type="hidden" id="sp-lang" value="{{ page.try_lang }}">
+        {% else %}
+        <label class="sp-lang"><span>Language spoken</span>
+          <select id="sp-lang" aria-label="Language spoken in the recording">
+            {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
+            {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+          </select></label>
+        {% endif %}
+        <div class="tk-try-progress" id="sp-progress" hidden><progress id="sp-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="sp-pct">0%</span></div>
+        <p class="tk-try-msg sp-msg" id="sp-msg" role="status" aria-live="polite"></p>
+      </div>
     </div>
     <div class="m-hero-ctas">
-      <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-page">{{ page.cta_label or 'Start a project' }} &rarr;</a>
-      <a href="/demo" class="btn secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.7 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg>{{ 'Book a demo' if page.cta_label else 'Talk to us' }}</a>
+      <button type="button" class="btn cta-olive" id="sp-go" data-cta="solution-try">{{ page.hero_cta or 'Transcribe Now' }} &rarr;</button>
+      <a href="/demo" class="btn secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.7 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg>Talk to Us</a>
     </div>
+    <script>
+      (function () {
+        var file = document.getElementById("sp-file"), go = document.getElementById("sp-go"), label = document.getElementById("sp-label"), msg = document.getElementById("sp-msg"),
+            bar = document.getElementById("sp-bar"), pct = document.getElementById("sp-pct"), prog = document.getElementById("sp-progress"), lang = document.getElementById("sp-lang"),
+            drop = document.getElementById("sp-dropzone");
+        if (!file) return;
+        ["dragover", "dragenter"].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("is-over"); }); });
+        ["dragleave", "drop"].forEach(function (ev) { drop.addEventListener(ev, function () { drop.classList.remove("is-over"); }); });
+        drop.addEventListener("drop", function (e) { e.preventDefault(); if (e.dataTransfer && e.dataTransfer.files.length) { file.files = e.dataTransfer.files; file.dispatchEvent(new Event("change")); } });
+        drop.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+        file.addEventListener("change", function () {
+          var f = file.files[0]; msg.textContent = "";
+          if (!f) return;
+          if (f.size > 100 * 1024 * 1024) { msg.textContent = "That file is over 100 MB. Create a free account to upload larger files."; file.value = ""; return; }
+          label.textContent = f.name;
+        });
+        go.addEventListener("click", function () {
+          var f = file.files[0];
+          if (!f) { file.click(); return; }                       // no file yet: the button opens the file picker
+          var fd = new FormData(); fd.append("audio", f); fd.append("source_lang", lang.value);
+          var xhr = new XMLHttpRequest(); xhr.open("POST", "/try/start");
+          go.disabled = true; prog.hidden = false; msg.textContent = "Uploading...";
+          xhr.upload.onprogress = function (e) { if (e.lengthComputable) { var p = Math.round(100 * e.loaded / e.total); bar.value = p; pct.textContent = p + "%"; } };
+          xhr.onload = function () {
+            var d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+            if (xhr.status === 200 && d.redirect) { msg.textContent = "Starting your transcript..."; window.location.href = d.redirect; return; }
+            prog.hidden = true; go.disabled = false;
+            msg.innerHTML = ""; msg.appendChild(document.createTextNode((d.error || "Something went wrong. Please try again.") + " "));
+            if (d.signup) { var a = document.createElement("a"); a.href = d.signup; a.textContent = "Create a free account"; msg.appendChild(a); }
+            if (window.kpToast) kpToast(d.error || "Something went wrong.", "error");
+          };
+          xhr.onerror = function () { prog.hidden = true; go.disabled = false; msg.textContent = "Could not reach Kauli. Check your connection and try again."; };
+          xhr.send(fd);
+        });
+      })();
+    </script>
+    {% set sp_facts = page.hero_facts or ['Fast', '76+ languages', 'High Accuracy'] %}
     <ul class="sp-trust">
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg>Ready in minutes</li>
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="9" width="18" height="12" rx="1.6"/><rect x="2.4" y="6" width="19.2" height="3.6" rx="1.2"/><path d="M12 6v15"/></svg>First {{ free_minutes|int }} minutes free</li>
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/></svg>Word, text and SRT files</li>
+      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg>{{ sp_facts[0] }}</li>
+      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>{{ sp_facts[1] }}</li>
+      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>{{ sp_facts[2] }}</li>
     </ul>
     {% if page.tour %}
     {% set tour_mode = page.tour.mode %}
@@ -109,6 +172,7 @@
     <div class="m-inner">
       <span class="kb-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['spark']|safe }}</svg>Key benefits</span>
       <h2 class="m-h2">{{ page.why_heading }}</h2>
+      {% if page.why_sub %}<p class="kb-sub">{{ page.why_sub }}</p>{% endif %}
       <div class="kb-grid">
         {% for point in page.points %}
         {% set t = point.title|lower %}
@@ -121,14 +185,24 @@
         {% else %}{% set ik = kb_spare[loop.index0 % (kb_spare|length)] %}{% endif %}
         <article class="kb-card">
           <span class="kb-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ kb_icons[ik]|safe }}</svg></span>
+          {% set bp = point.body.split('. ', 1) %}
           <div>
-            <h3>{{ point.title }}</h3>
-            <p>{{ point.body }}</p>
+            <h3>{{ point.card_title or point.title }}</h3>
+            <p>{% if point.short %}{{ point.short }}{% elif bp|length > 1 %}{{ bp[0] }}.{% else %}{{ point.body }}{% endif %}</p>
           </div>
         </article>
         {% endfor %}
       </div>
-      <div class="kb-cta"><a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{{ page.cta_label or page.cta_heading }} &rarr;</a></div>
+      <details class="sp-readmore sp-readmore-kb">
+        <summary>Read more</summary>
+        <div class="sp-readmore-body">
+          {% for point in page.points %}
+          <h3>{{ point.title }}</h3>
+          <p>{{ point.body }}</p>
+          {% endfor %}
+        </div>
+      </details>
+      <div class="kb-cta"><a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{{ page.benefit_cta or page.cta_label or page.cta_heading }} &rarr;</a></div>
     </div>
   </section>
 
@@ -214,7 +288,7 @@
         'dub': '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10.5v3"/>'} %}
       <div class="sp-card">
         <table class="sp-table">
-          <thead><tr><th scope="col">Service</th><th scope="col" class="sp-ai">Instant AI</th><th scope="col">Human-reviewed</th></tr></thead>
+          <thead><tr><th scope="col">Service</th><th scope="col" class="sp-ai">Instant AI</th><th scope="col">Human-Reviewed</th></tr></thead>
           <tbody>
             {% for key, sl in service_levels.items() %}
             {% set parts = sl['name'].split(' (', 1) %}
@@ -230,7 +304,7 @@
       </div>
 
       <ul class="sp-facts">
-        <li><span class="sp-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span><b>Up to 99% accuracy</b> with human review</span></li>
+        <li><span class="sp-tick" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span><span><b>Up to 99% accuracy</b></span></li>
         <li><span class="sp-gift" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="1.6"/><rect x="2.4" y="6" width="19.2" height="3.6" rx="1.2"/><path d="M12 6v15M12 6C10 6 8 5 8 3.6S10.2 2.6 12 6zM12 6c2 0 4-1 4-2.4S13.8 2.6 12 6z"/></svg></span><b>First {{ free_minutes|int }} minutes free</b></li>
       </ul>
 
@@ -239,7 +313,13 @@
         <a href="/#pricing" class="sp-more">View full pricing &rarr;</a>
       </div>
 
-      <p class="sp-fine">Per audio-minute, in USD. <strong>Instant AI</strong> is ready in minutes and is AI-generated, not reviewed by a person. <strong>Human-reviewed</strong> adds a real editor who checks the result against the source audio before delivery ({{ human_review_languages }}; more languages are coming soon). Accuracy reaches up to 99% with human review, depending on audio quality. Free minutes apply to Instant AI transcription. Plans and add-ons are on the main pricing section.</p>
+      <p class="sp-fine">Per audio-minute, in USD. Instant AI is AI-generated and not reviewed by a person.</p>
+      <details class="sp-readmore sp-readmore-price">
+        <summary>Read more</summary>
+        <div class="sp-readmore-body">
+          <p><strong>Instant AI</strong> is ready in minutes and is AI-generated, not reviewed by a person. <strong>Human-Reviewed</strong> adds a real editor who checks the result against the source audio before delivery ({{ human_review_languages }}; more languages are coming soon). Accuracy reaches up to 99% with human review, depending on audio quality. Free minutes apply to Instant AI transcription. Plans and add-ons are on the main pricing section.</p>
+        </div>
+      </details>
 
       {% if page.fit_guide %}
       <h3 style="margin-top:36px; font-size:1.05rem;">Which plan actually fits you</h3>

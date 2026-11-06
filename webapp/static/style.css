@@ -7616,14 +7616,18 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .sp-hero .m-hero-sub { max-width: 640px; margin-left: auto; margin-right: auto; }
 
 .sp-stage { position: relative; display: flex; align-items: center; justify-content: center; gap: 22px; max-width: 1120px; margin: 34px auto 30px; }
-.sp-drop { flex: none; width: min(100%, 440px); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 30px 24px 28px;
-  border-radius: 26px; text-decoration: none; text-align: center;
-  background: color-mix(in srgb, #ffffff 78%, transparent); border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, #ffffff);
-  box-shadow: 0 22px 44px -26px rgba(8, 56, 120, 0.45); color: var(--accent); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
-.m-hero .sp-drop { color: var(--accent); }
-.sp-drop:hover { transform: translateY(-2px); border-style: solid; border-color: var(--accent); box-shadow: 0 26px 48px -24px rgba(8, 120, 200, 0.55); }
-.sp-drop b { color: #082848; font-size: 1.35rem; font-weight: 700; margin-top: 4px; }
-.sp-drop span { color: #52627a; font-size: 0.95rem; }
+/* the try-it-now card (same behaviour as the home page): a dashed drop area, a language, one button */
+.sp-try { width: min(100%, 520px); padding: 16px 16px 14px; border-radius: 26px; text-align: left;
+  background: color-mix(in srgb, #ffffff 82%, transparent); border: 1px solid #dbe5f5; box-shadow: 0 22px 44px -26px rgba(8, 56, 120, 0.45); }
+.sp-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 18px; border-radius: 18px; text-align: center; cursor: pointer;
+  background: #f7faff; border: 1.5px dashed color-mix(in srgb, var(--accent) 45%, #ffffff); color: var(--accent); transition: background .18s ease, border-color .18s ease; }
+.sp-drop:hover, .sp-drop.is-over { background: #eaf2ff; border-style: solid; border-color: var(--accent); }
+.sp-drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sp-drop b { color: #082848; font-size: 1.3rem; font-weight: 700; margin-top: 4px; }
+.sp-drop span { color: #52627a; font-size: 0.92rem; overflow-wrap: anywhere; }
+.sp-lang { display: grid; gap: 4px; flex: 1; min-width: 170px; font-size: 0.82rem; font-weight: 600; color: #082848; }
+.sp-lang select { margin: 0; width: 100%; }
+.sp-msg { margin: 6px 0 0; font-size: 0.88rem; color: #334155; }
 
 .sp-hero .m-hero-ctas { gap: 14px; }
 .m-hero.sp-hero .m-hero-ctas .btn { display: inline-flex; align-items: center; gap: 9px; padding: 15px 34px; font-size: 1.05rem; font-weight: 650; border-radius: 999px; }
@@ -7642,3 +7646,26 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
   .sp-trust li + li { border-left: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .sp-drop { transition: none; } .sp-drop:hover { transform: none; } }
+.sp-try [hidden] { display: none !important; }
+
+/* "Read more": the long, search-friendly text, kept on the page but folded away (a real <details>, so crawlers and screen readers get all of it) */
+.sp-readmore { max-width: 640px; margin: 10px auto 0; text-align: center; }
+.sp-readmore summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-size: 0.92rem; font-weight: 600; color: var(--accent-text); padding: 6px 12px; border-radius: 999px; }
+.sp-readmore summary::-webkit-details-marker { display: none; }
+.sp-readmore summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .18s ease; }
+.sp-readmore[open] summary::after { transform: rotate(225deg) translateY(-1px); }
+.sp-readmore summary:hover { background: var(--accent-soft); }
+.sp-readmore summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sp-readmore-body { margin-top: 8px; padding: 16px 20px; text-align: left; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border-subtle); border-radius: 14px; color: var(--muted); font-size: 0.95rem; line-height: 1.65; }
+.sp-readmore-body p { margin: 0 0 10px; } .sp-readmore-body p:last-child { margin-bottom: 0; }
+.sp-readmore-body h3 { margin: 14px 0 4px; font-size: 1rem; color: var(--heading-ink); } .sp-readmore-body h3:first-child { margin-top: 0; }
+.sp-readmore-hero { margin-top: 2px; margin-bottom: 0; }
+.sp-readmore-kb { max-width: 760px; margin-top: 22px; }
+.sp-readmore-price { margin-top: 4px; }
+.kb-sub { margin: 0 0 30px; color: var(--muted); font-size: 1.1rem; }
+.kb h2.m-h2:has(+ .kb-sub) { margin-bottom: 8px; }
+.sp-hero .sp-lang { margin: 12px 0 0; }
+.sp-hero .sp-msg:empty { display: none; }
+.m-hero.sp-hero .m-hero-ctas button.btn { border: 0; cursor: pointer; font-family: inherit; }
+.m-hero.sp-hero .m-hero-ctas button.btn:disabled { opacity: .7; cursor: progress; }
+@media (max-width: 640px) { .kb-sub { font-size: 1rem; } }

@@ -2423,6 +2423,28 @@ def _language_page_dict(code: str) -> dict:
     }
 
 
+def _mockup_copy(page: dict, label: str, code: str) -> dict:
+    """The short on-screen wording of a language page (the design brief). The long, search-friendly text is not thrown away:
+    solution_page.html keeps it on the page under "Read more", so a crawler still reads all of it."""
+    shorts = (("download", "Download Your Transcript", "Word (.docx), text (.txt), or SRT."),
+              ("pric", "Simple, Per-Minute Pricing", "From $0. No subscription."),
+              ("limit", "Know the Limits", "AI transcription (not human review) with multi-language support."),
+              ("transcribe", f"Transcribe {label}", "Get a transcript with timestamps and speaker labels."))
+    points = []
+    for p in page["points"]:
+        t = p["title"].lower()
+        for key, title, short in shorts:
+            if key in t:
+                p = {**p, "card_title": title, "short": short}
+                break
+        points.append(p)
+    return {**page, "points": points, "try_lang": code,
+            "hero_h1": f"{label} Audio to Text", "hero_sub": f"Transcribe {label} recordings in minutes.",
+            "hero_cta": "Transcribe Now", "hero_facts": ["Fast", f"Built for {label}", "High Accuracy"],
+            "why_heading": f"{label} Transcription with Kauli", "why_sub": "Fast, accurate, and easy-to-use AI transcription.",
+            "benefit_cta": f"Transcribe a {label} Recording"}
+
+
 @app.get("/transcribe/{slug}", response_class=HTMLResponse)
 def language_page(request: Request, slug: str):
     code = AI_LANGUAGE_SLUGS.get(slug)
@@ -2439,6 +2461,7 @@ def language_page(request: Request, slug: str):
     if code in seo_pages.REVIEWED:
         page = {**page, **seo_pages.language_page_extras(code, billing.PRICE_CARD["intl"]["transcribe"]["ai"],
                                                           billing.PRICE_CARD["intl"]["transcribe"]["human"], code in _human_review_live())}
+    page = _mockup_copy(page, seo_languages.display_name(AI_ONLY_LANGUAGES[code]), code)   # short wording on screen, the full text under "Read more"
     return templates.TemplateResponse(request, "solution_page.html", {
         **_marketing_context(home="/", market=_display_market(request)),
         "page": page, "related_pages": related_pages,
@@ -2457,6 +2480,7 @@ def language_task_page(request: Request, slug: str, task: str):
     card = billing.PRICE_CARD["intl"]["transcribe"]
     page = seo_pages.combo_page(code, task, card["ai"], card["human"], code in _human_review_live(), seo_pages.REVIEWED[code][1])
     related_pages = [{"slug": s, "kicker": SOLUTION_PAGES[s]["kicker"], "h1": SOLUTION_PAGES[s]["h1"]} for s in page["related"] if s in SOLUTION_PAGES]
+    page = {**page, "try_lang": code}                  # the hero's upload box starts on this page's language
     return templates.TemplateResponse(request, "solution_page.html", {
         **_marketing_context(home="/", market=_display_market(request)),
         "page": page, "related_pages": related_pages,
