@@ -60,52 +60,145 @@
 <div class="marketing-page">
   {% include "_nav.html" %}
 
-  {# Hero, the same on every solution and language page, worded exactly as in the design brief: back link + topic pill, a short headline and
-     line, the try-it-now upload box, "Transcribe Now" + "Talk to Us", three facts. The upload works like the one on the home page
-     (POST /try/start, no account needed; the result is kept in a free account) and starts on this page's own language. The long,
-     search-friendly headline and introduction are kept on the page under "Read more". #}
+  {# Shared icons for the hero, key benefits and choose sections (24x24, stroke). #}
+  {% set I = {
+    'bolt': '<path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/>',
+    'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>',
+    'target': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+    'shield': '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
+    'mic': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+    'translate': '<path d="M4 6h9M8.5 4v2M6 6c.5 3 2.5 5.5 5.5 7M12 6c-.5 3-3 5.5-7 7"/><path d="m12.5 20 4-9 4 9M13.9 17h5.2"/>',
+    'cloud': '<path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 8"/><path d="M12 21v-9M8.8 14.7 12 11.5l3.2 3.2"/>',
+    'play': '<rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="m10 9.5 5 2.5-5 2.5z"/>',
+    'wave': '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/>',
+    'sparkle': '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+    'chat': '<path d="M21 12a8 8 0 0 1-11.7 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/>',
+    'check': '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+    'ok': '<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.8 2.8L16 9.5"/>',
+    'chev': '<path d="m6 9 6 6 6-6"/>',
+    'download': '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
+    'coins': '<ellipse cx="9" cy="7" rx="5.5" ry="2.5"/><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5M14.5 12.3c3 0 6 1 6 2.5v4c0 1.4-2.5 2.5-5.5 2.5S9.5 20.2 9.5 18.8v-1"/>',
+    'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'card': '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/>',
+    'video': '<rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3z"/>',
+    'tag': '<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.2"/>'} %}
+  {% macro fact_key(t) %}{% set l = t|lower %}{% if 'languag' in l %}globe{% elif 'accura' in l %}target{% elif 'access' in l or 'secure' in l %}shield{% elif 'youtube' in l %}play{% else %}bolt{% endif %}{% endmacro %}
+
+  {# Hero. One look on every solution and language page, in three layouts (page.hero_layout):
+       inline (the default)  centered: headline, the upload card (drop area, then language + button on one row), facts underneath
+       stack                 the same, with the facts above the card and the language and button stacked
+       split                 headline and a compact upload row on the left, the real before / after demo videos on the right
+     The upload works like the one on the home page (POST /try/start, no account needed; the result is kept in a free account) and starts on
+     this page's own language. The long, search-friendly headline and introduction stay on the page under "Read more". #}
+  {% set layout = page.hero_layout or 'inline' %}
   {% set intro_parts = page.intro.split('. ', 1) %}
-  <section class="m-hero sp-hero">
+  {% set hh = page.hero_h1 or page.h1 %}
+  {% set sp_facts = page.hero_facts or ['Fast', '76+ languages', 'High Accuracy'] %}
+  <section class="m-hero sp-hero sp-h-{{ layout }}">
     <div class="sp-hero-top">
       <a href="/" class="m-breadcrumb-back">&larr; Back to Kauli</a>
-      <span class="kicker">{{ page.kicker }}</span>
+      <span class="kicker">{% if page.kicker_icon %}<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I[page.kicker_icon]|safe }}</svg>{% endif %}{{ page.kicker }}</span>
     </div>
-    <h1>{% if page.hero_h1 %}{{ page.hero_h1 }}{% else %}{{ page.h1|safe }}{% endif %}</h1>
-    <p class="m-hero-sub">{% if page.hero_sub %}{{ page.hero_sub }}{% elif intro_parts|length > 1 %}{{ intro_parts[0] }}.{% else %}{{ page.intro }}{% endif %}</p>
-    {% if page.hero_sub or intro_parts|length > 1 %}
-    <details class="sp-readmore sp-readmore-hero">
-      <summary>Read more</summary>
-      <div class="sp-readmore-body">
-        {% if page.hero_h1 %}<p><strong>{{ page.h1|safe }}</strong></p>{% endif %}
-        <p>{% if page.hero_sub %}{{ page.intro }}{% else %}{{ intro_parts[1] }}{% endif %}</p>
-      </div>
-    </details>
-    {% endif %}
-    <div class="sp-stage">
-      <div class="sp-try" id="sp-try">
-        <input type="file" id="sp-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
-        <label class="sp-drop" for="sp-file" id="sp-dropzone" tabindex="0">
-          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4.5 4.5 0 0 1-.6-8.96A6 6 0 0 1 18 8.5a4 4 0 0 1-.5 8"/><path d="M12 21v-9M8.8 14.7 12 11.5l3.2 3.2"/></svg>
-          <div class="sp-drop-text"><b>Upload audio</b>
-          <span id="sp-label">or drag and drop</span></div>
-        </label>
-        {% if page.try_lang %}
-        <input type="hidden" id="sp-lang" value="{{ page.try_lang }}">
+    {% macro hero_facts() %}
+    <ul class="sp-trust">
+      {% for f in sp_facts %}<li><span class="sp-fi"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I[fact_key(f)|trim]|safe }}</svg></span>{{ f }}</li>{% endfor %}
+    </ul>
+    {% endmacro %}
+    <div class="sp-cols">
+      <div class="sp-copy">
+        {% set ha = page.hero_accent %}
+        <h1>{% if page.hero_h1 and ha and ha in hh %}{{ hh.split(ha)[0] }}<span class="sp-ha">{{ ha }}</span>{{ hh.split(ha)[1] }}{% elif page.hero_h1 %}{{ page.hero_h1 }}{% else %}{{ page.h1|safe }}{% endif %}</h1>
+        {% if page.hero_h1 %}
+          {% if page.hero_sub %}<p class="m-hero-sub">{{ page.hero_sub }}</p>{% endif %}
         {% else %}
-        <label class="sp-lang"><span>Language spoken</span>
-          <select id="sp-lang" aria-label="Language spoken in the recording">
-            {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
-            {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
-          </select></label>
+          <p class="m-hero-sub">{% if intro_parts|length > 1 %}{{ intro_parts[0] }}.{% else %}{{ page.intro }}{% endif %}</p>
         {% endif %}
-        <div class="tk-try-progress" id="sp-progress" hidden><progress id="sp-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="sp-pct">0%</span></div>
-        <p class="tk-try-msg sp-msg" id="sp-msg" role="status" aria-live="polite"></p>
+        {% if page.hero_h1 or intro_parts|length > 1 %}
+        <details class="sp-readmore sp-readmore-hero">
+          <summary>Read more</summary>
+          <div class="sp-readmore-body">
+            {% if page.hero_h1 %}<p><strong>{{ page.h1|safe }}</strong></p><p>{{ page.intro }}</p>{% else %}<p>{{ intro_parts[1] }}</p>{% endif %}
+          </div>
+        </details>
+        {% endif %}
+        {% if layout == 'stack' %}{{ hero_facts() }}{% endif %}
+        {% if page.hero_steps %}
+        <ul class="sp-steps">
+          {% for s in page.hero_steps %}<li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I[s.icon]|safe }}</svg>{{ s.text }}</li>{% endfor %}
+        </ul>
+        {% endif %}
+        <div class="sp-stage">
+          <div class="sp-try" id="sp-try">
+            <input type="file" id="sp-file" accept="audio/*,video/*,.mp3,.wav,.m4a,.flac,.mp4,.mov,.mkv" hidden>
+            {% macro lang_select() %}
+            {% if page.try_lang %}
+            <input type="hidden" id="sp-lang" value="{{ page.try_lang }}">
+            {% else %}
+            <label class="sp-lang"><span class="sp-lang-cap">Language</span>
+              <span class="sp-sel"><svg class="sp-sel-ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['globe']|safe }}</svg>
+              <select id="sp-lang" aria-label="Language spoken in the recording">
+                {% for code, name in source_languages.items() %}<option value="{{ code }}"{{ ' selected' if code == 'en' else '' }}>{{ name }}</option>{% endfor %}
+                {% for code, name in ai_only_languages.items()|sort(attribute='1') %}<option value="{{ code }}">{{ name }}</option>{% endfor %}
+              </select>
+              <svg class="sp-sel-chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['chev']|safe }}</svg></span></label>
+            {% endif %}
+            {% endmacro %}
+            {% if layout == 'split' %}
+            <div class="sp-row">
+              <label class="sp-drop sp-drop-btn" for="sp-file" id="sp-dropzone" tabindex="0">
+                <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['cloud']|safe }}</svg>
+                <b id="sp-label">{{ page.hero_dz or 'Upload video' }}</b>
+              </label>
+              <span class="sp-to" aria-hidden="true">&rarr;</span>
+              {{ lang_select() }}
+            </div>
+            {% else %}
+            <label class="sp-drop" for="sp-file" id="sp-dropzone" tabindex="0">
+              <span class="sp-drop-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['cloud']|safe }}</svg></span>
+              <div class="sp-drop-text"><b>{{ page.hero_dz or 'Upload your video or audio' }}</b>
+              <span id="sp-label">{{ page.hero_dz_sub or 'Drag & drop or click to upload' }}</span></div>
+            </label>
+            <div class="sp-row">
+              {{ lang_select() }}
+              <button type="button" class="btn cta-olive sp-go" id="sp-go" data-cta="solution-try">{% if layout == 'stack' %}<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['sparkle']|safe }}</svg>{% else %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>{% endif %}{{ page.hero_cta or 'Transcribe Now' }} &rarr;</button>
+            </div>
+            {% endif %}
+            <div class="tk-try-progress" id="sp-progress" hidden><progress id="sp-bar" max="100" value="0" aria-label="Upload progress"></progress><span id="sp-pct">0%</span></div>
+            <p class="tk-try-msg sp-msg" id="sp-msg" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+        {% if layout == 'split' %}
+        <div class="m-hero-ctas">
+          <button type="button" class="btn cta-olive sp-go" id="sp-go" data-cta="solution-try">{{ page.hero_cta or 'Transcribe Now' }} &rarr;</button>
+          <a href="{{ page.hero_see_href or '/try?use=video' }}" class="btn secondary" data-cta="solution-see"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10.5 8.5 5 3.5-5 3.5z"/></svg>{{ page.hero_see or 'See it in action' }}</a>
+        </div>
+        {% elif page.hero_talk != false %}
+        <div class="m-hero-ctas">
+          <a href="/demo" class="btn secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['chat']|safe }}</svg>Talk to Us</a>
+        </div>
+        {% endif %}
       </div>
+      {% if layout == 'split' %}
+      {# The real before / after: the original demo video and the same video AI-dubbed into Spanish (the clips the home-page demo plays). #}
+      <div class="sp-visual">
+        <figure class="sp-vid sp-vid-a">
+          <video controls preload="none" playsinline poster="/static/demo/vid-video-en.jpg" src="/static/demo/vid-video-en.mp4" aria-label="The original video, in English"></video>
+          <figcaption>English, original</figcaption>
+        </figure>
+        <span class="sp-vid-arrow" aria-hidden="true">&rarr;</span>
+        <figure class="sp-vid sp-vid-b">
+          <video controls preload="none" playsinline poster="/static/demo/vid-video-es.jpg" src="/static/demo/vid-video-es.mp4" aria-label="The same video, dubbed into Spanish by AI"></video>
+          <figcaption>Spanish, AI dub</figcaption>
+        </figure>
+      </div>
+      {% endif %}
     </div>
-    <div class="m-hero-ctas">
-      <button type="button" class="btn cta-olive" id="sp-go" data-cta="solution-try">{{ page.hero_cta or 'Transcribe Now' }} &rarr;</button>
-      <a href="/demo" class="btn secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.7 7L4 20l1.1-4.6A8 8 0 1 1 21 12z"/></svg>Talk to Us</a>
-    </div>
+    {% if page.hero_flow %}
+    <ol class="sp-flow">
+      {% for s in page.hero_flow %}<li><span class="sp-flow-ic"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I[s.icon]|safe }}</svg></span><b>{{ loop.index }}. {{ s.text }}</b></li>{% endfor %}
+    </ol>
+    {% endif %}
+    {% if layout != 'stack' %}{{ hero_facts() }}{% endif %}
     <script>
       (function () {
         var file = document.getElementById("sp-file"), go = document.getElementById("sp-go"), label = document.getElementById("sp-label"), msg = document.getElementById("sp-msg"),
@@ -142,12 +235,6 @@
         });
       })();
     </script>
-    {% set sp_facts = page.hero_facts or ['Fast', '76+ languages', 'High Accuracy'] %}
-    <ul class="sp-trust">
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/></svg>{{ sp_facts[0] }}</li>
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>{{ sp_facts[1] }}</li>
-      <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/></svg>{{ sp_facts[2] }}</li>
-    </ul>
     {% if page.tour %}
     {% set tour_mode = page.tour.mode %}
     {% set tour_filename = page.tour.filename %}
@@ -168,57 +255,62 @@
   </section>
   {% endif %}
 
-  {# Key benefits: one card per point, an icon chosen from the card's own title, the same look on every solution and language page.
-     All the words are real text (never CSS content), so the per-language page translation picks them up. #}
-  {% set kb_icons = {
-    'mic': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
-    'download': '<path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/>',
-    'coins': '<ellipse cx="9" cy="7" rx="5.5" ry="2.5"/><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5M14.5 12.3c3 0 6 1 6 2.5v4c0 1.4-2.5 2.5-5.5 2.5S9.5 20.2 9.5 18.8v-1"/>',
-    'layers': '<path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/>',
-    'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>',
-    'shield': '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>',
-    'doc': '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
-    'spark': '<path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/>'} %}
-  {% set kb_spare = ['mic', 'doc', 'spark', 'clock', 'shield', 'globe'] %}
-  <section class="m-section kb" id="why-you">
+  {# Key benefits: one card per point, the same look on every solution and language page, in three styles (page.kb_style):
+       cards (the default)   icon tile on the left, title and one short line
+       tiles                 icon tile above, centered title and line, a row of ticks under the heading, a ghost button next to the main one
+       rows                  one compact line per point (title only, an optional chip), for short, scannable lists
+     The icon comes from point.icon, or is picked from the card's own title. All the words are real text (never CSS content), so the
+     per-language page translation picks them up. The full title and text of every point stay under "Learn more". #}
+  {% set kb_icons = I %}
+  {% set kb_spare = ['mic', 'download', 'bolt', 'clock', 'shield', 'globe'] %}
+  {% set kbs = page.kb_style or 'cards' %}
+  {% set wh = page.why_heading %}
+  {% set wa = page.why_accent or (wh.split(' ')[-2:]|join(' ')) %}
+  <section class="m-section kb kb-{{ kbs }}" id="why-you">
     <div class="m-inner">
-      <span class="kb-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['spark']|safe }}</svg>Key benefits</span>
-      {% set wh = page.why_heading %}{% set wa = page.why_accent %}
-      <h2 class="m-h2">{% if wa and wa in wh %}{{ wh.split(wa)[0] }}<span class="kb-accent">{% set wa_parts = wa.rsplit(' ', 1) %}{% if wa_parts|length > 1 %}{{ wa_parts[0] }} <span class="kb-u">{{ wa_parts[1] }}</span>{% else %}<span class="kb-u">{{ wa }}</span>{% endif %}</span>{{ wh.split(wa)[1] }}{% else %}{{ wh }}{% endif %}</h2>
+      <span class="kb-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['bolt']|safe }}</svg>Key benefits</span>
+      <h2 class="m-h2">{% if wa and wa in wh %}{{ wh.rsplit(wa, 1)[0] }}<span class="kb-accent">{% set wa_parts = wa.rsplit(' ', 1) %}{% if wa_parts|length > 1 %}{{ wa_parts[0] }} <span class="kb-u">{{ wa_parts[1] }}</span>{% else %}<span class="kb-u">{{ wa }}</span>{% endif %}</span>{{ wh.rsplit(wa, 1)[1] }}{% else %}{{ wh }}{% endif %}</h2>
       {% if page.why_sub %}<p class="kb-sub">{{ page.why_sub }}</p>{% endif %}
+      {% if page.kb_checks %}
+      <ul class="kb-checks">{% for c in page.kb_checks %}<li><span class="kb-tick"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['check']|safe }}</svg></span>{{ c }}</li>{% endfor %}</ul>
+      {% endif %}
       <div class="kb-grid">
         {% for point in page.points %}
         {% set t = point.title|lower %}
-        {% if 'download' in t or 'word,' in t or 'srt' in t %}{% set ik = 'download' %}
+        {% if point.icon %}{% set ik = point.icon %}
+        {% elif 'download' in t or 'word,' in t or 'srt' in t %}{% set ik = 'download' %}
         {% elif 'pric' in t or 'cost' in t %}{% set ik = 'coins' %}
-        {% elif 'limit' in t or 'honest' in t %}{% set ik = 'layers' %}
+        {% elif 'limit' in t or 'honest' in t %}{% set ik = 'target' %}
         {% elif 'timestamp' in t or 'deadline' in t %}{% set ik = 'clock' %}
         {% elif 'languag' in t %}{% set ik = 'globe' %}
         {% elif 'review' in t or 'privat' in t or 'secure' in t or 'consent' in t %}{% set ik = 'shield' %}
         {% else %}{% set ik = kb_spare[loop.index0 % (kb_spare|length)] %}{% endif %}
-        <article class="kb-card">
+        <article class="kb-card{{ ' kb-t-' ~ point.tone if point.tone else '' }}">
           <span class="kb-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ kb_icons[ik]|safe }}</svg></span>
           {% set bp = point.body.split('. ', 1) %}
-          <div>
-            <h3>{{ point.card_title or point.title }}</h3>
-            <p>{% if point.short %}{{ point.short }}{% elif bp|length > 1 %}{{ bp[0] }}.{% else %}{{ point.body }}{% endif %}</p>
+          <div class="kb-tx">
+            <h3>{{ point.card_title or point.title }}{% if point.chip %} <span class="kb-chip">{{ point.chip }}</span>{% endif %}</h3>
+            {% if kbs != 'rows' %}<p>{% if point.short %}{{ point.short }}{% elif bp|length > 1 %}{{ bp[0] }}.{% else %}{{ point.body }}{% endif %}</p>{% endif %}
           </div>
         </article>
         {% endfor %}
       </div>
-      <div class="kb-cta"><a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{{ page.benefit_cta or page.cta_label or page.cta_heading }} &rarr;</a></div>
+      <div class="kb-cta">
+        <a href="/login?mode=signup" class="btn cta-olive" data-cta="solution-benefits">{% if kbs == 'rows' %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>{% endif %}{{ page.benefit_cta or page.cta_label or page.cta_heading }} &rarr;</a>
+        {% if page.kb_ghost %}<a href="{{ page.kb_ghost.href }}" class="kb-ghost" data-cta="solution-benefits-see"><span class="kb-ghost-ic"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>{{ page.kb_ghost.text }}</a>{% endif %}
+      </div>
       {% if page.kb_assure %}
       <ul class="kb-assure">
-        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h3"/></svg>{{ page.kb_assure[0] }}</li>
-        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['spark']|safe }}</svg>{{ page.kb_assure[1] }}</li>
-        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ kb_icons['shield']|safe }}</svg>{{ page.kb_assure[2] }}</li>
+        {% for a in page.kb_assure %}{% if a is string %}{% set ai = ['card', 'bolt', 'shield'][loop.index0 % 3] %}{% set at = a %}{% else %}{% set ai = a.icon %}{% set at = a.text %}{% endif %}
+        <li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I[ai]|safe }}</svg>{{ at }}</li>{% endfor %}
       </ul>
       {% endif %}
+      {% if page.kb_note %}<p class="kb-note"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ I['ok']|safe }}</svg>{{ page.kb_note }}</p>{% endif %}
       <details class="sp-readmore sp-readmore-kb">
         <summary>Learn more</summary>
         <div class="sp-readmore-body">
           {% if page.why_long %}<p><strong>{{ page.why_long }}</strong></p>{% endif %}
+          {% if page.why_heading and not page.why_long %}<p><strong>{{ page.why_heading }}</strong></p>{% endif %}
           {% for point in page.points %}
           <h3>{{ point.title }}</h3>
           <p>{{ point.body }}</p>
@@ -271,62 +363,81 @@
   </section>
   {% endif %}
 
+  {# "Choose what fits": three option cards on every solution page, in two styles (choose_ui.style):
+       cards (the default)   an icon tile, name, one line, chips and a button on each card; one card can be highlighted with a badge
+       radio                 the same three cards as a pick-one group, with a ticked list, and one button underneath
+     A page can give its own short wording in choose_ui; a page without it gets cards built from its "choose" list ("Best for" as the line),
+     so every page has the same look. The full text of every option stays under "Learn more". #}
   {% if choose %}
-  {% set cu = page.choose_ui %}
-  {% set ch_icons = {
-    'spark': '<path d="M13.2 2.5 5 13.2h5.6L9.8 21.5 19 10.2h-5.7z"/>',
-    'review': '<circle cx="9.5" cy="8" r="3.6"/><path d="M3.5 20c0-3.6 2.7-6 6-6 1.3 0 2.4.3 3.4.9"/><path d="m14.5 18 2.2 2.2 4-4.4"/>',
-    'mic': '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
-    'clock': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-    'globe': '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/>',
-    'target': '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
-    'wave': '<path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/>',
-    'star': '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'} %}
-  <section class="m-section{{ ' ch' if cu else '' }}" id="choose">
+  {% set ch_icons = I %}
+  {% set _ = ch_icons.update({'review': '<circle cx="9.5" cy="8" r="3.6"/><path d="M3.5 20c0-3.6 2.7-6 6-6 1.3 0 2.4.3 3.4.9"/><path d="m14.5 18 2.2 2.2 4-4.4"/>', 'spark': I['bolt'], 'star': '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>', 'doc': '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>'}) %}
+  {% if page.choose_ui %}
+    {% set cu = page.choose_ui %}
+  {% else %}
+    {% set auto_cards = [] %}
+    {% for c in choose %}{% set _ = auto_cards.append({'icon': ['spark', 'review', 'mic'][loop.index0 % 3], 'tone': ['blue', 'violet', 'green'][loop.index0 % 3], 'name': c.name, 'line': c.best}) %}{% endfor %}
+    {% set cu = {'pill': page.kicker, 'heading': 'Choose what fits', 'sub': 'Every job is different. Pick the option that fits yours.', 'cta': 'Get started', 'cards': auto_cards} %}
+  {% endif %}
+  {% set chs = cu.style or 'cards' %}
+  <section class="m-section chz ch-theme-{{ cu.theme or 'violet' }}" id="choose">
     <div class="m-inner">
-      {% if cu %}
-      <span class="ch-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons['globe']|safe }}</svg>{{ cu.pill }}</span>
-      <h2 class="m-h2">{{ cu.heading }}</h2>
+      <span class="ch-pill"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons[cu.pill_icon or 'globe']|safe }}</svg>{{ cu.pill }}</span>
+      <h2 class="m-h2">{% if cu.accent and cu.accent in cu.heading %}{{ cu.heading.split(cu.accent)[0] }}<span class="ch-accent">{{ cu.accent }}</span>{{ cu.heading.split(cu.accent)[1] }}{% else %}{{ cu.heading }}{% endif %}</h2>
       <p class="kb-sub">{{ cu.sub }}</p>
-      <div class="ch-grid">
+      {% if chs == 'radio' %}<span class="ch-bar" aria-hidden="true"></span>{% endif %}
+      <div class="ch-grid ch-{{ chs }}{{ ' ch-has-top' if cu.badge_pos == 'top' else '' }}"{% if chs == 'radio' %} role="radiogroup" aria-label="{{ cu.pill }}"{% endif %}>
         {% for c in cu.cards %}
-        <article class="ch-card ch-{{ c.tone }}{{ ' is-featured' if c.featured else '' }}">
+        {% if chs == 'radio' %}<label{% else %}<article{% endif %} class="ch-card ch-{{ c.tone }}{{ ' is-featured' if c.featured else '' }}">
           {% if c.badge %}<span class="ch-badge"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true">{{ ch_icons['star']|safe }}</svg>{{ c.badge }}</span>{% endif %}
+          {% if chs == 'radio' %}<input type="radio" name="ch-pick" value="{{ loop.index0 }}"{{ ' checked' if c.featured else '' }}><span class="ch-dot" aria-hidden="true"></span>{% endif %}
           <span class="ch-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{{ ch_icons[c.icon]|safe }}</svg></span>
           <h3>{{ c.name }}</h3>
           <p>{{ c.line }}</p>
+          {% if c.chips %}
           <ul class="ch-chips">
-            {% for chip in c.chips %}<li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons[chip.icon]|safe }}</svg>{{ chip.text }}</li>{% endfor %}
+            {% for chip in c.chips %}<li><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="{{ '2.4' if chip.icon == 'check' else '1.8' }}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons[chip.icon]|safe }}</svg>{{ chip.text }}</li>{% endfor %}
           </ul>
-          <a href="/login?mode=signup" class="ch-btn" data-cta="solution-choose">{{ cu.cta }} <span aria-hidden="true">&rarr;</span></a>
-        </article>
+          {% endif %}
+          {% if chs != 'radio' %}<a href="{{ c.href or '/login?mode=signup' }}" class="ch-btn" data-cta="solution-choose">{{ c.btn or cu.cta }} <span aria-hidden="true">&rarr;</span></a>{% endif %}
+        {% if chs == 'radio' %}</label>{% else %}</article>{% endif %}
         {% endfor %}
       </div>
+      {% if cu.demo %}
+      <div class="ch-actions">
+        <a href="{{ cu.demo.href }}" class="ch-demo" data-cta="solution-demo"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>{{ cu.demo.text }}{% if chs == 'radio' %} <span aria-hidden="true">&rarr;</span>{% endif %}</a>
+        <span class="ch-links">
+          <a href="/#how"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m10.5 8.5 5 3.5-5 3.5z"/></svg><u>How it works</u></a>
+          <a href="/#pricing"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons['tag']|safe }}</svg><u>Plans &amp; pricing</u></a>
+        </span>
+      </div>
+      {% endif %}
+      {% if cu.facts %}
+      <ul class="kb-assure ch-facts">
+        {% for f in cu.facts %}<li><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">{{ ch_icons[f.icon]|safe }}</svg>{{ f.text }}</li>{% endfor %}
+      </ul>
+      {% endif %}
       <details class="sp-readmore sp-readmore-ch">
         <summary>Learn more</summary>
         <div class="sp-readmore-body">
-      {% endif %}
-      <h2 class="m-h2">Choose what fits</h2>
-      <p class="m-lede">Every job is different. Here is what each option gets you, so you can pick the one that fits yours.</p>
-      <div class="m-choose-grid">
-        {% for c in choose %}
-        <div class="m-choose-card">
-          <h3>{{ c.name }}</h3>
-          <p class="m-choose-best"><strong>Best for:</strong> {{ c.best }}</p>
-          <p>{{ c['get'] }}</p>
-          {% if c.guide %}<a class="m-choose-guide" href="/blog/{{ c.guide.slug }}">Read the guide: {{ c.guide.title }} &rarr;</a>{% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      <p class="m-choose-links">
-        {% if page.demo %}<a class="btn secondary" href="/try?use={{ page.demo }}" data-cta="solution-demo">Hear and read a live demo</a>{% endif %}
-        <a href="/human-review">How human review works</a>
-        <a href="/#pricing">Plans and pricing</a>
-      </p>
-      {% if cu %}
+          <h2 class="m-h2">Choose what fits</h2>
+          <p class="m-lede">Every job is different. Here is what each option gets you, so you can pick the one that fits yours.</p>
+          <div class="m-choose-grid">
+            {% for c in choose %}
+            <div class="m-choose-card">
+              <h3>{{ c.name }}</h3>
+              <p class="m-choose-best"><strong>Best for:</strong> {{ c.best }}</p>
+              <p>{{ c['get'] }}</p>
+              {% if c.guide %}<a class="m-choose-guide" href="/blog/{{ c.guide.slug }}">Read the guide: {{ c.guide.title }} &rarr;</a>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          <p class="m-choose-links">
+            {% if page.demo %}<a class="btn secondary" href="/try?use={{ page.demo }}" data-cta="solution-demo-more">Hear and read a live demo</a>{% endif %}
+            <a href="/human-review">How human review works</a>
+            <a href="/#pricing">Plans and pricing</a>
+          </p>
         </div>
       </details>
-      {% endif %}
     </div>
   </section>
   {% endif %}
