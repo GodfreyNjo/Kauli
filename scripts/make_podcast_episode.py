@@ -1,4 +1,4 @@
-"""Turn a podcast script (marketing/podcast/episode-01-script.md) into a finished episode, all on ElevenLabs:
+"""Turn a podcast script (marketing/podcast/episode-NN-script.md, pick it with --episode NN) into a finished episode, all on ElevenLabs:
 
     voices   ElevenLabs Text to Dialogue (Eleven v3): AMARA and DAN each get their own voice, one request per chunk of a section
     music    ElevenLabs Music: the theme, a quiet bed that sits under the voices, and the outro (instrumental)
@@ -28,10 +28,27 @@ import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SHOW = ROOT / "marketing" / "podcast"
+SHARED = SHOW / "build"                          # the theme, bed, outro and sound effects: made once and used by every episode
 SCRIPT = SHOW / "episode-01-script.md"
-BUILD = SHOW / "build"
+BUILD = SHARED
 FINAL = SHOW / "kauli-guides-ep01.mp3"
+EPISODE = 1
 API = "https://api.elevenlabs.io"
+
+
+def configure(episode: int, mock: bool) -> None:
+    """Point the paths at one episode. Episode 1 keeps its files in build/; later episodes get build/epNN/. A --mock run builds in its own
+    folder, so placeholder audio can never be mistaken for real voices by a later run."""
+    global SCRIPT, BUILD, FINAL, EPISODE
+    EPISODE = episode
+    SCRIPT = SHOW / f"episode-{episode:02d}-script.md"
+    BUILD = SHARED if episode == 1 and not mock else SHARED / f"ep{episode:02d}{'-mock' if mock else ''}"
+    FINAL = BUILD / "mock.mp3" if mock else SHOW / f"kauli-guides-ep{episode:02d}.mp3"
+
+
+def episode_title() -> str:
+    m = re.search(r"^\*\*Title:\*\* (.+)$", SCRIPT.read_text(encoding="utf-8"), re.M)
+    return m.group(1).strip() if m else f"Kauli Guides, Episode {EPISODE}"
 
 VOICES = {"AMARA": "cgSgspJ2msm6clMCkdW9",      # Jessica - playful, bright, warm
           "DAN": "iP95p4xoKVk53GoZ742B"}         # Chris - charming, down-to-earth
@@ -153,9 +170,13 @@ def dialogue(path: pathlib.Path, lines: list[tuple[str, str]], key: str, mock: b
 
 
 def music(name: str, key: str, mock: bool) -> pathlib.Path:
-    path = BUILD / f"music-{name}.mp3"
+    path = SHARED / f"music-{name}.mp3"              # shared by every episode: the show sounds the same each time
     if path.exists():
         return path
+    if mock:
+        path = BUILD / f"music-{name}.mp3"           # placeholder audio stays in the mock folder
+        if path.exists():
+            return path
     prompt, ms = MUSIC[name]
     if mock:
         tone(path, ms / 1000, {"theme": 330, "bed": 110, "outro": 392}[name])
@@ -165,9 +186,13 @@ def music(name: str, key: str, mock: bool) -> pathlib.Path:
 
 
 def effect(name: str, key: str, mock: bool) -> pathlib.Path:
-    path = BUILD / f"sfx-{name}.mp3"
+    path = SHARED / f"sfx-{name}.mp3"
     if path.exists():
         return path
+    if mock:
+        path = BUILD / f"sfx-{name}.mp3"
+        if path.exists():
+            return path
     text, seconds = EFFECTS[name]
     if mock:
         tone(path, seconds, 880)
@@ -274,8 +299,8 @@ def build(key: str, mock: bool) -> None:
     join(finals, full, gap=0.0)
     FINAL.parent.mkdir(parents=True, exist_ok=True)
     ff("-i", str(full), "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-ar", "44100", "-ac", "2", "-b:a", "128k",
-       "-metadata", "title=Why Your Transcript Is Wrong, and How to Fix It for Good", "-metadata", "artist=Kauli", "-metadata", "album=Kauli Guides",
-       "-metadata", "track=1", "-metadata", "comment=Voiced with AI voices", str(FINAL))
+       "-metadata", f"title={episode_title()}", "-metadata", "artist=Kauli", "-metadata", "album=Kauli Guides",
+       "-metadata", f"track={EPISODE}", "-metadata", "comment=Voiced with AI voices", str(FINAL))
     seconds = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(FINAL)],
                                    capture_output=True, text=True).stdout.strip() or 0)
     print(f"Done: {FINAL}  ({int(seconds // 60)}:{int(seconds % 60):02d}, {FINAL.stat().st_size / 1_000_000:.1f} MB)")
@@ -286,7 +311,9 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--probe", action="store_true")
     ap.add_argument("--mock", action="store_true")
+    ap.add_argument("--episode", type=int, default=1, help="which episode-NN-script.md to make (default 1)")
     args = ap.parse_args()
+    configure(args.episode, args.mock)
     secs = sections()
     voiced = sum(len(t) for lines in secs.values() for _, t in lines)
     requests = sum(len(chunks(v)) for v in secs.values())
