@@ -1021,6 +1021,23 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
       if (submitBtn) submitBtn.disabled = false;
     }
 
+    // Asks the server what this one file will cost (it only needs the length the browser has already read, never the file). Resolves to the
+    // pay-first page's address when payment is due before upload, otherwise to null: the order carries on and uploads as before.
+    // Any trouble asking also resolves to null, so a problem here can never stop an order.
+    function askPrepay() {
+      return new Promise((resolve) => {
+        if (fileQueue.length !== 1 || fileDurationMinutes == null) { resolve(null); return; }
+        const fd = new FormData(form);
+        fd.delete("audio"); fd.delete("style_guide");
+        fd.set("minutes", String(fileDurationMinutes));
+        fd.set("name", fileQueue[0].name);
+        fetch("/client/orders/quote", { method: "POST", body: fd, credentials: "same-origin" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => resolve(d && d.can_prepay && d.needs_payment && d.prepay_url ? d.prepay_url : null))
+          .catch(() => resolve(null));
+      });
+    }
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       const youtubeActive = $('#source-switch [data-source="youtube"]').classList.contains("active");
@@ -1037,7 +1054,12 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
       if (usingFile && fileQueue.length > 1) {
         submitBatch();
       } else if (usingFile) {
-        uploadFileDirectToR2(fileQueue[0], formData);
+        // Pay first, then upload: when this order is going to need payment, the customer pays before a single byte of the file goes up.
+        progressLabel.textContent = kT("Checking your price");
+        askPrepay().then((payUrl) => {
+          if (payUrl) { kpUp({ active: false, error: null }); window.location.href = payUrl; return; }
+          uploadFileDirectToR2(fileQueue[0], formData);
+        });
       } else if (resumedUploadKey) {
         // Already safely on R2 from before a refresh - skip straight to
         // finalize, no re-upload.
@@ -1075,14 +1097,30 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
       set: (o) => { pendingStep = o && o.step; applyPendingStep(); },
     };
   }
+  // Back from paying first (?prepaid=1): the file was waiting in the browser, and now goes up on its own. If the browser no longer has it,
+  // the customer is told to choose it again, and that nothing more will be charged.
+  function cameBackFromPaying() { return new URLSearchParams(window.location.search).get("prepaid") === "1"; }
+  function prepaidBanner(text) {
+    const form = $("#order-form");
+    if (!form) return;
+    let p = $("#prepaid-banner");
+    if (!p) { p = document.createElement("p"); p.id = "prepaid-banner"; p.className = "ok"; p.setAttribute("role", "status"); form.insertBefore(p, form.firstChild); }
+    p.textContent = text;
+  }
+  function continueAfterPaying() {
+    prepaidBanner(kT("Payment received. Uploading your file now."));
+    showStep(TOTAL_STEPS);
+    setTimeout(() => { const b = $("#wizard-submit"); if (b && !b.disabled) b.click(); }, 1200);
+  }
   function restoreStagedFiles() {
-    if (!window.kpFiles || (window.kpUploads && window.kpUploads.active)) return;
+    if (!window.kpFiles || (window.kpUploads && window.kpUploads.active)) { if (cameBackFromPaying()) prepaidBanner(kT("Payment received. Choose your file and press Submit. You will not be charged again.")); return; }
     window.kpFiles.list("order").then((files) => {
-      if (!files.length || fileQueue.length) return;
+      if (!files.length || fileQueue.length) { if (cameBackFromPaying() && !fileQueue.length) prepaidBanner(kT("Payment received. Choose your file and press Submit. You will not be charged again.")); return; }
       addFiles(files, true);
       const note = $("#file-queue-note");
       if (note) note.textContent = files.length > 1 ? kT("Your files are still here from before. Nothing is uploaded until you press Submit.") : kT("Your file is still here from before. Nothing is uploaded until you press Submit.");
       applyPendingStep();
+      if (cameBackFromPaying() && files.length === 1) continueAfterPaying();
     });
   }
 

@@ -1626,6 +1626,12 @@ def init_db() -> None:
            WHERE id NOT IN (SELECT user_id FROM subscriptions)""",
         (time.time(),),
     )
+    # Anyone who has made a real payment is a paying customer: downloads and editing are open on every one of their orders, including the ones
+    # processed with free minutes (which used to stay locked until each was paid for). Runs once.
+    if not conn.execute("SELECT 1 FROM app_flags WHERE key = 'migrated_payers_unlocked_2026_11'").fetchone():
+        conn.execute("UPDATE orders SET is_free_preview = 0 WHERE is_free_preview = 1 AND client_id IN "
+                     "(SELECT DISTINCT user_id FROM payments WHERE status = 'completed' AND amount_usd > 0)")
+        conn.execute("INSERT INTO app_flags (key, value, updated_by, updated_at) VALUES ('migrated_payers_unlocked_2026_11', '1', 'system', ?)", (time.time(),))
     conn.commit()
     conn.close()
 
@@ -3524,6 +3530,24 @@ def set_order_review_tier(order_id: str, review_tier: str) -> None:
     conn.execute("UPDATE orders SET review_tier = ? WHERE id = ?", (review_tier, order_id))
     conn.commit()
     conn.close()
+
+
+def client_has_paid(client_id: str) -> bool:
+    """True once this account has made a real payment of any kind (an order, a plan, or a wallet top-up). Paying customers can download and edit."""
+    conn = get_conn()
+    row = conn.execute("SELECT 1 FROM payments WHERE user_id = ? AND status = 'completed' AND amount_usd > 0 LIMIT 1", (client_id,)).fetchone()
+    conn.close()
+    return row is not None
+
+
+def clear_free_previews(client_id: str) -> int:
+    """Opens every order of this account that was held as a free preview. Returns how many were opened."""
+    conn = get_conn()
+    cur = conn.execute("UPDATE orders SET is_free_preview = 0 WHERE client_id = ? AND is_free_preview = 1", (client_id,))
+    conn.commit()
+    n = cur.rowcount
+    conn.close()
+    return n
 
 
 def set_order_free_preview(order_id: str, is_free_preview: bool) -> None:

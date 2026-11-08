@@ -6604,7 +6604,8 @@ def create_order(
     # total_usd > 0, but spelled out here too for clarity.
     cost["human_minutes_included"] = round(human_included, 2)
     is_free_preview = ((cost["free_minutes_applied"] > 0 or bool(cost.get("first_order_courtesy_usd")))
-                        and cost["credits_applied"] <= 0 and review_tier == "ai" and cost["total_usd"] <= 0 and not is_rush)
+                        and cost["credits_applied"] <= 0 and review_tier == "ai" and cost["total_usd"] <= 0 and not is_rush
+                        and not db.client_has_paid(user["client_scope_id"]))      # a paying customer's free-minute orders open for download and editing too
 
     # Free-allowance orders (the free plan, fully covered, Instant AI) go to the low-cost providers; everyone who pays keeps Transkriptor.
     free_covered = (plan == "free" and review_tier == "ai" and cost["free_minutes_applied"] > 0
@@ -6705,11 +6706,14 @@ def create_order(
     ga_events.send_event(ga_events.client_id_from_request(request), "order_submitted", {
         "service_level": service_level, "is_rush": is_rush, "value": round(cost["total_usd"], 2),
     })
-    if cost["free_minutes_applied"] > 0 and not (user["is_guest"] if "is_guest" in user.keys() else 0):
-        try:
-            usage_prompts.check(user["client_scope_id"], str(request.base_url), _queue_and_send)
-        except Exception as exc:  # noqa: BLE001 - a kind word must never stop an order
-            api_log.warning("usage prompt failed", extra={"error": str(exc)})
+    def _free_minutes_notice() -> None:
+        """The "you have used half of your free minutes" notice, sent only once free minutes have really been used on work that has started.
+        An order that is still waiting for payment has not started: nothing has been processed, so nobody is told their free minutes are gone."""
+        if cost["free_minutes_applied"] > 0 and not (user["is_guest"] if "is_guest" in user.keys() else 0):
+            try:
+                usage_prompts.check(user["client_scope_id"], str(request.base_url), _queue_and_send)
+            except Exception as exc:  # noqa: BLE001 - a kind word must never stop an order
+                api_log.warning("usage prompt failed", extra={"error": str(exc)})
 
     if cost["total_usd"] <= 0:
         # Fully covered by this month's free allowance - no payment step,
@@ -6721,6 +6725,7 @@ def create_order(
             db.set_order_deadlines(order_id, deadlines["start_at"], deadlines["internal_deadline_at"],
                                     deadlines["deadline_at"])
         worker.submit_job(order_id)
+        _free_minutes_notice()
         return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
 
     # Real cost beyond the free allowance - hold the order for payment.
@@ -7512,6 +7517,128 @@ def buy_wallet_credits(request: Request, package: str = Form(""), provider: str 
                       payment_kind=f"credits_topup:{pkg['credits']}")
 
 
+# ------------------------------------------------ pay first, then upload ----
+# A large Instant AI order that is going to need payment (more minutes than the free minutes cover) used to be uploaded in full first (hundreds
+# of megabytes, stored on our server) and only then asked for money. Now the order form reads the recording's length in the browser, asks the
+# server what it will cost, and, when payment is due, takes the customer to pay first. The payment goes into their wallet as prepaid credits for
+# exactly that amount; when they come back the file is uploaded and the order uses those credits, so it starts straight away. Nothing is uploaded
+# until the money has arrived. Orders that need no payment (inside the free minutes) upload and process as before, and so do orders with add-ons,
+# human review, dubbing or rush, whose price has parts that credits do not cover.
+PREPAY_MIN_USD = 1.00            # the smallest card payment worth taking; any extra stays in the wallet for the next order
+
+
+def _prepay_quote(user, minutes: float, service_level: str, review_tier: str, source_lang: str, target_lang: str,
+                  has_addons: bool = False, rush: bool = False) -> dict:
+    """What an order would cost right now, worked out the way create_order() will, but without reserving anything and without the file.
+    can_prepay is False for anything whose price has parts the wallet does not cover (add-ons, rush, human review, dubbing)."""
+    client_id = user["client_scope_id"]
+    if user["client_scope_id"] != user["id"]:
+        return {"can_prepay": False, "needs_payment": None}                      # only the account owner pays; a teammate's order is paid on the order page
+    if target_lang in ("", "same"):
+        target_lang = source_lang
+    if service_level == "transcribe" and target_lang != source_lang:
+        service_level = "translate"
+    eligible = (minutes > 0 and review_tier == "ai" and service_level in ("transcribe", "translate") and not has_addons and not rush
+                and source_lang in LANGUAGE_NAMES and source_lang not in MANUAL_TRANSCRIPTION_LANGUAGES and target_lang in LANGUAGE_NAMES)
+    if not eligible:
+        return {"can_prepay": False, "needs_payment": None}
+    subscription = db.get_subscription_current(client_id)
+    plan = billing.effective_plan(user, subscription)
+    free_available = 0.0
+    if billing.allowance_covers(plan, service_level, review_tier):
+        cap = billing.plan_included_minutes(plan) + ((subscription["bonus_minutes"] or 0.0) + billing._reward_minutes(subscription) if subscription else 0.0)
+        used = (subscription["minutes_used_this_period"] or 0.0) if subscription else 0.0
+        free_available = max(0.0, cap - used)
+    cost = billing.order_cost_usd(minutes, service_level, plan, min(minutes, free_available), addons=[],
+                                   wallet_credits_available=db.wallet_credits_remaining(client_id), rush=False,
+                                   market=db.get_billing_market(client_id), review_tier=review_tier)
+    # A new customer's first Instant AI order is processed free (see create_order); the quote must agree, or we would ask for money
+    # that the order itself would never ask for.
+    if (cost["total_usd"] > 0 and minutes <= min(billing.FIRST_ORDER_FREE_MAX_MINUTES, onboarding.first_order_cap(db.get_user(client_id)))
+            and not _plan_chosen(client_id) and not db.list_orders_for_client(client_id)):
+        cost = {**cost, "first_order_courtesy_usd": cost["total_usd"], "total_usd": 0.0}
+    needs = cost["total_usd"] > 0.004
+    charge = round(max(cost["total_usd"], PREPAY_MIN_USD), 2) if needs else 0.0
+    return {"can_prepay": True, "needs_payment": needs, "total_usd": round(cost["total_usd"], 2), "charge_usd": charge, "minutes": round(minutes, 2),
+            "credits": round(charge * billing.CREDITS_PER_DOLLAR, 2), "cost": cost, "explain": _price_explanation(cost)["sentence"],
+            "service_level": service_level, "target_lang": target_lang}
+
+
+def _prepay_params(source) -> dict:
+    """The few choices that decide the price, from a form or a query string."""
+    def get(key, default=""):
+        value = source.get(key, default)
+        return value if isinstance(value, str) else str(value)
+    try:
+        minutes = max(0.0, min(float(get("minutes", "0") or 0), 24 * 60.0))
+    except ValueError:
+        minutes = 0.0
+    return {"minutes": minutes, "service_level": get("service_level", "transcribe"), "review_tier": get("review_tier", "ai") or "ai",
+            "source_lang": get("source_lang", "sw"), "target_lang": get("target_lang", ""), "name": get("name", "")[:120],
+            "has_addons": bool(get("addon_video_deliverables") or get("addon_human_voice_over") or get("addon_premium_voice") or get("addon_audio_cleanup")),
+            "rush": bool(get("rush"))}
+
+
+@app.post("/client/orders/quote")
+async def client_order_quote(request: Request):
+    """What this order will cost, asked by the order form before anything is uploaded. Read-only."""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    params = _prepay_params(await request.form())
+    q = _prepay_quote(user, params["minutes"], params["service_level"], params["review_tier"], params["source_lang"], params["target_lang"],
+                      params["has_addons"], params["rush"])
+    out = {k: v for k, v in q.items() if k != "cost"}
+    if q.get("can_prepay") and q.get("needs_payment"):
+        request.session["prepay"] = {k: params[k] for k in ("minutes", "service_level", "review_tier", "source_lang", "target_lang", "name")}
+        out["prepay_url"] = "/client/pay-first"
+    return out
+
+
+def _prepay_context(request: Request, user):
+    saved = request.session.get("prepay") or {}
+    params = _prepay_params(saved)
+    q = _prepay_quote(user, params["minutes"], params["service_level"], params["review_tier"], params["source_lang"], params["target_lang"])
+    return params, q
+
+
+@app.get("/client/pay-first", response_class=HTMLResponse)
+def client_prepay_page(request: Request, notice: str | None = None, error: str | None = None):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    params, q = _prepay_context(request, user)
+    if not q.get("can_prepay") or not q.get("needs_payment"):
+        return RedirectResponse("/client?prepaid=1" if q.get("can_prepay") else "/client", status_code=303)      # nothing to pay first: carry on with the order
+    return templates.TemplateResponse(request, "client_prepay.html", {
+        "user": user, "q": q, "params": params, "explanation": _price_explanation(q["cost"]), "notice": notice, "error": error,
+        "local_hint": _local_charge_hint(request, user, q["charge_usd"]),
+        "paystack_configured": billing.paystack_configured(), "mpesa_live": billing.mpesa_live(),
+    })
+
+
+@app.post("/client/pay-first")
+def client_prepay_checkout(request: Request, provider: str = Form(...), phone: str = Form("")):
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return RedirectResponse("/login")
+    params, q = _prepay_context(request, user)
+    if not q.get("can_prepay") or not q.get("needs_payment"):
+        return RedirectResponse("/client?prepaid=1" if q.get("can_prepay") else "/client", status_code=303)
+    return _checkout(request, user, provider, "wallet", q["charge_usd"], None, phone, "/client?prepaid=1", "/client/pay-first",
+                      payment_kind=f"credits_topup:{q['credits']}", return_to="/client?prepaid=1")
+
+
+@app.get("/client/pay-first/status")
+def client_prepay_status(request: Request):
+    """Polled by the pay-first page while an M-Pesa prompt is open: has the money arrived (do the credits now cover the order)?"""
+    user = current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Not signed in."}, status_code=401)
+    params, q = _prepay_context(request, user)
+    return {"covered": bool(q.get("can_prepay") and not q.get("needs_payment"))}
+
+
 def _order_rate_per_min(order) -> float:
     """What this order's per-minute rate actually was - the rate frozen at
     creation (cost_breakdown_json), not today's price card, so a later price
@@ -7567,6 +7694,43 @@ def _order_receipt_line_items(order) -> list[dict] | None:
     return lines
 
 
+def _local_charge_hint(request: Request, user, amount_usd: float) -> str | None:
+    """When the card checkout will charge in Kenyan shillings (Kenya, with the shilling price card), say so on our own page before the customer
+    leaves for Paystack, so the amount there is no surprise next to the dollar price here. None when the charge is in dollars."""
+    try:
+        if billing.paystack_currency_for_market(db.get_billing_market(user["client_scope_id"]), request.headers.get("cf-ipcountry")) != "KES":
+            return None
+        kes, _source = billing.usd_to_kes(amount_usd)
+        return f"At checkout this is charged in Kenyan shillings: about KES {kes:,.0f} at today's rate (${amount_usd:.2f})."
+    except Exception:  # noqa: BLE001 - a hint must never stop a page from opening
+        return None
+
+
+def _price_explanation(cost: dict) -> dict:
+    """The price in plain words, from billing.order_cost_usd's breakdown: the length, what the free minutes took off, what is left to pay for,
+    the rate, and the total. {"sentence": "191.8 min - 30.0 free = 161.8 min x $0.12 = $19.41", "lines": [(label, amount-or-None), ...]}."""
+    minutes = float(cost.get("minutes") or 0)
+    free = float(cost.get("free_minutes_applied") or 0)
+    billable = float(cost.get("billable_minutes") if cost.get("billable_minutes") is not None else minutes - free)
+    rate = float(cost.get("rate_per_min") or 0)
+    gross = float(cost.get("gross_usd") or 0)
+    lines = [(f"Length of your recording: {minutes:.1f} minutes", None)]
+    if free > 0:
+        lines.append((f"Your free minutes cover {free:.1f} of them", None))
+    lines.append((f"{billable:.1f} minutes to pay for, at ${rate:.2f} per minute", gross))
+    if cost.get("discount_usd"):
+        lines.append((f"Plan discount ({cost.get('discount_pct', 0) * 100:.0f}%)", -float(cost["discount_usd"])))
+    if cost.get("credits_applied_usd"):
+        lines.append((f"Prepaid credits used ({float(cost.get('credits_applied') or 0):.0f})", -float(cost["credits_applied_usd"])))
+    for addon in cost.get("addons") or []:
+        lines.append((addon.get("name", "Add-on"), float(addon.get("cost_usd") or 0)))
+    if cost.get("rush_surcharge_usd"):
+        lines.append(("Rush processing", float(cost["rush_surcharge_usd"])))
+    total = float(cost.get("total_usd") or 0)
+    sentence = f"{minutes:.1f} min" + (f" - {free:.1f} free" if free > 0 else "") + f" = {billable:.1f} min x ${rate:.2f} = ${total:.2f}"
+    return {"sentence": sentence, "lines": lines, "free": free, "billable": billable, "rate": rate, "total": total}
+
+
 def _activate_payment(payment, provider_reference: str, base_url: str = "") -> bool:
     """The one place a confirmed payment turns into something real -
     either an order gets released to the worker (usage charge) or a plan
@@ -7585,7 +7749,10 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
     if not payment["order_id"]:
         dunning.resolve(payment["user_id"], "paid")        # a plan payment went through: any failed-payment recovery is over
     # Any real payment confirms the card and counts as choosing a plan.
-    db.set_plan_chosen(db.get_team_owner_for_member(payment["user_id"]) or payment["user_id"])
+    owner_id = db.get_team_owner_for_member(payment["user_id"]) or payment["user_id"]
+    db.set_plan_chosen(owner_id)
+    if (payment["amount_usd"] or 0) > 0:
+        db.clear_free_previews(owner_id)          # a paying customer: downloads and editing open on every order, free-minute ones included
     payer = db.get_user(payment["user_id"])
     if payer and payer["onboarding_status"] != "activated":
         # First real money from this account, of any kind (order, plan,
@@ -7649,6 +7816,13 @@ def _activate_payment(payment, provider_reference: str, base_url: str = "") -> b
                                         deadlines["internal_deadline_at"], deadlines["deadline_at"])
             order = db.get_order(payment["order_id"])  # re-fetch with the deadline fields now set
             worker.submit_job(payment["order_id"])
+            # The order has really started now: if free minutes were used on it, this is the first moment the customer is told how many are left.
+            try:
+                breakdown = json.loads(order["cost_breakdown_json"]) if order["cost_breakdown_json"] else {}
+                if float(breakdown.get("free_minutes_applied") or 0) > 0:
+                    usage_prompts.check(order["client_id"], base_url or "", _queue_and_send)
+            except Exception as exc:  # noqa: BLE001 - a kind word must never stop an order
+                api_log.warning("usage prompt failed", extra={"error": str(exc)})
         level = billing.SERVICE_LEVELS.get(order["service_level"]) if order else None
         description = (f"{level['name']} - {order['original_filename']}" if order and level
                         else f"Order {payment['order_id']} - {payment['plan']} plan")
@@ -7755,7 +7929,7 @@ def _note_payment_failure(client_id: str, order_id: str | None, provider: str, r
 
 def _checkout(request: Request, user, provider: str, plan: str, amount_usd: float,
               order_id: str | None, phone: str, success_redirect: str, back_url: str,
-              payment_kind: str = "order"):
+              payment_kind: str = "order", return_to: str | None = None):
     """Shared by the plan-purchase and per-order checkout routes - same
     three providers, same idempotent-payment-record pattern either way.
     payment_kind rides along in meta so _activate_payment knows what
@@ -7796,7 +7970,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         if not billing.paystack_configured():
             return RedirectResponse(f"{back_url}?error=Paystack+isn%27t+configured+yet.", status_code=303)
         db.create_payment(payment_id, user["client_scope_id"], plan, amount_usd, None, "USD", "paystack", order_id=order_id,
-                           meta=json.dumps({"kind": payment_kind, "ga_client_id": ga_client_id}))
+                           meta=json.dumps({"kind": payment_kind, "ga_client_id": ga_client_id, "return_to": return_to}))
         callback_url = str(request.base_url).rstrip("/") + f"/billing/callback/paystack?payment_id={payment_id}"
         # A plan purchase (no order) on a plan that has a Paystack plan code
         # configured becomes a RECURRING subscription; anything else (orders,
@@ -7819,7 +7993,7 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
         # page for a given reference stays open well past our own 15-
         # minute pending window, so re-using it is safe and correct.
         db.update_payment_meta(payment_id, json.dumps({
-            "kind": payment_kind, "authorization_url": result["authorization_url"], "ga_client_id": ga_client_id,
+            "kind": payment_kind, "authorization_url": result["authorization_url"], "ga_client_id": ga_client_id, "return_to": return_to,
         }))
         return RedirectResponse(result["authorization_url"], status_code=303)
 
@@ -8000,8 +8174,13 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
             db.PENDING_PAYMENT_MAX_AGE_S - (time.time() - existing_payment["created_at"])))
         if existing_payment["provider"] == "paystack" and existing_payment["meta"]:
             resume_url = json.loads(existing_payment["meta"]).get("authorization_url")
+    try:
+        explanation = _price_explanation(json.loads(order["cost_breakdown_json"])) if order["cost_breakdown_json"] else None
+    except (ValueError, TypeError):
+        explanation = None
     return templates.TemplateResponse(request, "order_pay.html", {
-        "user": user, "order": order, "notice": notice, "error": error,
+        "user": user, "order": order, "notice": notice, "error": error, "explanation": explanation,
+        "local_hint": _local_charge_hint(request, user, float(order["cost_usd"] or 0)),
         "pending_retry_after_s": pending_retry_after_s, "resume_url": resume_url,
         "paystack_configured": billing.paystack_configured(),
         "mpesa_configured": billing.mpesa_configured(),
@@ -8101,6 +8280,13 @@ def paystack_callback(request: Request, payment_id: str, reference: str | None =
     result = billing.paystack_verify(payment_id)
     payment = db.get_payment(payment_id)
     dest = f"/client/orders/{payment['order_id']}" if payment and payment["order_id"] else "/client/billing"
+    try:
+        pay_meta = json.loads(payment["meta"] or "{}") if payment else {}
+    except (ValueError, TypeError):
+        pay_meta = {}
+    return_to = pay_meta.get("return_to") if isinstance(pay_meta.get("return_to"), str) else None
+    if return_to and return_to.startswith("/") and not return_to.startswith("//"):
+        dest = return_to                                      # paid before uploading: back to the order form, where the file goes up next
     if result.get("status") == "success" and payment:
         _activate_payment(payment, result.get("reference", payment_id), base_url=str(request.base_url))
         try:
@@ -8111,7 +8297,9 @@ def paystack_callback(request: Request, payment_id: str, reference: str | None =
             latest = next(iter(db.list_orders_for_client(payment["user_id"])), None)
             return RedirectResponse((f"/client/orders/{latest['id']}" if latest else "/client/home")
                                     + "?notice=You%27re+all+set.+Everything+is+unlocked%2C+and+your+%241+is+in+your+wallet.", status_code=303)
-        return RedirectResponse(f"{dest}?notice=Payment+confirmed.", status_code=303)
+        return RedirectResponse(f"{dest}{'&' if '?' in dest else '?'}notice=Payment+confirmed.", status_code=303)
+    if return_to and dest == return_to:
+        dest = "/client/pay-first"                        # not confirmed yet: back to the pay-first page, not the order form
     return RedirectResponse(f"{dest}?error=Payment+wasn%27t+confirmed+yet+-+give+it+a+minute+and+check+again.",
                              status_code=303)
 

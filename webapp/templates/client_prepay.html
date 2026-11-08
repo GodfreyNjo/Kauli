@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Pay first, then we upload{% endblock %}
+{% block content %}
+{% set show_mobile_money = mpesa_ok(request, user) %}
+{% set bank_allowed = bank_ok(user) %}
+<div class="pay-wrap">
+  <a href="/client" class="breadcrumb">&larr; Back to your order</a>
+
+  {% if notice %}<p class="ok" id="prepay-notice">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  <div class="pay-grid">
+    <section class="pay-card pay-summary" aria-labelledby="pay-file">
+      <span class="pay-chip">Pay first, then we upload</span>
+      <h1 class="pay-file" id="pay-file" title="{{ params.name }}">{{ params.name or 'Your recording' }}</h1>
+      <dl class="pay-facts">
+        <div><dt>Length</dt><dd>{{ "%.1f"|format(q.minutes) }} minutes</dd></div>
+        <div><dt>Service</dt><dd>{{ 'Transcription and translation' if q.service_level == 'translate' else 'Transcription' }}, Instant AI</dd></div>
+      </dl>
+      <div class="pay-math" aria-label="How the price is worked out">
+        <p class="pay-math-title">How this price is worked out</p>
+        <ul>
+          {% for label, amount in explanation.lines %}<li><span>{{ label }}</span>{% if amount is not none %}<b>{{ '-' if amount < 0 else '' }}${{ "%.2f"|format(amount|abs) }}</b>{% endif %}</li>{% endfor %}
+        </ul>
+        <p class="pay-math-sum">{{ explanation.sentence }}</p>
+      </div>
+      <div class="pay-total"><span>You pay</span><b>${{ "%.2f"|format(q.charge_usd) }}</b></div>
+      {% if local_hint %}<p class="pay-sub">{{ local_hint }}</p>{% endif %}
+      {% if q.charge_usd > q.total_usd + 0.004 %}<p class="pay-sub">The smallest payment is ${{ "%.2f"|format(q.charge_usd) }}. The extra ${{ "%.2f"|format(q.charge_usd - q.total_usd) }} stays in your wallet for your next order.</p>{% endif %}
+      <p class="pay-sub">Your file is not uploaded until your payment goes through. It waits in your browser, and goes up automatically afterwards. If its length turns out slightly different once it is processed, the small difference is settled from, or kept in, your wallet.</p>
+    </section>
+
+    <form method="post" action="/client/pay-first" id="pay-form" class="pay-card pay-method">
+      <h2>Pay with</h2>
+      <div class="pay-options" role="radiogroup" aria-label="Payment method" id="provider-select">
+        <label class="pay-option{% if not paystack_configured %} is-off{% endif %}">
+          <input type="radio" name="provider" value="paystack" {% if not paystack_configured %}disabled{% else %}checked{% endif %}>
+          <span class="pay-option-body">
+            <strong>{% if show_mobile_money %}Card or mobile money{% else %}Card{% endif %}</strong>
+            <small>{% if paystack_configured %}Secure checkout{% else %}Unavailable right now{% endif %}</small>
+          </span>
+        </label>
+        {% if show_mobile_money %}
+        <label class="pay-option{% if not mpesa_live %} is-off{% endif %}">
+          <input type="radio" name="provider" value="mpesa" {% if not mpesa_live %}disabled{% endif %}>
+          <span class="pay-option-body"><strong>M-Pesa direct</strong><small>{% if mpesa_live %}No card needed{% else %}Coming soon{% endif %}</small></span>
+        </label>
+        {% endif %}
+        {% if bank_allowed %}<label class="pay-option">
+          <input type="radio" name="provider" value="bank" {% if not paystack_configured %}checked{% endif %}>
+          <span class="pay-option-body"><strong>Bank transfer</strong><small>We confirm it by hand, usually within one business day</small></span>
+        </label>{% endif %}
+      </div>
+      <p class="pay-note" id="paystack-note" hidden>Takes you to Paystack's own checkout page{% if show_mobile_money %}, where you can pay by card, M-Pesa, M-Pesa Till or Airtel Money{% endif %}. You come straight back here afterwards.</p>
+      {% if show_mobile_money %}
+      <label id="phone-field" class="pay-phone" hidden>M-Pesa phone number
+        <input type="tel" name="phone" placeholder="2547XXXXXXXX">
+      </label>
+      {% endif %}
+      <p class="pay-note" id="bank-note" hidden>We'll email transfer instructions and confirm it by hand once it lands. After that, come back to your order and your file goes up.</p>
+      <button type="submit" id="pay-submit" class="pay-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Pay ${{ "%.2f"|format(q.charge_usd) }}</button>
+      <ul class="pay-trust" aria-label="What happens next">
+        <li>1. You pay now.</li>
+        <li>2. We upload your file and start the work.</li>
+        <li>3. You are told when it is ready.</li>
+      </ul>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    var form = document.getElementById('pay-form');
+    if (!form) return;
+    var phoneField = document.getElementById('phone-field'), bankNote = document.getElementById('bank-note'), paystackNote = document.getElementById('paystack-note');
+    function chosen() { var r = form.querySelector('input[name="provider"]:checked'); return r ? r.value : ''; }
+    function update() {
+      var v = chosen();
+      if (phoneField) phoneField.hidden = v !== 'mpesa';
+      bankNote.hidden = v !== 'bank';
+      paystackNote.hidden = v !== 'paystack';
+      [].forEach.call(form.querySelectorAll('.pay-option'), function (o) { o.classList.toggle('is-picked', o.querySelector('input').checked); });
+    }
+    [].forEach.call(form.querySelectorAll('input[name="provider"]'), function (r) { r.addEventListener('change', update); });
+    update();
+    var btn = document.getElementById('pay-submit');
+    form.addEventListener('submit', function () { btn.disabled = true; btn.textContent = chosen() === 'paystack' ? 'Taking you to Paystack...' : 'Processing...'; });
+    // After an M-Pesa prompt: the money arrives a little later, so look for it and carry on by itself.
+    var notice = document.getElementById('prepay-notice');
+    if (notice && /phone/i.test(notice.textContent)) {
+      var tries = 0, timer = setInterval(function () {
+        tries += 1;
+        fetch('/client/pay-first/status', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+          if (d && d.covered) { clearInterval(timer); window.location.href = '/client?prepaid=1'; }
+        }).catch(function () {});
+        if (tries > 90) clearInterval(timer);
+      }, 4000);
+    }
+  })();
+</script>
+{% endblock %}

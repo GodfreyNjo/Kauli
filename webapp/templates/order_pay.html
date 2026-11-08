@@ -60,7 +60,17 @@
         <div><dt>{{ t('pay_delivery') }}</dt><dd>{{ tier_name }}</dd></div>
         {% if has_video_addon %}<div><dt>Add-on</dt><dd>Video deliverables (burned captions + dubbed video)</dd></div>{% endif %}
       </dl>
+      {% if explanation %}
+      <div class="pay-math" aria-label="How the price is worked out">
+        <p class="pay-math-title">How this price is worked out</p>
+        <ul>
+          {% for label, amount in explanation.lines %}<li><span>{{ label }}</span>{% if amount is not none %}<b>{{ '-' if amount < 0 else '' }}${{ "%.2f"|format(amount|abs) }}</b>{% endif %}</li>{% endfor %}
+        </ul>
+        <p class="pay-math-sum">{{ explanation.sentence }}</p>
+      </div>
+      {% endif %}
       <div class="pay-total"><span>{{ t('pay_total') }}</span><b>${{ "%.2f"|format(order['cost_usd']) }}</b></div>
+      {% if local_hint %}<p class="pay-sub">{{ local_hint }}</p>{% endif %}
       <p class="pay-sub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>{{ t('pay_starts') }}</p>
     </section>
 

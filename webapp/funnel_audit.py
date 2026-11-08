@@ -152,13 +152,12 @@ def _diagnose(c: dict, f: dict, flags: dict, now: float, base: str = "") -> dict
         what = (latest.get("original_filename") or "your recording")
         service = SERVICE_WORDS.get(latest.get("service_level") or "", "your order")
         mins = latest.get("duration_minutes") or 0
-        one = (f"Your {service} order for \"{what}\" ({mins:.0f} minutes) is ready to go ahead. The price is ${latest['cost_usd'] or 0:.2f}, shown before you pay."
+        one = (f"Your recording \"{what}\" is uploaded and waiting. Pay ${latest['cost_usd'] or 0:.2f} and we'll start it right away:"
                if len(unpaid) == 1 else
-               f"You have {len(unpaid)} orders waiting, {service} for \"{what}\" among them, ${total:.2f} in all, with the price shown before you pay.")
-        subject = "Your Kauli order is ready when you are"
-        body = (f"Hi {first},\n\n{one}\n\nYou can finish it here: {link}\n\n"
-                "If something was unclear, or card payment didn't work for you, tell us. We can take M-Pesa or a bank transfer, and we're happy to go through "
-                "the order with you.\n\nKauli Team")
+               f"Your {len(unpaid)} orders are uploaded and waiting, ${total:.2f} in all. Pay and we'll start them right away:")
+        subject = "Your Kauli order is ready to start"
+        body = (f"Hi {first},\n\n{one}\n{link}\n\n"
+                "Card trouble? Reply and we'll help you pay by M-Pesa or bank transfer.\n\nKauli Team")
         cta = "Open your order"
         account = link
     elif failed_pay and not orders:

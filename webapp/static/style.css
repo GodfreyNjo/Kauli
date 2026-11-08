@@ -8025,3 +8025,11 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .fa-dlg-msg.is-bad { color: var(--err, #e5484d); } .fa-dlg-msg.is-ok { color: var(--ok, #1fa55a); }
 .fa-dlg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
 .fa-dlg-spacer { flex: 1; }
+
+/* How a price is worked out (order payment page and the pay-first page) */
+.pay-math { margin: 14px 0 4px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.pay-math-title { margin: 0 0 8px; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.pay-math ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pay-math li { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; }
+.pay-math li b { white-space: nowrap; }
+.pay-math-sum { margin: 10px 0 0; padding-top: 8px; border-top: 1px dashed var(--border-subtle); font-size: 0.88rem; color: var(--muted); }
