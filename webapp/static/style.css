@@ -7965,3 +7965,63 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .sp-h-inline .sp-row .sp-go { padding: 12px 14px; font-size: 1rem; }
 .sp-h-stack .sp-go { padding: 12px 14px; font-size: 1rem; }
 .sp-h-inline .sp-sel select, .sp-h-stack .sp-sel select, .sp-h-split .sp-sel select { padding-top: 12px; padding-bottom: 12px; }
+
+/* ---- Staff: the sign-up analysis (Clients page, "Analyse sign-ups") ---- */
+#fa-panel { margin: 0 0 18px; }
+.fa { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 22px 24px 26px; margin: 0 0 18px; }
+.fa-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 20px; align-items: flex-start; }
+.fa h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 800; }
+.fa h3 { margin: 26px 0 10px; font-size: 1.05rem; font-weight: 800; }
+.fa h4 { margin: 0; font-size: 1rem; }
+.fa-top-actions { display: flex; gap: 8px; }
+.fa-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0 12px; }
+.fa-summary div { border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px; display: grid; gap: 2px; }
+.fa-summary b { font-size: 1.7rem; line-height: 1.1; }
+.fa-summary span { color: var(--muted); font-size: 0.85rem; }
+.fa-summary .fa-bad b { color: var(--err, #e5484d); }
+.fa-lead { margin: 6px 0 0; line-height: 1.55; }
+.fa-funnel { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.fa-funnel li { display: grid; grid-template-columns: 190px minmax(0, 1fr) 170px; align-items: center; gap: 12px; }
+.fa-f-bar { height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 18%, transparent); overflow: hidden; }
+.fa-f-bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #1769e0, #6a4cf0); }
+.fa-f-num small { color: var(--muted); margin-left: 4px; }
+.fa-f-num em { color: var(--err, #e5484d); font-style: normal; font-size: 0.82rem; margin-left: 6px; }
+.fa-card { border: 1px solid var(--border-subtle); border-left-width: 4px; border-radius: 12px; padding: 14px 16px; margin: 0 0 10px; }
+.fa-card header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.fa-card p { margin: 4px 0; line-height: 1.55; }
+.fa-pill { padding: 2px 10px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; background: color-mix(in srgb, var(--muted) 20%, transparent); }
+.fa-p-high { border-left-color: var(--err, #e5484d); } .fa-p-high .fa-pill { background: color-mix(in srgb, #e5484d 22%, transparent); color: var(--err, #e5484d); }
+.fa-p-medium { border-left-color: #d99a14; } .fa-p-medium .fa-pill { background: color-mix(in srgb, #d99a14 22%, transparent); color: #d99a14; }
+.fa-p-low { border-left-color: #2f6fe0; } .fa-p-low .fa-pill { background: color-mix(in srgb, #2f6fe0 22%, transparent); color: #6c9bff; }
+.fa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fa-chips a { padding: 2px 10px; border: 1px solid var(--border-subtle); border-radius: 999px; font-size: 0.82rem; text-decoration: none; }
+.fa-table-wrap { overflow-x: auto; }
+.fa-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.fa-table th { text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 8px 10px; }
+.fa-table td { padding: 10px; border-top: 1px solid var(--border-subtle); vertical-align: top; line-height: 1.45; }
+.fa-table td small { display: block; color: var(--muted); }
+.fa-table .fa-act { white-space: nowrap; }
+.fa-table .fa-act .rp-btn { min-height: 34px; padding: 0 12px; font-size: 0.82rem; }
+.fa-sev-high td:first-child { box-shadow: inset 3px 0 0 var(--err, #e5484d); }
+.fa-sev-medium td:first-child { box-shadow: inset 3px 0 0 #d99a14; }
+.fa-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.fa-box { border: 1px solid var(--border-subtle); border-radius: 12px; padding: 12px 14px; }
+.fa-box h4 { margin-bottom: 6px; } .fa-box p { margin: 4px 0; color: var(--muted); line-height: 1.5; font-size: 0.9rem; }
+.fa-caveats { margin: 0; padding-left: 18px; color: var(--muted); line-height: 1.6; font-size: 0.9rem; }
+@media (max-width: 800px) {
+  .fa-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fa-funnel li { grid-template-columns: 1fr; gap: 4px; }
+  .fa-grid { grid-template-columns: 1fr; }
+}
+.fa-sent { display: block; margin-top: 4px; color: var(--muted); }
+.fa-dialog { width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface); color: inherit; padding: 22px 24px; }
+.fa-dialog::backdrop { background: rgba(5, 12, 30, 0.6); }
+.fa-dialog h3 { margin: 0 0 4px; font-size: 1.2rem; }
+.fa-dialog label { display: block; margin: 14px 0 6px; font-size: 0.85rem; font-weight: 700; }
+.fa-dialog input[type=text], .fa-dialog textarea { width: 100%; box-sizing: border-box; margin: 0; font: inherit; line-height: 1.5; }
+.fa-dialog textarea { min-height: 260px; resize: vertical; }
+.fa-dlg-note { margin: 10px 0 0; font-size: 0.82rem; }
+.fa-dlg-msg { min-height: 1.4em; margin: 8px 0 0; font-weight: 600; }
+.fa-dlg-msg.is-bad { color: var(--err, #e5484d); } .fa-dlg-msg.is-ok { color: var(--ok, #1fa55a); }
+.fa-dlg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; }
+.fa-dlg-spacer { flex: 1; }

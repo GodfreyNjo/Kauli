@@ -5,7 +5,10 @@
 {% set tones = ['#7c5cff', '#2f6fe0', '#1fa55a', '#f0782a', '#e0489a', '#14a3b8', '#d99a14'] %}
 <header class="rp-head">
   <div><h1>Clients</h1><p>Manage all your clients in one place. Every real account, not a prospect: people who have not signed up yet are in the <a href="/staff/leads">CRM</a>.</p></div>
+  <div class="rp-head-actions"><button type="button" class="rp-btn primary" id="fa-open" aria-controls="fa-panel" aria-expanded="false">Analyse sign-ups</button></div>
 </header>
+<div id="fa-panel" hidden aria-live="polite"></div>
+<script src="/static/funnel_analysis.js?v=1" defer></script>
 
 <div class="cl-bar">
   <form method="get" action="/staff/clients" class="cl-search" role="search">
@@ -79,6 +82,27 @@
       r.addEventListener('keydown', function (e) { if (e.key === 'Enter') window.location.href = r.dataset.href; });
     });
     draw();
+  })();
+  // "Analyse sign-ups": fetches the analysis (read-only, worked out from the live data) and shows it above the list.
+  (function () {
+    var open = document.getElementById('fa-open'), panel = document.getElementById('fa-panel');
+    if (!open || !panel) return;
+    function run() {
+      open.disabled = true; open.textContent = 'Analysing...'; panel.hidden = false;
+      panel.innerHTML = '<p class="muted" style="padding:12px 0;">Looking at every sign-up, order, payment and visit...</p>';
+      fetch('/staff/clients/analysis?partial=1', { credentials: 'same-origin' }).then(function (r) {
+        if (!r.ok) throw new Error(r.status); return r.text();
+      }).then(function (html) {
+        panel.innerHTML = html; open.setAttribute('aria-expanded', 'true'); panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }).catch(function () {
+        panel.innerHTML = '<p class="muted" style="padding:12px 0;">The analysis could not be loaded. Please try again.</p>';
+      }).then(function () { open.disabled = false; open.textContent = 'Analyse sign-ups'; });
+    }
+    open.addEventListener('click', run);
+    panel.addEventListener('click', function (e) {
+      if (e.target.closest('#fa-refresh')) run();
+      if (e.target.closest('#fa-close')) { panel.hidden = true; panel.innerHTML = ''; open.setAttribute('aria-expanded', 'false'); }
+    });
   })();
 </script>
 {% endblock %}

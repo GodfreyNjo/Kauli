@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block theme %}dark{% endblock %}
+{% block title %}Sign-up analysis{% endblock %}
+{% block content %}
+<header class="rp-head">
+  <div><h1>Sign-up analysis</h1><p><a href="/staff/clients">&larr; Back to Clients</a></p></div>
+</header>
+{% include "_funnel_analysis.html" %}
+<script src="/static/funnel_analysis.js?v=1" defer></script>
+{% endblock %}

@@ -4982,7 +4982,7 @@ def stale_leads(threshold_hours: float = 48.0):
 # 'nudged' means a 48h-inactivity reminder got queued - it's a side branch
 # off 'new', not a dead end: an account can go 'new' -> 'nudged' -> 'activated'.
 ONBOARDING_STATUSES = ("new", "nudged", "activated")
-ONBOARDING_MESSAGE_KINDS = ("welcome", "first_payment", "inactivity_nudge")
+ONBOARDING_MESSAGE_KINDS = ("welcome", "first_payment", "inactivity_nudge", "staff_followup")   # staff_followup: a one-to-one email staff review and send
 
 
 def queue_onboarding_message(user_id: str, kind: str, subject: str, body: str) -> str:
@@ -5018,6 +5018,24 @@ def has_onboarding_message(user_id: str, kind: str) -> bool:
     ).fetchone()
     conn.close()
     return row is not None
+
+
+def recent_onboarding_message(user_id: str, kind: str, within_seconds: float):
+    """The newest message of this kind sent to or queued for this account in the last `within_seconds`, or None. Stops a double click, or two
+    people on the team, from emailing the same client twice in a day."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM onboarding_messages WHERE user_id = ? AND kind = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 1",
+        (user_id, kind, time.time() - within_seconds)).fetchone()
+    conn.close()
+    return row
+
+
+def get_onboarding_message(message_id: str):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM onboarding_messages WHERE id = ?", (message_id,)).fetchone()
+    conn.close()
+    return row
 
 
 def list_onboarding_messages(status: str | None = None):

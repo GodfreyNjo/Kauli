@@ -1,0 +1,115 @@
+{# The sign-up analysis (webapp/funnel_audit.py): shown inside the Clients page when staff press "Analyse sign-ups", and on its own page. Read-only. #}
+{% set a = analysis %}
+{% set tot = a.totals %}
+<section class="fa" aria-label="Sign-up analysis">
+  <div class="fa-top">
+    <div>
+      <h2>Sign-up analysis</h2>
+      <p class="muted">Worked out from the live data just now ({{ a.generated_at|int|timestamp_to_str }}). Nothing is sent to anyone.</p>
+    </div>
+    {% if panel %}<div class="fa-top-actions">
+      <button type="button" class="rp-btn" id="fa-refresh">Run it again</button>
+      <button type="button" class="rp-btn" id="fa-close">Close</button>
+    </div>{% endif %}
+  </div>
+
+  <div class="fa-summary">
+    <div><b>{{ tot.clients }}</b><span>real clients</span></div>
+    <div><b>{{ tot.paying }}</b><span>paying</span></div>
+    <div class="fa-bad"><b>{{ tot.stuck }}</b><span>not yet paying</span></div>
+    <div><b>{{ a.funnel[3].count }}</b><span>placed an order</span></div>
+  </div>
+  {% if a.biggest_drop and tot.clients %}
+  <p class="fa-lead">The biggest drop is the step to <strong>"{{ a.biggest_drop.label }}"</strong>: {{ a.biggest_drop.lost_from_previous }} of the {{ a.biggest_drop.previous_count }} clients who reached "{{ a.biggest_drop.previous_label }}" did not go on to it.
+    {% if a.recent.signups %}Of the {{ a.recent.signups }} client(s) who signed up in the last 60 days, {{ a.recent.never_ordered }} never placed an order and {{ a.recent.paid }} paid.{% endif %}</p>
+  {% endif %}
+
+  <h3>How far people get</h3>
+  <ol class="fa-funnel">
+    {% for s in a.funnel %}
+    <li>
+      <span class="fa-f-label">{{ s.label }}</span>
+      <span class="fa-f-bar"><i style="width: {{ s.pct_of_signups }}%"></i></span>
+      <span class="fa-f-num"><b>{{ s.count }}</b> <small>{{ s.pct_of_signups }}%</small>{% if s.lost_from_previous %} <em>{{ s.lost_from_previous }} lost</em>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <h3>What we should do</h3>
+  {% for s in a.suggestions %}
+  <article class="fa-card fa-p-{{ s.priority }}">
+    <header><span class="fa-pill">{{ s.priority|capitalize }}</span><h4>{{ s.title }}</h4></header>
+    <p><b>Why:</b> {{ s.why }}</p>
+    <p><b>Do this:</b> {{ s.do }}</p>
+    {% if s.clients %}<p class="fa-chips">{% for c in s.clients %}<a href="/staff/clients/{{ c.id }}">{{ c.name }}</a>{% endfor %}</p>{% endif %}
+  </article>
+  {% else %}
+  <p class="muted">Nothing needs attention right now.</p>
+  {% endfor %}
+
+  <h3>Clients who are not paying yet, and how to help each one</h3>
+  {% if a.stuck %}
+  <div class="fa-table-wrap"><table class="fa-table">
+    <thead><tr><th>Client</th><th>Joined</th><th>Got as far as</th><th>What happened</th><th>How to help</th><th></th></tr></thead>
+    <tbody>
+    {% for d in a.stuck %}
+      <tr class="fa-sev-{{ d.severity }}">
+        <td><a href="/staff/clients/{{ d.id }}">{{ d.name }}</a><small>{{ d.email }}</small></td>
+        <td class="muted">{{ d.signup_days }} d ago</td>
+        <td>{{ a.funnel[d.stage].label }}</td>
+        <td>{{ d.why }}{% if d.nudges %} <small>{{ d.nudges }} reminder email(s) sent, no result.</small>{% endif %}</td>
+        <td>{{ d.do }}</td>
+        <td class="fa-act">
+          {% if d.email %}<button type="button" class="rp-btn primary fa-send" data-id="{{ d.id }}">Review &amp; send email</button>{% endif %}
+          {% if d.last_followup %}<small class="fa-sent">Emailed {{ d.last_followup }}</small>{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}<p class="muted">Every real client has paid.</p>{% endif %}
+
+  <h3>Signals behind it</h3>
+  {% set fr = a.friction %}{% set tr = a.traffic %}
+  <div class="fa-grid">
+    <div class="fa-box"><h4>Payments</h4>
+      <p>{{ fr.unpaid_orders }} order(s) waiting for payment, worth ${{ '%.2f'|format(fr.unpaid_value) }}{% if fr.unpaid_oldest_days is not none %} (oldest {{ fr.unpaid_oldest_days }} days){% endif %}.</p>
+      <p>The $1 unlock: {{ fr.trial_started }} started, {{ fr.trial_done }} finished. M-Pesa: {{ fr.mpesa_failed }} of {{ fr.mpesa_all }} failed.</p></div>
+    <div class="fa-box"><h4>Getting in</h4>
+      <p>Sign-up method: {% for k, v in fr.signup_methods.items() %}{{ k|replace('_', ' ') }} {{ v }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+      <p>{{ fr.unconfirmed|length }} person(s) saw "Email not confirmed"{% if fr.unconfirmed %} ({% for u in fr.unconfirmed %}{{ u.email }}{{ ' - no account' if not u.has_account }}{{ '; ' if not loop.last }}{% endfor %}){% endif %}.</p>
+      <p>Uploads rejected: {% if fr.uploads_rejected %}{% for k, v in fr.uploads_rejected.items() %}{{ v }} x {{ k[:60] }}{{ '; ' if not loop.last }}{% endfor %}{% else %}none{% endif %}.</p></div>
+    <div class="fa-box"><h4>Reminder emails</h4>
+      <p>{{ fr.nudges_sent }} sent to {{ fr.nudge_users }} people; {{ fr.nudge_then_ordered }} of them ordered afterwards.</p>
+      <p>{{ fr.messages_not_delivered }} not delivered.</p></div>
+    <div class="fa-box"><h4>Website</h4>
+      {% if tr.visitors %}<p>{{ '{:,}'.format(tr.visitors) }} visitors from {{ tr.from }} to {{ tr.to }}; {{ tr.login_visitors }} reached sign-in; {{ tr.signups }} signed up ({{ tr.visit_to_signup_pct }}% of visitors, {{ tr.login_to_signup_pct }}% of sign-in visitors).</p>
+      <p>{{ tr.mobile_pct }}% on mobile. Sources: {% for ch, n in tr.channels %}{{ ch }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}. Countries: {% for co, n in tr.countries %}{{ co }} {{ n }}{{ ', ' if not loop.last }}{% endfor %}.</p>
+      {% else %}<p>No visits recorded yet.</p>{% endif %}</div>
+    <div class="fa-box"><h4>Prospects</h4>
+      <p>{{ fr.leads_new }} prospects in the CRM are still marked "new" ({{ fr.leads_research }} from research).</p></div>
+  </div>
+
+  <h3>Read this with care</h3>
+  <ul class="fa-caveats">{% for c in a.caveats %}<li>{{ c }}</li>{% endfor %}</ul>
+
+  {# The email each client would get, written from what they did. Staff read it, change it if they like, and press Send. Nothing is sent until then. #}
+  <script type="application/json" id="fa-drafts">{{ a.drafts|tojson }}</script>
+  <dialog id="fa-dialog" class="fa-dialog" aria-labelledby="fa-dlg-title">
+    <form method="dialog" id="fa-dlg-form">
+      <h3 id="fa-dlg-title">Email to <span id="fa-dlg-name"></span></h3>
+      <p class="muted" id="fa-dlg-to"></p>
+      <label for="fa-dlg-subject">Subject</label>
+      <input type="text" id="fa-dlg-subject" maxlength="160" autocomplete="off">
+      <label for="fa-dlg-body">Message (written from what this client did; change anything you like)</label>
+      <textarea id="fa-dlg-body" rows="14"></textarea>
+      <p class="muted fa-dlg-note">It goes out from "Kauli Team" as a one-to-one message, is saved in their message history and noted on their account. Replies come to your team inbox.</p>
+      <p class="fa-dlg-msg" id="fa-dlg-msg" role="status" aria-live="polite"></p>
+      <div class="fa-dlg-actions">
+        <a class="rp-btn" id="fa-dlg-mailto" href="#">Open in my email app instead</a>
+        <span class="fa-dlg-spacer"></span>
+        <button type="button" class="rp-btn" id="fa-dlg-cancel">Cancel</button>
+        <button type="button" class="rp-btn primary" id="fa-dlg-send">Send email</button>
+      </div>
+    </form>
+  </dialog>
+</section>

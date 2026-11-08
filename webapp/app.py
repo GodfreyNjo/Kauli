@@ -57,7 +57,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, funnel_audit, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -2550,6 +2550,7 @@ def _queue_and_send(user, kind: str, subject: str, body: str, base_url: str = ""
         html = mailer.wrap_email_html(inner, cta_text=cta_text, cta_url=cta_url, base_url=base_url)
         ok, detail = mailer.send_as("success", user["email"], subject, html, body)
         db.set_onboarding_message_email_result(message_id, ok, detail)
+    return message_id
 
 
 
@@ -8665,6 +8666,57 @@ def staff_clients(request: Request, q: str | None = None):
     return templates.TemplateResponse(request, "staff_clients.html", {
         "user": user, "clients": rows, "q": q or "", "plans": billing.PLANS, "now_ts": time.time(),
     })
+
+
+@app.get("/staff/clients/analysis", response_class=HTMLResponse)
+def staff_clients_analysis(request: Request, partial: int = 0):
+    """The sign-up analysis behind the Clients page's "Analyse sign-ups" button: where clients stop and what to do to help. Read-only.
+    Declared before /staff/clients/{client_id} so "analysis" is never mistaken for a client id."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return RedirectResponse("/login")
+    context = {"user": user, "analysis": funnel_audit.analyse(_site_base(request)), "panel": bool(partial)}
+    return templates.TemplateResponse(request, "_funnel_analysis.html" if partial else "staff_clients_analysis.html", context)
+
+
+def _followup_html(body: str) -> str:
+    """A staff-written plain-text email as safe HTML: escaped, paragraphs kept, and web addresses made clickable."""
+    import html as _html
+    escaped = _html.escape(body)
+    escaped = re.sub(r"(https?://[^\s<]+)", lambda m: f'<a href="{m.group(1)}" style="color:{mailer.BRAND_ACCENT};">{m.group(1)}</a>', escaped)
+    return mailer.text_to_html_paragraphs(escaped)
+
+
+@app.post("/staff/clients/{client_id}/followup")
+def staff_client_followup(request: Request, client_id: str, subject: str = Form(""), body: str = Form("")):
+    """Sends the follow-up email staff reviewed in the sign-up analysis (a draft written from what the client did, which staff may have edited).
+    One real, one-to-one message from "Kauli Team", recorded in the client's message history and in their staff notes. Staff only, and a client
+    cannot be emailed twice within 20 hours, so a double click or two people on the team cannot send it twice."""
+    user = current_user(request)
+    if not user or user["role"] != "staff":
+        return JSONResponse({"ok": False, "error": "Sign in as staff to send this."}, status_code=403)
+    client = db.get_user(client_id)
+    if not client or client["role"] != "client" or client["account_status"] == "closed" or not client["email"]:
+        return JSONResponse({"ok": False, "error": "This client can't be emailed."}, status_code=404)
+    subject = " ".join((subject or "").split())[:160]
+    body = (body or "").replace("\r\n", "\n").strip()
+    if len(subject) < 3 or len(body) < 20:
+        return JSONResponse({"ok": False, "error": "Write a subject and a message first."}, status_code=400)
+    if len(body) > 5000:
+        return JSONResponse({"ok": False, "error": "The message is too long (5,000 characters at most)."}, status_code=400)
+    if not mailer.email_configured():
+        return JSONResponse({"ok": False, "error": "Email is not set up on this server, so nothing was sent."}, status_code=503)
+    if db.recent_onboarding_message(client_id, "staff_followup", 20 * 3600):
+        return JSONResponse({"ok": False, "error": "A follow-up was already sent to this client in the last 20 hours."}, status_code=429)
+    base = _site_base(request)
+    message_id = _queue_and_send(client, "staff_followup", subject, body, base_url=base, cta_text="Open your Kauli account", cta_url=f"{base}/client",
+                                 html_inner=_followup_html(body))
+    row = db.get_onboarding_message(message_id)
+    sent = bool(row and row["status"] == "sent")
+    db.append_client_staff_note(client_id, f"Follow-up email {'sent' if sent else 'NOT delivered (saved in the queue)'} by {user['email']}: {subject}")
+    if not sent:
+        return JSONResponse({"ok": False, "error": "The email provider did not accept it: " + str((row["email_send_detail"] if row else "") or "unknown reason")[:160]}, status_code=502)
+    return {"ok": True, "to": client["email"]}
 
 
 _STAFF_CLIENT_TABS = ("overview", "orders", "team", "billing", "settings")
