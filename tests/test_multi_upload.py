@@ -14,7 +14,7 @@ JS = (Path(__file__).parent.parent / "webapp" / "static" / "client_wizard.js").r
 def test_the_upload_form_accepts_several_files_and_lists_them(env):
     page = env.client.get("/account").text
     assert re.search(r'<input type="file" name="audio" id="file-input"[^>]*\bmultiple\b', page)
-    assert 'id="file-queue"' in page and "Up to 10 files at once" in page
+    assert 'id="file-queue"' in page and "Up to <b>10</b> files" in page
     if os.environ.get("DASH_DUMP_PATH"):
         Path(os.environ["DASH_DUMP_PATH"]).write_text(page, encoding="utf-8")
 

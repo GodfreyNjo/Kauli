@@ -3,6 +3,7 @@
 {% block content %}
 {% from "_pager.html" import pager %}
 {% from "_ds.html" import ico, file_ic, status_pill with context %}
+{% from "_home_art.html" import art_youtube, art_media, art_wizard %}
 <div class="ds-page" lang="en">
   <div class="ds-head">
     <div>
@@ -14,8 +15,12 @@
 
 
 <div class="card ds-card wizard-card" id="new-project">
-  <h2 class="wizard-title">Start a new project</h2>
-  <p class="muted wizard-sub">Upload your media and choose what you need.</p>
+  <div class="mk-title">
+    <span class="mk-title-ic">{{ ico('video', 30) }}</span>
+    <div><h2 class="wizard-title">Start a new project</h2>
+      <p class="wizard-sub">Turn your audio or video into text, a translation or a dub.</p></div>
+    <span class="mk-title-art">{{ art_wizard() }}</span>
+  </div>
   {% if error %}
     <p class="error">{{ error }}</p>
     {% if exception_context %}
@@ -38,15 +43,15 @@
 
   <div class="wizard-steps" id="wizard-steps">
     <div class="wizard-step active" data-step="1">
-      <span class="wizard-step-num">1</span><span class="wizard-step-label">Upload media</span>
+      <span class="wizard-step-num">1</span><span class="wizard-step-label">Upload Media</span>
     </div>
     <div class="wizard-step-line"></div>
     <div class="wizard-step" data-step="2">
-      <span class="wizard-step-num">2</span><span class="wizard-step-label">Choose services</span>
+      <span class="wizard-step-num">2</span><span class="wizard-step-label">Choose Service</span>
     </div>
     <div class="wizard-step-line"></div>
     <div class="wizard-step" data-step="3">
-      <span class="wizard-step-num">3</span><span class="wizard-step-label">Review &amp; submit</span>
+      <span class="wizard-step-num">3</span><span class="wizard-step-label">Review &amp; Submit</span>
     </div>
   </div>
 
@@ -70,7 +75,7 @@
     <input type="hidden" name="idempotency_key" id="idempotency-key-field">
 
     <div class="wizard-pane" data-pane="1">
-      <h2 class="wizard-pane-title">Add your file and choose languages</h2>
+      <h2 class="wizard-pane-title">Add your media</h2>
       {# The two buttons stay (the wizard script reads them to know the chosen source) but the cards below are the
          real controls: picking a file or typing a link makes that card the source. #}
       <div class="step-switch" id="source-switch" hidden>
@@ -80,13 +85,8 @@
 
       <div class="src-cards">
         <section class="src-card {{ '' if form_values.get('youtube_url') else 'is-active' }}" id="card-file" aria-labelledby="src-file-title">
-          <div class="src-card-head">
-            <span class="src-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
-            <div>
-              <h3 id="src-file-title">Upload audio or video</h3>
-              <p>Drag and drop your file or click to browse.</p>
-            </div>
-          </div>
+          <div class="mk-art">{{ art_media() }}</div>
+          <h3 id="src-file-title">Upload media</h3>
           <div id="source-file">
             {% if error and not form_values.get('youtube_url') %}
             <p class="muted src-note" style="margin:0 0 10px;">Your other choices were kept. Choose your file again.</p>
@@ -98,41 +98,39 @@
                 <path d="M24 22v14m0-14 5 5m-5-5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               <p class="dropzone-text" id="dropzone-text">Drag &amp; drop files or click to upload</p>
-              <p class="src-formats">Up to 10 files at once. Up to 2 GB per file. Also OGG, Opus, AAC, WMA, WebM and AVI.</p>
+              <button type="button" class="mk-choose" tabindex="-1">Choose files</button>
             </div>
             <ul class="file-queue" id="file-queue" aria-live="polite"></ul>
             <p class="file-queue-note" id="file-queue-note" role="status"></p>
             <div class="cloud-import" id="cloud-import" hidden></div>
           </div>
           <ul class="src-chips" aria-label="Common formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
+          <p class="mk-limits" title="Also OGG, Opus, AAC, WMA, WebM and AVI"><span>Up to <b>10</b> files</span><span>&le; <b>2 GB</b> per file</span></p>
         </section>
 
+        <span class="src-or" aria-hidden="true">OR</span>
         <section class="src-card {{ 'is-active' if form_values.get('youtube_url') else '' }}" id="card-youtube" aria-labelledby="src-yt-title">
-          <div class="src-card-head">
-            <span class="src-card-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>
-            <div>
-              <h3 id="src-yt-title">Paste a YouTube link</h3>
-              <p>We'll fetch the audio and transcribe it.</p>
-            </div>
-          </div>
+          <div class="mk-art">{{ art_youtube() }}</div>
+          <h3 id="src-yt-title">YouTube link</h3>
           <div id="source-youtube">
             <label class="src-link" for="youtube-url-input">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>
               <span class="sr-only">YouTube link</span>
-              <input type="url" name="youtube_url" id="youtube-url-input" placeholder="https://www.youtube.com/watch?v=..."
+              <input type="url" name="youtube_url" id="youtube-url-input" placeholder="Paste YouTube URL"
                      value="{{ form_values.get('youtube_url', '') }}">
               <button type="button" class="src-go" id="youtube-go" aria-label="Use this link and continue">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </button>
             </label>
-            <p class="muted src-note">Only submit videos you have the rights to use. If a link can't be fetched, upload the file instead.</p>
+            <p class="muted src-note">Only use videos you have the rights to. If a link fails, upload the file instead.</p>
           </div>
-          <ul class="src-chips" aria-label="What you can order"><li>Transcript</li><li>Subtitles</li><li>Translation</li><li>Dubbing</li></ul>
+          
         </section>
       </div>
 
       {% if languages_learned %}<p class="lang-learned" id="lang-learned"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>Languages are set to the ones you usually order. Change them any time.</p>{% endif %}
-      <div class="row" style="margin-top:16px;">
+      <h3 class="mk-sub"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg> Languages</h3>
+      <div class="row mk-lang">
         <label>From
           <select name="source_lang" id="source-lang-select"
                   data-manual-langs="{{ manual_transcription_languages|join(',') }}"
@@ -182,13 +180,13 @@
     </div>
 
     <div class="wizard-pane" data-pane="2" hidden>
-      <h2 class="wizard-pane-title">Choose a service and how it is delivered</h2>
+      <h2 class="wizard-pane-title">Choose service</h2>
       <div class="wizard-grid">
         <div>
           {% set chosen_tier = form_values.get('review_tier') or default_review_tier %}
           {% set rate_tier = 'human' if chosen_tier == 'studio' else chosen_tier %}
           <fieldset class="tiers" id="review-tier-fieldset">
-            <legend>How should we deliver it?</legend>
+            <legend><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></svg> Delivery speed</legend>
             {% for tkey, tier in review_tiers.items() %}
             <label class="tier-option">
               <input type="radio" name="review_tier" value="{{ tkey }}" {% if tkey == chosen_tier %}checked{% endif %}>
@@ -214,23 +212,23 @@
           </fieldset>
 
           <fieldset class="tiers" id="tier-fieldset">
-            <legend>What do you need?</legend>
+            <legend><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg> Service</legend>
             {% for key, level in service_levels.items() %}
             <label class="tier-option">
               <input type="radio" name="service_level" value="{{ key }}" data-rate="{{ price_card[key][rate_tier] }}"
                      data-rate-ai="{{ price_card[key]['ai'] }}" data-rate-human="{{ price_card[key]['human'] }}"
                      data-name="{{ level['name'] }}" {% if key == form_values.get('service_level', 'transcribe') %}checked{% endif %}>
               <div>
-                <strong>{{ level['name'] }}</strong>
+                <strong>{{ {'transcribe': 'Transcription', 'translate': 'Transcription + Translation', 'dub': 'Full Dub'}.get(key, level['name']) }}</strong>
                 <p><span class="tier-price" data-ai="{{ '%.2f'|format(price_card[key]['ai']) }}"
-                         data-human="{{ '%.2f'|format(price_card[key]['human']) }}">${{ "%.2f"|format(price_card[key][rate_tier]) }}</span>/audio-minute.</p>
+                         data-human="{{ '%.2f'|format(price_card[key]['human']) }}">${{ "%.2f"|format(price_card[key][rate_tier]) }}</span>/min</p>
               </div>
             </label>
             {% endfor %}
           </fieldset>
 
           <details class="od-more extras-box" id="extras" {% if form_values.get('addon_video_deliverables') or form_values.get('addon_human_voice_over') or form_values.get('addon_audio_cleanup') or form_values.get('addon_premium_voice') or form_values.get('voice_clone_consent') or form_values.get('rush') %}open{% endif %}>
-            <summary>Extras and extra charges (optional)</summary>
+            <summary>Add extras (optional)</summary>
             <div class="extras-body">
               {% if not plans[plan]['video_deliverables'] %}
               <label class="checkbox tier-option">
@@ -285,7 +283,7 @@
         </div>
 
         <div class="pricing-summary" id="pricing-summary">
-          <h2 class="pricing-summary-heading" style="margin-top:0;">Estimated cost</h2>
+          <h2 class="pricing-summary-heading" style="margin-top:0;"><span class="mk-sum-ic" aria-hidden="true">&#9638;</span> Order summary</h2>
           <div class="pricing-row"><span>File length</span><span id="price-duration">—</span></div>
           <div class="pricing-row"><span>Service</span><span id="price-service">Full dub</span></div>
           <div class="pricing-row" id="price-addon-row" hidden><span>Video deliverables</span><span id="price-addon">—</span></div>
@@ -294,15 +292,15 @@
           <div class="pricing-row" id="price-premium-voice-row" hidden><span>Premium AI voice</span><span id="price-premium-voice">—</span></div>
           <div class="pricing-row" id="price-audio-cleanup-row" hidden><span>Audio clean-up</span><span id="price-audio-cleanup">—</span></div>
           <div class="pricing-row" id="price-studio-row" hidden><span>Studio recognition + speaker labels</span><span id="price-studio">—</span></div>
-          <div class="pricing-row" id="price-free-row"><span>Free minutes applied</span><span id="price-free">—</span></div>
+          <div class="pricing-row" id="price-free-row"><span>Free minutes</span><span id="price-free">—</span></div>
           <div class="pricing-row" id="price-wallet-row" hidden><span>Prepaid credits applied</span><span id="price-wallet">—</span></div>
           <div class="pricing-row" id="price-rush-row" hidden><span>Rush surcharge</span><span id="price-rush">—</span></div>
-          <div class="pricing-total"><span>Estimated total</span><span id="price-total">$0.00</span></div>
+          <div class="pricing-total"><span>Estimated cost</span><span id="price-total">$0.00</span></div>
           <p class="muted" style="font-size:0.78rem; margin-bottom:0;">
              {{ "%.1f"|format(free_minutes_remaining)|replace('.0', '') }} free minute{{ '' if free_minutes_remaining == 1 else 's' }}
              left this month. <a href="/account/billing">Plan &amp; usage &rarr;</a></p>
           <details class="od-more">
-            <summary>How free minutes apply</summary>
+            <summary>How free minutes work</summary>
             <p>Free minutes cover Instant AI transcription, and on Pro and Premium translation too. They are applied automatically, and the final cost is confirmed once we have processed the file. Results download once you have chosen a plan. Dubbing and human review are billed from the first minute.</p>
           </details>
         </div>
@@ -310,18 +308,25 @@
     </div>
 
     <div class="wizard-pane" data-pane="3" hidden>
-      <h2 class="wizard-pane-title">Review and submit</h2>
+      <h2 class="wizard-pane-title">Review order</h2>
       <div class="review-card" id="review-card" aria-live="polite">
-        <dl class="review-list">
-          <div><dt>File</dt><dd id="rv-file">-</dd></div>
-          <div><dt>Languages</dt><dd id="rv-langs">-</dd></div>
-          <div><dt>Service</dt><dd id="rv-service">-</dd></div>
-          <div><dt>Estimated total</dt><dd id="rv-total">-</dd></div>
-        </dl>
+        <div class="rv-wrap">
+          <dl class="review-list">
+            <div><dt>File</dt><dd id="rv-file">-</dd></div>
+            <div><dt>Languages</dt><dd id="rv-langs">-</dd></div>
+            <div><dt>Service</dt><dd id="rv-service">-</dd></div>
+          </dl>
+          <div class="rv-estimate">
+            <h4><span class="mk-sum-ic" aria-hidden="true">&#9638;</span> Estimate</h4>
+            <p class="rv-rate"><b id="rv-rate">-</b> <span>/ min</span></p>
+            <p class="rv-dur" id="rv-duration"></p>
+            <div class="rv-total"><span>Total (est.)</span><b id="rv-total">-</b></div>
+          </div>
+        </div>
         <p class="muted" style="margin:10px 0 0; font-size:0.86rem;">If your minutes or credits don't cover this order, you pay securely on the next page before processing starts.</p>
       </div>
       <h3 class="wizard-subtitle">Optional details</h3>
-      <label>Project / folder (optional)
+      <label class="mk-folder">Project / folder <span class="muted">(optional)</span>
         <input type="text" name="folder_name" list="folder-list" placeholder="e.g. Q3 campaign, NGO field reports"
                value="{{ form_values.get('folder_name', '') }}">
         <datalist id="folder-list">
@@ -456,8 +461,7 @@
     </div>
     <div class="wizard-actions" id="wizard-actions">
       <button type="button" class="secondary" id="wizard-back" hidden>&larr; Back</button>
-      <span class="muted wizard-actions-spacer" style="font-size:0.78rem;">The first {{ free_minutes|int }} minutes of Instant AI
-         transcription each month are free - you'll only pay for what goes beyond that.</span>
+      <span class="wizard-actions-spacer"><span class="mk-free-banner"><svg class="mk-gift" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v8a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-8M12 8c-2.5 0-4-1-4-2.5S9.5 3 11 4l1 4zm0 0c2.5 0 4-1 4-2.5S14.5 3 13 4z"/></svg> <span>First <b>{{ free_minutes|int }} minutes</b> of Instant AI are free each month.</span></span></span>
       <button type="button" class="wizard-next" id="wizard-next">Next &rarr;</button>
       <button type="submit" class="wizard-submit" id="wizard-submit" hidden>Submit order</button>
     </div>

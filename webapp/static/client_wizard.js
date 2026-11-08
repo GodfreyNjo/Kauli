@@ -168,6 +168,11 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     set("rv-service", (svc ? kT(svc.dataset.name) : "-") + (tierName ? " - " + tierName : ""));
     const total = $("#price-total");
     set("rv-total", total ? total.textContent : "-");
+    // The rate and the length that make up the total, shown beside it: "$0.12 / min  x 1:17 min".
+    const perMin = svc ? parseFloat(tier && tier.value !== "ai" ? svc.dataset.rateHuman : svc.dataset.rateAi) : NaN;
+    set("rv-rate", isNaN(perMin) ? "-" : formatMoney(perMin));
+    const length = $("#price-duration");
+    set("rv-duration", length && length.textContent && length.textContent !== "\u2014" ? "\u00d7 " + length.textContent : "");
   }
 
   function step1Valid() {

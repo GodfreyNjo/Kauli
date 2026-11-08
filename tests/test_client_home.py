@@ -10,10 +10,10 @@ from test_order_flow import env, wav_bytes  # noqa: E402,F401
 def test_home_is_short_and_clear(env, wav_bytes):
     env.order_from(env.place(wav_bytes))
     page = env.client.get("/account/home").text
-    for action in ("Upload media", "Import from YouTube", "Explore a sample"):
+    for action in ("Upload", "From YouTube", "Try a sample", "Connect tools"):
         assert action in page
     assert "Recent projects" in page and 'id="ch-search"' in page and "clip.wav" in page
-    assert "Processing" in page and "In review" in page and "Needs your input" in page and "Awaiting quality check" in page
+    assert "Processing" in page and "In review" in page and "Needs input" in page
     for column in ("File / Project", "Service", "Languages", "Updated", "Status", "Actions"):
         assert column in page
     # none of the old wordy cards

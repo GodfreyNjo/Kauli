@@ -181,7 +181,7 @@ def test_human_review_orders_still_keep_their_editor_instructions(env, wav_bytes
 
 def test_the_service_step_keeps_extras_in_one_collapsed_section_and_names_no_vendors(env):
     page = env.client.get("/account").text
-    assert 'id="extras"' in page and "Extras and extra charges (optional)" in page
+    assert 'id="extras"' in page and "Add extras (optional)" in page
     extras = page.split('id="extras"', 1)[1].split("</details>", 1)[0]
     for ident in ("human-voice-field", "voice-clone-consent-field", "rush-checkbox"):
         assert ident in extras, ident                                                         # every optional charge lives inside it

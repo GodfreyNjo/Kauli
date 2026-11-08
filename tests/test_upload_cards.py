@@ -17,13 +17,13 @@ def test_step_one_shows_two_cards_with_the_ids_the_script_needs(env):
                    'id="file-input"', 'id="youtube-url-input"', 'id="youtube-go"', 'id="source-file"', 'id="source-youtube"',
                    'data-source="file"', 'data-source="youtube"', 'name="audio"', 'name="youtube_url"'):
         assert needed in html, needed
-    assert "Upload audio or video" in html and "Paste a YouTube link" in html
-    for chip in ("MP3", "WAV", "M4A", "FLAC", "MP4", "MOV", "MKV", "Transcript", "Subtitles", "Translation", "Dubbing"):
+    assert "Upload media" in html and "YouTube link" in html
+    for chip in ("MP3", "WAV", "M4A", "FLAC", "MP4", "MOV", "MKV"):
         assert f"<li>{chip}</li>" in html
     # both sources are on screen at once: neither pane is hidden any more
     assert not re.search(r'id="source-(file|youtube)"[^>]*hidden', html)
     assert 'id="source-switch" hidden' in html                              # the switch buttons still exist, unseen
-    assert "Up to 2 GB per file" in html                                    # the size limit is still stated
+    assert "<b>2 GB</b> per file" in html                                    # the size limit is still stated
 
 
 def test_the_file_card_is_active_by_default(env):

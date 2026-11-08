@@ -5,59 +5,53 @@
 {% include "_nudges.html" %}
 {% from "_ds.html" import ico, file_ic, status_pill, svc_cell, langs_cell with context %}
 {% from "_pager.html" import pager %}
+{% from "_home_art.html" import art_upload, art_youtube, art_sample, art_tools, stat_icon %}
 
-<div class="ds-page">
+<div class="ds-page hm-page">
   {% if next_step and not winback_offer %}
-  <div class="ds-card wb-banner ns-card"><div><strong>{{ next_step.title }}</strong> {{ next_step.text }}</div>
+  <div class="ds-card wb-banner ns-card"><div class="ns-body"><strong>{{ next_step.title }}</strong> <span class="ns-text">{{ next_step.text }}</span></div>
     <a class="ds-btn small" href="{{ next_step.url }}">{{ next_step.cta }}</a></div>
   {% endif %}
   {% if winback_offer %}
   <div class="ds-card wb-banner"><div><strong>A free month, on us.</strong> Welcome back: 30 days of your plan, free, with your personal code.</div>
     <a class="ds-btn small" href="/account/winback/{{ winback_offer['id'] }}">Get my free month</a></div>
   {% endif %}
-  <div class="ds-head">
-    <div>
-      <h1>{{ t(greeting) }}{% set fn = first_name(user) %}{% if fn %}{{ {'zh': '，', 'ja': '、', 'ar': '،'}.get(ui_lang(), ', ') }}{{ fn }}{% endif %}</h1>
-      <p>{{ t('home_sub') }}</p>
-    </div>
+  <div class="hm-head">
+    <h1>{{ t(greeting) }}{% set fn = first_name(user) %}{% if fn %}{{ {'zh': '，', 'ja': '、', 'ar': '،'}.get(ui_lang(), ', ') }}{{ fn }}{% endif %}</h1>
     {% if free_minutes_left and free_minutes_left > 0 %}
     {% set free_n %}<b>{{ free_minutes_left|round|int }}</b>{% endset %}
-    <div class="ds-head-actions"><a href="/account#order-form" class="ds-pill info ch-plan">{{ t('free_left', n=free_n) }}</a></div>
+    <a href="/account#order-form" class="hm-free">{{ t('free_left', n=free_n) }}</a>
     {% endif %}
   </div>
 
-  <div class="ds-actions">
-    <a class="ds-action primary" href="/account#order-form">
-      <span class="ds-action-ic">{{ ico('upload', 24) }}</span>
-      <span><strong>{{ t('act_upload_t') }}</strong><small>{{ t('act_upload_s') }}</small></span>
-      <span class="go">{{ ico('arrow', 18) }}</span>
+  <div class="hm-actions">
+    <a class="hm-card primary" href="/account#order-form">
+      <span class="hm-art-wrap">{{ art_upload() }}</span>
+      <span class="hm-card-foot"><strong>{{ t('act_upload_t') }}</strong><span class="go">{{ ico('arrow', 18) }}</span></span>
     </a>
-    <a class="ds-action" href="/account?source=youtube#order-form">
-      <span class="ds-action-ic">{{ ico('link', 24) }}</span>
-      <span><strong>{{ t('act_yt_t') }}</strong><small>{{ t('act_yt_s') }}</small></span>
-      <span class="go">{{ ico('arrow', 18) }}</span>
+    <a class="hm-card" href="/account?source=youtube#order-form">
+      <span class="hm-art-wrap">{{ art_youtube() }}</span>
+      <span class="hm-card-foot"><strong>{{ t('act_yt_t') }}</strong><span class="go">{{ ico('arrow', 18) }}</span></span>
     </a>
-    <a class="ds-action" href="/try">
-      <span class="ds-action-ic">{{ ico('play', 24) }}</span>
-      <span><strong>{{ t('act_demo_t') }}</strong><small>{{ t('act_demo_s') }}</small></span>
-      <span class="go">{{ ico('arrow', 18) }}</span>
+    <a class="hm-card" href="/try">
+      <span class="hm-art-wrap">{{ art_sample() }}</span>
+      <span class="hm-card-foot"><strong>{{ t('act_demo_t') }}</strong><span class="go">{{ ico('arrow', 18) }}</span></span>
     </a>
-    <a class="ds-action" href="/account/integrations" id="home-integrations">
-      <span class="ds-action-ic">{{ ico('puzzle', 24) }}</span>
-      <span><strong>{{ t('act_int_t') }}</strong><small>{{ t('act_int_s') }}</small></span>
-      <span class="go">{{ ico('arrow', 18) }}</span>
+    <a class="hm-card" href="/account/integrations" id="home-integrations">
+      <span class="hm-art-wrap">{{ art_tools() }}</span>
+      <span class="hm-card-foot"><strong>{{ t('act_int_t') }}</strong><span class="go">{{ ico('arrow', 18) }}</span></span>
     </a>
   </div>
 
-  <div class="ds-tiles">
-    <a class="ds-tile" href="/account/home?status=in_progress"><span class="ds-tile-ic">{{ ico('clock', 22) }}</span>
-      <span><b>{{ stats['in_progress'] }}</b><strong>{{ t('pill_processing') }}</strong><small>{{ t('tile_processing_h') }}</small></span></a>
-    <a class="ds-tile" href="/account/home?status=in_progress"><span class="ds-tile-ic">{{ ico('doc', 22) }}</span>
-      <span><b>{{ stats['in_review'] }}</b><strong>{{ t('pill_review') }}</strong><small>{{ t('tile_review_h') }}</small></span></a>
-    <a class="ds-tile{{ ' warn' if stats['needs_you'] > 0 else '' }}" href="/account/pending"><span class="ds-tile-ic">{{ ico('alert', 22) }}</span>
-      <span><b>{{ stats['needs_you'] }}</b><strong>{{ t('pill_needs') }}</strong><small>{{ t('tile_needs_h') }}</small></span></a>
-    <a class="ds-tile ok" href="/account/home?status=ready"><span class="ds-tile-ic">{{ ico('check', 22) }}</span>
-      <span><b>{{ stats['completed'] }}</b><strong>{{ t('pill_ready') }}</strong><small>{{ t('tile_ready_h') }}</small></span></a>
+  <div class="hm-stats">
+    <a class="hm-stat processing" href="/account/home?status=in_progress"><span class="hm-stat-ic">{{ stat_icon('processing') }}</span>
+      <span><b>{{ stats['in_progress'] }}</b><strong>{{ t('pill_processing') }}</strong></span></a>
+    <a class="hm-stat review" href="/account/home?status=in_progress"><span class="hm-stat-ic">{{ stat_icon('review') }}</span>
+      <span><b>{{ stats['in_review'] }}</b><strong>{{ t('pill_review') }}</strong></span></a>
+    <a class="hm-stat needs" href="/account/pending"><span class="hm-stat-ic">{{ stat_icon('needs') }}</span>
+      <span><b>{{ stats['needs_you'] }}</b><strong>{{ t('pill_needs') }}</strong></span></a>
+    <a class="hm-stat ready" href="/account/home?status=ready"><span class="hm-stat-ic">{{ stat_icon('ready') }}</span>
+      <span><b>{{ stats['completed'] }}</b><strong>{{ t('pill_ready') }}</strong></span></a>
   </div>
 
   <section class="ds-card ch-files" aria-labelledby="ch-files-title">

@@ -20,10 +20,10 @@
 {% set od_secs = ((order['duration_minutes'] or 0) * 60)|round|int %}
 <div class="od-head">
   <div class="od-head-main">
-    <a href="/account" class="breadcrumb">&larr; Back to my orders</a>
+    <a href="/account" class="breadcrumb">&larr; My orders</a>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
-    <h1>{{ order['original_filename'] }}</h1>
+    <div class="od-title"><span class="od-title-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="m10.5 9.5 4 2.5-4 2.5z"/></svg></span><h1>{{ order['original_filename'] }}</h1></div>
     <p class="od-meta">
       <span class="od-meta-ic" aria-hidden="true">{% if source_is_video %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="m16 10 5-3v10l-5-3"/></svg>{% else %}<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 12v0M8 8v8M12 5v14M16 9v6M20 11v2"/></svg>{% endif %}</span>
       {% if '.' in order['original_filename'] %}<span>{{ order['original_filename'].rsplit('.', 1)[-1]|upper }}</span><i>&middot;</i>{% endif %}
@@ -39,6 +39,7 @@
       <strong>{{ 'Order ready' if od_done else order['status']|client_status_label }}</strong>
       <small>{{ 'Your files are ready to download' if od_done else ('Something went wrong. We have been told.' if od_bad else 'This page updates as it moves along.') }}</small>
     </div>
+    {% if od_done %}<a class="od-dl" href="#order-files">Download</a>{% endif %}
   </div>
 </div>
 
@@ -86,6 +87,19 @@
         <p class="muted order-preview-hint">Tap any line of the transcript to jump to it.</p>
       </div>
       {% endif %}
+      <div class="mk-quick">
+        <button type="button" class="mk-q q-sum" data-click="sm-open"><span class="mk-q-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M9 11h6M9 15h4"/></svg></span><strong>Summary</strong></button>
+        {% if can_export_transcript %}<form method="post" action="/account/orders/{{ order['id'] }}/notes" class="mk-q-form"><button type="submit" class="mk-q q-note"><span class="mk-q-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M4 11h7M4 16h5"/><path d="m14 19 1-4 6-6 3 3-6 6z" transform="translate(-3 0)"/></svg></span><strong>Notes</strong></button></form>{% endif %}
+        <button type="button" class="mk-q q-ask" data-click="ai-ask-input"><span class="mk-q-ic"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H10l-5 4v-4H4z"/><path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01"/></svg></span><strong>Ask AI</strong></button>
+      </div>
+      <script>
+        [].forEach.call(document.querySelectorAll("[data-click]"), function (b) {
+          b.addEventListener("click", function () {
+            var t = document.getElementById(b.getAttribute("data-click")); if (!t) return;
+            if (t.tagName === "INPUT") { var d = t.closest("details"); if (d) d.open = true; t.scrollIntoView({ block: "center" }); t.focus(); } else { t.click(); }
+          });
+        });
+      </script>
     </div>
 
     <div class="order-workspace-transcript">
@@ -458,7 +472,7 @@
 </script>
 {% endif %}
 
-<div class="card">
+<div class="card" id="order-files">
 
   {% set ts = tat_status(order['tat_start_at'], order['deadline_at']) %}
   {% if ts and order['status'] in ['queued', 'processing', 'awaiting_review', 'editor_returned'] %}

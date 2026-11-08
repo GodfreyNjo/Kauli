@@ -1,0 +1,107 @@
+{#- The pictures on the account home's four action cards. Plain inline SVG: no files to load, they scale and follow the theme.
+    Each is drawn in a 200 x 130 box. Import with: {% from "_home_art.html" import art_upload, art_youtube, art_sample, art_tools %} -#}
+
+{% macro art_upload() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <rect x="34" y="14" width="74" height="58" rx="10" fill="#fff" fill-opacity=".34" transform="rotate(-6 71 43)"/>
+  <path d="M62 30l20 12-20 12z" fill="#fff" fill-opacity=".9" transform="rotate(-6 71 43)"/>
+  <rect x="92" y="22" width="76" height="60" rx="10" fill="#fff" fill-opacity=".3" transform="rotate(6 130 52)"/>
+  <circle cx="148" cy="38" r="6" fill="#ffd45a" transform="rotate(6 130 52)"/>
+  <path d="M100 72l16-18 14 14 10-8 22 20z" fill="#fff" fill-opacity=".75" transform="rotate(6 130 52)"/>
+  <path d="M58 98a16 16 0 0 1 5-31 22 22 0 0 1 42-4 18 18 0 0 1 8 35z" fill="#fff"/>
+  <path d="M90 100V78m0 0-8 8m8-8 8 8" stroke="#1d6fe0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
+{%- endmacro %}
+
+{% macro art_youtube() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <ellipse cx="96" cy="108" rx="62" ry="8" fill="#ff5a5a" fill-opacity=".16"/>
+  <rect x="34" y="26" width="116" height="78" rx="22" fill="#ee2a2a"/>
+  <rect x="34" y="26" width="116" height="40" rx="22" fill="#fff" fill-opacity=".1"/>
+  <path d="M82 50l34 17-34 17z" fill="#fff"/>
+  <circle cx="148" cy="92" r="21" fill="#fff" stroke="#dbe6fb" stroke-width="3"/>
+  <g stroke="#3f6fe0" stroke-width="4.5" stroke-linecap="round" fill="none">
+    <path d="M144 96a7 7 0 0 0 10 0l5-5a7 7 0 0 0-10-10l-2 2"/>
+    <path d="M152 88a7 7 0 0 0-10 0l-5 5a7 7 0 0 0 10 10l2-2"/>
+  </g>
+</svg>
+{%- endmacro %}
+
+{% macro art_sample() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <defs><linearGradient id="hm-sample" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7c8cf8"/><stop offset="1" stop-color="#5a5fe0"/></linearGradient></defs>
+  <ellipse cx="100" cy="112" rx="64" ry="7" fill="#5a5fe0" fill-opacity=".14"/>
+  <rect x="28" y="28" width="132" height="80" rx="14" fill="url(#hm-sample)"/>
+  <path d="M82 52l32 16-32 16z" fill="#fff"/>
+  <rect x="42" y="94" width="104" height="5" rx="2.5" fill="#fff" fill-opacity=".45"/>
+  <rect x="42" y="94" width="38" height="5" rx="2.5" fill="#fff"/>
+  <circle cx="80" cy="96.5" r="5" fill="#fff"/>
+  <g stroke="#ffc83a" stroke-width="4" stroke-linecap="round"><path d="M160 14l6 8M174 28l8 4M148 8l1 9"/></g>
+</svg>
+{%- endmacro %}
+
+{% macro art_tools() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <circle cx="100" cy="68" r="44" fill="none" stroke="#c9dcf7" stroke-width="2.5"/>
+  <circle cx="100" cy="112" r="14" fill="#5b8def"/>
+  <g stroke="#fff" stroke-width="3.5" stroke-linecap="round" fill="none">
+    <path d="M97 114a4 4 0 0 0 6-1l3-3a4 4 0 0 0-6-6"/><path d="M103 110a4 4 0 0 0-6 1l-3 3a4 4 0 0 0 6 6"/>
+  </g>
+  <!-- Slack -->
+  <rect x="78" y="8" width="44" height="44" rx="12" fill="#fff" stroke="#e5ecf8"/>
+  <rect x="89" y="14" width="8" height="18" rx="4" fill="#36c5f0"/><rect x="104" y="15" width="18" height="8" rx="4" fill="#2eb67d"/>
+  <rect x="103" y="28" width="8" height="18" rx="4" fill="#ecb22e"/><rect x="88" y="36" width="18" height="8" rx="4" fill="#e01e5a"/>
+  <!-- Google Drive -->
+  <rect x="16" y="52" width="44" height="44" rx="12" fill="#fff" stroke="#e5ecf8"/>
+  <path d="M33 64h10l12 20H45z" fill="#f4b400"/><path d="M33 64 21 84l5 8 12-20z" fill="#0f9d58"/><path d="M26 92h24l5-8H31z" fill="#4285f4"/>
+  <!-- Notion -->
+  <rect x="140" y="52" width="44" height="44" rx="12" fill="#fff" stroke="#e5ecf8"/>
+  <rect x="148" y="60" width="28" height="28" rx="5" fill="#fff" stroke="#111" stroke-width="2.5"/>
+  <path d="M155 80V68l10 12V68" stroke="#111" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{%- endmacro %}
+
+{#- The upload card on the new-project page: a media file with a waveform and an upload badge. -#}
+{% macro art_media() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <ellipse cx="86" cy="104" rx="52" ry="8" fill="#5b8def" fill-opacity=".14"/>
+  <rect x="30" y="40" width="46" height="46" rx="12" fill="#b9d3fb" fill-opacity=".55"/>
+  <path d="M62 16h42l18 18v60a8 8 0 0 1-8 8H62a8 8 0 0 1-8-8V24a8 8 0 0 1 8-8z" fill="#fff" stroke="#cfe0fa" stroke-width="2"/>
+  <path d="M104 16v14a4 4 0 0 0 4 4h14" fill="#dbe8fd"/>
+  <path d="M70 36l16 9-16 9z" fill="#3b82f6"/>
+  <g stroke="#3b82f6" stroke-width="3" stroke-linecap="round"><path d="M66 78v8M74 72v20M82 66v32M90 74v16M98 79v6"/></g>
+  <circle cx="112" cy="84" r="17" fill="#1d6fe0" stroke="#fff" stroke-width="3"/>
+  <path d="M112 92V76m0 0-7 7m7-7 7 7" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <g stroke="#6aa5f6" stroke-width="3" stroke-linecap="round"><path d="M132 24l6 7M144 38l8 3M124 14l1 8"/></g>
+</svg>
+{%- endmacro %}
+
+{#- The picture at the top right of the new-project card: a video with a waveform, and a translate badge. -#}
+{% macro art_wizard() -%}
+<svg viewBox="0 0 220 110" role="img" aria-hidden="true" class="mk-wizard-art">
+  <defs><linearGradient id="mk-w" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#78a8f6"/><stop offset="1" stop-color="#4f86ee"/></linearGradient></defs>
+  <rect x="18" y="16" width="136" height="76" rx="14" fill="url(#mk-w)" transform="rotate(-4 86 54)"/>
+  <circle cx="86" cy="38" r="15" fill="#fff"/><path d="M81 31l12 7-12 7z" fill="#4f86ee"/>
+  <g stroke="#fff" stroke-width="3" stroke-linecap="round" transform="rotate(-4 86 54)"><path d="M36 74v8M46 68v20M56 72v12M66 64v28M76 70v16M86 66v24M96 72v12M106 66v24M116 71v14M126 74v8M136 76v4"/></g>
+  <rect x="150" y="36" width="52" height="44" rx="12" fill="#5b8def" transform="rotate(5 176 58)"/>
+  <text x="161" y="66" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="22" fill="#fff" transform="rotate(5 176 58)">A</text>
+  <text x="178" y="70" font-family="Inter, Arial, sans-serif" font-weight="700" font-size="18" fill="#fff" transform="rotate(5 176 58)">文</text>
+</svg>
+{%- endmacro %}
+
+{#- The ring icon on each status tile. `kind` is processing, review, needs or ready. -#}
+{% macro stat_icon(kind) -%}
+<svg viewBox="0 0 48 48" width="34" height="34" aria-hidden="true">
+{%- if kind == 'processing' %}
+  <g fill="#3b82f6"><circle cx="24" cy="6" r="3.2"/><circle cx="35.6" cy="9.5" r="3" opacity=".9"/><circle cx="42" cy="24" r="2.8" opacity=".8"/><circle cx="38" cy="37" r="2.6" opacity=".65"/><circle cx="24" cy="42" r="2.4" opacity=".5"/><circle cx="10" cy="37" r="2.2" opacity=".4"/><circle cx="6" cy="24" r="2" opacity=".3"/><circle cx="10" cy="11" r="1.8" opacity=".2"/></g>
+{%- elif kind == 'review' %}
+  <path d="M13 5h16l8 8v26a3 3 0 0 1-3 3H13a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3z" fill="#8b7bf0"/><path d="M29 5v8h8" fill="#6c5ce0"/>
+  <path d="M16 20h14M16 26h10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="33" cy="35" r="9" fill="#5b4bd8" stroke="#fff" stroke-width="2.5"/><path d="m29 35 3 3 5-6" stroke="#fff" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+{%- elif kind == 'needs' %}
+  <path d="M24 6 4 41h40z" fill="#f59e0b" stroke="#f59e0b" stroke-width="3" stroke-linejoin="round"/><path d="M24 18v10" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><circle cx="24" cy="34.5" r="2.2" fill="#fff"/>
+{%- else %}
+  <circle cx="24" cy="24" r="19" fill="none" stroke="#16a34a" stroke-width="3.4"/><path d="m15 25 6.5 6.5L33 18" stroke="#16a34a" stroke-width="3.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+{%- endif %}
+</svg>
+{%- endmacro %}

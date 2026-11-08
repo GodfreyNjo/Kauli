@@ -60,7 +60,7 @@ def test_the_account_menu_for_a_customer_has_no_role_a_dark_mode_switch_and_a_fl
 def test_the_home_tab_has_a_clickable_integrations_card_for_customers_and_staff(env):
     home = env.client.get("/account/home").text
     card = home.split('id="home-integrations"')[1].split("</a>")[0]
-    assert 'href="/account/integrations"' in home.split('id="home-integrations"')[0][-80:] and "Connect your tools" in card and "Slack, Google Docs, Notion and more" in card
+    assert 'href="/account/integrations"' in home.split('id="home-integrations"')[0][-80:] and "Connect tools" in card
     from webapp import ui_text
     for lang, catalog in ui_text.CATALOG.items():                                        # every language has the words
         assert catalog.get("act_int_t") and catalog.get("act_int_s"), lang
