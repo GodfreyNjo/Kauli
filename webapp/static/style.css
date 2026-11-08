@@ -8491,3 +8491,20 @@ html[data-theme="dark"] #order-transcript-table tr.order-transcript-active td { 
 @media (max-width: 760px) { .review-card .rv-wrap { grid-template-columns: 1fr; } }
 html[data-theme="dark"] .rv-estimate { background: linear-gradient(135deg, #14233f, #112042); border-color: #243556; }
 html[data-theme="dark"] .rv-estimate h4, html[data-theme="dark"] .rv-rate b, html[data-theme="dark"] .rv-estimate .rv-total { color: #eaf1ff; }
+
+/* home cards, more compact: shorter cards, smaller pictures, labels that never wrap */
+.hm-head { margin: 4px 0 18px; }
+.hm-head h1 { font-size: clamp(1.6rem, 2.3vw, 2.2rem); }
+.hm-actions, .hm-stats { gap: 14px; margin-bottom: 14px; }
+.hm-card { min-height: 0; padding: 8px 16px 14px; border-radius: 22px; }
+.hm-art-wrap { padding: 2px 0; }
+.hm-art { max-width: 150px; max-height: 96px; }
+.hm-card-foot strong { min-width: 0; font-size: clamp(.92rem, 1.05vw, 1.08rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-card .go { width: 32px; height: 32px; }
+.hm-stat { padding: 12px 16px; gap: 12px; border-radius: 20px; min-width: 0; }
+.hm-stat-ic { width: 48px; height: 48px; } .hm-stat-ic svg { width: 26px; height: 26px; }
+.hm-stat b { font-size: clamp(1.6rem, 2vw, 2.1rem); }
+.hm-stat strong { margin-top: 2px; font-size: clamp(.82rem, .95vw, .95rem); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-stat > span:last-child { min-width: 0; }
+@media (max-width: 1280px) { .hm-actions, .hm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .hm-card { padding: 6px 12px 10px; } .hm-art { max-width: 120px; max-height: 76px; } .hm-stat { padding: 10px 12px; } }
