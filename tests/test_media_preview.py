@@ -25,8 +25,8 @@ def _finished(env, wav, **place):
 
 def test_an_audio_upload_plays_with_live_captions_and_a_transcript_that_follows(env, wav_bytes):
     order = _finished(env, wav_bytes)
-    page = env.client.get(f"/client/orders/{order['id']}").text
-    assert 'class="order-audio-stage"' in page and f'src="/client/orders/{order["id"]}/download/source"' in page
+    page = env.client.get(f"/account/orders/{order['id']}").text
+    assert 'class="order-audio-stage"' in page and f'src="/account/orders/{order["id"]}/download/source"' in page
     assert 'id="order-caption-overlay"' in page and "Tap any line of the transcript to jump to it." in page
     assert "highlight(media.currentTime * 1000)" in page and 'row.addEventListener("click"' in page
     import os
@@ -36,10 +36,10 @@ def test_an_audio_upload_plays_with_live_captions_and_a_transcript_that_follows(
 
 def test_the_original_file_is_served_inline_with_range_support(env, wav_bytes):
     order = _finished(env, wav_bytes)
-    r = env.client.get(f"/client/orders/{order['id']}/download/source", headers={"range": "bytes=0-99"})
+    r = env.client.get(f"/account/orders/{order['id']}/download/source", headers={"range": "bytes=0-99"})
     assert r.status_code == 206 and len(r.content) == 100 and r.headers["content-type"].startswith("audio")
     assert "attachment" not in r.headers.get("content-disposition", "")
-    full = env.client.get(f"/client/orders/{order['id']}/download/source")
+    full = env.client.get(f"/account/orders/{order['id']}/download/source")
     assert full.status_code == 200 and full.content == wav_bytes
 
 
@@ -51,7 +51,7 @@ def test_a_video_upload_plays_as_video_with_subtitles_over_it(env, wav_bytes):
     conn.execute("UPDATE orders SET audio_path = ? WHERE id = ?", (str(video), order["id"]))
     conn.commit()
     conn.close()
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert re.search(r'<video controls preload="metadata" class="order-preview-media" src="[^"]+/download/source"', page)
     assert 'id="order-caption-overlay"' in page and 'class="order-audio-stage"' not in page
 
@@ -62,7 +62,7 @@ def test_a_youtube_order_shows_the_video_with_captions_synced_through_the_player
     conn.execute("UPDATE orders SET source_youtube_id = 'dQw4w9WgXcQ' WHERE id = ?", (order["id"],))
     conn.commit()
     conn.close()
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="order-yt"' in page and "enablejsapi=1" in page and 'id="order-caption-overlay"' in page
     assert "onYouTubeIframeAPIReady" in page and "getCurrentTime" in page
 
@@ -70,6 +70,6 @@ def test_a_youtube_order_shows_the_video_with_captions_synced_through_the_player
 def test_nothing_plays_and_nothing_breaks_when_the_original_is_gone(env, wav_bytes):
     order = _finished(env, wav_bytes)
     Path(order["audio_path"]).unlink()
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert 'class="order-audio-stage"' not in page and "Transcript &amp; translation" in page
-    assert env.client.get(f"/client/orders/{order['id']}/download/source").status_code == 404
+    assert env.client.get(f"/account/orders/{order['id']}/download/source").status_code == 404

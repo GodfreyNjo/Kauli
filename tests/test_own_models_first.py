@@ -88,7 +88,7 @@ def test_turning_elevenlabs_off_takes_the_realistic_voice_away_everywhere(premiu
     premium.db.set_provider_setting("elevenlabs", enabled=False)
     assert not premium.app._elevenlabs_configured()
     assert premium.order_from(premium.dub())["tts"] != "elevenlabs"                                 # Premium dubs still work, with the standard voice
-    assert 'name="addon_premium_voice"' not in premium.client.get("/client").text                    # and the wizard stops offering it
+    assert 'name="addon_premium_voice"' not in premium.client.get("/account").text                    # and the wizard stops offering it
 
 
 def test_the_switchboard_page_lists_elevenlabs_with_the_others(env):

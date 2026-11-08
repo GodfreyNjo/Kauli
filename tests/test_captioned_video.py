@@ -36,10 +36,10 @@ def _ready_order(env, wav_bytes, video=True, entitled=True):
 
 def test_ttml_and_sbv_download_as_translated_captions(env, wav_bytes):
     order = _ready_order(env, wav_bytes)
-    ttml = env.client.get(f"/client/orders/{order['id']}/download/ttml")
+    ttml = env.client.get(f"/account/orders/{order['id']}/download/ttml")
     assert ttml.status_code == 200 and "application/ttml+xml" in ttml.headers["content-type"] and ".ttml" in ttml.headers["content-disposition"]
     assert 'xml:lang="en"' in ttml.text and "Hello there, my friend." in ttml.text
-    sbv = env.client.get(f"/client/orders/{order['id']}/download/sbv")
+    sbv = env.client.get(f"/account/orders/{order['id']}/download/sbv")
     assert sbv.status_code == 200 and sbv.text.startswith("0:00:00.500,") and ".sbv" in sbv.headers["content-disposition"]
 
 
@@ -49,7 +49,7 @@ def test_a_transcription_only_order_gets_its_transcript_as_ttml(env, wav_bytes):
     env.db.set_order_free_preview(order["id"], False)
     env.monkeypatch.setattr(env.app, "_plan_chosen", lambda client_id: True)
     env.monkeypatch.setattr(env.app, "_load_job", lambda o: _job())
-    ttml = env.client.get(f"/client/orders/{order['id']}/download/ttml").text
+    ttml = env.client.get(f"/account/orders/{order['id']}/download/ttml").text
     assert 'xml:lang="sw"' in ttml and "Habari rafiki yangu." in ttml and "Hello there" not in ttml
 
 
@@ -62,7 +62,7 @@ def test_creating_a_look_starts_one_background_render_and_the_file_downloads(env
         env.app._captioned_path(o, style).write_bytes(b"mp4")
         env.app._captioned_path(o, style).with_suffix(".rendering").unlink(missing_ok=True)
     monkeypatch.setattr(env.app, "_render_captioned_video", fake_render)
-    r = env.client.post(f"/client/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
+    r = env.client.post(f"/account/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
     assert r.status_code == 303 and "notice=" in r.headers["location"] and "#captioned-video" in r.headers["location"]
     for _ in range(40):
         if made:
@@ -70,9 +70,9 @@ def test_creating_a_look_starts_one_background_render_and_the_file_downloads(env
         time.sleep(0.05)
     assert made == ["social"]
     assert env.app._captioned_state(order, "social") == "ready" and env.app._captioned_state(order, "box") is None
-    got = env.client.get(f"/client/orders/{order['id']}/download/captioned_social")
+    got = env.client.get(f"/account/orders/{order['id']}/download/captioned_social")
     assert got.status_code == 200 and got.content == b"mp4" and "captioned_social_en.mp4" in got.headers["content-disposition"]
-    again = env.client.post(f"/client/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
+    again = env.client.post(f"/account/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
     assert "already+ready" in again.headers["location"] and made == ["social"]               # no second render
 
 
@@ -81,11 +81,11 @@ def test_the_page_lists_each_look_with_its_state(env, wav_bytes):
     env.app._captioned_path(order, "box").write_bytes(b"mp4")
     marker = env.app._captioned_path(order, "social").with_suffix(".rendering")
     marker.write_text("x")
-    html = env.client.get(f"/client/orders/{order['id']}").text
+    html = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="captioned-video"' in html and "More caption formats" in html
     assert 'data-captioned="ready"' in html and 'data-captioned="rendering"' in html and "Creating your video" in html
     assert f"/download/captioned_box" in html and "words light up as they are spoken" in html
-    again = env.client.post(f"/client/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
+    again = env.client.post(f"/account/orders/{order['id']}/captioned-video", data={"style": "social"}, follow_redirects=False)
     assert "already+being+made" in again.headers["location"]
 
 
@@ -93,18 +93,18 @@ def test_refusals_leave_nothing_behind(env, wav_bytes, monkeypatch):
     started = []
     monkeypatch.setattr(env.app, "_render_captioned_video", lambda o, s: started.append(s))
     plain = _ready_order(env, wav_bytes, entitled=False)
-    r = env.client.post(f"/client/orders/{plain['id']}/captioned-video", data={"style": "classic"}, follow_redirects=False)
+    r = env.client.post(f"/account/orders/{plain['id']}/captioned-video", data={"style": "classic"}, follow_redirects=False)
     assert "upgrade_for=video" in r.headers["location"]
-    assert "upgrade_for=video" in env.client.get(f"/client/orders/{plain['id']}/download/captioned_classic", follow_redirects=False).headers["location"]
-    html = env.client.get(f"/client/orders/{plain['id']}").text
+    assert "upgrade_for=video" in env.client.get(f"/account/orders/{plain['id']}/download/captioned_classic", follow_redirects=False).headers["location"]
+    html = env.client.get(f"/account/orders/{plain['id']}").text
     assert "Captioned videos come with Premium and up" in html
     entitled = _ready_order(env, wav_bytes)
-    assert "error=" in env.client.post(f"/client/orders/{entitled['id']}/captioned-video", data={"style": "neon"}, follow_redirects=False).headers["location"]
+    assert "error=" in env.client.post(f"/account/orders/{entitled['id']}/captioned-video", data={"style": "neon"}, follow_redirects=False).headers["location"]
     env.monkeypatch.setattr(env.app, "is_video_file", lambda p: False)
-    audio = env.client.post(f"/client/orders/{entitled['id']}/captioned-video", data={"style": "classic"}, follow_redirects=False)
+    audio = env.client.post(f"/account/orders/{entitled['id']}/captioned-video", data={"style": "classic"}, follow_redirects=False)
     assert "audio+only" in audio.headers["location"]
     assert started == [] and env.app._captioned_state(entitled, "classic") is None
-    assert env.client.get(f"/client/orders/{entitled['id']}/download/captioned_classic").status_code == 404
+    assert env.client.get(f"/account/orders/{entitled['id']}/download/captioned_classic").status_code == 404
 
 
 def test_a_stale_render_marker_from_a_restart_does_not_block_a_retry(env, wav_bytes):

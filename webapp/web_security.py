@@ -21,7 +21,7 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 TOKEN_PREFIXES = ("/webhooks/", "/api/v1/", "/mcp")
 
 # Pages for one signed-in person.
-PRIVATE_PREFIXES = ("/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password", "/reset-password",
+PRIVATE_PREFIXES = ("/account", "/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password", "/reset-password",
                     "/billing/", "/receipts/", "/notifications/", "/auth/")
 
 SECURITY_TXT_EXPIRES = "2027-11-05T00:00:00.000Z"

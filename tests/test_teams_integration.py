@@ -105,7 +105,7 @@ def test_order_ready_posts_a_card_without_download_buttons_by_default(teams):
     assert facts["File"] == "clip.wav" and facts["Service"] == "Transcription" and facts["Order"] == order["id"]
     actions = _actions(teams.sent[0]["json"])
     assert [a["title"] for a in actions] == ["Open order"]
-    assert actions[0]["url"] == f"https://kauli.test/client/orders/{order['id']}"
+    assert actions[0]["url"] == f"https://kauli.test/account/orders/{order['id']}"
 
 
 def test_download_buttons_only_when_opted_in_and_downloads_are_unlocked(teams):

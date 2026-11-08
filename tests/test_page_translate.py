@@ -104,7 +104,7 @@ def test_a_public_page_has_an_address_in_each_language_with_the_right_tags(env, 
 
 def test_arabic_pages_read_right_to_left_and_private_pages_have_no_language_address(env, fake):
     assert 'dir="rtl"' in env.client.get("/ar/human-review").text
-    assert env.client.get("/zh/client/home", follow_redirects=False).status_code in (404, 303, 401)
+    assert env.client.get("/zh/account/home", follow_redirects=False).status_code in (404, 303, 401)
     assert env.client.get("/zh/staff").status_code == 404
 
 
@@ -132,7 +132,7 @@ def test_a_browser_set_to_chinese_is_sent_to_the_chinese_address_once(env, fake)
 
 def test_the_signed_in_account_is_translated_end_to_end(env, fake):
     env.db.set_ui_lang("u1", "zh")
-    page = env.client.get("/client/billing").text
+    page = env.client.get("/account/billing").text
     assert "«zh»" in page
     assert 'lang="zh-Hans"' in page
 
@@ -149,7 +149,7 @@ def test_the_sitemap_lists_every_public_page_in_every_language_with_alternates(e
     xml = env.client.get("/sitemap.xml").text
     assert "<loc>http://testserver/zh/human-review</loc>" in xml and "<loc>http://testserver/ja/solutions/youtubers</loc>" in xml
     assert 'hreflang="zh-Hans" href="http://testserver/zh/human-review"' in xml and 'hreflang="x-default" href="http://testserver/human-review"' in xml
-    assert "/zh/terms" not in xml and "/zh/client" not in xml                                     # legal and private pages have no translated address
+    assert "/zh/terms" not in xml and "/zh/account" not in xml                                     # legal and private pages have no translated address
 
 
 def test_an_email_goes_out_in_the_customers_language(env, fake):

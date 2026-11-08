@@ -126,10 +126,10 @@ def can_nudge(c: dict, now: float | None = None) -> bool:
 def suggestion(c: dict) -> tuple[str, str, str]:
     """(what to try, the sentence, where it is) for someone who only uses one thing."""
     if "translate" not in c["used"]:
-        return ("Translate", "Turn a transcript into another language: Instant AI translation covers 76+ languages, and it comes with your free minutes on Pro and Premium.", "/client#new-project")
+        return ("Translate", "Turn a transcript into another language: Instant AI translation covers 76+ languages, and it comes with your free minutes on Pro and Premium.", "/account#new-project")
     if "summary" not in c["used"]:
-        return ("Summarise", "Open a finished order and press Summarise to get the key points, action items or a blog outline in a click.", "/client/home")
-    return ("Dub", "Hear a video spoken in another language with an AI voice, with captions burned in.", "/client#new-project")
+        return ("Summarise", "Open a finished order and press Summarise to get the key points, action items or a blog outline in a click.", "/account/home")
+    return ("Dub", "Hear a video spoken in another language with an AI voice, with captions burned in.", "/account#new-project")
 
 
 # ---------------------------------------------------------------------------------------------------------- the in-app card
@@ -141,10 +141,10 @@ def next_step(user_id: str, now: float | None = None) -> dict | None:
     free = billing.FREE_MINUTES_PER_MONTH
     if c["state"] == "never_started":
         return {"state": c["state"], "title": "Your first file is free", "text": f"You have {free:.0f} Instant AI minutes every month. Upload a recording and get a transcript back in minutes.",
-                "cta": "Upload a file", "url": "/client#new-project"}
+                "cta": "Upload a file", "url": "/account#new-project"}
     if c["state"] == "drifting":
         return {"state": c["state"], "title": "Pick up where you left off", "text": "Your free minutes renew every month, so there is nothing to catch up on. Upload something new, or reopen a finished order.",
-                "cta": "Start a project", "url": "/client#new-project"}
+                "cta": "Start a project", "url": "/account#new-project"}
     if c["state"] == "underusing":
         what, text, url = suggestion(c)
         return {"state": c["state"], "title": f"Get more from your files: {what.lower()} them", "text": text, "cta": f"Try {what.lower()}", "url": url}
@@ -157,16 +157,16 @@ def _email(c: dict, base_url: str) -> tuple[str, list[str], str, str]:
     free = billing.FREE_MINUTES_PER_MONTH
     if c["state"] == "never_started":
         return ("Your free minutes are waiting", [f"You signed up for Kauli but have not uploaded anything yet. Your first {free:.0f} minutes of Instant AI transcription are free every month.",
-                                                  "Upload a recording and you get a transcript back in minutes, ready to download as Word, text or subtitles."], "Upload your first file", f"{base_url}/client")
+                                                  "Upload a recording and you get a transcript back in minutes, ready to download as Word, text or subtitles."], "Upload your first file", f"{base_url}/account")
     if c["state"] == "drifting":
         return ("Pick up where you left off", ["It has been a little while since your last project on Kauli.",
                                                f"Your free minutes renew every month, so there is nothing to catch up on: upload a recording and carry on. If something got in the way last time, just reply and tell us."],
-                "Start a project", f"{base_url}/client")
+                "Start a project", f"{base_url}/account")
     if c["state"] == "underusing":
         what, text, url = suggestion(c)
         return (f"Get more from Kauli: {what.lower()}", ["You have been getting transcripts from Kauli, and there is more in it than that.", text], f"Try {what.lower()}", base_url + url)
     return ("How is Kauli working for you?", ["We noticed things have gone a bit quiet on your account, and we would like to know whether Kauli is doing what you need.",
-                                             "If something is missing or in the way, reply to this email and tell us. A real person reads every reply."], "Open my account", f"{base_url}/client/home")
+                                             "If something is missing or in the way, reply to this email and tell us. A real person reads every reply."], "Open my account", f"{base_url}/account/home")
 
 
 def send_nudge(c: dict, base_url: str) -> bool:

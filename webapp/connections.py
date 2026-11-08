@@ -196,7 +196,7 @@ setTimeout(function(){{window.close()}},1400)</script></body></html>"""
 
 
 # ------------------------------------------------------------------------------------------------ connect
-@router.get("/client/integrations/{provider}/connect")
+@router.get("/account/integrations/{provider}/connect")
 def connect(request: Request, provider: str):
     user, client_id = _owner_id(request)
     if not user:
@@ -309,16 +309,16 @@ def _dropbox_label(token: str) -> str:
 DISCORD_HOOK = re.compile(r"^https://(?:canary\.|ptb\.)?discord(?:app)?\.com/api/webhooks/\d{5,25}/[A-Za-z0-9_\-]{20,100}$")
 
 
-@router.post("/client/integrations/discord/paste")
+@router.post("/account/integrations/discord/paste")
 def discord_paste(request: Request, url: str = Form("")):
     """Discord without Kauli having to register an app first: the customer pastes their channel's webhook link (Discord makes one in two
     clicks) and Kauli proves it works by posting a first message there."""
     user, client_id = _owner_id(request)
     if not user:
-        return RedirectResponse("/login?next=/client/integrations", status_code=303)
+        return RedirectResponse("/login?next=/account/integrations", status_code=303)
 
     def back(kind: str, text: str):
-        return RedirectResponse(f"/client/integrations?{kind}={quote(text)}", status_code=303)
+        return RedirectResponse(f"/account/integrations?{kind}={quote(text)}", status_code=303)
 
     if user["client_scope_id"] != user["id"]:
         return back("notice", "Only the account owner can connect integrations.")
@@ -362,7 +362,7 @@ def _notion_first_page(token: str) -> str | None:
 
 
 # ------------------------------------------------------------------------------------------------ settings and disconnect
-@router.get("/client/integrations/{provider}/settings")
+@router.get("/account/integrations/{provider}/settings")
 def get_settings(request: Request, provider: str):
     user, client_id = _owner_id(request)
     row = get_connection(client_id, provider) if user and provider in PROVIDERS else None
@@ -374,7 +374,7 @@ def get_settings(request: Request, provider: str):
                          "options": [{"key": k, "label": label, "on": current[k]} for k, label, _d in spec["settings"]]})
 
 
-@router.post("/client/integrations/{provider}/settings")
+@router.post("/account/integrations/{provider}/settings")
 async def save_settings(request: Request, provider: str):
     user, client_id = _owner_id(request)
     row = get_connection(client_id, provider) if user and provider in PROVIDERS else None
@@ -393,7 +393,7 @@ async def save_settings(request: Request, provider: str):
     return JSONResponse({"ok": True, "settings": clean})
 
 
-@router.post("/client/integrations/{provider}/disconnect")
+@router.post("/account/integrations/{provider}/disconnect")
 def disconnect(request: Request, provider: str):
     user, client_id = _owner_id(request)
     if not user or provider not in PROVIDERS:
@@ -615,7 +615,7 @@ def deliver_order_ready(order, base_url: str) -> None:
     conn = db.get_conn()
     rows = conn.execute("SELECT * FROM integration_connections WHERE client_id = ?", (order["client_id"],)).fetchall()
     conn.close()
-    link = f"{base_url.rstrip('/')}/client/orders/{order['id']}"
+    link = f"{base_url.rstrip('/')}/account/orders/{order['id']}"
     for row in rows:
         if row["provider"] not in _SEND:                                 # calendars send Kauli to meetings; they receive nothing
             continue

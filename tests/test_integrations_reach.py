@@ -23,16 +23,16 @@ def _clean(monkeypatch):
 
 def test_discord_connects_by_pasting_a_link_and_proves_it_with_a_first_message(env, monkeypatch, wav_bytes):
     _clean(monkeypatch)
-    card = env.client.get("/client/integrations").text.split("<h3>Discord</h3>")[1].split("</article>")[0]
-    assert 'action="/client/integrations/discord/paste"' in card and "Copy Webhook URL" in card and "Coming soon" not in card
+    card = env.client.get("/account/integrations").text.split("<h3>Discord</h3>")[1].split("</article>")[0]
+    assert 'action="/account/integrations/discord/paste"' in card and "Copy Webhook URL" in card and "Coming soon" not in card
     sent = []
     monkeypatch.setattr(connections.httpx, "post", lambda url, **k: sent.append((url, k)) or Reply({}, 204))
-    r = env.client.post("/client/integrations/discord/paste", data={"url": HOOK}, follow_redirects=False)
+    r = env.client.post("/account/integrations/discord/paste", data={"url": HOOK}, follow_redirects=False)
     assert "Discord+is+connected" in r.headers["location"] or "Discord%20is%20connected" in r.headers["location"]
     assert sent[0][0] == HOOK and "Kauli is connected" in sent[0][1]["json"]["content"]                    # a first message proves the link works
     row = connections.get_connection("u1", "discord")
     assert connections._dec(row["target_enc"]) == HOOK and HOOK not in row["target_enc"]
-    page = env.client.get("/client/integrations").text.split("<h3>Discord</h3>")[1].split("</article>")[0]
+    page = env.client.get("/account/integrations").text.split("<h3>Discord</h3>")[1].split("</article>")[0]
     assert 'data-settings="discord"' in page and 'data-disconnect="discord"' in page and "ig-paste" not in page
     sent.clear()                                                                                             # and finished orders arrive there
     connections.deliver_order_ready(_order(env, wav_bytes), "https://kauli.test")
@@ -45,11 +45,11 @@ def test_a_pasted_discord_link_must_really_be_a_discord_webhook_that_answers(env
     monkeypatch.setattr(connections.httpx, "post", lambda url, **k: sent.append(url) or Reply({}, 204))
     for bad in ("https://evil.example.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz", "http://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz",
                 "https://discord.com.evil.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz", "https://discord.com/api/webhooks/1/x", "not a link", ""):
-        r = env.client.post("/client/integrations/discord/paste", data={"url": bad}, follow_redirects=False)
+        r = env.client.post("/account/integrations/discord/paste", data={"url": bad}, follow_redirects=False)
         assert "notice=" in r.headers["location"] and "does+not+look" in r.headers["location"].replace("%20", "+"), bad
     assert sent == [] and connections.get_connection("u1", "discord") is None                                # nothing was contacted or saved
     monkeypatch.setattr(connections.httpx, "post", lambda url, **k: Reply({}, 404))                          # a link Discord no longer knows
-    r = env.client.post("/client/integrations/discord/paste", data={"url": HOOK}, follow_redirects=False)
+    r = env.client.post("/account/integrations/discord/paste", data={"url": HOOK}, follow_redirects=False)
     assert "did+not+accept" in r.headers["location"].replace("%20", "+") and connections.get_connection("u1", "discord") is None
 
 

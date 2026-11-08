@@ -8067,3 +8067,32 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .dg-checks small { color: var(--muted); }
 .dg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); } .dg-dot.is-on { background: var(--ok, #1fa55a); }
 @media (max-width: 700px) { .dg-facts div { grid-template-columns: 1fr; } .dg-checks li { grid-template-columns: 14px auto auto; } .dg-checks small { grid-column: 2 / -1; } }
+
+/* ---- Shared form behaviour (app_ux.js) and the account-security pages ---- */
+.btn-danger, button.btn-danger { background: var(--err, #d92d20); border-color: var(--err, #d92d20); color: #fff; }
+.btn-danger:hover, button.btn-danger:hover { filter: brightness(0.92); }
+.btn-danger-outline, button.btn-danger-outline { background: transparent; color: var(--err, #d92d20); border: 1px solid color-mix(in srgb, var(--err, #d92d20) 55%, transparent); }
+.btn-danger-outline:hover { background: color-mix(in srgb, var(--err, #d92d20) 10%, transparent); }
+[data-danger], form[data-danger] button[type="submit"] { color: var(--err, #d92d20); }
+button.is-loading { position: relative; cursor: progress; opacity: 0.85; }
+button.is-loading::before { content: ""; display: inline-block; width: 0.9em; height: 0.9em; margin-right: 8px; vertical-align: -0.1em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: ux-spin 0.7s linear infinite; }
+@keyframes ux-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { button.is-loading::before { animation-duration: 2s; } }
+.field-error { display: block; min-height: 1.2em; margin-top: 4px; color: var(--err, #d92d20); font-size: 0.85rem; }
+input[aria-invalid="true"] { border-color: var(--err, #d92d20); }
+.ux-dialog { max-width: min(440px, calc(100vw - 32px)); padding: 22px 24px; border: 1px solid var(--border-subtle); border-radius: 16px; background: var(--surface, #fff); color: inherit; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.5); }
+.ux-dialog::backdrop { background: rgba(5, 12, 30, 0.55); }
+.ux-dialog p { margin: 0 0 18px; font-size: 1.02rem; line-height: 1.5; }
+.ux-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.acct-page { max-width: 760px; margin: 0 auto; padding: 8px 0 40px; }
+.acct-narrow { max-width: 480px; }
+.acct-list { list-style: none; margin: 18px 0; padding: 0; display: grid; gap: 10px; }
+.acct-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface); }
+.acct-row.is-current { border-color: var(--accent); }
+.acct-row small { display: block; color: var(--muted); margin-top: 2px; }
+.acct-badge { margin-left: 8px; padding: 2px 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text, var(--accent)); font-size: 0.75rem; font-weight: 700; }
+.acct-card { margin: 16px 0; padding: 18px 20px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); }
+.acct-card h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.acct-card label { display: block; margin: 10px 0 4px; font-weight: 600; }
+.acct-card input { width: 100%; box-sizing: border-box; margin: 0 0 12px; }
+.acct-actions { margin: 14px 0; }

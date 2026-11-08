@@ -1,6 +1,6 @@
 """Push a real, generated caption file straight onto a client's own
-YouTube video - webapp/app.py's /client/youtube/connect|callback|disconnect
-and /client/orders/{id}/push-captions-youtube routes.
+YouTube video - webapp/app.py's /account/youtube/connect|callback|disconnect
+and /account/orders/{id}/push-captions-youtube routes.
 
 A deliberately SEPARATE OAuth grant from the sign-in Google login
 (webapp/supabase_auth.py's Google flow): that one only ever asks for

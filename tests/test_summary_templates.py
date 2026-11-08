@@ -55,7 +55,7 @@ def test_opening_an_order_makes_no_summary_and_asks_for_none(env, wav_bytes, mon
     order = _ready(env, wav_bytes)
     calls = []
     _writer(env, calls)
-    html = env.client.get(f"/client/orders/{order['id']}").text
+    html = env.client.get(f"/account/orders/{order['id']}").text
     assert calls == [] and env.db.list_order_summaries(order["id"]) == []
     assert 'id="sm-open"' in html and "No summary yet" in html and "Create summary" in html
     assert "ai-summary-loading" not in html and "Generating a summary" not in html               # the old automatic request is gone
@@ -66,15 +66,15 @@ def test_choosing_a_template_writes_it_once_and_keeps_it(env, wav_bytes):
     order = _ready(env, wav_bytes)
     calls = []
     _writer(env, calls)
-    r = env.client.post(f"/client/orders/{order['id']}/ai-summary", data={"template": "general-meeting"})
+    r = env.client.post(f"/account/orders/{order['id']}/ai-summary", data={"template": "general-meeting"})
     data = r.json()
     assert data["ok"] and data["template"] == "general-meeting" and data["name"] == "General Meeting" and "<h4>Decisions Made</h4>" in data["html"]
     assert calls == ["general-meeting"]
-    again = env.client.post(f"/client/orders/{order['id']}/ai-summary", data={"template": "general-meeting"}).json()
+    again = env.client.post(f"/account/orders/{order['id']}/ai-summary", data={"template": "general-meeting"}).json()
     assert again["ok"] and again["summary"] == MARKDOWN and calls == ["general-meeting"]          # kept: no second paid request
-    env.client.post(f"/client/orders/{order['id']}/ai-summary", data={"template": "standard"})
+    env.client.post(f"/account/orders/{order['id']}/ai-summary", data={"template": "standard"})
     assert calls == ["general-meeting", "standard"] and len(env.db.list_order_summaries(order["id"])) == 2
-    html = env.client.get(f"/client/orders/{order['id']}").text
+    html = env.client.get(f"/account/orders/{order['id']}").text
     assert 'data-template="general-meeting"' in html and 'data-template="standard"' in html and "Create another summary" in html
     assert 'id="sm-empty" hidden' in html                                                        # the "no summary yet" note goes away
     plain = env.db.get_order(order["id"])["ai_summary_text"]
@@ -85,9 +85,9 @@ def test_no_template_given_uses_the_basic_summary_and_a_failure_saves_nothing(en
     order = _ready(env, wav_bytes)
     calls = []
     _writer(env, calls)
-    assert env.client.post(f"/client/orders/{order['id']}/ai-summary").json()["template"] == "basic-summary"
+    assert env.client.post(f"/account/orders/{order['id']}/ai-summary").json()["template"] == "basic-summary"
     env.monkeypatch.setattr(order_ai_assist, "generate_templated_summary", lambda t, tpl: {"ok": False, "error": "Summary request failed: down"})
-    bad = env.client.post(f"/client/orders/{order['id']}/ai-summary", data={"template": "board-meeting"}).json()
+    bad = env.client.post(f"/account/orders/{order['id']}/ai-summary", data={"template": "board-meeting"}).json()
     assert not bad["ok"] and [r["template_id"] for r in env.db.list_order_summaries(order["id"])] == ["basic-summary"]
 
 

@@ -16,8 +16,8 @@
   <section class="guest-card">
     <h2>See your transcript in your free account</h2>
     <p>Results are shown inside your account. Give your email and we send a link; open it and your transcript is there, along with your {{ max_minutes }} free minutes each month.</p>
-    <form method="post" action="/client/save-guest" class="guest-form-big">
-      <input type="hidden" name="next" value="/client/orders/{{ order['id'] }}">
+    <form method="post" action="/account/save-guest" class="guest-form-big">
+      <input type="hidden" name="next" value="/account/orders/{{ order['id'] }}">
       <input type="email" name="email" placeholder="you@example.com" required aria-label="Your email address" autocomplete="email">
       <button type="submit" class="btn cta-olive">Email me the link</button>
     </form>
@@ -30,7 +30,7 @@
   (function () {
     var bar = document.getElementById("go-bar"), status = document.getElementById("go-status"), title = document.getElementById("go-title");
     function poll() {
-      fetch("/client/orders/{{ order['id'] }}/progress", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+      fetch("/account/orders/{{ order['id'] }}/progress", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
         if (d && typeof d.pct === "number") bar.value = Math.max(10, Math.min(100, d.pct));
         if (d && d.done) { bar.value = 100; status.textContent = "Ready."; title.textContent = "Your transcript is ready"; return; }
         setTimeout(poll, 4000);

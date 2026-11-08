@@ -9,18 +9,18 @@
       <h1>Files</h1>
       <p>Access and manage all your uploaded files.</p>
     </div>
-    <div class="ds-head-actions"><a href="/client#order-form" class="ds-btn">{{ ico('upload', 18) }} Upload file</a></div>
+    <div class="ds-head-actions"><a href="/account#order-form" class="ds-btn">{{ ico('upload', 18) }} Upload file</a></div>
   </div>
 
   <section class="ds-card">
     <div class="ds-tools">
       <div class="ds-tabs" style="margin:0;" role="group" aria-label="File type">
         {% for key, label in [('', 'All'), ('audio', 'Audio'), ('video', 'Video'), ('other', 'Others')] %}
-        <a href="/client/files{% if key or q %}?{% if key %}type={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
+        <a href="/account/files{% if key or q %}?{% if key %}type={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
            class="{{ 'is-on' if type == key else '' }}"{% if type == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
         {% endfor %}
       </div>
-      <form class="ds-search" method="get" action="/client/files" role="search">{{ ico('search', 18) }}
+      <form class="ds-search" method="get" action="/account/files" role="search">{{ ico('search', 18) }}
         <input type="search" name="q" value="{{ q }}" placeholder="Search files..." aria-label="Search files" autocomplete="off">
         {% if type %}<input type="hidden" name="type" value="{{ type }}">{% endif %}
       </form>
@@ -29,7 +29,7 @@
     {% if not all_count %}
     <div class="empty-state ds-empty">
       <p>You haven't submitted any projects yet.</p>
-      <a href="/client#order-form" class="ds-btn">+ Submit your first order</a>
+      <a href="/account#order-form" class="ds-btn">+ Submit your first order</a>
     </div>
     {% elif not rows %}
     <p class="ds-empty">No files match.</p>
@@ -40,7 +40,7 @@
         <tbody>
           {% for r in rows %}
           <tr>
-            <td><div class="ds-file">{{ file_ic(r['order']['original_filename']) }}<div><a href="/client/orders/{{ r['order']['id'] }}"><strong title="{{ r['order']['original_filename'] }}">{{ r['order']['original_filename'] }}</strong></a>
+            <td><div class="ds-file">{{ file_ic(r['order']['original_filename']) }}<div><a href="/account/orders/{{ r['order']['id'] }}"><strong title="{{ r['order']['original_filename'] }}">{{ r['order']['original_filename'] }}</strong></a>
               <small>{{ r['order']['source_lang']|upper }}{% if r['order']['target_lang'] != r['order']['source_lang'] %} &rarr; {{ r['order']['target_lang']|upper }}{% endif %}</small></div></div></td>
             <td class="hide-sm">{{ {'audio': 'Audio', 'video': 'Video'}.get(r['kind'], 'Other') }}</td>
             <td class="hide-sm num">{% if r['source_size'] %}{{ r['source_size']|filesizeformat }}{% else %}&mdash;{% endif %}</td>
@@ -52,9 +52,9 @@
                 <ul>
                   <li class="muted">{{ r['order']['original_filename'] }}: not re-downloadable once submitted</li>
                   {% for d in r['deliverables'] %}
-                  <li><a href="/client/orders/{{ r['order']['id'] }}/download/{{ d['kind'] }}" title="Download">{{ d['label'] }} &darr;</a></li>
+                  <li><a href="/account/orders/{{ r['order']['id'] }}/download/{{ d['kind'] }}" title="Download">{{ d['label'] }} &darr;</a></li>
                   {% endfor %}
-                  {% if r['deliverables'] %}<li><a href="/client/orders/{{ r['order']['id'] }}#order-downloads">Transcript (.docx, .txt) and more formats on the order page</a></li>{% endif %}
+                  {% if r['deliverables'] %}<li><a href="/account/orders/{{ r['order']['id'] }}#order-downloads">Transcript (.docx, .txt) and more formats on the order page</a></li>{% endif %}
                   {% if not r['deliverables'] %}
                   <li class="muted">{% if r['order']['status'] in ('ready_for_delivery', 'delivered') %}Ran on free trial minutes - no downloadable deliverables for a preview.{% else %}Deliverables appear here once this order is ready.{% endif %}</li>
                   {% endif %}
@@ -66,7 +66,7 @@
         </tbody>
       </table>
     </div>
-    <div class="ds-pager">{{ pager(page, pages, '/client/files', {'type': type, 'q': q}) }}</div>
+    <div class="ds-pager">{{ pager(page, pages, '/account/files', {'type': type, 'q': q}) }}</div>
     {% endif %}
   </section>
 </div>

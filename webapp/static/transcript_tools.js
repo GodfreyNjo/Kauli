@@ -71,7 +71,7 @@
              "split=" + encodeURIComponent(radio("tx-split") || "line"),
              "timestamps=" + ($("tx-opt-time").checked ? "1" : "0"),
              "speakers=" + ($("tx-opt-speaker").checked ? "1" : "0")];
-    return "/client/orders/" + orderId + "/export?" + q.join("&");
+    return "/account/orders/" + orderId + "/export?" + q.join("&");
   }
   function say(el, text, kind) {
     el.textContent = text || "";
@@ -95,7 +95,7 @@
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
         if ($("tx-opt-media") && $("tx-opt-media").checked) {
           var m = document.createElement("a");
-          m.href = "/client/orders/" + orderId + "/download/source"; m.download = "";
+          m.href = "/account/orders/" + orderId + "/download/source"; m.download = "";
           document.body.appendChild(m); m.click(); m.remove();
         }
         say(msg, "Downloaded " + name, "success");
@@ -107,7 +107,7 @@
   // ---- share
   function post(action, extra) {
     var body = { action: action }; for (var k in (extra || {})) body[k] = extra[k];
-    return fetch("/client/orders/" + orderId + "/share", { method: "POST", credentials: "same-origin",
+    return fetch("/account/orders/" + orderId + "/share", { method: "POST", credentials: "same-origin",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Something went wrong."); return d; }); });
   }

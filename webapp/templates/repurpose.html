@@ -2,7 +2,7 @@
 {% block title %}Do more with this file{% endblock %}
 {% block content %}
 <div class="rp-wrap">
-  <p class="rp-back"><a href="/client/orders/{{ order['id'] }}">&larr; Back to your order</a></p>
+  <p class="rp-back"><a href="/account/orders/{{ order['id'] }}">&larr; Back to your order</a></p>
   <header class="rp-head">
     <h1>Do more with this file</h1>
     <p class="rp-file"><strong>{{ order['original_filename'] }}</strong>
@@ -21,17 +21,17 @@
       {% if plan.human_left is not none %}<li><b>{{ '{:,.0f}'.format(plan.human_left) }}</b><span>of {{ plan.human_total }} human-reviewed minutes left</span></li>{% endif %}
       {% if plan.credit_usd %}<li><b>${{ '%.2f'|format(plan.credit_usd) }}</b><span>prepaid credit</span></li>{% endif %}
     </ul>
-    <a class="rp-plan-link" href="/client/billing#change-plan">{{ 'Change plan' if plan.paid else 'See plans' }}</a>
+    <a class="rp-plan-link" href="/account/billing#change-plan">{{ 'Change plan' if plan.paid else 'See plans' }}</a>
   </section>
 
   {% if not cards %}
-  <p class="rp-empty">There is nothing more to add to this one right now. <a href="/client">Start a new project</a> to order something else.</p>
+  <p class="rp-empty">There is nothing more to add to this one right now. <a href="/account">Start a new project</a> to order something else.</p>
   {% endif %}
 
   <div class="rp-grid">
     {% for c in cards %}
     {% set q = c.quote %}
-    <form method="post" action="/client/orders" class="rp-card">
+    <form method="post" action="/account/orders" class="rp-card">
       <input type="hidden" name="reuse_order_id" value="{{ order['id'] }}">
       <input type="hidden" name="source_lang" value="{{ order['source_lang'] }}">
       <input type="hidden" name="service_level" value="{{ c.level }}">

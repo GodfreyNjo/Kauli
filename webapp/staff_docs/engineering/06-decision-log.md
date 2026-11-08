@@ -3,6 +3,18 @@
 Decisions that a newcomer would otherwise reverse by accident. Each says what was decided, why, and what it costs. Add a new entry when you make a decision that is hard to see from the code.
 Newest first.
 
+## D12. Sign-ins are server-side records, and sensitive actions ask "is it you?" again (2026-11)
+
+**Decision.** Every sign-in is a row in `user_sessions` and every request checks the row has not been revoked. Actions that cannot be undone or that give others access need a recent confirmation (password, or a code emailed to the customer) through the `sudo_mode.required` dependency.
+**Why.** The sign-in cookie is signed but stateless, so before this a stolen or forgotten laptop could not be signed out remotely, and a left-open browser could create an API key or close the account. Large sites do both, and customers expect it.
+**Cost.** One small indexed read per request (the row is also touched at most every five minutes). A POST to a guarded route from an unconfirmed session redirects to the confirm page, and the person presses the button again afterwards. Tests that call a guarded route must be signed in as confirmed (the shared `env` fixture does this).
+
+## D11. "Account" and "customers", not "client" (2026-11)
+
+**Decision.** Customers see `/account`; staff see `/staff/customers`. The old `/client` and `/staff/clients` addresses redirect (308) and stay out of search results. The OAuth callbacks keep their old addresses.
+**Why.** "Client" is the word of a firm that serves clients. A product has accounts and customers, and the sites customers already use say "account". Old links in sent emails, notifications and bookmarks could not be allowed to break.
+**Cost.** One redirect hop for old links. Code, database values and variable names still say `client`; renaming them was not worth the risk. The redirects can be removed after the old emails have aged out, but the OAuth callbacks never move.
+
 ## D10. The quality gate is a ratchet, not a clean-slate rule (2026-11)
 
 **Decision.** `scripts/quality_gate.py` holds new code to the full standard and lets old shortcomings stay but never grow. `quality-baseline.json` is the record.

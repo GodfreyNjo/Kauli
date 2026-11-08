@@ -14,7 +14,7 @@
       <button type="button" class="tx-menu-item" id="tx-undo">Undo</button>
       <button type="button" class="tx-menu-item" id="tx-redo">Redo</button>
       {% endif %}
-      <form method="post" action="/client/orders/{{ order['id'] }}/notes?as=transcript"><button type="submit" class="tx-menu-item">Edit as note</button></form>
+      <form method="post" action="/account/orders/{{ order['id'] }}/notes?as=transcript"><button type="submit" class="tx-menu-item">Edit as note</button></form>
       <button type="button" class="tx-menu-item" data-open="tx-keys-dialog">Keyboard shortcuts</button>
     </div>
   </details>

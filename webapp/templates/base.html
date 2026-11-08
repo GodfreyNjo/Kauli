@@ -105,7 +105,7 @@
   {% if user %}
   <header class="topbar" lang="{{ page_lang() }}">
     <div class="topbar-brand">
-      <a href="{{ '/staff' if user['role'] == 'staff' else '/actor' if user['role'] == 'voice_actor' else '/client/home' }}" class="topbar-logo-link" aria-label="Kauli by Forge Media Services - home">
+      <a href="{{ '/staff' if user['role'] == 'staff' else '/actor' if user['role'] == 'voice_actor' else '/account/home' }}" class="topbar-logo-link" aria-label="Kauli by Forge Media Services - home">
         <picture>
           <source srcset="/static/kauli-logo-nav-light.webp" type="image/webp">
           <img src="/static/kauli-logo-nav-light.png" alt="Kauli" class="topbar-logo" width="141" height="38">
@@ -116,8 +116,8 @@
     {% if user['role'] == 'staff' %}
     <form method="get" action="/staff/search" class="topbar-search" role="search">
       <svg class="topbar-search-ico" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="9" r="5.8"/><path d="M13.5 13.5L17 17"/></svg>
-      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, clients, leads..."
-             aria-label="Search jobs, clients, leads" aria-keyshortcuts="Control+K">
+      <input type="text" name="q" id="topbar-search-input" placeholder="Search jobs, customers, leads..."
+             aria-label="Search jobs, customers, leads" aria-keyshortcuts="Control+K">
       <kbd class="topbar-search-kbd" aria-hidden="true">Ctrl + K</kbd>
     </form>
     {% endif %}
@@ -211,7 +211,7 @@
         <div class="snav-sec"><span>Operations</span></div>
         {{ snav('/staff/jobs', 'Jobs', 'checklist', ['/staff/jobs', '/staff/orders'], [('/staff/exceptions', 'Exceptions', 'alert', '/staff/exceptions')]) }}
         {{ snav('/staff/leads', 'CRM', 'target', ['/staff/leads']) }}
-        {{ snav('/staff/clients', 'Clients', 'users', ['/staff/clients'], [('/staff/engagement', 'Engagement', 'pulse', '/staff/engagement'), ('/staff/lifecycle', 'Lifecycle emails', 'mail', '/staff/lifecycle'), ('/staff/winback', 'Win-back', 'target', '/staff/winback'), ('/staff/exit-feedback', 'Exit feedback', 'message', '/staff/exit-feedback')]) }}
+        {{ snav('/staff/customers', 'Customers', 'users', ['/staff/customers'], [('/staff/engagement', 'Engagement', 'pulse', '/staff/engagement'), ('/staff/lifecycle', 'Lifecycle emails', 'mail', '/staff/lifecycle'), ('/staff/winback', 'Win-back', 'target', '/staff/winback'), ('/staff/exit-feedback', 'Exit feedback', 'message', '/staff/exit-feedback')]) }}
         {{ snav('/staff/support', 'Support', 'message', ['/staff/support']) }}
         {{ snav('/staff/integrations', 'Integrations', 'puzzle', ['/staff/integrations']) }}
 
@@ -244,17 +244,17 @@
         </div>
         {% else %}
         {% set pending = pending_count(user) %}
-        {{ snav('/client/home', t('nav_dashboard'), 'grid', ['=/client/home']) }}
-        {{ snav('/client', t('nav_orders'), 'checklist', ['=/client', '/client/order'], ([('/client/meetings', t('nav_meetings'), 'mic', '/client/meetings')] if meetings_enabled() else [])) }}
-        <a href="/client/pending" class="{{ 'active' if request.url.path == '/client/pending' else '' }}">{{ nav_icon('bell') }}<span class="label">{{ t('nav_pending') }}</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
-        {{ snav('/client/files', t('nav_files'), 'paper', ['/client/files'], [('/client/notes', t('nav_notes'), 'message', '/client/notes')]) }}
-        {{ snav('/client/billing', t('nav_billing'), 'card', ['/client/billing']) }}
+        {{ snav('/account/home', t('nav_dashboard'), 'grid', ['=/account/home']) }}
+        {{ snav('/account', t('nav_orders'), 'checklist', ['=/account', '/account/order'], ([('/account/meetings', t('nav_meetings'), 'mic', '/account/meetings')] if meetings_enabled() else [])) }}
+        <a href="/account/pending" class="{{ 'active' if request.url.path == '/account/pending' else '' }}">{{ nav_icon('bell') }}<span class="label">{{ t('nav_pending') }}</span>{% if pending %}<span class="nav-badge" aria-label="{{ pending }} pending">{{ pending }}</span>{% endif %}</a>
+        {{ snav('/account/files', t('nav_files'), 'paper', ['/account/files'], [('/account/notes', t('nav_notes'), 'message', '/account/notes')]) }}
+        {{ snav('/account/billing', t('nav_billing'), 'card', ['/account/billing']) }}
         <div class="sidebar-divider"></div>
-        {{ snav('/client/analytics', t('nav_analytics'), 'bars', ['/client/analytics']) }}
-        {{ snav('/client/workspace', t('nav_workspace'), 'users', ['/client/workspace'], [('/client/vocabulary', t('nav_vocabulary'), 'book', '/client/vocabulary')]) }}
-        {{ snav('/client/resources', t('nav_learn'), 'book_open', ['/client/resources']) }}
-        {{ snav('/client/integrations', t('nav_integrations'), 'puzzle', ['/client/integrations']) }}
-        {{ snav('/client/rewards', t('nav_rewards'), 'gift', ['/client/rewards']) }}
+        {{ snav('/account/analytics', t('nav_analytics'), 'bars', ['/account/analytics']) }}
+        {{ snav('/account/workspace', t('nav_workspace'), 'users', ['/account/workspace'], [('/account/vocabulary', t('nav_vocabulary'), 'book', '/account/vocabulary')]) }}
+        {{ snav('/account/resources', t('nav_learn'), 'book_open', ['/account/resources']) }}
+        {{ snav('/account/integrations', t('nav_integrations'), 'puzzle', ['/account/integrations']) }}
+        {{ snav('/account/rewards', t('nav_rewards'), 'gift', ['/account/rewards']) }}
         <div class="sidebar-divider"></div>
         <a href="/help" class="sidebar-help-btn {{ 'active' if '/help' in request.url.path else '' }}"><span class="icon help-q">?</span><span class="label">{{ t('nav_get_help') }}</span><svg class="help-chev label" viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2.5L7.5 6 4 9.5"/></svg></a>
         {% endif %}
@@ -280,7 +280,7 @@
       <main id="main-content" tabindex="-1">
         {% if user is defined and user and user['role'] == 'client' and user['is_guest'] %}
         <div class="plan-banner guest-banner" role="status">
-          <form method="post" action="/client/save-guest" class="guest-form">
+          <form method="post" action="/account/save-guest" class="guest-form">
             <input type="hidden" name="next" value="{{ request.url.path }}">
             <span><strong>Save your transcript.</strong> Give your email and we send a link; your transcript and your free minutes are kept in a free account.</span>
             <input type="email" name="email" placeholder="you@example.com" required aria-label="Your email address" autocomplete="email">
@@ -289,18 +289,18 @@
         </div>
         {% endif %}
         {% if user is defined and user and user['role'] == 'client' and not plan_chosen(user) and not user['is_guest']
-              and request.url.path not in ['/client/billing'] %}
+              and request.url.path not in ['/account/billing'] %}
         <div class="plan-banner" role="status">
-          <span><strong>Subscribe to the Free plan (pay as you go) to download and edit your files.</strong> You can read the start of your results now. <a href="/client/billing?choose_plan=1">See how it works</a></span>
-          <a class="btn" href="/client/billing?choose_plan=1">Subscribe to the Free plan</a>
+          <span><strong>Subscribe to the Free plan (pay as you go) to download and edit your files.</strong> You can read the start of your results now. <a href="/account/billing?choose_plan=1">See how it works</a></span>
+          <a class="btn" href="/account/billing?choose_plan=1">Subscribe to the Free plan</a>
         </div>
         {% endif %}
-        {% if user is defined and user and user['role'] == 'client' and payment_issue(user) and request.url.path != '/client/billing/update-card' %}
+        {% if user is defined and user and user['role'] == 'client' and payment_issue(user) and request.url.path != '/account/billing/update-card' %}
         {% set pi = payment_issue(user) %}
         <div class="plan-banner pay-banner" role="status">
           <span><strong>We had trouble processing your latest payment.</strong> Your plan is still active while we try again; please update your payment method to avoid any interruption.</span>
-          <a class="btn" href="/client/billing/update-card">Update payment method</a>
-          <a class="pay-banner-more" href="/client/billing#payment-problem">Need more time or a cheaper option?</a>
+          <a class="btn" href="/account/billing/update-card">Update payment method</a>
+          <a class="pay-banner-more" href="/account/billing#payment-problem">Need more time or a cheaper option?</a>
         </div>
         {% endif %}
         {% block content %}{% endblock %}
@@ -790,7 +790,8 @@
   <script src="/static/flash.js?v=2" defer></script>
   <script src="/static/busy.js?v=1" defer></script>
   <script src="/static/softswap.js?v=2" defer></script>
-  <script src="/static/persist.js?v=1" defer></script>
+  <script src="/static/persist.js?v=2" defer></script>
+  <script src="/static/app_ux.js?v=1" defer></script>
 {% if user is defined and user and user['role'] == 'client' %}{% include "_assistant.html" %}{% endif %}
 </body>
 </html>

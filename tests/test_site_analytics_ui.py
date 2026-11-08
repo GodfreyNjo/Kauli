@@ -98,12 +98,12 @@ def test_the_address_lists_mark_accounts_as_internal_automatically(env, monkeypa
 
 def test_staff_can_mark_a_client_internal_and_the_analytics_page_says_so(env, wav_bytes):
     _staff(env)
-    r = env.client.post("/staff/clients/u1/internal", data={"internal": "1"}, follow_redirects=False)
+    r = env.client.post("/staff/customers/u1/internal", data={"internal": "1"}, follow_redirects=False)
     assert r.status_code == 303 and env.db.get_user("u1")["is_internal"] == 1
     page = env.client.get("/staff/analytics").text
     assert "Real customers only: 1 internal or test account left out" in page
     assert "Showing <strong>everyone</strong>" in env.client.get("/staff/analytics?internal=1").text
-    env.client.post("/staff/clients/u1/internal", data={}, follow_redirects=False)
+    env.client.post("/staff/customers/u1/internal", data={}, follow_redirects=False)
     assert env.db.get_user("u1")["is_internal"] == 0
 
 

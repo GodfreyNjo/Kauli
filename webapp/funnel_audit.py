@@ -1,6 +1,6 @@
 """Sign-up funnel audit: who signs up, how far they get, where they stop, and what staff can do to help.
 
-Behind the "Analyse sign-ups" button on /staff/clients. It only READS the database (nothing is sent, changed or emailed), and every number
+Behind the "Analyse sign-ups" button on /staff/customers. It only READS the database (nothing is sent, changed or emailed), and every number
 and every suggestion is worked out from the live data each time, so the page is never out of date.
 
     analyse()  ->  {
@@ -126,7 +126,7 @@ def _diagnose(c: dict, f: dict, flags: dict, now: float, base: str = "") -> dict
     unpaid = [o for o in orders if o["status"] in UNPAID]
     failed_pay = [p for p in f["payments"] if p["status"] == "failed"]
     pending_trial = [p for p in f["payments"] if p.get("plan") == "trial_verification" and p["status"] == "pending"]
-    account = f"{base}/client" if base else "/client"
+    account = f"{base}/account" if base else "/account"
     free = f"{billing.FREE_MINUTES_PER_MONTH:.0f}"
     cta = "Open your Kauli account"
     if f["uploads_ok"] > 0 and not orders:
@@ -148,7 +148,7 @@ def _diagnose(c: dict, f: dict, flags: dict, now: float, base: str = "") -> dict
         why = f"Placed {len(unpaid)} order(s) worth ${total:.2f} that are waiting for payment (the oldest {oldest} day(s) ago)." + (
             f" {len(failed_pay)} payment attempt(s) failed." if failed_pay else "")
         do = ("Send the email: it names their order, shows the price, and offers M-Pesa or bank transfer if card payment is the problem. Do not offer discounts.")
-        link = f"{base}/client/orders/{latest['id']}" if base else f"/client/orders/{latest['id']}"
+        link = f"{base}/account/orders/{latest['id']}" if base else f"/account/orders/{latest['id']}"
         what = (latest.get("original_filename") or "your recording")
         service = SERVICE_WORDS.get(latest.get("service_level") or "", "your order")
         mins = latest.get("duration_minutes") or 0

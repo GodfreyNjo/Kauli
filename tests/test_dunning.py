@@ -52,7 +52,7 @@ def test_a_failed_renewal_keeps_the_plan_open_and_sends_a_kind_email(env, monkey
     mails = [m for m in sent if m[1] == "Your Kauli payment did not go through"]
     assert len(mails) == 1 and mails[0][0] == email
     for part in mails[0][2:]:
-        assert "Kauli Team" in part and "Godfrey" not in part and "/client/billing/update-card" in part
+        assert "Kauli Team" in part and "Godfrey" not in part and "/account/billing/update-card" in part
         assert "suspend" not in part.lower() and "off" not in part.lower().split("%")[0][-3:]    # kind wording, no discount bait
     assert "happens all the time" in mails[0][3]
 
@@ -60,21 +60,21 @@ def test_a_failed_renewal_keeps_the_plan_open_and_sends_a_kind_email(env, monkey
 def test_the_banner_and_billing_page_offer_the_ways_out(env, monkeypatch):
     _mail(env, monkeypatch)
     _subscribed(env)
-    assert "We had trouble processing your latest payment" not in env.client.get("/client/home").text
+    assert "We had trouble processing your latest payment" not in env.client.get("/account/home").text
     _webhook(env, monkeypatch, "invoice.payment_failed", env.db.get_user("u1")["email"])
-    home = env.client.get("/client/home").text
-    assert "We had trouble processing your latest payment" in home and "/client/billing/update-card" in home and "Your plan is still active" in home and "by " not in home.split("We had trouble")[1].split("Update payment method")[0]
-    billing = env.client.get("/client/billing").text
+    home = env.client.get("/account/home").text
+    assert "We had trouble processing your latest payment" in home and "/account/billing/update-card" in home and "Your plan is still active" in home and "by " not in home.split("We had trouble")[1].split("Update payment method")[0]
+    billing = env.client.get("/account/billing").text
     assert "Your last payment did not go through" in billing and "Switch to Pay as you go" in billing and "more days" not in billing
 
 
 def test_update_card_goes_to_a_secure_paystack_form(env, monkeypatch):
     _subscribed(env)
     monkeypatch.setattr(env.app.billing, "paystack_manage_link", lambda code: f"https://paystack.test/manage/{code}")
-    r = env.client.get("/client/billing/update-card", follow_redirects=False)
+    r = env.client.get("/account/billing/update-card", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "https://paystack.test/manage/SUB_1"
     monkeypatch.setattr(env.app.billing, "paystack_manage_link", lambda code: None)
-    assert "error=" in env.client.get("/client/billing/update-card", follow_redirects=False).headers["location"]
+    assert "error=" in env.client.get("/account/billing/update-card", follow_redirects=False).headers["location"]
 
 
 def test_a_paid_renewal_ends_the_recovery(env, monkeypatch):
@@ -84,7 +84,7 @@ def test_a_paid_renewal_ends_the_recovery(env, monkeypatch):
     env.db.create_payment("pay-ok", "u1", "pro", 29, None, "USD", "paystack", meta=json.dumps({"kind": "subscription_renewal"}))
     assert env.app._activate_payment(env.db.get_payment("pay-ok"), "ref-1", base_url="https://kauli.test")
     assert env.app.dunning._open("u1") is None
-    assert "We had trouble processing" not in env.client.get("/client/home").text
+    assert "We had trouble processing" not in env.client.get("/account/home").text
 
 
 def test_switching_to_pay_as_you_go_stops_the_renewal_and_the_banner(env, monkeypatch):
@@ -93,7 +93,7 @@ def test_switching_to_pay_as_you_go_stops_the_renewal_and_the_banner(env, monkey
     _webhook(env, monkeypatch, "invoice.payment_failed", env.db.get_user("u1")["email"])
     calls = []
     monkeypatch.setattr(env.app.billing, "paystack_disable_subscription", lambda code, token: calls.append(code) or {"ok": True})
-    r = env.client.post("/client/billing/switch-to-payg", follow_redirects=False)
+    r = env.client.post("/account/billing/switch-to-payg", follow_redirects=False)
     assert r.status_code == 303 and calls == ["SUB_1"]
     assert env.app.dunning._open("u1") is None and env.db.get_subscription("u1")["paystack_subscription_code"] is None
     assert env.db.get_user("u1")["account_status"] != "closed"
@@ -155,7 +155,7 @@ def test_the_payment_problem_card_shows_even_with_no_payment_history(env, monkey
     _mail(env, monkeypatch)
     _subscribed(env, paid_payments=0)
     _webhook(env, monkeypatch, "invoice.payment_failed", env.db.get_user("u1")["email"])
-    page = env.client.get("/client/billing").text
+    page = env.client.get("/account/billing").text
     assert "Your last payment did not go through" in page and "Switch to Pay as you go" in page
 
 
@@ -163,5 +163,5 @@ def test_closing_a_failing_plan_is_still_described_as_a_paid_plan(env, monkeypat
     _mail(env, monkeypatch)
     _subscribed(env)
     _webhook(env, monkeypatch, "invoice.payment_failed", env.db.get_user("u1")["email"])
-    page = env.client.get("/client/close-account").text
+    page = env.client.get("/account/close-account").text
     assert "already on Pay as you go" not in page and "stops renewing straight away" in page

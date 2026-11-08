@@ -34,7 +34,7 @@ from urllib.parse import quote, urlparse
 
 import httpx
 import yt_dlp
-from fastapi import Body, FastAPI, Request, UploadFile, Form, File
+from fastapi import Body, Depends, FastAPI, Request, UploadFile, Form, File
 from starlette.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, RedirectResponse, FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -56,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, funnel_audit, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi, diagnostics_routes  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, funnel_audit, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi, late_routes, sessions, sudo_mode  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -362,11 +362,11 @@ def _is_large_body_exempt(path: str) -> bool:
     they're exempt from the blanket cap here rather than double-capped at
     a much smaller, wrong-for-video-files number. Matched by real prefix/
     suffix against request.url.path, NOT the route-template strings
-    ("/client/orders/{order_id}/resume") those never equal - a request's
+    ("/account/orders/{order_id}/resume") those never equal - a request's
     actual path always has the real id substituted in."""
-    if path in ("/client/orders", "/settings", "/api/v1/orders", "/try/start"):
+    if path in ("/account/orders", "/settings", "/api/v1/orders", "/try/start"):
         return True
-    if path.startswith("/client/orders/") and path.endswith("/resume"):
+    if path.startswith("/account/orders/") and path.endswith("/resume"):
         return True
     if path.startswith("/staff/orders/") and path.endswith("/human-voice-upload"):
         return True
@@ -400,8 +400,8 @@ async def limit_request_size(request: Request, call_next):
 
 
 # Pages a search engine has no business indexing: the signed-in app, the account utilities and machine endpoints.
-_NOINDEX_PREFIXES = ("/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password", "/reset-password",
-                      "/logout", "/lang/", "/api/", "/webhooks/", "/billing/", "/receipts/", "/avatar/", "/notifications/",
+_NOINDEX_PREFIXES = ("/account", "/client", "/staff", "/settings", "/actor", "/login", "/signup", "/forgot-password",
+                      "/reset-password", "/logout", "/lang/", "/api/", "/webhooks/", "/billing/", "/receipts/", "/avatar/", "/notifications/",
                       "/download/", "/status", "/s/", "/r/")
 
 
@@ -488,7 +488,7 @@ async def add_trace_id(request: Request, call_next):
 #
 # https://checkout.paystack.com in form-action - a second, real, live-
 # reproduced instance of the exact same class of bug: order_pay.html's
-# <form> posts to this app's own /client/orders/{id}/pay ('self' - fine),
+# <form> posts to this app's own /account/orders/{id}/pay ('self' - fine),
 # which then issues a real 303 redirect to Paystack's hosted checkout
 # page. Chrome enforces form-action against the FINAL destination after
 # a redirect, not just the form's own action URL - so every real payment
@@ -897,7 +897,7 @@ def current_user(request: Request):
     if not user_id:
         return None
     user = db.get_user(user_id)
-    if user is None:
+    if user is None or not sessions.is_active(request, user_id):
         return None
     if user["account_status"] == "closed":
         # Blocks the account without a special error message that would
@@ -2186,7 +2186,7 @@ def solution_page(request: Request, slug: str):
     user = current_user(request)
     if user:
         return RedirectResponse(
-            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/account/home")
     # Real internal linking between the real, related pages - "connect the
     # services" rather than let each page dead-end. Silently skips any slug
     # that isn't (shouldn't happen with the hardcoded lists above, but a
@@ -2334,7 +2334,7 @@ def _logged_in_redirect(request: Request):
     user = current_user(request)
     if user:
         return RedirectResponse(
-            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/account/home")
     return None
 
 
@@ -2591,7 +2591,7 @@ def _notify_internal_new_signup(user, base_url: str = "") -> None:
     if not mailer.email_configured():
         return
     name = (user["display_name"] or user["email"].split("@")[0]).strip()
-    link = f"{base_url.rstrip('/')}/staff/clients/{user['id']}" if base_url else f"/staff/clients/{user['id']}"
+    link = f"{base_url.rstrip('/')}/staff/customers/{user['id']}" if base_url else f"/staff/customers/{user['id']}"
     subject = f"New Kauli signup: {name}"
     body = f"New client account created.\n\nName: {name}\nEmail: {user['email']}\n\n{link}"
     html = (
@@ -2648,7 +2648,7 @@ def _queue_welcome_message(user, base_url: str = "") -> None:
         "If anything's unclear, or you'd rather just talk it through, just reply to this email.\n\n"
         f"Talk soon,\n{TEAM_NAME}"
     )
-    cta_url = f"{base_url.rstrip('/')}/client" if base_url else "/client"
+    cta_url = f"{base_url.rstrip('/')}/account" if base_url else "/account"
     html_inner = (
         f'<p style="margin:0 0 14px;">Hi {name},</p>'
         f'<p style="margin:0 0 14px;">Welcome aboard - we\'re glad you\'re here.</p>'
@@ -2724,7 +2724,7 @@ def index(request: Request):
     user = current_user(request)
     if user:
         return RedirectResponse(
-            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/client/home")
+            "/staff" if user["role"] == "staff" else "/actor" if user["role"] == "voice_actor" else "/account/home")
     return templates.TemplateResponse(request, "marketing.html",
         {**_marketing_context(sent=request.query_params.get("sent") == "1", market=_display_market(request)),
          "demo": _try_context(request), "hreflang_alts": _hreflang_alternates(_site_base(request)),
@@ -2920,8 +2920,8 @@ def robots_txt(request: Request):
     base = _site_base(request)
     ai_bots = ("GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "PerplexityBot",
                "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "Amazonbot", "Meta-ExternalAgent")
-    private = ("/client", "/staff", "/settings", "/actor", "/lang/", "/api/", "/receipts/", "/avatar/", "/status",
-              "/webhooks/", "/billing/", "/notifications/", "/download/", "/s/", "/r/")
+    private = ("/account", "/client", "/staff", "/settings", "/actor", "/lang/", "/api/", "/receipts/", "/avatar/",
+              "/status", "/webhooks/", "/billing/", "/notifications/", "/download/", "/s/", "/r/")
     body = "User-agent: *\nAllow: /\n" + "".join(f"Disallow: {p}\n" for p in private)
     body += "".join(f"\nUser-agent: {bot}\nAllow: /\n" for bot in ai_bots)
     body += f"\nSitemap: {base}/sitemap.xml\n"
@@ -3231,7 +3231,7 @@ def _premium_voices(force: bool = False) -> list[dict]:
     return voices
 
 
-@app.get("/client/premium-voices")
+@app.get("/account/premium-voices")
 def client_premium_voices(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -3525,7 +3525,7 @@ def request_callback(request: Request, name: str = Form(""), email: str = Form("
 
 
 def _safe_next(path: str | None) -> str:
-    """Only ever a relative in-app path - "/client/orders/xyz", never a
+    """Only ever a relative in-app path - "/account/orders/xyz", never a
     protocol-relative or absolute URL (which could redirect somewhere
     outside Kauli after a real login). Falls back to "/" (the normal
     role-based landing page) for anything else, including empty/missing."""
@@ -3605,9 +3605,9 @@ def _complete_auth_session(request: Request, session, next: str, marketing_conse
             # Price card for this account: US/international vs East Africa,
             # from Cloudflare's visitor-country header (absent when hit
             # directly -> the international card). Fixed from here on; only
-            # staff can change it (see /staff/clients/{id}/market).
+            # staff can change it (see /staff/customers/{id}/market).
             db.set_billing_market(user["id"], billing.market_for_country(request.headers.get("cf-ipcountry")))
-    request.session["user_id"] = user["id"]
+    sessions.sign_in(request, user["id"])
     # Their language follows them in: the translated site they came from (cookie) wins, else what the account
     # already had. Either way the cookie and the account end up agreeing.
     cookie_lang = request.cookies.get(LANG_COOKIE)
@@ -3883,11 +3883,11 @@ def login_magic(request: Request, email: str = Form(...), next: str = Form("")):
 @app.post("/try/start")
 def guest_trial_start(request: Request, audio: UploadFile = File(...), source_lang: str = Form("en")):
     """Try Kauli before signing up: up to the free minutes (30) of a file are transcribed with no account. The result is only ever shown inside an
-    account: the guest page asks for an email, and the transcript appears once they open the link (see /client/save-guest). Limited per address
+    account: the guest page asks for an email, and the transcript appears once they open the link (see /account/save-guest). Limited per address
     and per day, and the file is the only thing asked for."""
     user = current_user(request)
     if user and not (user["is_guest"] if "is_guest" in user.keys() else 0):
-        return JSONResponse({"redirect": "/client#new-project"})
+        return JSONResponse({"redirect": "/account#new-project"})
     ip = rate_limit.client_ip(request)
     allowed, _ = rate_limit.check(f"guest-trial:{ip}", limit=3, window_s=86400)
     if not allowed or db.guest_trials_today() >= GUEST_TRIALS_PER_DAY:
@@ -3933,21 +3933,21 @@ def guest_trial_start(request: Request, audio: UploadFile = File(...), source_la
             except ApiOrderError as exc:
                 return JSONResponse({"error": str(exc)}, status_code=400)
         loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
-        if not re.match(r"^/client/orders/[0-9a-f]+$", loc):
+        if not re.match(r"^/account/orders/[0-9a-f]+$", loc):
             return JSONResponse({"error": "We could not start that transcript. Create a free account to try again.", "signup": "/login?mode=signup"}, status_code=400)
-        request.session["user_id"] = guest_id
+        sessions.sign_in(request, guest_id)
         ga_events.send_event(ga_events.client_id_from_request(request), "guest_trial_started", {"minutes": round(min(minutes, GUEST_TRIAL_MAX_MINUTES), 1)})
         return JSONResponse({"redirect": loc, "trimmed": minutes > GUEST_TRIAL_MAX_MINUTES})
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-@app.post("/client/save-guest")
-def guest_save(request: Request, email: str = Form(...), next: str = Form("/client")):
+@app.post("/account/save-guest")
+def guest_save(request: Request, email: str = Form(...), next: str = Form("/account")):
     """A guest gives an email to keep and download their transcript: we send a sign-in link, and their orders move to the account it opens."""
     user = current_user(request)
     if not user or not (user["is_guest"] if "is_guest" in user.keys() else 0):
-        return RedirectResponse("/client", status_code=303)
+        return RedirectResponse("/account", status_code=303)
     email = email.strip().lower()
     ip = rate_limit.client_ip(request)
     ok_user, _ = rate_limit.check(f"magic:{email}", limit=3, window_s=600)
@@ -3962,7 +3962,7 @@ def guest_save(request: Request, email: str = Form(...), next: str = Form("/clie
     return RedirectResponse(f"{back}?notice={quote('We sent a link to ' + email + '. Open it and your transcript is saved to your account.')}", status_code=303)
 
 
-@app.post("/client/exit-reason")
+@app.post("/account/exit-reason")
 async def exit_reason(request: Request):
     """The review step's "Not ready? Tell us why": one tap, optional note. It explains the drop-off between review and submit."""
     user = current_user(request)
@@ -4055,7 +4055,7 @@ def google_one_tap_submit(request: Request, credential: str = Form(""), nonce: s
 
 
 # ---------------------------------------------- client YouTube connect ----
-@app.get("/client/youtube/connect")
+@app.get("/account/youtube/connect")
 def youtube_connect_start(request: Request, next: str = ""):
     """A real, separate OAuth grant to the client's OWN YouTube channel -
     see webapp/youtube_captions.py's own docstring for why this can't
@@ -4079,7 +4079,7 @@ def youtube_connect_callback(request: Request, code: str = "", state: str = "", 
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
-    next_url = request.session.pop("youtube_oauth_next", "/client")
+    next_url = request.session.pop("youtube_oauth_next", "/account")
     expected_state = request.session.pop("youtube_oauth_state", None)
     if error:
         return RedirectResponse(f"{next_url}?youtube_error={quote('YouTube connection was cancelled.')}", status_code=303)
@@ -4097,7 +4097,7 @@ def youtube_connect_callback(request: Request, code: str = "", state: str = "", 
     return RedirectResponse(f"{next_url}?youtube_connected=1", status_code=303)
 
 
-@app.post("/client/youtube/disconnect")
+@app.post("/account/youtube/disconnect")
 def youtube_disconnect(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -4106,7 +4106,7 @@ def youtube_disconnect(request: Request):
     return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
-@app.post("/client/orders/{order_id}/push-captions-youtube")
+@app.post("/account/orders/{order_id}/push-captions-youtube")
 def push_captions_to_youtube(request: Request, order_id: str):
     """Real captions.insert against the client's own connected channel -
     see webapp/youtube_captions.py. Only ever pushes the subtitle file
@@ -4120,15 +4120,15 @@ def push_captions_to_youtube(request: Request, order_id: str):
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if _order_locked(order):
-        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Choose a plan to unlock downloads and publishing.')}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?youtube_error={quote('Choose a plan to unlock downloads and publishing.')}", status_code=303)
     if not order["source_youtube_id"]:
-        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('This order was not sourced from a YouTube video.')}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?youtube_error={quote('This order was not sourced from a YouTube video.')}", status_code=303)
     srt_path = Path(order["outdir"]) / f"subs_{order['target_lang']}.srt"
     if not srt_path.exists():
-        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Subtitles are not ready yet.')}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?youtube_error={quote('Subtitles are not ready yet.')}", status_code=303)
     connection = db.get_youtube_connection(user["id"])
     if not connection:
-        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote('Connect your YouTube channel first.')}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?youtube_error={quote('Connect your YouTube channel first.')}", status_code=303)
     try:
         access_token = youtube_captions.ensure_fresh_token(connection)
         youtube_captions.upload_caption(
@@ -4138,13 +4138,13 @@ def push_captions_to_youtube(request: Request, order_id: str):
                   else f"{order['target_lang'].upper()} (Kauli, human-verified)"),
         )
     except Exception as exc:  # noqa: BLE001 - a real, specific message beats a silent failure
-        return RedirectResponse(f"/client/orders/{order_id}?youtube_error={quote(str(exc)[:250])}", status_code=303)
-    return RedirectResponse(f"/client/orders/{order_id}?youtube_pushed=1", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?youtube_error={quote(str(exc)[:250])}", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}?youtube_pushed=1", status_code=303)
 
 
 @app.get("/logout")
 def logout(request: Request):
-    request.session.clear()
+    sessions.sign_out(request)
     return RedirectResponse("/login")
 
 
@@ -4289,7 +4289,7 @@ def settings_form(request: Request, tab: str = "general", team_notice: str | Non
     })
 
 
-@app.post("/settings/api-key/generate")
+@app.post("/settings/api-key/generate", dependencies=[Depends(sudo_mode.required)])
 def settings_api_key_generate(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
@@ -4303,7 +4303,7 @@ def settings_api_key_generate(request: Request):
     return RedirectResponse("/settings?tab=integrations", status_code=303)
 
 
-@app.post("/settings/api-key/revoke")
+@app.post("/settings/api-key/revoke", dependencies=[Depends(sudo_mode.required)])
 def settings_api_key_revoke(request: Request):
     user = current_user(request)
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
@@ -4421,7 +4421,7 @@ def _notion_push_order(order, base_url: str) -> tuple[bool, str]:
             order["original_filename"] or order["id"],
             _NOTION_SERVICE_LABELS.get(order["service_level"] or "transcribe", "Order"), langs,
             f"{order['duration_minutes']:.1f} min" if order["duration_minutes"] else "") if x)
-        blocks = notion_export.build_blocks(meta, f"{base_url.rstrip('/')}/client/orders/{order['id']}", lines,
+        blocks = notion_export.build_blocks(meta, f"{base_url.rstrip('/')}/account/orders/{order['id']}", lines,
                                             ai_note=order["review_tier"] == "ai")
         title = f"Transcript - {order['original_filename'] or order['id']}"
         page = notion_export.create_page(token, row["parent_id"], row["parent_kind"], row["title_prop"], title,
@@ -4450,7 +4450,7 @@ def _notify_notion_order_ready(request, order) -> None:
         _notion_push_order(order, base)
 
 
-@app.post("/client/orders/{order_id}/send-to-notion")
+@app.post("/account/orders/{order_id}/send-to-notion")
 def client_send_to_notion(request: Request, order_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -4462,8 +4462,8 @@ def client_send_to_notion(request: Request, order_id: str):
     ok, detail = _notion_push_order(order, str(request.base_url))
     if ok:
         msg = "Sent to Notion." if detail else "This order is already being sent to Notion."
-        return RedirectResponse(f"/client/orders/{order_id}?notice={quote_plus(msg)}", status_code=303)
-    return RedirectResponse(f"/client/orders/{order_id}?error={quote_plus(detail)}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?notice={quote_plus(msg)}", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}?error={quote_plus(detail)}", status_code=303)
 
 
 _TEAMS_HOST_SUFFIXES = (".logic.azure.com", ".webhook.office.com", ".powerplatform.com")
@@ -4525,7 +4525,7 @@ def _teams_order_ready_message(request, order, include_links: bool) -> dict:
     base = str(request.base_url).rstrip("/")
     src, tgt = order["source_lang"], order["target_lang"]
     langs = LANGUAGE_NAMES.get(src, src) + (f" to {LANGUAGE_NAMES.get(tgt, tgt)}" if tgt and tgt != src else "")
-    actions = [("Open order", f"{base}/client/orders/{order['id']}")]
+    actions = [("Open order", f"{base}/account/orders/{order['id']}")]
     if include_links:
         links = _order_to_api_dict(request, order)["deliverables"]
         for kind, label in (("txt", "Transcript (TXT)"), ("docx", "Transcript (Word)"), ("srt", "Subtitles (SRT)"),
@@ -4812,7 +4812,7 @@ def settings_mfa_cancel_enroll(request: Request):
     return RedirectResponse("/settings?tab=security", status_code=303)
 
 
-@app.post("/settings/mfa/disable")
+@app.post("/settings/mfa/disable", dependencies=[Depends(sudo_mode.required)])
 def settings_mfa_disable(request: Request, current_password: str = Form(...)):
     user = current_user(request)
     if not user:
@@ -4833,7 +4833,7 @@ def settings_mfa_disable(request: Request, current_password: str = Form(...)):
                              status_code=303)
 
 
-@app.post("/settings/mfa/regenerate-backup-codes")
+@app.post("/settings/mfa/regenerate-backup-codes", dependencies=[Depends(sudo_mode.required)])
 def settings_mfa_regenerate_backup_codes(request: Request, current_password: str = Form(...)):
     user = current_user(request)
     if not user:
@@ -4859,7 +4859,7 @@ def settings_mfa_regenerate_backup_codes(request: Request, current_password: str
     return RedirectResponse("/settings?tab=security&mfa_step=backup_codes", status_code=303)
 
 
-@app.post("/settings/team/invite")
+@app.post("/settings/team/invite", dependencies=[Depends(sudo_mode.required)])
 def settings_team_invite(request: Request, email: str = Form(...)):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -4904,7 +4904,7 @@ def settings_team_invite(request: Request, email: str = Form(...)):
     return RedirectResponse("/settings?tab=team&team_notice=Invite+sent.", status_code=303)
 
 
-@app.post("/settings/team/remove")
+@app.post("/settings/team/remove", dependencies=[Depends(sudo_mode.required)])
 def settings_team_remove(request: Request, member_id: str = Form(...)):
     user = current_user(request)
     if not user or user["role"] != "client" or user["client_scope_id"] != user["id"]:
@@ -5400,7 +5400,7 @@ def settings_marketing_consent(request: Request, marketing_consent: str = Form("
     return RedirectResponse("/settings?tab=notifications&saved=1", status_code=303)
 
 
-@app.post("/settings/close-account")
+@app.post("/settings/close-account", dependencies=[Depends(sudo_mode.required)])
 def settings_close_account(request: Request, confirm_text: str = Form("")):
     """Client-only on purpose - staff/admin accounts don't get a self-
     service close button here (too easy to accidentally lock yourself, or
@@ -5417,11 +5417,11 @@ def settings_close_account(request: Request, confirm_text: str = Form("")):
     db.log_security_event("account_closed", user_id=user["id"], email=user["email"],
                            ip_address=rate_limit.client_ip(request))
     db.close_account(user["id"])
-    request.session.clear()
+    sessions.sign_out(request)
     return RedirectResponse("/login?notice=account_closed", status_code=303)
 
 
-@app.post("/settings/request-deletion")
+@app.post("/settings/request-deletion", dependencies=[Depends(sudo_mode.required)])
 def settings_request_deletion(request: Request):
     """Never auto-deletes anything - see db.create_deletion_request's own
     docstring for why (real accounting/dispute-resolution reasons to keep
@@ -5446,12 +5446,12 @@ def avatar(request: Request, user_id: str):
 
 
 # -------------------------------------------------------------- client ----
-@app.get("/client/files", response_class=HTMLResponse)
+@app.get("/account/files", response_class=HTMLResponse)
 def client_files(request: Request, type: str = "", q: str = "", page: int = 1):
     """A real cross-order file view - every order's source file plus
     whatever's actually deliverable for it, in one place, instead of
     having to open each order individually to find a download link.
-    Reuses the exact same /client/orders/{id}/download/{kind} routes and
+    Reuses the exact same /account/orders/{id}/download/{kind} routes and
     the same real gating order_detail.html already uses (free-preview
     orders and anything not yet delivered get no download links here
     either) - no new file-serving logic, purely an aggregated view over
@@ -5490,11 +5490,11 @@ def client_files(request: Request, type: str = "", q: str = "", page: int = 1):
                                                                       "all_count": len(rows), "page": page, "pages": pages})
 
 
-@app.get("/client/messages", include_in_schema=False)
+@app.get("/account/messages", include_in_schema=False)
 def client_messages(request: Request):
     """The separate Messages page is gone: replies from the team arrive in the assistant's inbox (the button at the bottom right) and on
     the order itself. Old links and bookmarks land on the dashboard."""
-    return RedirectResponse("/client", status_code=303)
+    return RedirectResponse("/account", status_code=303)
 
 
 # ------------------------------------------------------------------ Kauli in your meetings
@@ -5556,7 +5556,7 @@ def _finish_meeting(m, link: str, request: Request) -> None:
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
     loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
-    found = re.match(r"^/client/orders/([0-9a-f]+)", loc)
+    found = re.match(r"^/account/orders/([0-9a-f]+)", loc)
     if not found:
         _fail_meeting(m, "The recording could not be turned into a transcript.")
         return
@@ -5585,7 +5585,7 @@ _MEETING_STATUS_TEXT = {"scheduled": "Scheduled", "joining": "Joining", "recordi
                         "importing": "Making the transcript", "done": "Transcript ready", "failed": "Did not work", "cancelled": "Cancelled"}
 
 
-@app.get("/client/meetings", response_class=HTMLResponse)
+@app.get("/account/meetings", response_class=HTMLResponse)
 def client_meetings(request: Request, error: str | None = None, notice: str | None = None, page: int = 1):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -5608,7 +5608,7 @@ def client_meetings(request: Request, error: str | None = None, notice: str | No
     })
 
 
-@app.post("/client/meetings")
+@app.post("/account/meetings")
 def client_meeting_create(request: Request, meeting_url: str = Form(""), title: str = Form(""), source_lang: str = Form("en"),
                           join_at: str = Form("")):
     user = current_user(request)
@@ -5616,7 +5616,7 @@ def client_meeting_create(request: Request, meeting_url: str = Form(""), title: 
         return RedirectResponse("/login")
 
     def back(kind: str, text: str):
-        return RedirectResponse(f"/client/meetings?{kind}={quote(text)}", status_code=303)
+        return RedirectResponse(f"/account/meetings?{kind}={quote(text)}", status_code=303)
 
     if not meeting_bot.configured():
         return back("error", "Meetings are not switched on yet.")
@@ -5662,7 +5662,7 @@ def _send_bot(url: str, platform: str, title: str, source_lang: str, client_id: 
     return {"id": meeting_id}
 
 
-@app.post("/client/meetings/{meeting_id}/cancel")
+@app.post("/account/meetings/{meeting_id}/cancel")
 def client_meeting_cancel(request: Request, meeting_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -5674,7 +5674,7 @@ def client_meeting_cancel(request: Request, meeting_id: str):
         if m["provider_bot_id"]:
             meeting_bot.leave_bot(m["provider_bot_id"])
         db.update_meeting(m["id"], status="cancelled")
-    return RedirectResponse("/client/meetings?notice=" + quote("Meeting cancelled."), status_code=303)
+    return RedirectResponse("/account/meetings?notice=" + quote("Meeting cancelled."), status_code=303)
 
 
 @app.post("/webhooks/recall")
@@ -5708,7 +5708,7 @@ def _attention_kind(order) -> str:
     return "review" if order["status"] in ("awaiting_review", "editor_returned") else "progress"
 
 
-@app.get("/client/pending", response_class=HTMLResponse)
+@app.get("/account/pending", response_class=HTMLResponse)
 def client_pending(request: Request, page: int = 1, tab: str = ""):
     """Orders that are not finished yet, with the one thing each is waiting for."""
     user = current_user(request)
@@ -5735,10 +5735,10 @@ def _paginate(items: list, page: int, per_page: int) -> tuple[int, int, list]:
     return page, pages, items[(page - 1) * per_page: page * per_page]
 
 
-@app.get("/client/home", response_class=HTMLResponse)
+@app.get("/account/home", response_class=HTMLResponse)
 def client_home(request: Request, page: int = 1, q: str = "", status: str = ""):
     """The client portal's real landing page - summary stats + a preview
-    of recent orders, separate from /client (the full order list +
+    of recent orders, separate from /account (the full order list +
     submission wizard, kept at its existing URL so none of the 'back to
     my orders' links elsewhere break). Every number here is a real,
     freshly-computed count from the client's own orders/payments - no
@@ -5788,7 +5788,7 @@ def _orders_view(orders: list, status: str = "", folder: str = "", q: str = "", 
             "status": status, "folder": folder, "q": (q or "").strip(), "params": {"status": status, "folder": folder, "q": (q or "").strip()}}
 
 
-@app.get("/client", response_class=HTMLResponse)
+@app.get("/account", response_class=HTMLResponse)
 def client_dashboard(request: Request, reorder_youtube_url: str | None = None, reorder_source_lang: str | None = None,
                      page: int = 1, status: str = "", folder: str = "", q: str = ""):
     user = current_user(request)
@@ -5858,7 +5858,7 @@ def client_dashboard(request: Request, reorder_youtube_url: str | None = None, r
     })
 
 
-@app.post("/client/tour/seen")
+@app.post("/account/tour/seen")
 def client_tour_seen(request: Request):
     """Fired once, whether the tour was finished or skipped - either way
     it's real, informed "don't show me this again", not just a page
@@ -5917,7 +5917,7 @@ def _client_dashboard_error(request: Request, user, error: str, form_values: dic
     })
 
 
-@app.post("/client/request-exception")
+@app.post("/account/request-exception")
 def client_request_exception(request: Request, context: str = Form(...), note: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -5929,7 +5929,7 @@ def client_request_exception(request: Request, context: str = Form(...), note: s
         + (f"Their note: {note.strip()}\n\n" if note.strip() else "")
         + "Review on /staff/exceptions.",
     )
-    return RedirectResponse("/client?exception_requested=1", status_code=303)
+    return RedirectResponse("/account?exception_requested=1", status_code=303)
 
 
 @app.get("/feedback/{context}/{user_id}/{rating}", response_class=HTMLResponse)
@@ -5966,32 +5966,32 @@ def record_feedback(request: Request, context: str, user_id: str, rating: str):
     )
 
 
-@app.post("/client/youtube-watches")
+@app.post("/account/youtube-watches")
 def client_add_youtube_watch(request: Request, channel_url: str = Form(""), label: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     if not youtube_poll.youtube_polling_configured():
-        return RedirectResponse("/client?yt_error=not_configured", status_code=303)
+        return RedirectResponse("/account?yt_error=not_configured", status_code=303)
     # Each add below calls out to the real YouTube Data API, which is
     # quota-limited on our side, not just rate-limited on theirs - bound
     # how fast one account can burn through that shared quota.
     allowed, retry_after = rate_limit.check(f"ytwatch:{user['id']}", limit=10, window_s=600)
     if not allowed:
-        return RedirectResponse("/client?yt_error=rate_limited", status_code=303)
+        return RedirectResponse("/account?yt_error=rate_limited", status_code=303)
     parsed = youtube_poll.extract_channel_or_playlist_id(channel_url.strip())
     if not parsed:
-        return RedirectResponse("/client?yt_error=unrecognized", status_code=303)
+        return RedirectResponse("/account?yt_error=unrecognized", status_code=303)
     try:
         playlist_id = youtube_poll.resolve_uploads_playlist(*parsed)
     except Exception as exc:  # noqa: BLE001 - surface a real reason, not a silent failure
         api_log.warning("youtube watch resolve failed", extra={"error": str(exc)})
-        return RedirectResponse("/client?yt_error=resolve_failed", status_code=303)
+        return RedirectResponse("/account?yt_error=resolve_failed", status_code=303)
     db.create_youtube_watch(user["id"], playlist_id, label.strip() or None)
-    return RedirectResponse("/client?yt_added=1", status_code=303)
+    return RedirectResponse("/account?yt_added=1", status_code=303)
 
 
-@app.post("/client/youtube-watches/{watch_id}/remove")
+@app.post("/account/youtube-watches/{watch_id}/remove")
 def client_remove_youtube_watch(request: Request, watch_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -6000,10 +6000,10 @@ def client_remove_youtube_watch(request: Request, watch_id: str):
     if watch_id not in watches:
         return HTMLResponse("Not found.", status_code=404)
     db.set_youtube_watch_active(watch_id, False)
-    return RedirectResponse("/client", status_code=303)
+    return RedirectResponse("/account", status_code=303)
 
 
-@app.post("/client/youtube-imports/{import_id}/dismiss")
+@app.post("/account/youtube-imports/{import_id}/dismiss")
 def client_dismiss_youtube_import(request: Request, import_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -6013,7 +6013,7 @@ def client_dismiss_youtube_import(request: Request, import_id: str):
     # effect beyond a wasted request; list_pending_imports already scopes
     # what each client actually sees.
     db.set_pending_import_status(import_id, "dismissed")
-    return RedirectResponse("/client", status_code=303)
+    return RedirectResponse("/account", status_code=303)
 
 
 class _LocalFileAdapter:
@@ -6033,7 +6033,7 @@ class _LocalFileAdapter:
         self.filename = filename
 
 
-@app.post("/client/wizard-event")
+@app.post("/account/wizard-event")
 def client_wizard_event(request: Request, step: str = Form(...)):
     """Real friction signal, nothing else in the app already covers: which
     step of the order wizard a client actually reached before leaving,
@@ -6054,7 +6054,7 @@ def client_wizard_event(request: Request, step: str = Form(...)):
     return JSONResponse({"ok": True})
 
 
-@app.post("/client/orders/presign-upload")
+@app.post("/account/orders/presign-upload")
 def client_presign_upload(request: Request, filename: str = Form(...), content_type: str = Form("")):
     """Step 1 of the direct-to-R2 upload flow: issue a short-lived,
     write-only URL for exactly one new object key, so the client's
@@ -6134,7 +6134,7 @@ def _resolve_uploaded_audio(upload_key: str, order_upload_dir: Path, client_id: 
         r2_uploads.delete_object(upload_key)
 
 
-@app.post("/client/orders")
+@app.post("/account/orders")
 def create_order(
     request: Request,
     audio: UploadFile | None = File(None),
@@ -6211,7 +6211,7 @@ def create_order(
     if idempotency_key.strip():
         existing = db.get_order_by_idempotency_key(user["client_scope_id"], idempotency_key.strip())
         if existing:
-            return RedirectResponse(f"/client/orders/{existing['id']}", status_code=303)
+            return RedirectResponse(f"/account/orders/{existing['id']}", status_code=303)
     if service_level not in billing.SERVICE_LEVELS:
         return _client_dashboard_error(request, user, "Unknown service level.", form_values=form_values)
     if source_lang not in LANGUAGE_NAMES:
@@ -6669,7 +6669,7 @@ def create_order(
         if mailer.email_configured() and db.wallet_low_alert_needed(user["id"]):
             remaining = db.wallet_credits_remaining(user["client_scope_id"])
             name = (user["display_name"] or user["email"].split("@")[0]).strip()
-            billing_url = f"{str(request.base_url).rstrip('/')}/client/billing"
+            billing_url = f"{str(request.base_url).rstrip('/')}/account/billing"
             body = (
                 f"Hi {name},\n\n"
                 f"You're down to about {remaining:.0f} prepaid credits - just a heads up so an upcoming "
@@ -6725,13 +6725,13 @@ def create_order(
                                     deadlines["deadline_at"])
         worker.submit_job(order_id)
         _free_minutes_notice()
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
 
     # Real cost beyond the free allowance - hold the order for payment.
     # worker.submit_job() is only ever called once a payment webhook
     # confirms it (see billing_checkout / the webhook handlers below).
     db.update_order_status(order_id, "pending_payment")
-    return RedirectResponse(f"/client/orders/{order_id}/pay", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}/pay", status_code=303)
 
 
 _PROGRESS_STEPS = [
@@ -6772,7 +6772,7 @@ def _rewrite_caption_files(order, job) -> None:
     (out / f"transcript_{order['source_lang']}.srt").write_text(to_srt(job, source=True), encoding="utf-8")
 
 
-@app.post("/client/orders/{order_id}/transcript")
+@app.post("/account/orders/{order_id}/transcript")
 def client_edit_transcript(request: Request, order_id: str, body: dict = Body(...)):
     """A client corrects their own Instant AI transcript. Edits are stored beside the original text (never over it), the caption
     files are rebuilt, and an empty text puts a line back as it was. Human-reviewed transcripts are not edited here: a person
@@ -6941,7 +6941,7 @@ def _processing_state(order, lang: str = "en") -> dict:
             "elapsed_s": int(max(0, time.time() - (order["created_at"] or time.time())))}
 
 
-@app.get("/client/orders/{order_id}/progress")
+@app.get("/account/orders/{order_id}/progress")
 def client_order_progress(request: Request, order_id: str):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -6984,7 +6984,7 @@ def _order_progress_steps(status: str, review_tier: str = "human") -> list[dict]
     return steps
 
 
-@app.get("/client/orders/{order_id}", response_class=HTMLResponse)
+@app.get("/account/orders/{order_id}", response_class=HTMLResponse)
 def client_order_detail(request: Request, order_id: str, error: str | None = None, notice: str | None = None,
                          youtube_error: str | None = None, youtube_connected: str | None = None,
                          youtube_pushed: str | None = None):
@@ -7129,7 +7129,7 @@ def _transcript_text_for_order(job, order_level: dict) -> str:
     return "\n".join(lines)
 
 
-@app.post("/client/orders/{order_id}/ai-summary")
+@app.post("/account/orders/{order_id}/ai-summary")
 def client_order_ai_summary(request: Request, order_id: str, template: str = Form("")):
     """Made only when the customer asks, in the template they chose, and kept: asking again for the same template shows the saved
     one. (Older note: lazy-generated, cached forever after - see the ai_summary_text
@@ -7171,7 +7171,7 @@ def client_order_ai_summary(request: Request, order_id: str, template: str = For
     return JSONResponse(result)
 
 
-@app.post("/client/orders/{order_id}/ai-ask")
+@app.post("/account/orders/{order_id}/ai-ask")
 async def client_order_ai_ask(request: Request, order_id: str):
     """Stateless per-question Q&A, not a persisted chat - each call is a
     fresh grounded-in-the-real-transcript request, no conversation memory
@@ -7203,7 +7203,7 @@ async def client_order_ai_ask(request: Request, order_id: str):
     return JSONResponse(result)
 
 
-@app.post("/client/orders/{order_id}/messages")
+@app.post("/account/orders/{order_id}/messages")
 def client_send_message(request: Request, order_id: str, body: str = Form(...)):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -7212,17 +7212,17 @@ def client_send_message(request: Request, order_id: str, body: str = Form(...)):
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["review_tier"] == "ai":
-        return RedirectResponse(f"/client/orders/{order_id}?error=" + quote("Instant AI orders are not reviewed by a person, so messages and "
+        return RedirectResponse(f"/account/orders/{order_id}?error=" + quote("Instant AI orders are not reviewed by a person, so messages and "
                                 "revisions are not available. Edit the transcript yourself, or add human review."), status_code=303)
     if body.strip():
         # visibility is hardcoded here, never read from the request - a
         # client has no form field that could set it to 'internal'.
         db.create_message(order_id, user["id"], "client", body)
         db.mark_read(user["id"], order_id)
-    return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
 
 
-@app.post("/client/orders/{order_id}/resume")
+@app.post("/account/orders/{order_id}/resume")
 def client_resume_order(request: Request, order_id: str, audio: UploadFile | None = File(None),
                          upload_key: str = Form("")):
     """The other way a returned order gets moving again - no brand-new
@@ -7238,7 +7238,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["status"] != "returned_to_client":
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
 
     new_audio_path, new_original_filename, new_duration = None, None, None
     if audio is not None and audio.filename:
@@ -7251,7 +7251,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
             db.log_upload_audit(user["id"], order_id,
                                  {"original_filename": audio.filename, "rejected": True, "reject_reason": str(exc)},
                                  client_ip, user_agent)
-            return RedirectResponse(f"/client/orders/{order_id}?error={quote(str(exc))}", status_code=303)
+            return RedirectResponse(f"/account/orders/{order_id}?error={quote(str(exc))}", status_code=303)
         db.log_upload_audit(user["id"], order_id, audit, client_ip, user_agent)
         new_audio_path = audit["final_path"]
         new_original_filename = audio.filename
@@ -7261,7 +7261,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
             new_duration = probe_duration_minutes(new_audio_path)
         except Exception:
             return RedirectResponse(
-                f"/client/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
+                f"/account/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
                 status_code=303)
     elif upload_key.strip():
         client_ip = request.client.host if request.client else None
@@ -7273,7 +7273,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
             db.log_upload_audit(user["id"], order_id,
                                  {"original_filename": upload_key.strip(), "rejected": True, "reject_reason": str(exc)},
                                  client_ip, user_agent)
-            return RedirectResponse(f"/client/orders/{order_id}?error={quote(str(exc))}", status_code=303)
+            return RedirectResponse(f"/account/orders/{order_id}?error={quote(str(exc))}", status_code=303)
         db.log_upload_audit(user["id"], order_id, audit, client_ip, user_agent)
         new_audio_path = audit["final_path"]
         if audit.get("content_safety_flagged"):
@@ -7282,7 +7282,7 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
             new_duration = probe_duration_minutes(new_audio_path)
         except Exception:
             return RedirectResponse(
-                f"/client/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
+                f"/account/orders/{order_id}?error=Couldn%27t+read+that+file%27s+duration+-+it+may+not+be+a+valid+audio%2Fvideo+file.",
                 status_code=303)
 
     db.resume_returned_order(order_id, new_audio_path, new_original_filename, new_duration)
@@ -7291,10 +7291,10 @@ def client_resume_order(request: Request, order_id: str, audio: UploadFile | Non
         "Resumed this order" + (" with a replacement file." if new_audio_path else "."),
     )
     worker.submit_job(order_id)
-    return RedirectResponse(f"/client/orders/{order_id}?notice=Order+resumed+-+back+in+the+queue.", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}?notice=Order+resumed+-+back+in+the+queue.", status_code=303)
 
 
-@app.post("/client/orders/{order_id}/folder")
+@app.post("/account/orders/{order_id}/folder")
 def client_move_order_folder(request: Request, order_id: str, folder_name: str = Form("")):
     """Re-files an order that's already been submitted - folder was
     previously a one-time choice at upload, with no way back into a
@@ -7306,7 +7306,7 @@ def client_move_order_folder(request: Request, order_id: str, folder_name: str =
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     db.set_order_folder(order_id, user["id"], folder_name)
-    return RedirectResponse(f"/client/orders/{order_id}?notice=Folder+updated.", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}?notice=Folder+updated.", status_code=303)
 
 
 @app.post("/staff/orders/{order_id}/resume")
@@ -7328,7 +7328,7 @@ def staff_resume_order(request: Request, order_id: str):
     return RedirectResponse(f"/staff/orders/{order_id}", status_code=303)
 
 
-@app.post("/client/orders/{order_id}/grant-voice-clone-consent")
+@app.post("/account/orders/{order_id}/grant-voice-clone-consent")
 def client_grant_voice_clone_consent(request: Request, order_id: str):
     """The other way to grant this, alongside the submission-time checkbox
     (client_dashboard.html) - for someone who didn't check it up front and
@@ -7343,11 +7343,11 @@ def client_grant_voice_clone_consent(request: Request, order_id: str):
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     db.set_voice_clone_consent(order_id, request.client.host if request.client else None)
-    return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
 
 
 # -------------------------------------------------------------- billing ----
-@app.get("/client/billing", response_class=HTMLResponse)
+@app.get("/account/billing", response_class=HTMLResponse)
 def billing_page(request: Request, upgrade_for: str | None = None, notice: str | None = None,
                   error: str | None = None, choose_plan: str | None = None, payments_page: int = 1):
     user = current_user(request)
@@ -7397,7 +7397,7 @@ def billing_page(request: Request, upgrade_for: str | None = None, notice: str |
     })
 
 
-@app.post("/client/billing/cancel-subscription")
+@app.post("/account/billing/cancel-subscription", dependencies=[Depends(sudo_mode.required)])
 def billing_cancel_subscription(request: Request):
     """Stop a recurring Paystack subscription from renewing. The client keeps
     the plan until the period they already paid for ends. Team owner only,
@@ -7407,15 +7407,15 @@ def billing_cancel_subscription(request: Request):
         return RedirectResponse("/login")
     subscription = db.get_subscription(user["id"])
     if not subscription or not billing._is_recurring(subscription) or not subscription["paystack_email_token"]:
-        return RedirectResponse("/client/billing?error=No+auto-renewing+subscription+to+cancel.", status_code=303)
+        return RedirectResponse("/account/billing?error=No+auto-renewing+subscription+to+cancel.", status_code=303)
     result = billing.paystack_disable_subscription(subscription["paystack_subscription_code"],
                                                    subscription["paystack_email_token"])
     if not result["ok"]:
-        return RedirectResponse(f"/client/billing?error={quote(result['error'])}", status_code=303)
+        return RedirectResponse(f"/account/billing?error={quote(result['error'])}", status_code=303)
     db.set_paystack_subscription(user["id"], None, None)
     dunning.resolve(user["id"], "downgraded")
     return RedirectResponse(
-        "/client/billing?notice=Auto-renewal+cancelled.+You+keep+your+plan+until+the+period+you+paid+for+ends.",
+        "/account/billing?notice=Auto-renewal+cancelled.+You+keep+your+plan+until+the+period+you+paid+for+ends.",
         status_code=303)
 
 
@@ -7455,7 +7455,7 @@ def _free_plan_charge(client_id: str, order_id: str | None = None) -> dict | Non
     return {"order_id": order["id"], "name": order["original_filename"], "order": order, "amount": _unlock_price(order)}
 
 
-@app.post("/client/billing/choose-free")
+@app.post("/account/billing/choose-free")
 def billing_choose_free(request: Request, order_id: str = Form(""), phone: str = Form("")):
     """Subscribing to the Free plan (pay as you go). The cost of the order being opened is worked out and charged; once that payment
     succeeds the account is on the Free plan and downloads and editing open (any real payment marks the plan as chosen, see
@@ -7464,29 +7464,29 @@ def billing_choose_free(request: Request, order_id: str = Form(""), phone: str =
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     if user["client_scope_id"] != user["id"]:
-        return RedirectResponse("/client/billing?error=Only+the+account+owner+can+choose+the+plan.", status_code=303)
+        return RedirectResponse("/account/billing?error=Only+the+account+owner+can+choose+the+plan.", status_code=303)
     if user["plan_chosen_at"]:
-        return RedirectResponse("/client/billing", status_code=303)
+        return RedirectResponse("/account/billing", status_code=303)
     charge = _free_plan_charge(user["id"], order_id or None)
     if charge and charge["amount"] > 0:
         if not billing.paystack_configured():
-            return RedirectResponse("/client/billing?error=Payment+isn%27t+configured+yet+-+contact+us.", status_code=303)
+            return RedirectResponse("/account/billing?error=Payment+isn%27t+configured+yet+-+contact+us.", status_code=303)
         order = charge["order"]
-        back = f"/client/orders/{order['id']}"
+        back = f"/account/orders/{order['id']}"
         return _checkout(request, user, "paystack", order["tier"], charge["amount"], order["id"], phone, back, back, payment_kind="preview_unlock")
     db.set_plan_chosen(user["id"])
     if charge:
         db.set_order_free_preview(charge["order_id"], False)                  # nothing to pay for this order: it opens
-    return RedirectResponse("/client/billing?notice=You%27re+on+the+Free+plan+%28pay+as+you+go%29.+Downloads+and+editing+are+unlocked.", status_code=303)
+    return RedirectResponse("/account/billing?notice=You%27re+on+the+Free+plan+%28pay+as+you+go%29.+Downloads+and+editing+are+unlocked.", status_code=303)
 
 
-@app.get("/client/verify-trial")
+@app.get("/account/verify-trial")
 def client_verify_trial_retired():
     """The $1 card confirmation no longer exists; old links and emails land where a plan is chosen."""
-    return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
+    return RedirectResponse("/account/billing?choose_plan=1", status_code=303)
 
 
-@app.post("/client/billing/wallet")
+@app.post("/account/billing/wallet")
 def buy_wallet_credits(request: Request, package: str = Form(""), provider: str = Form(...),
                         phone: str = Form(""), custom_minutes: str = Form("")):
     """custom_minutes is still the form field name (and still means "how
@@ -7501,18 +7501,18 @@ def buy_wallet_credits(request: Request, package: str = Form(""), provider: str 
         try:
             minutes_equiv = float(custom_minutes.strip())
         except ValueError:
-            return RedirectResponse("/client/billing?error=Enter+a+real+number+of+minutes.", status_code=303)
+            return RedirectResponse("/account/billing?error=Enter+a+real+number+of+minutes.", status_code=303)
         if not (billing.CREDIT_CUSTOM_MIN_MINUTES_EQUIV <= minutes_equiv <= billing.CREDIT_CUSTOM_MAX_MINUTES_EQUIV):
             return RedirectResponse(
-                f"/client/billing?error=Enter+between+{billing.CREDIT_CUSTOM_MIN_MINUTES_EQUIV}+and+"
+                f"/account/billing?error=Enter+between+{billing.CREDIT_CUSTOM_MIN_MINUTES_EQUIV}+and+"
                 f"{billing.CREDIT_CUSTOM_MAX_MINUTES_EQUIV}+minutes.", status_code=303)
         pkg = billing.custom_credit_price(minutes_equiv)
     elif package in billing.CREDIT_PACKAGES:
         pkg = billing.CREDIT_PACKAGES[package]
     else:
-        return RedirectResponse("/client/billing?error=Unknown+credit+package.", status_code=303)
+        return RedirectResponse("/account/billing?error=Unknown+credit+package.", status_code=303)
     return _checkout(request, user, provider, "wallet", pkg["price_usd"],
-                      None, phone, "/client/billing", "/client/billing",
+                      None, phone, "/account/billing", "/account/billing",
                       payment_kind=f"credits_topup:{pkg['credits']}")
 
 
@@ -7578,7 +7578,7 @@ def _prepay_params(source) -> dict:
             "rush": bool(get("rush"))}
 
 
-@app.post("/client/orders/quote")
+@app.post("/account/orders/quote")
 async def client_order_quote(request: Request):
     """What this order will cost, asked by the order form before anything is uploaded. Read-only."""
     user = current_user(request)
@@ -7590,7 +7590,7 @@ async def client_order_quote(request: Request):
     out = {k: v for k, v in q.items() if k != "cost"}
     if q.get("can_prepay") and q.get("needs_payment"):
         request.session["prepay"] = {k: params[k] for k in ("minutes", "service_level", "review_tier", "source_lang", "target_lang", "name")}
-        out["prepay_url"] = "/client/pay-first"
+        out["prepay_url"] = "/account/pay-first"
     return out
 
 
@@ -7601,14 +7601,14 @@ def _prepay_context(request: Request, user):
     return params, q
 
 
-@app.get("/client/pay-first", response_class=HTMLResponse)
+@app.get("/account/pay-first", response_class=HTMLResponse)
 def client_prepay_page(request: Request, notice: str | None = None, error: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     params, q = _prepay_context(request, user)
     if not q.get("can_prepay") or not q.get("needs_payment"):
-        return RedirectResponse("/client?prepaid=1" if q.get("can_prepay") else "/client", status_code=303)      # nothing to pay first: carry on with the order
+        return RedirectResponse("/account?prepaid=1" if q.get("can_prepay") else "/account", status_code=303)      # nothing to pay first: carry on with the order
     return templates.TemplateResponse(request, "client_prepay.html", {
         "user": user, "q": q, "params": params, "explanation": _price_explanation(q["cost"]), "notice": notice, "error": error,
         "local_hint": _local_charge_hint(request, user, q["charge_usd"]),
@@ -7616,19 +7616,19 @@ def client_prepay_page(request: Request, notice: str | None = None, error: str |
     })
 
 
-@app.post("/client/pay-first")
+@app.post("/account/pay-first")
 def client_prepay_checkout(request: Request, provider: str = Form(...), phone: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     params, q = _prepay_context(request, user)
     if not q.get("can_prepay") or not q.get("needs_payment"):
-        return RedirectResponse("/client?prepaid=1" if q.get("can_prepay") else "/client", status_code=303)
-    return _checkout(request, user, provider, "wallet", q["charge_usd"], None, phone, "/client?prepaid=1", "/client/pay-first",
-                      payment_kind=f"credits_topup:{q['credits']}", return_to="/client?prepaid=1")
+        return RedirectResponse("/account?prepaid=1" if q.get("can_prepay") else "/account", status_code=303)
+    return _checkout(request, user, provider, "wallet", q["charge_usd"], None, phone, "/account?prepaid=1", "/account/pay-first",
+                      payment_kind=f"credits_topup:{q['credits']}", return_to="/account?prepaid=1")
 
 
-@app.get("/client/pay-first/status")
+@app.get("/account/pay-first/status")
 def client_prepay_status(request: Request):
     """Polled by the pay-first page while an M-Pesa prompt is open: has the money arrived (do the credits now cover the order)?"""
     user = current_user(request)
@@ -7913,7 +7913,7 @@ def _note_payment_failure(client_id: str, order_id: str | None, provider: str, r
     """Real, automatic paper trail on a payment failure - never silently
     dropped, never left for staff to notice on their own. Appends to the
     same staff_notes field the client detail page's Settings tab already
-    shows (see /staff/clients/{id}), so this shows up exactly where staff
+    shows (see /staff/customers/{id}), so this shows up exactly where staff
     would already look, next to whatever they've manually noted about
     this account - never overwrites it. Counts recent failures so a
     one-off card decline and a client genuinely stuck read differently at
@@ -8059,24 +8059,24 @@ def _checkout(request: Request, user, provider: str, plan: str, amount_usd: floa
     return RedirectResponse(back_url, status_code=303)
 
 
-@app.post("/client/billing/checkout")
+@app.post("/account/billing/checkout")
 def billing_checkout(request: Request, plan: str = Form(...), provider: str = Form(...),
                       phone: str = Form(""), interval: str = Form("month")):
     user = current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login")
     if plan not in billing.PLANS or plan == "free":
-        return RedirectResponse("/client/billing", status_code=303)
+        return RedirectResponse("/account/billing", status_code=303)
     if plan == "enterprise":
         return RedirectResponse(
-            "/client/billing?notice=" +
+            "/account/billing?notice=" +
             "Enterprise is set up by an account manager, not self-serve checkout - "
             "send us a message from any order page and we'll reach out.",
             status_code=303,
         )
     yearly = interval == "year"
     return _checkout(request, user, provider, plan, billing.PLANS[plan]["price_usd_year" if yearly else "price_usd"],
-                      None, phone, "/client/billing", "/client/billing", payment_kind="plan_year" if yearly else "order")
+                      None, phone, "/account/billing", "/account/billing", payment_kind="plan_year" if yearly else "order")
 
 
 def _order_upsell_prices(order) -> dict:
@@ -8133,7 +8133,7 @@ def _upsell_checkout(request: Request, order_id: str, provider: str, phone: str,
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
-    back = f"/client/orders/{order_id}"
+    back = f"/account/orders/{order_id}"
     amount = _order_upsell_prices(order)["unlock" if kind == "preview_unlock" else "upgrade"]
     if not amount:
         return RedirectResponse(f"{back}?error=That+option+is+not+available+for+this+order.", status_code=303)
@@ -8141,17 +8141,17 @@ def _upsell_checkout(request: Request, order_id: str, provider: str, phone: str,
                       payment_kind=kind)
 
 
-@app.post("/client/orders/{order_id}/unlock")
+@app.post("/account/orders/{order_id}/unlock")
 def order_unlock_preview(request: Request, order_id: str, provider: str = Form("paystack"), phone: str = Form("")):
     return _upsell_checkout(request, order_id, provider, phone, "preview_unlock")
 
 
-@app.post("/client/orders/{order_id}/upgrade-review")
+@app.post("/account/orders/{order_id}/upgrade-review")
 def order_upgrade_review(request: Request, order_id: str, provider: str = Form("paystack"), phone: str = Form("")):
     return _upsell_checkout(request, order_id, provider, phone, "review_upgrade")
 
 
-@app.get("/client/orders/{order_id}/pay", response_class=HTMLResponse)
+@app.get("/account/orders/{order_id}/pay", response_class=HTMLResponse)
 def order_pay_page(request: Request, order_id: str, notice: str | None = None, error: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -8188,7 +8188,7 @@ def order_pay_page(request: Request, order_id: str, notice: str | None = None, e
     })
 
 
-@app.post("/client/orders/{order_id}/pay")
+@app.post("/account/orders/{order_id}/pay")
 def order_pay_checkout(request: Request, order_id: str, provider: str = Form(...), phone: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -8197,13 +8197,13 @@ def order_pay_checkout(request: Request, order_id: str, provider: str = Form(...
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["status"] != "pending_payment":
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
-    back_url = f"/client/orders/{order_id}/pay"
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
+    back_url = f"/account/orders/{order_id}/pay"
     return _checkout(request, user, provider, order["tier"], order["cost_usd"],
                       order_id, phone, back_url, back_url)
 
 
-@app.get("/client/orders/{order_id}/difficulty-surcharge", response_class=HTMLResponse)
+@app.get("/account/orders/{order_id}/difficulty-surcharge", response_class=HTMLResponse)
 def order_surcharge_page(request: Request, order_id: str, notice: str | None = None, error: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -8229,7 +8229,7 @@ def order_surcharge_page(request: Request, order_id: str, notice: str | None = N
     })
 
 
-@app.post("/client/orders/{order_id}/difficulty-surcharge/pay")
+@app.post("/account/orders/{order_id}/difficulty-surcharge/pay")
 def order_surcharge_checkout(request: Request, order_id: str, provider: str = Form(...), phone: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "client":
@@ -8238,8 +8238,8 @@ def order_surcharge_checkout(request: Request, order_id: str, provider: str = Fo
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if order["difficulty_surcharge_status"] != "pending_approval":
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
-    back_url = f"/client/orders/{order_id}/difficulty-surcharge"
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
+    back_url = f"/account/orders/{order_id}/difficulty-surcharge"
     return _checkout(request, user, provider, order["tier"], order["difficulty_surcharge_usd"],
                       order_id, phone, back_url, back_url, payment_kind="difficulty_surcharge")
 
@@ -8278,7 +8278,7 @@ def paystack_callback(request: Request, payment_id: str, reference: str | None =
     redirect can be skipped, retried, or never arrive at all."""
     result = billing.paystack_verify(payment_id)
     payment = db.get_payment(payment_id)
-    dest = f"/client/orders/{payment['order_id']}" if payment and payment["order_id"] else "/client/billing"
+    dest = f"/account/orders/{payment['order_id']}" if payment and payment["order_id"] else "/account/billing"
     try:
         pay_meta = json.loads(payment["meta"] or "{}") if payment else {}
     except (ValueError, TypeError):
@@ -8294,11 +8294,11 @@ def paystack_callback(request: Request, payment_id: str, reference: str | None =
             unlocking = False
         if unlocking:                                         # the one-time unlock: straight back to what they were reading, now in full
             latest = next(iter(db.list_orders_for_client(payment["user_id"])), None)
-            return RedirectResponse((f"/client/orders/{latest['id']}" if latest else "/client/home")
+            return RedirectResponse((f"/account/orders/{latest['id']}" if latest else "/account/home")
                                     + "?notice=You%27re+all+set.+Everything+is+unlocked%2C+and+your+%241+is+in+your+wallet.", status_code=303)
         return RedirectResponse(f"{dest}{'&' if '?' in dest else '?'}notice=Payment+confirmed.", status_code=303)
     if return_to and dest == return_to:
-        dest = "/client/pay-first"                        # not confirmed yet: back to the pay-first page, not the order form
+        dest = "/account/pay-first"                        # not confirmed yet: back to the pay-first page, not the order form
     return RedirectResponse(f"{dest}?error=Payment+wasn%27t+confirmed+yet+-+give+it+a+minute+and+check+again.",
                              status_code=303)
 
@@ -8347,14 +8347,14 @@ async def paystack_webhook(request: Request):
             db.set_paystack_subscription(user["id"], None, None)
             db.create_notification(user["id"], "subscription_ended",
                                     "Your Kauli subscription won't renew",
-                                    link="/client/billing")
+                                    link="/account/billing")
     elif kind == "invoice.payment_failed":
         customer = (data.get("customer") or {})
         user = db.get_user_by_email((customer.get("email") or "").strip().lower())
         if user:
             db.create_notification(user["id"], "subscription_payment_failed",
                                     "Your Kauli subscription payment failed - update your card",
-                                    link="/client/billing")
+                                    link="/account/billing")
             notifications.notify_staff("Kauli: a subscription payment failed",
                                         f"{user['email']}'s recurring subscription charge failed.")
             dunning.record_failure(user, base_url, str(data.get("gateway_response") or data.get("message") or ""))
@@ -8703,7 +8703,7 @@ def _send_activation_nudge(client, base_url: str) -> None:
         "Happy to walk you through it - just reply to this email.\n\n"
         f"Talk soon,\n{TEAM_NAME}"
     )
-    nudge_cta_url = f"{base_url.rstrip('/')}/client"
+    nudge_cta_url = f"{base_url.rstrip('/')}/account"
     html_inner = (
         f'<p style="margin:0 0 14px;">Hi {name},</p>'
         f'<p style="margin:0 0 14px;">Noticed you signed up for Kauli but haven\'t uploaded anything '
@@ -8837,7 +8837,7 @@ def download_style_guide(request: Request, order_id: str):
 # reasoning at the time. What's here (Overview/Orders/Team/Billing/
 # Settings) is real, built on data that already exists elsewhere in this
 # app, just not previously assembled into one place for staff.
-@app.get("/staff/clients", response_class=HTMLResponse)
+@app.get("/staff/customers", response_class=HTMLResponse)
 def staff_clients(request: Request, q: str | None = None):
     user = current_user(request)
     if not user or user["role"] != "staff":
@@ -8855,10 +8855,10 @@ def staff_clients(request: Request, q: str | None = None):
     })
 
 
-@app.get("/staff/clients/analysis", response_class=HTMLResponse)
+@app.get("/staff/customers/analysis", response_class=HTMLResponse)
 def staff_clients_analysis(request: Request, partial: int = 0):
     """The sign-up analysis behind the Clients page's "Analyse sign-ups" button: where clients stop and what to do to help. Read-only.
-    Declared before /staff/clients/{client_id} so "analysis" is never mistaken for a client id."""
+    Declared before /staff/customers/{client_id} so "analysis" is never mistaken for a client id."""
     user = current_user(request)
     if not user or user["role"] != "staff":
         return RedirectResponse("/login")
@@ -8874,7 +8874,7 @@ def _followup_html(body: str) -> str:
     return mailer.text_to_html_paragraphs(escaped)
 
 
-@app.post("/staff/clients/{client_id}/followup")
+@app.post("/staff/customers/{client_id}/followup")
 def staff_client_followup(request: Request, client_id: str, subject: str = Form(""), body: str = Form("")):
     """Sends the follow-up email staff reviewed in the sign-up analysis (a draft written from what the client did, which staff may have edited).
     One real, one-to-one message from "Kauli Team", recorded in the client's message history and in their staff notes. Staff only, and a client
@@ -8896,7 +8896,7 @@ def staff_client_followup(request: Request, client_id: str, subject: str = Form(
     if db.recent_onboarding_message(client_id, "staff_followup", 20 * 3600):
         return JSONResponse({"ok": False, "error": "A follow-up was already sent to this client in the last 20 hours."}, status_code=429)
     base = _site_base(request)
-    message_id = _queue_and_send(client, "staff_followup", subject, body, base_url=base, cta_text="Open your Kauli account", cta_url=f"{base}/client",
+    message_id = _queue_and_send(client, "staff_followup", subject, body, base_url=base, cta_text="Open your Kauli account", cta_url=f"{base}/account",
                                  html_inner=_followup_html(body))
     row = db.get_onboarding_message(message_id)
     sent = bool(row and row["status"] == "sent")
@@ -8909,7 +8909,7 @@ def staff_client_followup(request: Request, client_id: str, subject: str = Form(
 _STAFF_CLIENT_TABS = ("overview", "orders", "team", "billing", "settings")
 
 
-@app.get("/staff/clients/{client_id}", response_class=HTMLResponse)
+@app.get("/staff/customers/{client_id}", response_class=HTMLResponse)
 def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
                          notice: str | None = None, error: str | None = None):
     user = current_user(request)
@@ -8938,7 +8938,7 @@ def staff_client_detail(request: Request, client_id: str, tab: str = "overview",
     })
 
 
-@app.post("/staff/clients/{client_id}/internal")
+@app.post("/staff/customers/{client_id}/internal")
 def staff_client_set_internal(request: Request, client_id: str, internal: str = Form("")):
     """Team, test and friends-and-family accounts are left out of the business numbers on Site analytics."""
     user = current_user(request)
@@ -8948,10 +8948,10 @@ def staff_client_set_internal(request: Request, client_id: str, internal: str = 
     if not client or client["role"] != "client":
         return HTMLResponse("Client not found.", status_code=404)
     db.set_user_internal(client_id, bool(internal))
-    return RedirectResponse(f"/staff/clients/{client_id}?notice={quote('Marked as an internal account: left out of the business numbers.' if internal else 'Counted as a real customer again.')}", status_code=303)
+    return RedirectResponse(f"/staff/customers/{client_id}?notice={quote('Marked as an internal account: left out of the business numbers.' if internal else 'Counted as a real customer again.')}", status_code=303)
 
 
-@app.post("/staff/clients/{client_id}/market")
+@app.post("/staff/customers/{client_id}/market")
 def staff_client_set_market(request: Request, client_id: str, market: str = Form(...)):
     """Move an account to another price card (US/international, Kenya & East
     Africa, or back to the legacy rates). Staff-only on purpose - the market
@@ -8963,14 +8963,14 @@ def staff_client_set_market(request: Request, client_id: str, market: str = Form
     if not client or client["role"] != "client":
         return HTMLResponse("Client not found.", status_code=404)
     if market not in billing.MARKETS:
-        return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&error=Unknown+market.", status_code=303)
+        return RedirectResponse(f"/staff/customers/{client_id}?tab=settings&error=Unknown+market.", status_code=303)
     db.set_billing_market(client_id, market)
     db.log_security_event("billing_market_changed", user_id=user["id"], email=client["email"],
                            ip_address=rate_limit.client_ip(request), detail=f"-> {market}")
-    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Price+card+updated.", status_code=303)
+    return RedirectResponse(f"/staff/customers/{client_id}?tab=settings&notice=Price+card+updated.", status_code=303)
 
 
-@app.post("/staff/clients/{client_id}/notes")
+@app.post("/staff/customers/{client_id}/notes")
 def staff_client_save_notes(request: Request, client_id: str, notes: str = Form("")):
     user = current_user(request)
     if not user or user["role"] != "staff":
@@ -8978,10 +8978,10 @@ def staff_client_save_notes(request: Request, client_id: str, notes: str = Form(
     if not db.get_user(client_id):
         return HTMLResponse("Client not found.", status_code=404)
     db.set_client_staff_notes(client_id, notes)
-    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Notes+saved.", status_code=303)
+    return RedirectResponse(f"/staff/customers/{client_id}?tab=settings&notice=Notes+saved.", status_code=303)
 
 
-@app.post("/staff/clients/{client_id}/reopen")
+@app.post("/staff/customers/{client_id}/reopen")
 def staff_client_reopen(request: Request, client_id: str):
     user = current_user(request)
     if not user or user["role"] != "staff":
@@ -8989,10 +8989,10 @@ def staff_client_reopen(request: Request, client_id: str):
     if not db.get_user(client_id):
         return HTMLResponse("Client not found.", status_code=404)
     db.reopen_account(client_id)
-    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Account+reopened.", status_code=303)
+    return RedirectResponse(f"/staff/customers/{client_id}?tab=settings&notice=Account+reopened.", status_code=303)
 
 
-@app.post("/staff/clients/{client_id}/close")
+@app.post("/staff/customers/{client_id}/close")
 def staff_client_close(request: Request, client_id: str):
     """The staff-initiated counterpart to a client's own self-service
     close (Settings > Security) - for when the request comes in by email/
@@ -9003,10 +9003,10 @@ def staff_client_close(request: Request, client_id: str):
     if not db.get_user(client_id):
         return HTMLResponse("Client not found.", status_code=404)
     db.close_account(client_id)
-    return RedirectResponse(f"/staff/clients/{client_id}?tab=settings&notice=Account+closed.", status_code=303)
+    return RedirectResponse(f"/staff/customers/{client_id}?tab=settings&notice=Account+closed.", status_code=303)
 
 
-@app.post("/staff/clients/{client_id}/refund-trial-verification")
+@app.post("/staff/customers/{client_id}/refund-trial-verification")
 def staff_refund_trial_verification(request: Request, client_id: str):
     """A genuine last resort - real money back to a real client's card,
     for when onboarding hasn't worked out despite staff actually trying.
@@ -9025,20 +9025,20 @@ def staff_refund_trial_verification(request: Request, client_id: str):
     payment = db.get_trial_verification_payment(client_id)
     if not payment:
         return RedirectResponse(
-            f"/staff/clients/{client_id}?tab=settings&error=No+trial-verification+payment+found+for+this+client.",
+            f"/staff/customers/{client_id}?tab=settings&error=No+trial-verification+payment+found+for+this+client.",
             status_code=303)
     if payment["refunded_at"]:
         return RedirectResponse(
-            f"/staff/clients/{client_id}?tab=settings&error=Already+refunded.", status_code=303)
+            f"/staff/customers/{client_id}?tab=settings&error=Already+refunded.", status_code=303)
     result = billing.paystack_refund(payment["provider_reference"])
     if not result["ok"]:
         return RedirectResponse(
-            f"/staff/clients/{client_id}?tab=settings&error=Refund+failed%3A+{quote(result['error'])}",
+            f"/staff/customers/{client_id}?tab=settings&error=Refund+failed%3A+{quote(result['error'])}",
             status_code=303)
     db.mark_payment_refunded(payment["id"], payment["provider_reference"])
     db.consume_wallet_credits(client_id, billing.usd_to_credits(payment["amount_usd"]))
     return RedirectResponse(
-        f"/staff/clients/{client_id}?tab=settings&notice=Refund+submitted+to+Paystack+"
+        f"/staff/customers/{client_id}?tab=settings&notice=Refund+submitted+to+Paystack+"
         f"({quote(result['status'])})+-+it+can+take+a+few+days+to+reach+their+card.",
         status_code=303)
 
@@ -9187,10 +9187,10 @@ def _order_to_api_dict(request: Request, order) -> dict:
     }
     if order["status"] == "pending_payment":
         out["payment_required"] = True
-        out["payment_url"] = f"{str(request.base_url).rstrip('/')}/client/orders/{order['id']}/pay"
+        out["payment_url"] = f"{str(request.base_url).rstrip('/')}/account/orders/{order['id']}/pay"
     if _order_locked(order):
         out["plan_required"] = True
-        out["choose_plan_url"] = f"{str(request.base_url).rstrip('/')}/client/billing?choose_plan=1"
+        out["choose_plan_url"] = f"{str(request.base_url).rstrip('/')}/account/billing?choose_plan=1"
     return out
 
 
@@ -9295,7 +9295,7 @@ def api_create_order(
     except ApiOrderError as exc:
         return JSONResponse({"error": str(exc)}, status_code=400)
     loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
-    m = re.match(r"^/client/orders/([0-9a-f]+)(/pay)?$", loc)
+    m = re.match(r"^/account/orders/([0-9a-f]+)(/pay)?$", loc)
     if not m:
         return JSONResponse({"error": "could not create the order"}, status_code=400)
     order = db.get_order(m.group(1))
@@ -9468,7 +9468,7 @@ def _slack_order_ready_message(request, order, include_links: bool) -> dict:
     src, tgt = order["source_lang"], order["target_lang"]
     langs = LANGUAGE_NAMES.get(src, src) + (f" \u2192 {LANGUAGE_NAMES.get(tgt, tgt)}" if tgt and tgt != src else "")
     buttons = [{"type": "button", "text": {"type": "plain_text", "text": "Open order"},
-                "url": f"{base}/client/orders/{order['id']}", "style": "primary"}]
+                "url": f"{base}/account/orders/{order['id']}", "style": "primary"}]
     if include_links:
         links = _order_to_api_dict(request, order)["deliverables"]
         for kind, label in (("txt", "Transcript (TXT)"), ("docx", "Transcript (Word)"), ("srt", "Subtitles (SRT)"),
@@ -9616,7 +9616,7 @@ def _own_finished_order(request: Request, order_id: str):
     return user, order, None
 
 
-@app.get("/client/orders/{order_id}/export")
+@app.get("/account/orders/{order_id}/export")
 def client_export_transcript(request: Request, order_id: str, format: str = "docx", side: str = "source", split: str = "line",
                              timestamps: str | None = None, speakers: str | None = None):
     user, order, err = _own_finished_order(request, order_id)
@@ -9634,7 +9634,7 @@ def client_export_transcript(request: Request, order_id: str, format: str = "doc
                     headers={"Content-Disposition": f'attachment; filename="{filename}"', "Cache-Control": "no-store"})
 
 
-@app.post("/client/orders/{order_id}/share")
+@app.post("/account/orders/{order_id}/share")
 async def client_share_transcript(request: Request, order_id: str):
     """Body {"action": "create" | "revoke" | "email", "to": "..."}. create returns the link and a WhatsApp link."""
     user, order, err = _own_finished_order(request, order_id)
@@ -9694,7 +9694,7 @@ def shared_transcript(request: Request, token: str):
     })
 
 
-@app.get("/client/orders/{order_id}/download/{kind}")
+@app.get("/account/orders/{order_id}/download/{kind}")
 def download_deliverable(request: Request, order_id: str, kind: str):
     user = current_user(request)
     if not user:
@@ -9713,18 +9713,18 @@ def download_deliverable(request: Request, order_id: str, kind: str):
     # client who owns the order.
     if user["role"] == "client":
         if order["status"] == "pending_payment":
-            return RedirectResponse(f"/client/orders/{order_id}/pay", status_code=303)
+            return RedirectResponse(f"/account/orders/{order_id}/pay", status_code=303)
         if order["difficulty_surcharge_status"] == "pending_approval":
-            return RedirectResponse(f"/client/orders/{order_id}/difficulty-surcharge", status_code=303)
+            return RedirectResponse(f"/account/orders/{order_id}/difficulty-surcharge", status_code=303)
         if _order_locked(order):
             # Nothing downloads until a plan is chosen - the Free plan (pay as
             # you go: it charges for the order being opened) is enough, and covers results
             # made with the free monthly minutes.
-            return RedirectResponse("/client/billing?choose_plan=1", status_code=303)
+            return RedirectResponse("/account/billing?choose_plan=1", status_code=303)
         plan = billing.effective_plan(user, db.get_subscription(user["client_scope_id"]))
         has_video = billing.PLANS[plan]["video_deliverables"] or db.order_has_addon(order, "video_deliverables")
         if (kind in ("burned", "dubbed") or kind.startswith("captioned_")) and not has_video:
-            return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
+            return RedirectResponse("/account/billing?upgrade_for=video", status_code=303)
         # Real enforcement, not just a hidden UI button - a transcription-
         # only or translation-only order's mt/tts providers are set to
         # 'stub' by design (billing.SERVICE_LEVELS), but kauli.pipeline.run
@@ -9998,7 +9998,7 @@ def _render_captioned_video(order, style: str) -> None:
         out.with_suffix(".progress").unlink(missing_ok=True)
 
 
-@app.get("/client/orders/{order_id}/captioned-video/status")
+@app.get("/account/orders/{order_id}/captioned-video/status")
 def client_captioned_video_status(request: Request, order_id: str, style: str = "classic"):
     """The page asks this every few seconds while a captioned video is being made: {state, pct}."""
     user = current_user(request)
@@ -10012,7 +10012,7 @@ def client_captioned_video_status(request: Request, order_id: str, style: str = 
                         headers={"Cache-Control": "no-store"})
 
 
-@app.post("/client/orders/{order_id}/captioned-video")
+@app.post("/account/orders/{order_id}/captioned-video")
 def client_make_captioned_video(request: Request, order_id: str, style: str = Form("classic")):
     from urllib.parse import quote_plus
     user = current_user(request)
@@ -10023,14 +10023,14 @@ def client_make_captioned_video(request: Request, order_id: str, style: str = Fo
         return HTMLResponse("Order not found.", status_code=404)
 
     def back(kind: str, message: str):
-        return RedirectResponse(f"/client/orders/{order_id}?{kind}={quote_plus(message)}#captioned-video", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}?{kind}={quote_plus(message)}#captioned-video", status_code=303)
 
     if order["status"] not in db.TERMINAL_OK_STATUSES:
         return back("error", "This order is not ready yet.")
     if _order_locked(order):
-        return RedirectResponse("/client/billing?choose_plan=1" if not _plan_chosen(user["client_scope_id"]) else f"/client/orders/{order_id}", status_code=303)
+        return RedirectResponse("/account/billing?choose_plan=1" if not _plan_chosen(user["client_scope_id"]) else f"/account/orders/{order_id}", status_code=303)
     if not (billing.PLANS.get(order["tier"], {}).get("video_deliverables") or db.order_has_addon(order, "video_deliverables")):
-        return RedirectResponse("/client/billing?upgrade_for=video", status_code=303)
+        return RedirectResponse("/account/billing?upgrade_for=video", status_code=303)
     if style not in CAPTION_LOOKS:
         return back("error", "Choose one of the caption looks.")
     if not (is_video_file(order["audio_path"]) or order["source_youtube_id"]):
@@ -10935,7 +10935,7 @@ def staff_send_message(request: Request, order_id: str,
         if visibility == "client":
             db.create_notification(order["client_id"], "staff_message",
                                     f"New message about {order['original_filename']}",
-                                    link=f"/client/orders/{order_id}")
+                                    link=f"/account/orders/{order_id}")
         # also_email is only ever meaningful on a client-visible message -
         # an internal note has no client to email, and the checkbox
         # doesn't even exist on that form, but the check here is real
@@ -10945,7 +10945,7 @@ def staff_send_message(request: Request, order_id: str,
             if client and client["email"]:
                 html = mailer.wrap_email_html(
                     f"<p>{body.strip()}</p>".replace("\n", "</p><p>"),
-                    cta_text="View your order →", cta_url=str(request.base_url).rstrip("/") + f"/client/orders/{order_id}",
+                    cta_text="View your order →", cta_url=str(request.base_url).rstrip("/") + f"/account/orders/{order_id}",
                     base_url=str(request.base_url),
                 )
                 mailer.send_as("orders", client["email"], f"Update on your Kauli order - {order['original_filename']}",
@@ -11019,7 +11019,7 @@ def staff_ops_decision(request: Request, order_id: str, action: str = Form(...),
             db.create_message(order_id, user["id"], "client", message.strip())
         client = db.get_user(order["client_id"])
         if client and mailer.email_configured():
-            link = f"{str(request.base_url).rstrip('/')}/client/orders/{order_id}"
+            link = f"{str(request.base_url).rstrip('/')}/account/orders/{order_id}"
             reason_text = f"\n\n{message.strip()}" if message.strip() else ""
             client_name = (client["display_name"] or client["email"].split("@")[0]).strip()
             body = (f"Hi {client_name},\n\n"
@@ -12447,9 +12447,9 @@ account_closure.register(sys.modules[__name__])
 winback.register(sys.modules[__name__])
 dunning.register(sys.modules[__name__])
 engagement.register(sys.modules[__name__])
-diagnostics_routes.register(sys.modules[__name__])
 onboarding.register(sys.modules[__name__])
 repurpose.register(sys.modules[__name__])
 model_stats.register(sys.modules[__name__])
 calendar_feed.register(sys.modules[__name__])        # calendar links and sending Kauli to meetings        # import from Google Drive, OneDrive and Dropbox          # narrated blog posts and the podcast feed
+late_routes.register(sys.modules[__name__])   # see late_routes.py for what is in it and why it is last
 blog_audio.mark_stale_jobs_failed()         # notes, analytics, workspace, vocabulary, plans, rewards, integrations, assistant

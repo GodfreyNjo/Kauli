@@ -144,17 +144,17 @@ def suggestions(order, user) -> list[dict]:
     return out
 
 
-@router.get("/client/orders/{order_id}/more")
+@router.get("/account/orders/{order_id}/more")
 def more_from_this_file(request: Request, order_id: str):
     user = A.current_user(request)
     if not user or user["role"] != "client":
-        return RedirectResponse(f"/login?next=/client/orders/{order_id}/more", status_code=303)
+        return RedirectResponse(f"/login?next=/account/orders/{order_id}/more", status_code=303)
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     has_file = bool(order["source_youtube_id"]) or (bool(order["audio_path"]) and Path(order["audio_path"]).is_file())
     if order["status"] in ("pending_payment", "failed", "dead_letter") or not has_file:
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
     return A.templates.TemplateResponse(request, "repurpose.html", {
         "user": user, "order": order, "cards": suggestions(order, user), "language_names": A.LANGUAGE_NAMES,
         "key_prefix": uuid.uuid4().hex[:12], "plan": plan_summary(user, db.get_subscription_current(user["client_scope_id"])),

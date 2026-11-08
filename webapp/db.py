@@ -847,7 +847,7 @@ CREATE TABLE IF NOT EXISTS notion_exports (
 -- else in the app already covers (staff_ops's stale_orders/turnaround
 -- stats cover orders that exist; this covers the wizard visits that
 -- never became one). Never sent anywhere outside this database - see
--- app.py's /client/wizard-event route.
+-- app.py's /account/wizard-event route.
 CREATE TABLE IF NOT EXISTS wizard_step_events (
     id TEXT PRIMARY KEY,
     client_id TEXT NOT NULL,
@@ -1095,7 +1095,7 @@ def init_db() -> None:
         # Internal-only context a staff member jots about this client
         # account (a real CRM basic - "prefers WhatsApp", "sensitive
         # deadline last time", whatever's actually worth remembering) -
-        # never shown to the client themselves, only on /staff/clients.
+        # never shown to the client themselves, only on /staff/customers.
         conn.execute("ALTER TABLE users ADD COLUMN staff_notes TEXT")
     if "trial_verified_at" not in existing_user_cols:
         # Real-person gate before a client's free minutes can be spent -
@@ -2038,7 +2038,7 @@ def list_clients_for_staff(search: str | None = None):
     """Every real, top-level client account (never a teammate - those live
     under their owner's own Team tab, same scope rule client_scope_id
     already uses everywhere else) with real aggregate stats, for
-    /staff/clients. Search matches display_name or email, case-insensitive,
+    /staff/customers. Search matches display_name or email, case-insensitive,
     substring - deliberately simple, this is a handful of real accounts,
     not thousands."""
     conn = get_conn()
@@ -2078,7 +2078,7 @@ def append_client_staff_note(client_id: str, note: str) -> None:
     """One dated, auto-generated line added to the TOP of a client's
     staff notes, never replacing whatever a human already typed there -
     see set_client_staff_notes for the manual-edit path (the textarea on
-    /staff/clients/{id}?tab=settings) this must never clobber. Used for
+    /staff/customers/{id}?tab=settings) this must never clobber. Used for
     real automatic events worth a staff member seeing next time they look
     at this account (see app.py's _note_payment_failure), not a full
     activity log - keep call sites to genuinely note-worthy real events."""
@@ -3650,7 +3650,7 @@ def resume_returned_order(order_id: str, new_audio_path: str | None = None,
     only need the client's reply on the message thread (nothing here
     needed changing); a replacement file is only passed when the return
     reason actually required one (e.g. no_audio) - see the
-    /client/orders/{id}/resume and /staff/orders/{id}/resume routes."""
+    /account/orders/{id}/resume and /staff/orders/{id}/resume routes."""
     now = time.time()
     conn = get_conn()
     if new_audio_path:

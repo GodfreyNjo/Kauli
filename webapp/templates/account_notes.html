@@ -9,12 +9,12 @@
       <h1>Notes</h1>
       <p class="muted">Write your own, or make AI notes from any finished transcript: overview, key points and action items.</p>
     </div>
-    <form method="post" action="/client/notes/new"><button type="submit" class="cta-olive">New note</button></form>
+    <form method="post" action="/account/notes/new"><button type="submit" class="cta-olive">New note</button></form>
   </div>
 
   <div class="nt{% if current %} is-open{% endif %}">
     <aside class="nt-list" aria-label="All notes">
-      <form method="get" action="/client/notes" class="nt-search" role="search">
+      <form method="get" action="/account/notes" class="nt-search" role="search">
         <input type="search" name="q" value="{{ q }}" placeholder="Search notes" aria-label="Search notes">
       </form>
       <h2 class="nt-count">All notes <span class="muted">({{ total }})</span></h2>
@@ -23,19 +23,19 @@
       {% endif %}
       <ul>
         {% for n in notes %}
-        <li><a href="/client/notes?id={{ n.row['id'] }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}" class="nt-item{% if current and current['id'] == n.row['id'] %} is-current{% endif %}">
+        <li><a href="/account/notes?id={{ n.row['id'] }}{% if q %}&amp;q={{ q|urlencode }}{% endif %}" class="nt-item{% if current and current['id'] == n.row['id'] %} is-current{% endif %}">
           <strong>{{ n.row['title'] }}</strong>
           <span class="nt-prev">{{ n.preview or 'Empty note' }}</span>
           <small class="muted">{{ n.when }}</small>
         </a></li>
         {% endfor %}
       </ul>
-      {{ pager(page, pages, '/client/notes', {'q': q, 'id': note_id}) }}
+      {{ pager(page, pages, '/account/notes', {'q': q, 'id': note_id}) }}
     </aside>
 
     <section class="nt-editor" aria-label="Note editor">
       {% if current %}
-      <a class="nt-back" href="/client/notes">&larr; All notes</a>
+      <a class="nt-back" href="/account/notes">&larr; All notes</a>
       <div class="nt-head">
         <input type="text" id="nt-title" value="{{ current['title'] }}" maxlength="200" aria-label="Note title">
         <span id="nt-status" class="muted" role="status" aria-live="polite">Saved</span>
@@ -56,16 +56,16 @@
         <details class="nt-dl">
           <summary>Download</summary>
           <div>
-            <a href="/client/notes/{{ current['id'] }}/download?format=docx">Word</a>
-            <a href="/client/notes/{{ current['id'] }}/download?format=txt">Text</a>
-            <a href="/client/notes/{{ current['id'] }}/download?format=html">Web page</a>
+            <a href="/account/notes/{{ current['id'] }}/download?format=docx">Word</a>
+            <a href="/account/notes/{{ current['id'] }}/download?format=txt">Text</a>
+            <a href="/account/notes/{{ current['id'] }}/download?format=html">Web page</a>
           </div>
         </details>
       </div>
       <div id="nt-body" class="nt-body" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Note text" data-note-id="{{ current['id'] }}">{{ current['body_html']|safe }}</div>
       <div class="nt-foot">
-        {% if current['order_id'] %}<a href="/client/orders/{{ current['order_id'] }}">Open the transcript</a>{% endif %}
-        <form method="post" action="/client/notes/{{ current['id'] }}/delete" onsubmit="return confirm('Delete this note?');"><button type="submit" class="secondary">Delete note</button></form>
+        {% if current['order_id'] %}<a href="/account/orders/{{ current['order_id'] }}">Open the transcript</a>{% endif %}
+        <form method="post" action="/account/notes/{{ current['id'] }}/delete" data-confirm="Delete this note?" data-danger><button type="submit" class="secondary">Delete note</button></form>
       </div>
       <script src="/static/notes_editor.js?v={{ static_version('notes_editor.js') }}" defer></script>
       {% else %}

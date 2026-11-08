@@ -116,7 +116,7 @@ def test_the_purchase_model_scores_engaged_customers_above_idle_ones(env):
     _user(env, "idle", joined_days_ago=40, seen_days_ago=40)
     for d in (1, 3):
         _order(env, "keen", d, "translate")
-    sa.record_hit("/client/plans", "", "", "kauli.test", "1.1.1.1", CHROME, "us", "keen")
+    sa.record_hit("/account/plans", "", "", "kauli.test", "1.1.1.1", CHROME, "us", "keen")
     conn = env.db.get_conn()
     model = sa.purchase_model(sa.purchase_features(conn))
     conn.close()

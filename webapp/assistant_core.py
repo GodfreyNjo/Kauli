@@ -206,7 +206,7 @@ def feed(user, limit: int = 25) -> dict:
         if not last:
             continue
         items.append({"id": f"m-{oid}", "source": "message", "kind": "staff_message", "title": f"Reply from the team: {order['original_filename']}",
-                      "body": _snippet(last[-1]["body"]), "link": f"/client/orders/{oid}", "at": last[-1]["created_at"], "unread": True, "important": True})
+                      "body": _snippet(last[-1]["body"]), "link": f"/account/orders/{oid}", "at": last[-1]["created_at"], "unread": True, "important": True})
     conn = db.get_conn()
     threads = conn.execute(
         "SELECT t.id, t.subject, t.client_seen_at, MAX(m.created_at) AS last_at FROM support_threads t JOIN support_messages m ON m.thread_id = t.id "

@@ -45,19 +45,19 @@ def test_the_percentage_moves_forward_with_the_stage_and_never_claims_to_be_done
 
 def test_the_progress_endpoint_is_private_to_the_client_who_owns_the_order(env, wav_bytes):
     order = _running(env, wav_bytes, "transcribe")
-    r = env.client.get(f"/client/orders/{order['id']}/progress")
+    r = env.client.get(f"/account/orders/{order['id']}/progress")
     assert r.status_code == 200 and r.headers["cache-control"] == "no-store"
     assert r.json()["steps"][1]["state"] == "current"
-    assert env.client.get("/client/orders/not-a-real-order/progress").status_code == 404
+    assert env.client.get("/account/orders/not-a-real-order/progress").status_code == 404
 
 
 def test_the_order_page_shows_the_live_panel_while_running_and_not_after(env, wav_bytes):
     order = _running(env, wav_bytes, "transcribe")
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="live-progress"' in page and "Turning speech into text" in page and "you can close this page" in page.lower()
     assert "updates itself automatically" not in page
     env.db.update_order_status(order["id"], "ready_for_delivery")
-    assert 'id="live-progress"' not in env.client.get(f"/client/orders/{order['id']}").text
+    assert 'id="live-progress"' not in env.client.get(f"/account/orders/{order['id']}").text
 
 
 def test_the_pipeline_reports_each_stage_it_enters():
@@ -84,7 +84,7 @@ def test_instant_ai_reaches_the_ticked_state_with_no_staff_approval(env, wav_byt
     ai = env.order_from(env.place(wav_bytes))
     done = _run_worker(env, ai)
     assert done["status"] == "ready_for_delivery"                      # nobody approved anything
-    page = env.client.get(f"/client/orders/{ai['id']}").text
+    page = env.client.get(f"/account/orders/{ai['id']}").text
     assert page.count("order-progress-done") == 3 and "order-progress-current" not in page
 
 

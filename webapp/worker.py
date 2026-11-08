@@ -68,7 +68,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
     if not client:
         return
     link_base = (base_url or PUBLIC_BASE_URL or "").rstrip("/")
-    link = f"{link_base}/client/orders/{order['id']}" if link_base else None
+    link = f"{link_base}/account/orders/{order['id']}" if link_base else None
     name = (client["display_name"] or client["email"].split("@")[0]).strip()
     body = (
         f"Hi {name},\n\n"
@@ -90,7 +90,7 @@ def notify_client_order_ready(order, base_url: str | None = None) -> None:
                                    cta_url=link, base_url=link_base)
     mailer.send_as("orders", client["email"], "Your Kauli order is ready", html, body)
     db.create_notification(client["id"], "order_ready", f"{order['original_filename']} is ready",
-                            link=f"/client/orders/{order['id']}")
+                            link=f"/account/orders/{order['id']}")
 
 
 def notify_staff_needs_review(order) -> None:

@@ -13,7 +13,7 @@
   {% endif %}
   {% if winback_offer %}
   <div class="ds-card wb-banner"><div><strong>A free month, on us.</strong> Welcome back: 30 days of your plan, free, with your personal code.</div>
-    <a class="ds-btn small" href="/client/winback/{{ winback_offer['id'] }}">Get my free month</a></div>
+    <a class="ds-btn small" href="/account/winback/{{ winback_offer['id'] }}">Get my free month</a></div>
   {% endif %}
   <div class="ds-head">
     <div>
@@ -22,17 +22,17 @@
     </div>
     {% if free_minutes_left and free_minutes_left > 0 %}
     {% set free_n %}<b>{{ free_minutes_left|round|int }}</b>{% endset %}
-    <div class="ds-head-actions"><a href="/client#order-form" class="ds-pill info ch-plan">{{ t('free_left', n=free_n) }}</a></div>
+    <div class="ds-head-actions"><a href="/account#order-form" class="ds-pill info ch-plan">{{ t('free_left', n=free_n) }}</a></div>
     {% endif %}
   </div>
 
   <div class="ds-actions">
-    <a class="ds-action primary" href="/client#order-form">
+    <a class="ds-action primary" href="/account#order-form">
       <span class="ds-action-ic">{{ ico('upload', 24) }}</span>
       <span><strong>{{ t('act_upload_t') }}</strong><small>{{ t('act_upload_s') }}</small></span>
       <span class="go">{{ ico('arrow', 18) }}</span>
     </a>
-    <a class="ds-action" href="/client?source=youtube#order-form">
+    <a class="ds-action" href="/account?source=youtube#order-form">
       <span class="ds-action-ic">{{ ico('link', 24) }}</span>
       <span><strong>{{ t('act_yt_t') }}</strong><small>{{ t('act_yt_s') }}</small></span>
       <span class="go">{{ ico('arrow', 18) }}</span>
@@ -42,7 +42,7 @@
       <span><strong>{{ t('act_demo_t') }}</strong><small>{{ t('act_demo_s') }}</small></span>
       <span class="go">{{ ico('arrow', 18) }}</span>
     </a>
-    <a class="ds-action" href="/client/integrations" id="home-integrations">
+    <a class="ds-action" href="/account/integrations" id="home-integrations">
       <span class="ds-action-ic">{{ ico('puzzle', 24) }}</span>
       <span><strong>{{ t('act_int_t') }}</strong><small>{{ t('act_int_s') }}</small></span>
       <span class="go">{{ ico('arrow', 18) }}</span>
@@ -50,13 +50,13 @@
   </div>
 
   <div class="ds-tiles">
-    <a class="ds-tile" href="/client/home?status=in_progress"><span class="ds-tile-ic">{{ ico('clock', 22) }}</span>
+    <a class="ds-tile" href="/account/home?status=in_progress"><span class="ds-tile-ic">{{ ico('clock', 22) }}</span>
       <span><b>{{ stats['in_progress'] }}</b><strong>{{ t('pill_processing') }}</strong><small>{{ t('tile_processing_h') }}</small></span></a>
-    <a class="ds-tile" href="/client/home?status=in_progress"><span class="ds-tile-ic">{{ ico('doc', 22) }}</span>
+    <a class="ds-tile" href="/account/home?status=in_progress"><span class="ds-tile-ic">{{ ico('doc', 22) }}</span>
       <span><b>{{ stats['in_review'] }}</b><strong>{{ t('pill_review') }}</strong><small>{{ t('tile_review_h') }}</small></span></a>
-    <a class="ds-tile{{ ' warn' if stats['needs_you'] > 0 else '' }}" href="/client/pending"><span class="ds-tile-ic">{{ ico('alert', 22) }}</span>
+    <a class="ds-tile{{ ' warn' if stats['needs_you'] > 0 else '' }}" href="/account/pending"><span class="ds-tile-ic">{{ ico('alert', 22) }}</span>
       <span><b>{{ stats['needs_you'] }}</b><strong>{{ t('pill_needs') }}</strong><small>{{ t('tile_needs_h') }}</small></span></a>
-    <a class="ds-tile ok" href="/client/home?status=ready"><span class="ds-tile-ic">{{ ico('check', 22) }}</span>
+    <a class="ds-tile ok" href="/account/home?status=ready"><span class="ds-tile-ic">{{ ico('check', 22) }}</span>
       <span><b>{{ stats['completed'] }}</b><strong>{{ t('pill_ready') }}</strong><small>{{ t('tile_ready_h') }}</small></span></a>
   </div>
 
@@ -64,7 +64,7 @@
     <div class="ds-card-head">
       <h2 id="ch-files-title">{{ t('recent_files') }}</h2>
       <div class="ds-head-actions">
-        <form class="ds-search ch-search" method="get" action="/client/home" role="search">{{ ico('search', 18) }}
+        <form class="ds-search ch-search" method="get" action="/account/home" role="search">{{ ico('search', 18) }}
           <input type="search" id="ch-search" name="q" value="{{ q }}" placeholder="{{ t('search_files') }}" aria-label="{{ t('search_files') }}" autocomplete="off">
           {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
         </form>
@@ -72,7 +72,7 @@
     </div>
     <div class="ds-tabs" role="group" aria-label="{{ t('col_status') }}">
       {% for key, label in [('', t('tab_all')), ('in_progress', t('tab_progress')), ('needs_you', t('tab_attention')), ('ready', t('tab_ready'))] %}
-      <a href="/client/home{% if key or q %}?{% if key %}status={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
+      <a href="/account/home{% if key or q %}?{% if key %}status={{ key }}{% endif %}{% if key and q %}&amp;{% endif %}{% if q %}q={{ q|urlencode }}{% endif %}{% endif %}"
          class="{{ 'is-on' if status == key else '' }}"{% if status == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
       {% endfor %}
     </div>
@@ -82,7 +82,7 @@
     {% elif not recent_orders %}
     <div class="ds-empty ch-empty">
       <p>{{ t('empty_files') }}</p>
-      <a href="/client#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
+      <a href="/account#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
     </div>
     {% else %}
     <div class="ds-scroll">
@@ -91,19 +91,19 @@
         <tbody>
           {% for o in recent_orders %}
           <tr data-name="{{ o['original_filename']|lower }}">
-            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/client/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
+            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/account/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
               <small>{{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }}</small></div></div></td>
             <td class="hide-sm">{{ svc_cell(o) }}</td>
             <td class="hide-sm">{{ langs_cell(o) }}</td>
             <td class="hide-sm num">{{ o['created_at']|ts_ui }}</td>
             <td>{{ status_pill(o['status']) }}</td>
-            <td><a class="ds-act" href="/client/orders/{{ o['id'] }}" aria-label="{{ t('act_open') }}: {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
+            <td><a class="ds-act" href="/account/orders/{{ o['id'] }}" aria-label="{{ t('act_open') }}: {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="ds-pager">{{ pager(page, pages, '/client/home', {'q': q, 'status': status}) }}</div>
+    <div class="ds-pager">{{ pager(page, pages, '/account/home', {'q': q, 'status': status}) }}</div>
     {% endif %}
   </section>
 </div>

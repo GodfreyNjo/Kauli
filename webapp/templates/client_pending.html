@@ -10,19 +10,19 @@
       <h1>{{ t('pending_title') }}</h1>
       <p>{{ t('pending_sub') }}</p>
     </div>
-    <div class="ds-head-actions"><a href="/client#order-form" class="ds-btn">{{ t('new_order') }}</a></div>
+    <div class="ds-head-actions"><a href="/account#order-form" class="ds-btn">{{ t('new_order') }}</a></div>
   </div>
 
   <section class="ds-card ch-files">
     <div class="ds-tabs" role="group" aria-label="{{ t('col_status') }}">
       {% for key, label in [('', t('tab_all')), ('needs', t('tab_attention')), ('progress', t('tab_progress'))] %}
-      <a href="/client/pending{% if key %}?tab={{ key }}{% endif %}" class="{{ 'is-on' if tab == key else '' }}"{% if tab == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
+      <a href="/account/pending{% if key %}?tab={{ key }}{% endif %}" class="{{ 'is-on' if tab == key else '' }}"{% if tab == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ counts[key] }}</small></a>
       {% endfor %}
     </div>
     {% if not rows %}
     <div class="ds-empty ch-empty">
       <p>{{ t('caught_up') }}</p>
-      <a href="/client#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
+      <a href="/account#order-form" class="ds-btn">{{ t('act_upload_t') }}</a>
     </div>
     {% else %}
     <div class="ds-scroll">
@@ -31,23 +31,23 @@
         <tbody>
           {% for o, kind in rows %}
           <tr>
-            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/client/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
+            <td><div class="ds-file">{{ file_ic(o['original_filename']) }}<div><a href="/account/orders/{{ o['id'] }}"><strong title="{{ o['original_filename'] }}">{{ o['original_filename'] }}</strong></a>
               <small>{{ t('minutes_n', n="%.1f"|format(o['duration_minutes'] or 0)) }}{% if o['cost_usd'] %} &middot; ${{ "%.2f"|format(o['cost_usd']) }}{% endif %}</small></div></div></td>
             <td><span class="ds-issue {{ 'is-you' if kind in ('pay', 'input', 'charge') else '' }}">{{ t('issue_' ~ kind) }}</span></td>
             <td class="hide-sm num">{{ o['created_at']|ts_ui }}</td>
             <td>{{ status_pill(o['status']) }}</td>
             <td>
-              {% if kind == 'pay' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}/pay">{{ t('pay_now') }}</a>
-              {% elif kind == 'input' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}">{{ t('reply') }}</a>
-              {% elif kind == 'charge' %}<a class="ds-act primary" href="/client/orders/{{ o['id'] }}/difficulty-surcharge">{{ t('view') }}</a>
-              {% else %}<a class="ds-act" href="/client/orders/{{ o['id'] }}">{{ t('view') }}</a>{% endif %}
+              {% if kind == 'pay' %}<a class="ds-act primary" href="/account/orders/{{ o['id'] }}/pay">{{ t('pay_now') }}</a>
+              {% elif kind == 'input' %}<a class="ds-act primary" href="/account/orders/{{ o['id'] }}">{{ t('reply') }}</a>
+              {% elif kind == 'charge' %}<a class="ds-act primary" href="/account/orders/{{ o['id'] }}/difficulty-surcharge">{{ t('view') }}</a>
+              {% else %}<a class="ds-act" href="/account/orders/{{ o['id'] }}">{{ t('view') }}</a>{% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="ds-pager">{{ pager(page, pages, '/client/pending', {'tab': tab}) }}</div>
+    <div class="ds-pager">{{ pager(page, pages, '/account/pending', {'tab': tab}) }}</div>
     {% endif %}
   </section>
 </div>

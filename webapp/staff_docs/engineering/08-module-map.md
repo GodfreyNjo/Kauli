@@ -10,6 +10,7 @@ docstring instead, then run the script.
 |---|---:|---|
 | `account_closure.py` | 144 | Closing an account, done respectfully: one self-serve page (no call or email needed), a one-question survey that is optional, an honest alternative for whatever the reason is, a plain "what happens ne... |
 | `account_hub.py` | 1389 | The customer-account tools beyond orders: AI Notes, Analytics, the team Workspace, Custom vocabulary, Plans, Rewards (referrals), Integrations, the help Assistant with hand-off to the team, and the st... |
+| `account_security.py` | 113 | The account-security pages: where you are signed in, and confirming it is you before something sensitive |
 | `app.py` | 12455 | The Kauli website and portals: every page and API route, and the wiring of all the other modules |
 | `assistant_core.py` | 225 | The Kauli assistant's brain: what it knows, what it will not talk about, when a person has to step in, and the one inbox it feeds |
 | `billing.py` | 1046 | Pricing, currency conversion, and payment provider integrations |
@@ -38,7 +39,9 @@ docstring instead, then run the script.
 | `human_review_content.py` | 140 | Content for the human-review pages: /human-review and one page per language |
 | `ip_intel.py` | 99 | Real, free datacenter/hosting-IP detection - a legitimate, honest signal that a signup or login is coming from a cloud server rather than a residential connection, without a paid IP-reputation API/Red... |
 | `js_strings.py` | 67 | The words the page's scripts show, in the reader's language |
+| `late_routes.py` | 19 | Route modules that must be registered last, in this order, so that app.py does not need a line for each |
 | `lead_playbook.py` | 527 | Real, ready-to-use outreach content for the CRM's bulk-researched leads (NGOs, media houses, and future categories) - staff_lead_detail.html shows whichever stage matches the lead's own real pipeline ... |
+| `legacy_paths.py` | 44 | Old addresses that still work: they send the visitor to the new one |
 | `lifecycle.py` | 421 | The messages that follow a sale, each sent from the person a customer would expect to hear from: |
 | `locales.py` | 553 | Translated marketing-landing copy for the localized pages (/es, /zh, /ar ...) |
 | `locations.py` | 57 | The two offices, each with a page of its own (/locations/nairobi, /locations/dallas) |
@@ -65,9 +68,11 @@ docstring instead, then run the script.
 | `savings.py` | 38 | Tell a pay-as-you-go customer plainly when a monthly plan would have cost them less |
 | `seo_languages.py` | 113 | Per-language facts for the English 'X audio to text' pages and the languages hub - the multilingual-SEO side of the site |
 | `seo_pages.py` | 233 | Pages for the searches where a visitor already needs what Kauli sells: a language plus a job ("Spanish interview transcription") |
+| `sessions.py` | 175 | Where you are signed in: a list of devices, and the power to sign any of them out |
 | `site_analytics.py` | 742 | Kauli's own analytics, alongside Google Analytics: a cookie-free visit counter, and the engines that turn visits, orders and payments into the numbers on the staff Site analytics tab (traffic, audienc... |
 | `solution_pages.py` | 794 | The /solutions/<slug> pages: what each service is, who it is for, how to choose between its options, and where to read or hear more |
 | `staff_integrations.py` | 198 | Integrations for staff accounts: each staff member can have their alerts sent to their own Slack channel, Microsoft Teams channel or webhook |
+| `sudo_mode.py` | 87 | Confirm it is you before something sensitive: re-enter your password, or use a code we email you |
 | `summary_templates.py` | 222 | The summary formats a customer can choose from for a finished transcript |
 | `supabase_auth.py` | 414 | Thin wrapper around supabase-py for email/password auth |
 | `tat.py` | 138 | Turnaround-time (deadline) calculation - a real, deterministic formula from known variables (plan tier, service level, audio duration), not a guess and not an AI estimate |
@@ -80,7 +85,7 @@ docstring instead, then run the script.
 | `weekly_kpi.py` | 124 | The Monday email: the numbers that say whether the business is working, for real customers only, next to the day-30 targets from the growth plan |
 | `winback.py` | 281 | Winning back customers who paid and then went quiet: a unique coupon code for one free month of their subscription, offered once |
 | `worker.py` | 314 | Runs the real kauli pipeline in a background thread and syncs order status |
-| `youtube_captions.py` | 147 | Push a real, generated caption file straight onto a client's own YouTube video - webapp/app.py's /client/youtube/connect/callback/disconnect and /client/orders/{id}/push-captions-youtube routes |
+| `youtube_captions.py` | 147 | Push a real, generated caption file straight onto a client's own YouTube video - webapp/app.py's /account/youtube/connect/callback/disconnect and /account/orders/{id}/push-captions-youtube routes |
 | `youtube_poll.py` | 110 | Read-only YouTube channel/playlist polling - the "detect new uploads for you" half of automation, not the "process and bill automatically" half |
 
 ## The processing pipeline: transcription, translation, voices (`kauli/`)

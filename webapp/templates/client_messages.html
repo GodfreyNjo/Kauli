@@ -11,7 +11,7 @@
 {% else %}
 <div class="card" style="padding:0;">
   {% for c in conversations %}
-  <a href="/client/orders/{{ c['order_id'] }}" style="display:flex; gap:12px; align-items:flex-start; padding:14px 20px; border-bottom:1px solid var(--border-subtle); color:inherit;">
+  <a href="/account/orders/{{ c['order_id'] }}" style="display:flex; gap:12px; align-items:flex-start; padding:14px 20px; border-bottom:1px solid var(--border-subtle); color:inherit;">
     <div class="avatar" style="flex-shrink:0;">{{ c['original_filename'][0]|upper }}</div>
     <div style="min-width:0; flex:1;">
       <div style="display:flex; justify-content:space-between; gap:10px;">

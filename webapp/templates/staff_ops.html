@@ -43,18 +43,18 @@
 ] %}
 <div class="rp-row">
   <section class="rp-card" aria-labelledby="rp-fn-h">
-    <header><h2 id="rp-fn-h">Client funnel</h2>
+    <header><h2 id="rp-fn-h">Customer funnel</h2>
       <div class="rp-conv"><small>Conversion rate</small><strong>{{ "%.0f"|format((funnel['orders_paid'] / funnel['signups'] * 100) if funnel['signups'] else 0) }}%</strong><small>{{ funnel['orders_paid'] }} of {{ funnel['signups'] }} signups paid</small></div></header>
     <ul class="rp-funnel">
       {% for label, n in funnel_stages %}
       <li><span>{{ label }}</span><i><u class="f{{ loop.index0 }}" style="width: {{ (100 * n / funnel['signups']) if funnel['signups'] else 0 }}%"></u></i><b>{{ n }}</b><em>{{ "%.0f"|format((100 * n / funnel['signups']) if funnel['signups'] else 0) }}%</em></li>
       {% endfor %}
     </ul>
-    <p class="muted rp-fine">Clients who signed up in the last {{ days }} days, followed through to today. Wizard-step events only started logging recently, so older signups show 0 there.</p>
+    <p class="muted rp-fine">Customers who signed up in the last {{ days }} days, followed through to today. Wizard-step events only started logging recently, so older signups show 0 there.</p>
   </section>
   <section class="rp-card" data-tabs aria-labelledby="rp-rev-h">
     <header><h2 id="rp-rev-h">Revenue over time</h2>
-      <div class="rp-tabs" role="tablist"><button type="button" class="is-on" data-tab="revenue">Revenue</button><button type="button" data-tab="orders">Orders</button><button type="button" data-tab="clients">Clients</button></div></header>
+      <div class="rp-tabs" role="tablist"><button type="button" class="is-on" data-tab="revenue">Revenue</button><button type="button" data-tab="orders">Orders</button><button type="button" data-tab="clients">Customers</button></div></header>
     <div data-panel="revenue" class="rp-chart">{{ series['svg']['revenue']|safe }}</div>
     <div data-panel="orders" class="rp-chart" hidden>{{ series['svg']['orders']|safe }}</div>
     <div data-panel="clients" class="rp-chart" hidden>{{ series['svg']['clients']|safe }}</div>
@@ -183,7 +183,7 @@
        or return the job from the order page.</p>
   </div>
   <table>
-    <thead><tr><th>Order</th><th>Client</th><th>Reason</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Customer</th><th>Reason</th><th></th></tr></thead>
     <tbody>
       {% for o in ops_triage %}
       <tr>
@@ -206,7 +206,7 @@
     <p class="muted" style="padding:0 24px 20px;">Nothing stuck - every in-flight order has moved stage within the last day.</p>
   {% else %}
   <table>
-    <thead><tr><th>Order</th><th>Client</th><th>Stage</th><th>Stuck for</th><th></th></tr></thead>
+    <thead><tr><th>Order</th><th>Customer</th><th>Stage</th><th>Stuck for</th><th></th></tr></thead>
     <tbody>
       {% for o in stale_orders %}
       <tr>

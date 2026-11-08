@@ -33,7 +33,7 @@ def _order_translation(env, original, **extra):
     data = {"reuse_order_id": original["id"], "source_lang": original["source_lang"], "target_lang": "sw", "service_level": "translate",
             "review_tier": "ai"}
     data.update(extra)
-    return env.order_from(env.client.post("/client/orders", data=data, follow_redirects=False))
+    return env.order_from(env.client.post("/account/orders", data=data, follow_redirects=False))
 
 
 def test_a_translation_of_a_delivered_file_starts_from_the_delivered_transcript(env, wav_bytes):
@@ -95,9 +95,9 @@ def test_an_unfinished_or_empty_transcript_is_not_reused(env, wav_bytes):
 def test_the_page_says_the_transcript_was_reused_and_links_to_it(env, wav_bytes):
     original = _delivered(env, wav_bytes)
     new = _order_translation(env, original)
-    page = env.client.get(f"/client/orders/{new['id']}").text
-    assert "earlier transcript" in page and f"/client/orders/{original['id']}" in page
-    more = env.client.get(f"/client/orders/{original['id']}/more").text
+    page = env.client.get(f"/account/orders/{new['id']}").text
+    assert "earlier transcript" in page and f"/account/orders/{original['id']}" in page
+    more = env.client.get(f"/account/orders/{original['id']}/more").text
     assert "nothing to upload or transcribe again" in more
 
 
@@ -109,14 +109,14 @@ def test_without_a_plan_nobody_can_edit_or_download(env, wav_bytes):
     conn.commit()
     conn.close()
     oid = original["id"]
-    assert env.client.post(f"/client/orders/{oid}/transcript", json={"edits": []}).status_code == 403                 # edit
+    assert env.client.post(f"/account/orders/{oid}/transcript", json={"edits": []}).status_code == 403                 # edit
     for kind in ("docx", "txt", "srt", "source", "audio", "dubbed", "burned"):
-        r = env.client.get(f"/client/orders/{oid}/download/{kind}", follow_redirects=False)
+        r = env.client.get(f"/account/orders/{oid}/download/{kind}", follow_redirects=False)
         assert r.status_code in (303, 403, 404) and "choose_plan" in r.headers.get("location", "choose_plan"), kind
-    assert env.client.get(f"/client/orders/{oid}/export?format=docx").status_code == 403                              # export
-    assert env.client.post(f"/client/orders/{oid}/share", json={"action": "create"}).status_code == 403             # share link
-    env.client.post("/client/billing/choose-free")
-    assert env.client.get(f"/client/orders/{oid}/export?format=txt").status_code == 200                              # the Free plan unlocks it
+    assert env.client.get(f"/account/orders/{oid}/export?format=docx").status_code == 403                              # export
+    assert env.client.post(f"/account/orders/{oid}/share", json={"action": "create"}).status_code == 403             # share link
+    env.client.post("/account/billing/choose-free")
+    assert env.client.get(f"/account/orders/{oid}/export?format=txt").status_code == 200                              # the Free plan unlocks it
 
 
 

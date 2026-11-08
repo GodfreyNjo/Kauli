@@ -4,7 +4,7 @@
 {% set show_mobile_money = mpesa_ok(request, user) %}
 {% set bank_allowed = bank_ok(user) %}
 <div class="pay-wrap">
-  <a href="/client" class="breadcrumb">&larr; Back to your order</a>
+  <a href="/account" class="breadcrumb">&larr; Back to your order</a>
 
   {% if notice %}<p class="ok" id="prepay-notice">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -30,7 +30,7 @@
       <p class="pay-sub">Your file is not uploaded until your payment goes through. It waits in your browser, and goes up automatically afterwards. If its length turns out slightly different once it is processed, the small difference is settled from, or kept in, your wallet.</p>
     </section>
 
-    <form method="post" action="/client/pay-first" id="pay-form" class="pay-card pay-method">
+    <form method="post" action="/account/pay-first" id="pay-form" class="pay-card pay-method">
       <h2>Pay with</h2>
       <div class="pay-options" role="radiogroup" aria-label="Payment method" id="provider-select">
         <label class="pay-option{% if not paystack_configured %} is-off{% endif %}">
@@ -90,8 +90,8 @@
     if (notice && /phone/i.test(notice.textContent)) {
       var tries = 0, timer = setInterval(function () {
         tries += 1;
-        fetch('/client/pay-first/status', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
-          if (d && d.covered) { clearInterval(timer); window.location.href = '/client?prepaid=1'; }
+        fetch('/account/pay-first/status', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (d) {
+          if (d && d.covered) { clearInterval(timer); window.location.href = '/account?prepaid=1'; }
         }).catch(function () {});
         if (tries > 90) clearInterval(timer);
       }, 4000);

@@ -9,7 +9,7 @@
   function save() {
     if (!dirty || saving) return Promise.resolve();
     saving = true; dirty = false; setStatus("Saving...");
-    return fetch("/client/notes/" + id + "/save", { method: "POST", credentials: "same-origin", keepalive: true,
+    return fetch("/account/notes/" + id + "/save", { method: "POST", credentials: "same-origin", keepalive: true,
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: title.value, body_html: body.innerHTML }) })
       .then(function (r) { if (!r.ok) throw new Error(); setStatus(dirty ? "Unsaved changes" : "Saved"); })
       .catch(function () { dirty = true; setStatus("Not saved. Check your connection."); })

@@ -19,7 +19,7 @@ def _clean(monkeypatch):
 
 
 def _post(env, body):
-    return env.client.post("/client/import/fetch", json=body)
+    return env.client.post("/account/import/fetch", json=body)
 
 
 # ------------------------------------------------------------------------------------------------ which services are on
@@ -39,18 +39,19 @@ def test_a_service_appears_only_when_all_its_settings_are_present(monkeypatch):
 def test_the_config_is_for_signed_in_customers_and_the_upload_page_loads_the_script(env, monkeypatch):
     _clean(monkeypatch)
     monkeypatch.setenv("DROPBOX_APP_KEY", "dk")
-    assert env.client.get("/client/import/config").json() == {"dropbox": {"app_key": "dk"}}
-    page = env.client.get("/client").text
+    assert env.client.get("/account/import/config").json() == {"dropbox": {"app_key": "dk"}}
+    page = env.client.get("/account").text
     assert 'id="cloud-import"' in page and "/static/cloud_import.js" in page
     js = env.client.get("/static/cloud_import.js").text
-    for needle in ("dropins.js", "OneDrive.js", "gapi.load", "/client/import/fetch", "kauliUseCloudFile", "drive.file"):
+    for needle in ("dropins.js", "OneDrive.js", "gapi.load", "/account/import/fetch", "kauliUseCloudFile",
+                   "drive.file"):
         assert needle in js, needle
     assert "window.kauliUseCloudFile" in env.client.get("/static/client_wizard.js").text
     csp = env.client.get("/").headers["content-security-policy"]
     for host in ("https://www.dropbox.com", "https://apis.google.com", "https://js.live.net", "https://docs.google.com"):
         assert host in csp, host
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
-    assert env.client.get("/client/import/config").status_code == 401
+    assert env.client.get("/account/import/config").status_code == 401
 
 
 # ------------------------------------------------------------------------------------------------ the download
@@ -136,13 +137,13 @@ def test_a_dropbox_file_becomes_an_order_without_being_uploaded_again(env, wav_b
     key = data["upload_key"]
     assert key.startswith("import:") and cloud_import.staged_file(key, "u1") is not None
     assert cloud_import.staged_file(key, "someone-else") is None                              # another account cannot use it
-    posted = env.client.post("/client/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe", "review_tier": "ai",
+    posted = env.client.post("/account/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe", "review_tier": "ai",
                                                      "instr_verbatim_level": "clean_read", "upload_key": key})
     assert posted.status_code == 303
     order = env.db.list_orders_for_client("u1")[0]
     assert order["original_filename"] == data["filename"] and Path(order["audio_path"]).is_file()
     assert cloud_import.staged_file(key, "u1") is None                                       # the staging copy is gone once used
-    again = env.client.post("/client/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe", "review_tier": "ai",
+    again = env.client.post("/account/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe", "review_tier": "ai",
                                                     "instr_verbatim_level": "clean_read", "upload_key": key})
     assert again.status_code != 303 and "import again" in again.text.lower().replace("import the file again", "import again")
 
@@ -223,17 +224,17 @@ GOOD = "https://calendar.google.com/calendar/ical/me%40example.com/private-01234
 
 def _connect(env, monkeypatch, url=GOOD, text=None):
     monkeypatch.setattr(calendar_feed, "_fetch", lambda u: text or _sample())
-    return env.client.post("/client/calendar/connect", data={"url": url})
+    return env.client.post("/account/calendar/connect", data={"url": url})
 
 
 def test_connecting_a_calendar_shows_the_meetings_and_keeps_the_link_secret(env, monkeypatch):
     monkeypatch.setattr(meeting_bot, "configured", lambda: True)
     monkeypatch.setattr(env.app, "_meeting_gate", lambda user: (True, "", 500.0))
-    page = env.client.get("/client/calendar").text
+    page = env.client.get("/account/calendar").text
     assert "Connect a calendar" in page and "Secret address in iCal format" in page
     r = _connect(env, monkeypatch)
     assert r.status_code == 303 and "Connected" in env.client.get(r.headers["location"]).text
-    page = env.client.get("/client/calendar").text
+    page = env.client.get("/account/calendar").text
     assert "Customer call" in page and "Planning" in page and page.count("Send Kauli") >= 6 and "No video link" in page
     assert "private-0123456789abcdef" not in page and "calendar.google.com/...ic" in page.replace("basic.ics", "...ic") or "...ic" in page   # shown masked only
     assert _connect(env, monkeypatch).status_code == 303 and len(calendar_feed.list_feeds("u1")) == 1                           # the same link twice is one calendar
@@ -244,7 +245,7 @@ def test_bad_calendar_links_are_refused_with_a_reason(env, monkeypatch):
         r = _connect(env, monkeypatch, url=url)
         assert words in env.client.get(r.headers["location"]).text, url
     monkeypatch.setattr(calendar_feed, "_fetch", lambda u: (_ for _ in ()).throw(ValueError("That link is not a calendar (iCal) address.")))
-    r = env.client.post("/client/calendar/connect", data={"url": GOOD})
+    r = env.client.post("/account/calendar/connect", data={"url": GOOD})
     assert "not a calendar" in env.client.get(r.headers["location"]).text and calendar_feed.list_feeds("u1") == []
     for i in range(calendar_feed.MAX_FEEDS):
         _connect(env, monkeypatch, url=GOOD.replace("0123", f"{i:04d}"))
@@ -259,11 +260,11 @@ def test_disconnecting_deletes_the_link_and_only_the_owner_can(env, monkeypatch)
     env.db.get_or_create_user("u2", "other@example.com", "client")
     mine = env.app.current_user
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("u2")), "client_scope_id": "u2"})
-    env.client.post(f"/client/calendar/{feed['id']}/disconnect")
+    env.client.post(f"/account/calendar/{feed['id']}/disconnect")
     assert len(calendar_feed.list_feeds("u1")) == 1                                          # someone else cannot remove it
-    assert "Customer call" not in env.client.get("/client/calendar").text                    # nor see it
+    assert "Customer call" not in env.client.get("/account/calendar").text                    # nor see it
     env.monkeypatch.setattr(env.app, "current_user", mine)
-    env.client.post(f"/client/calendar/{feed['id']}/disconnect")
+    env.client.post(f"/account/calendar/{feed['id']}/disconnect")
     assert calendar_feed.list_feeds("u1") == []
     conn = env.db.get_conn()
     assert conn.execute("SELECT COUNT(*) FROM calendar_feeds WHERE url LIKE '%private-0123%'").fetchone()[0] == 0
@@ -278,27 +279,27 @@ def test_send_kauli_to_a_calendar_meeting_uses_the_meetings_recorder(env, monkey
     feed = calendar_feed.list_feeds("u1")[0]
     events = calendar_feed.events_for(feed)
     zoom = next(e for e in events if e["title"] == "Customer call")
-    r = env.client.post("/client/calendar/send", data={"feed_id": feed["id"], "key": zoom["key"], "source_lang": "en"})
-    assert r.status_code == 303 and r.headers["location"].startswith("/client/meetings?notice=")
+    r = env.client.post("/account/calendar/send", data={"feed_id": feed["id"], "key": zoom["key"], "source_lang": "en"})
+    assert r.status_code == 303 and r.headers["location"].startswith("/account/meetings?notice=")
     assert made["url"].startswith("https://us02web.zoom.us/j/123456789") and made["join"] and made["join"].endswith("Z")           # joins when it starts
     meeting = env.db.list_meetings_for_client("u1")[0]
     assert meeting["title"] == "Customer call" and meeting["platform"] == "zoom"
     lunch = next(e for e in events if e["title"] == "Lunch")
-    r = env.client.post("/client/calendar/send", data={"feed_id": feed["id"], "key": lunch["key"]})
+    r = env.client.post("/account/calendar/send", data={"feed_id": feed["id"], "key": lunch["key"]})
     assert "no longer on the calendar, or it has no" in env.client.get(r.headers["location"]).text                                # no video link: nothing is sent
-    r = env.client.post("/client/calendar/send", data={"feed_id": feed["id"], "key": "nope"})
+    r = env.client.post("/account/calendar/send", data={"feed_id": feed["id"], "key": "nope"})
     assert "no longer on the calendar" in env.client.get(r.headers["location"]).text
     monkeypatch.setattr(env.app, "_meeting_gate", lambda user: (False, "Kauli can join your meetings on the Pro and Premium plans.", 0.0))
     planning = next(e for e in events if e["title"] == "Planning")
-    r = env.client.post("/client/calendar/send", data={"feed_id": feed["id"], "key": planning["key"]})
+    r = env.client.post("/account/calendar/send", data={"feed_id": feed["id"], "key": planning["key"]})
     assert "Pro and Premium" in env.client.get(r.headers["location"]).text                    # the plan rules still apply
 
 
 def test_the_integrations_page_shows_real_connections_and_comes_alive_when_a_service_is_configured(env, monkeypatch):
     _clean(monkeypatch)
-    page = env.client.get("/client/integrations").text
-    assert 'href="/client/calendar"' in page and "Google Calendar" in page and "Outlook Calendar" in page
+    page = env.client.get("/account/integrations").text
+    assert 'href="/account/calendar"' in page and "Google Calendar" in page and "Outlook Calendar" in page
     assert "Coming soon" in page and "Import a file" not in page
     monkeypatch.setenv("DROPBOX_APP_KEY", "dk")
-    live = env.client.get("/client/integrations").text
+    live = env.client.get("/account/integrations").text
     assert "Import a file" in live and "pick recordings from it when you upload" in live

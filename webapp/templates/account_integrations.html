@@ -27,7 +27,7 @@
         {% elif c.oneclick %}
           <button type="button" class="btn" data-connect="{{ c.provider }}">Connect</button>
         {% else %}
-          <a class="btn" href="/client/calendar">Connect</a>
+          <a class="btn" href="/account/calendar">Connect</a>
         {% endif %}
       </div>
       {% endfor %}
@@ -58,12 +58,12 @@
             <span class="ig-on">Connected{% if i.account %} &middot; {{ i.account }}{% endif %}</span>
             <button type="button" class="btn" data-settings="{{ i.connect }}">Settings</button>
             <button type="button" class="ig-link" data-disconnect="{{ i.connect }}">Disconnect</button>
-            {% if i.import %}<a class="ig-link" href="/client#order-form">Import a file</a>{% endif %}
+            {% if i.import %}<a class="ig-link" href="/account#order-form">Import a file</a>{% endif %}
           {% elif i.connectable %}
             <button type="button" class="btn" data-connect="{{ i.connect }}">Connect</button>
-            {% if i.import %}<a class="ig-link" href="/client#order-form">Import a file</a>{% endif %}
+            {% if i.import %}<a class="ig-link" href="/account#order-form">Import a file</a>{% endif %}
           {% elif i.paste %}
-            <form method="post" action="/client/integrations/discord/paste" class="ig-paste">
+            <form method="post" action="/account/integrations/discord/paste" class="ig-paste">
               <input type="url" name="url" placeholder="Paste your Discord channel's webhook link" required aria-label="Discord webhook link" autocomplete="off">
               <button type="submit" class="btn">Connect</button>
               <small>In Discord: channel settings &rarr; Integrations &rarr; Webhooks &rarr; New Webhook &rarr; Copy Webhook URL.</small>
@@ -76,7 +76,7 @@
           {% if i.kind == 'zapier' %}<span class="ig-via">via Zapier / Make</span>{% endif %}
         {% else %}
           <span class="ig-via">Coming soon</span>
-          <form method="post" action="/client/integrations/request" class="ig-notify"><input type="hidden" name="body" value="Please tell me when {{ i.name }} connects"><button type="submit" class="ig-link">Tell me when it is ready</button></form>
+          <form method="post" action="/account/integrations/request" class="ig-notify"><input type="hidden" name="body" value="Please tell me when {{ i.name }} connects"><button type="submit" class="ig-link">Tell me when it is ready</button></form>
         {% endif %}
       </div>
     </article>
@@ -87,7 +87,7 @@
   <section class="hub-card" aria-labelledby="ig-req">
     <h2 id="ig-req">Feedback &amp; requests</h2>
     <p class="muted">Missing the tool you need? Tell us and we will look at it.</p>
-    <form method="post" action="/client/integrations/request" class="vc-form">
+    <form method="post" action="/account/integrations/request" class="vc-form">
       <textarea name="body" rows="3" maxlength="1000" placeholder="I would like Kauli to connect to..." required aria-label="Your request"></textarea>
       <button type="submit">Send request</button>
     </form>
@@ -108,7 +108,7 @@
     var current = null;
     function post(url, body) { return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : "{}", credentials: "same-origin" }); }
     function openSettings(provider) {
-      fetch("/client/integrations/" + provider + "/settings", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
+      fetch("/account/integrations/" + provider + "/settings", { credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (d) {
         if (d.error) { location.reload(); return; }
         current = provider; errEl.hidden = true;
         document.getElementById("ig-dialog-title").textContent = d.name + " Settings";
@@ -129,20 +129,22 @@
     document.getElementById("ig-dialog-form").addEventListener("submit", function (e) {
       e.preventDefault();
       var settings = {}; [].forEach.call(optionsEl.querySelectorAll("input"), function (b) { settings[b.dataset.key] = b.checked; });
-      post("/client/integrations/" + current + "/settings", { settings: settings }).then(function (r) {
+      post("/account/integrations/" + current + "/settings", { settings: settings }).then(function (r) {
         if (r.ok) { close(); location.reload(); } else { errEl.textContent = "Could not save. Please try again."; errEl.hidden = false; }
       });
     });
     [].forEach.call(document.querySelectorAll("[data-connect]"), function (b) {
       b.addEventListener("click", function () {
-        var url = "/client/integrations/" + b.dataset.connect + "/connect";
+        var url = "/account/integrations/" + b.dataset.connect + "/connect";
         if (!window.open(url, "kauliconnect", "width=520,height=720")) location.href = url;
       });
     });
     [].forEach.call(document.querySelectorAll("[data-settings]"), function (b) { b.addEventListener("click", function () { openSettings(b.dataset.settings); }); });
     [].forEach.call(document.querySelectorAll("[data-disconnect]"), function (b) {
       b.addEventListener("click", function () {
-        if (confirm("Disconnect this service? Kauli stops sending to it.")) post("/client/integrations/" + b.dataset.disconnect + "/disconnect").then(function () { location.reload(); });
+        kauliConfirm("Disconnect this service? Kauli stops sending to it.", true, function () {
+          post("/account/integrations/" + b.dataset.disconnect + "/disconnect").then(function () { location.reload(); });
+        });
       });
     });
     window.addEventListener("message", function (e) {

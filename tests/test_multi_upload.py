@@ -12,7 +12,7 @@ JS = (Path(__file__).parent.parent / "webapp" / "static" / "client_wizard.js").r
 
 
 def test_the_upload_form_accepts_several_files_and_lists_them(env):
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert re.search(r'<input type="file" name="audio" id="file-input"[^>]*\bmultiple\b', page)
     assert 'id="file-queue"' in page and "Up to 10 files at once" in page
     if os.environ.get("DASH_DUMP_PATH"):
@@ -21,9 +21,9 @@ def test_the_upload_form_accepts_several_files_and_lists_them(env):
 
 def test_each_file_becomes_its_own_order_and_failures_are_kept_for_a_retry():
     assert "async function submitBatch" in JS and "MAX_FILES = 10" in JS
-    assert JS.count('"/client/orders/presign-upload"') == 2          # the single-file path and the batch path
+    assert JS.count('"/account/orders/presign-upload"') == 2          # the single-file path and the batch path
     assert 'fd.set("idempotency_key"' in JS                           # a fresh key per file, so none is treated as a duplicate
-    assert 'okCount === 1 ? lastUrl : "/client/pending"' in JS and "window.location.href = dest" in JS
+    assert 'okCount === 1 ? lastUrl : "/account/pending"' in JS and "window.location.href = dest" in JS
     assert "fileQueue = failed" in JS and "Fix or remove those and press Submit again" in JS
 
 

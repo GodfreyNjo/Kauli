@@ -83,7 +83,7 @@ def record_failure(user, base_url: str, reason: str = "") -> None:
     one more gentle email. Every later retry just counts."""
     now = time.time()
     base_url = base_url.rstrip("/")
-    update_url = f"{base_url}/client/billing/update-card"
+    update_url = f"{base_url}/account/billing/update-card"
     row = _open(user["id"])
     conn = db.get_conn()
     if row:
@@ -128,7 +128,7 @@ def finish(user, base_url: str) -> None:
     _send(user, "Your Kauli plan is paused, and your files are safe",
           ["We could not take your last payment, so your plan is paused. Nothing has been deleted: your account, projects and files are all still here, and you can still use your 30 free Instant AI minutes every month.",
            "Whenever it suits you, pick your plan again with one click and carry on exactly where you were. We are here when you are ready."],
-          base_url, "Restart my plan", f"{base_url}/client/billing#change-plan")
+          base_url, "Restart my plan", f"{base_url}/account/billing#change-plan")
 
 
 def expire_backstop(now: float | None = None) -> int:
@@ -148,21 +148,21 @@ def _owner(request: Request):
     return user if user and user["role"] == "client" and user["client_scope_id"] == user["id"] else None
 
 
-@router.get("/client/billing/update-card")
+@router.get("/account/billing/update-card")
 def update_card(request: Request):
     """One click from the banner to a secure card form, with no hunting through menus."""
     user = _owner(request)
     if not user:
-        return RedirectResponse("/login?next=/client/billing/update-card", status_code=303)
+        return RedirectResponse("/login?next=/account/billing/update-card", status_code=303)
     sub = db.get_subscription(user["id"])
     if sub and sub["paystack_subscription_code"]:
         link = billing.paystack_manage_link(sub["paystack_subscription_code"])
         if link:
             return RedirectResponse(link, status_code=303)
-    return RedirectResponse("/client/billing?error=" + quote("We could not open the card form just now. You can restart your plan from Plans, or try again in a minute."), status_code=303)
+    return RedirectResponse("/account/billing?error=" + quote("We could not open the card form just now. You can restart your plan from Plans, or try again in a minute."), status_code=303)
 
 
-@router.post("/client/billing/switch-to-payg")
+@router.post("/account/billing/switch-to-payg")
 def switch_to_payg(request: Request):
     """The safety net: stop the failing renewal and keep the account on Pay as you go, so nobody has to leave."""
     user = _owner(request)
@@ -172,10 +172,10 @@ def switch_to_payg(request: Request):
     if sub and billing._is_recurring(sub) and sub["paystack_email_token"]:
         result = billing.paystack_disable_subscription(sub["paystack_subscription_code"], sub["paystack_email_token"])
         if not result["ok"]:
-            return RedirectResponse("/client/billing?error=" + quote(result["error"]), status_code=303)
+            return RedirectResponse("/account/billing?error=" + quote(result["error"]), status_code=303)
     db.set_paystack_subscription(user["id"], None, None)
     resolve(user["id"], "downgraded")
-    return RedirectResponse("/client/billing?notice=" + quote("You are on Pay as you go now. Nothing more will be charged, and all your files are still here."), status_code=303)
+    return RedirectResponse("/account/billing?notice=" + quote("You are on Pay as you go now. Nothing more will be charged, and all your files are still here."), status_code=303)
 
 
 @router.get("/staff/payment-failures", response_class=HTMLResponse)

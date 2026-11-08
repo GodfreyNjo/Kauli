@@ -33,12 +33,12 @@ def test_a_captioned_video_in_the_making_reports_a_real_percentage(env, wav_byte
     out.parent.mkdir(parents=True, exist_ok=True)
     out.with_suffix(".rendering").write_text("x")
     out.with_suffix(".progress").write_text("42")
-    r = env.client.get(f"/client/orders/{order['id']}/captioned-video/status?style=classic")
+    r = env.client.get(f"/account/orders/{order['id']}/captioned-video/status?style=classic")
     assert r.json() == {"state": "rendering", "pct": 42}
     out.with_suffix(".progress").unlink()
-    assert env.client.get(f"/client/orders/{order['id']}/captioned-video/status?style=classic").json() == {"state": "rendering", "pct": None}
+    assert env.client.get(f"/account/orders/{order['id']}/captioned-video/status?style=classic").json() == {"state": "rendering", "pct": None}
     out.write_bytes(b"video")
-    assert env.client.get(f"/client/orders/{order['id']}/captioned-video/status?style=classic").json() == {"state": "ready", "pct": 100}
+    assert env.client.get(f"/account/orders/{order['id']}/captioned-video/status?style=classic").json() == {"state": "ready", "pct": 100}
 
 
 def test_the_status_of_someone_elses_order_is_not_shown(env, wav_bytes):
@@ -48,13 +48,13 @@ def test_the_status_of_someone_elses_order_is_not_shown(env, wav_bytes):
     conn.execute("UPDATE orders SET client_id = 'other' WHERE id = ?", (order["id"],))
     conn.commit()
     conn.close()
-    assert env.client.get(f"/client/orders/{order['id']}/captioned-video/status?style=classic").status_code == 404
-    assert env.client.get(f"/client/orders/{order['id']}/captioned-video/status?style=nope").status_code == 404
+    assert env.client.get(f"/account/orders/{order['id']}/captioned-video/status?style=classic").status_code == 404
+    assert env.client.get(f"/account/orders/{order['id']}/captioned-video/status?style=nope").status_code == 404
 
 
 def test_a_processing_order_shows_a_spinner_and_updates_without_reloading(env, wav_bytes, monkeypatch):
     order = _order(env, wav_bytes, "processing")
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert "kpSoftRefresh" in page and "live-progress" in page
     assert "Refresh this page" not in page
     assert "setTimeout(function () { location.reload(); }, 600)" not in page
@@ -75,7 +75,7 @@ def test_the_render_reports_how_far_it_has_got(env, tmp_path):
 
 
 def test_signed_in_pages_carry_the_saved_work_scripts_and_the_wizard_uses_them(env):
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert 'name="kp-user"' in page and "/static/persist.js" in page
     assert 'name="kp-user"' not in env.client.get("/login").text                                # nothing is kept for people who are signed out
     wizard = env.client.get("/static/client_wizard.js").text

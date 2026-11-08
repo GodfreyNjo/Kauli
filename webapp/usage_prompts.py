@@ -74,9 +74,9 @@ def check(user_id: str, base_url: str, send) -> list[int]:
     for level in LEVELS:
         if st["pct"] >= level and db.mark_usage_prompt(user_id, _period(), level):
             subject, body, _ = _words(level, st, (user["display_name"] or "there").split(" ")[0])
-            db.create_notification(user_id, f"usage_{level}", subject, "/client/billing#change-plan")
+            db.create_notification(user_id, f"usage_{level}", subject, "/account/billing#change-plan")
             try:
-                send(user, f"usage_{level}", subject, body, base_url=base_url, cta_text="See your plan", cta_url=f"{base_url.rstrip('/')}/client/billing#change-plan")
+                send(user, f"usage_{level}", subject, body, base_url=base_url, cta_text="See your plan", cta_url=f"{base_url.rstrip('/')}/account/billing#change-plan")
             except Exception:  # noqa: BLE001 - the notice in the app is already there
                 pass
             sent.append(level)

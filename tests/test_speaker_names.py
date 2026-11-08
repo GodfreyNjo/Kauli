@@ -52,7 +52,7 @@ def test_the_order_page_shows_only_the_editors_name(env, wav_bytes):
     for seg in job.segments:
         seg.spoken = seg.source_transcript                          # a same-language order: the delivered text is the transcript itself
     job.save(str(Path(o["outdir"]) / "manifest.json"))
-    page = env.client.get(f"/client/orders/{o['id']}").text
+    page = env.client.get(f"/account/orders/{o['id']}").text
     assert ">AMARA</span>" in page and "SPK_1" not in page          # the name is the label, and the machine label is gone
     assert 'data-edit="source" data-tag="AMARA:" style="font-size:0.85rem;">Okay, so we begin.</td>' in page    # the name is not repeated inside the line
     assert "SPK_2" not in page                                      # nor is a leftover machine label shown among the named speakers

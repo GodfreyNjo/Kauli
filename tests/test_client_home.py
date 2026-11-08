@@ -9,7 +9,7 @@ from test_order_flow import env, wav_bytes  # noqa: E402,F401
 
 def test_home_is_short_and_clear(env, wav_bytes):
     env.order_from(env.place(wav_bytes))
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     for action in ("Upload media", "Import from YouTube", "Explore a sample"):
         assert action in page
     assert "Recent projects" in page and 'id="ch-search"' in page and "clip.wav" in page
@@ -27,30 +27,30 @@ def test_home_is_short_and_clear(env, wav_bytes):
 
 def test_home_labels_use_short_status_words(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     assert "Awaiting payment" in page and "YOUR ORDER" not in page.upper().split("RECENT PROJECTS", 1)[1]
 
 
 def test_a_new_client_gets_a_friendly_empty_state(env):
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     assert "Nothing here yet" in page
 
 
 def test_pending_tab_lists_unfinished_orders_and_shows_a_count(env, wav_bytes):
-    assert "Nothing is waiting" in env.client.get("/client/pending").text
-    assert 'class="nav-badge"' not in env.client.get("/client/home").text
+    assert "Nothing is waiting" in env.client.get("/account/pending").text
+    assert 'class="nav-badge"' not in env.client.get("/account/home").text
     order = env.order_from(env.place(wav_bytes, review_tier="human"))           # waits for payment
-    page = env.client.get("/client/pending").text
-    assert "clip.wav" in page and "Awaiting payment" in page and f"/client/orders/{order['id']}/pay" in page
-    home = env.client.get("/client/home").text
-    assert 'href="/client/pending"' in home and 'class="nav-badge"' in home
+    page = env.client.get("/account/pending").text
+    assert "clip.wav" in page and "Awaiting payment" in page and f"/account/orders/{order['id']}/pay" in page
+    home = env.client.get("/account/home").text
+    assert 'href="/account/pending"' in home and 'class="nav-badge"' in home
     assert env.db.pending_orders_count("u1") == 1
     done = env.order_from(env.place(wav_bytes))
     conn = env.db.get_conn()
     conn.execute("UPDATE orders SET status = 'delivered' WHERE id = ?", (done["id"],))
     conn.commit()
     conn.close()
-    assert env.db.pending_orders_count("u1") == 1 and "clip.wav" in env.client.get("/client/pending").text
+    assert env.db.pending_orders_count("u1") == 1 and "clip.wav" in env.client.get("/account/pending").text
 
 
 def test_the_greeting_uses_a_first_name():
@@ -69,5 +69,5 @@ def test_the_home_greeting_has_no_username_and_no_digits(env, wav_bytes):
     conn.execute("UPDATE users SET display_name = 'Edwin G K' WHERE id = 'u1'")
     conn.commit()
     conn.close()
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     assert ", Edwin</h1>" in page and "G K" not in page.split("<h1>", 1)[1].split("</h1>", 1)[0]

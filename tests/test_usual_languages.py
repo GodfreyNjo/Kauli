@@ -38,7 +38,7 @@ def test_the_most_common_pair_wins_and_a_tie_goes_to_the_newest(env, wav_bytes):
 def test_the_dashboard_starts_on_the_usual_pair_and_says_so(env, wav_bytes):
     ids = _place(env, wav_bytes, 3)
     _set_languages(env, [(i, "en", "sw", n) for i, n in zip(ids, (30, 20, 10))])
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert "Languages are set to the ones you usually order" in page
     source = re.search(r'<select name="source_lang".*?</select>', page, re.S).group(0)
     target = re.search(r'<select name="target_lang">.*?</select>', page, re.S).group(0)
@@ -52,10 +52,10 @@ def test_explicit_settings_defaults_beat_what_was_learned(env, wav_bytes):
     conn.execute("UPDATE users SET default_source_lang = 'sw', default_target_lang = 'en' WHERE id = 'u1'")
     conn.commit()
     conn.close()
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert "usually order" not in page
     assert re.search(r'<option value="sw"\s+selected', re.search(r'<select name="source_lang".*?</select>', page, re.S).group(0))
 
 
 def test_a_new_client_sees_the_normal_defaults_and_no_note(env):
-    assert "usually order" not in env.client.get("/client").text
+    assert "usually order" not in env.client.get("/account").text

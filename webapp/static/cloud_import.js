@@ -1,5 +1,5 @@
 /* Import a recording from Google Drive, OneDrive or Dropbox on the upload step. Each service's own picker opens in the browser; Kauli only
-   receives the one file that was chosen. Buttons appear only for the services that are switched on (GET /client/import/config). */
+   receives the one file that was chosen. Buttons appear only for the services that are switched on (GET /account/import/config). */
 (function () {
   "use strict";
   var box = document.getElementById("cloud-import");
@@ -21,7 +21,7 @@
   }
   function send(body) {
     say("Importing the file...");
-    return fetch("/client/import/fetch", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    return fetch("/account/import/fetch", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then(function (r) { return r.json().then(function (d) { if (!r.ok) throw new Error(d.error || "Could not import that file."); return d; }); })
       .then(function (d) {
         if (window.kauliUseCloudFile) window.kauliUseCloudFile(d.upload_key, d.filename);
@@ -44,7 +44,7 @@
       return load("https://js.live.net/v7.2/OneDrive.js").then(function () {
         window.OneDrive.open({
           clientId: cfg.client_id, action: "download", multiSelect: false, openInNewWindow: true,
-          advanced: { filter: "audio,video", redirectUri: window.location.origin + "/client" },
+          advanced: { filter: "audio,video", redirectUri: window.location.origin + "/account" },
           success: function (res) {
             var f = res && res.value && res.value[0];
             var url = f && (f["@microsoft.graph.downloadUrl"] || f["@content.downloadUrl"]);
@@ -80,7 +80,7 @@
   };
   var labels = { google: "Google Drive", onedrive: "OneDrive", dropbox: "Dropbox" };
 
-  fetch("/client/import/config", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (cfg) {
+  fetch("/account/import/config", { credentials: "same-origin" }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (cfg) {
     var names = ["google", "onedrive", "dropbox"].filter(function (k) { return cfg[k]; });
     if (!names.length) return;
     var label = document.createElement("span"); label.className = "ci-label"; label.textContent = "Or import from";

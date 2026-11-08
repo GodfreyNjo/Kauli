@@ -131,7 +131,8 @@ def test_each_state_has_its_own_next_step_in_the_account(env):
     _clean(env)
     _user(env, "idle", joined_days_ago=10)
     card = engagement.next_step("idle")
-    assert card["state"] == "never_started" and card["url"] == "/client#new-project" and "free" in card["title"].lower()
+    assert card["state"] == "never_started" and card["url"] == "/account#new-project"
+    assert "free" in card["title"].lower()
     _user(env, "one", joined_days_ago=30, seen_days_ago=1)
     _order(env, "one", 20)
     _order(env, "one", 1)
@@ -146,8 +147,8 @@ def test_the_customer_sees_the_card_on_their_home_page(env):
     conn.execute("UPDATE users SET created_at = ? WHERE id = 'u1'", (time.time() - 10 * DAY,))
     conn.commit()
     conn.close()
-    page = env.client.get("/client/home").text
-    assert "Your first file is free" in page and 'href="/client#new-project"' in page
+    page = env.client.get("/account/home").text
+    assert "Your first file is free" in page and 'href="/account#new-project"' in page
 
 
 def test_staff_see_the_states_and_can_send_one_nudge(env, monkeypatch):

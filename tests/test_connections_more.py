@@ -39,7 +39,7 @@ def _on(monkeypatch, provider):
 
 def _link(env, monkeypatch, provider, reply):
     _on(monkeypatch, provider)
-    r = env.client.get(f"/client/integrations/{provider}/connect", follow_redirects=False)
+    r = env.client.get(f"/account/integrations/{provider}/connect", follow_redirects=False)
     q = parse_qs(urlparse(r.headers["location"]).query)
     monkeypatch.setattr(connections.httpx, "post", lambda *a, **k: Reply(reply))
     for name in ("_google_email", "_dropbox_label", "_graph_label"):
@@ -51,15 +51,15 @@ def _link(env, monkeypatch, provider, reply):
 def test_every_service_sends_the_customer_to_its_own_sign_in_with_the_right_address(env, monkeypatch):
     for provider, host in HOSTS.items():
         _on(monkeypatch, provider)
-        r = env.client.get(f"/client/integrations/{provider}/connect", follow_redirects=False)
+        r = env.client.get(f"/account/integrations/{provider}/connect", follow_redirects=False)
         url = urlparse(r.headers["location"])
         q = parse_qs(url.query)
         assert url.netloc == host, provider
         assert q["redirect_uri"] == [f"https://kauli.test/client/integrations/{provider}/callback"], provider
         assert q["client_id"] == ["x-" + KEYS[provider][0].lower()] and q["state"], provider
-    cal = parse_qs(urlparse(env.client.get("/client/integrations/gcal/connect", follow_redirects=False).headers["location"]).query)
+    cal = parse_qs(urlparse(env.client.get("/account/integrations/gcal/connect", follow_redirects=False).headers["location"]).query)
     assert "calendar.events.readonly" in cal["scope"][0] and "auth/calendar " not in cal["scope"][0] + " "          # read-only, events only
-    assert "scope" not in parse_qs(urlparse(env.client.get("/client/integrations/notion/connect", follow_redirects=False).headers["location"]).query)
+    assert "scope" not in parse_qs(urlparse(env.client.get("/account/integrations/notion/connect", follow_redirects=False).headers["location"]).query)
 
 
 def test_each_service_stores_what_it_needs_to_send_later(env, monkeypatch):
@@ -75,7 +75,7 @@ def test_each_service_stores_what_it_needs_to_send_later(env, monkeypatch):
     assert connections._dec(row["refresh_enc"]) == "dbx-r" and row["expires_at"] > time.time() + 14000 and row["account_label"] == "me@example.com"
     bad = _link(env, monkeypatch, "slack", {"ok": False, "error": "invalid_code"})
     assert "Could not connect" in bad.text and connections.get_connection("u1", "slack") is None
-    page = env.client.get("/client/integrations").text
+    page = env.client.get("/account/integrations").text
     assert 'data-settings="discord"' in page and 'data-settings="notion"' in page and 'data-settings="dropbox"' in page
 
 
@@ -134,7 +134,7 @@ def test_an_expired_token_is_refreshed_before_sending(env, monkeypatch):
 
 def test_calendars_are_connections_but_never_a_place_to_send_transcripts(env, wav_bytes, monkeypatch):
     _link(env, monkeypatch, "gcal", {"access_token": "t", "refresh_token": "r", "expires_in": 3600})
-    d = env.client.get("/client/integrations/gcal/settings").json()
+    d = env.client.get("/account/integrations/gcal/settings").json()
     assert {o["key"] for o in d["options"]} == {"auto", "only_mine", "tell_attendees"}
     sent = []
     monkeypatch.setattr(connections.httpx, "post", lambda url, **k: sent.append(url) or Reply({}))
@@ -143,7 +143,7 @@ def test_calendars_are_connections_but_never_a_place_to_send_transcripts(env, wa
 
 
 def test_cards_that_are_not_built_offer_a_one_click_tell_me_instead_of_developer_docs(env):
-    page = env.client.get("/client/integrations").text
+    page = env.client.get("/account/integrations").text
     cards = page.split('id="ig-grid"')[1].split("</article>")
     hubspot = next(c for c in cards if "HubSpot" in c)
     assert "Coming soon" in hubspot and "Please tell me when HubSpot connects" in hubspot and "/docs/api" not in hubspot

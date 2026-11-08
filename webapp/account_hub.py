@@ -223,7 +223,7 @@ def _plain_preview(body_html: str, n: int = 110) -> str:
     return text[:n] + ("..." if len(text) > n else "")
 
 
-@router.get("/client/notes", response_class=HTMLResponse)
+@router.get("/account/notes", response_class=HTMLResponse)
 def notes_page(request: Request, id: str | None = None, q: str = "", page: int = 1):
     user = _client(request)
     if not user:
@@ -240,7 +240,7 @@ def notes_page(request: Request, id: str | None = None, q: str = "", page: int =
                    current=current, q=q, total=len(rows), page=page, pages=pages, note_id=id or "")
 
 
-@router.post("/client/notes/new")
+@router.post("/account/notes/new")
 def notes_new(request: Request):
     user = _client(request)
     if not user:
@@ -253,10 +253,10 @@ def notes_new(request: Request):
     conn.commit()
     conn.close()
     track_feature(request, "note_created", source="blank")
-    return RedirectResponse(f"/client/notes?id={note_id}", status_code=303)
+    return RedirectResponse(f"/account/notes?id={note_id}", status_code=303)
 
 
-@router.post("/client/notes/{note_id}/save")
+@router.post("/account/notes/{note_id}/save")
 async def notes_save(request: Request, note_id: str):
     user = _client(request)
     if not user:
@@ -277,7 +277,7 @@ async def notes_save(request: Request, note_id: str):
     return JSONResponse({"ok": True, "updated_at": now})
 
 
-@router.post("/client/notes/{note_id}/delete")
+@router.post("/account/notes/{note_id}/delete")
 def notes_delete(request: Request, note_id: str):
     user = _client(request)
     if not user:
@@ -286,10 +286,10 @@ def notes_delete(request: Request, note_id: str):
     conn.execute("DELETE FROM notes WHERE id = ? AND client_id = ?", (note_id, user["client_scope_id"]))
     conn.commit()
     conn.close()
-    return RedirectResponse("/client/notes", status_code=303)
+    return RedirectResponse("/account/notes", status_code=303)
 
 
-@router.get("/client/notes/{note_id}/download")
+@router.get("/account/notes/{note_id}/download")
 def notes_download(request: Request, note_id: str, format: str = "docx"):
     user = _client(request)
     if not user:
@@ -310,7 +310,7 @@ def notes_download(request: Request, note_id: str, format: str = "docx"):
     return Response(content=data, media_type=media, headers={"Content-Disposition": f'attachment; filename="{stem}.{ext}"'})
 
 
-@router.post("/client/orders/{order_id}/notes")
+@router.post("/account/orders/{order_id}/notes")
 def notes_from_order(request: Request, order_id: str, kind: str = Query("ai", alias="as")):
     """Make a note from one of the customer's finished transcripts: AI-written (extractive when no AI key is set), or with
     ?as=transcript the transcript itself, to edit freely as a note."""
@@ -321,7 +321,7 @@ def notes_from_order(request: Request, order_id: str, kind: str = Query("ai", al
     if not order or order["client_id"] != user["client_scope_id"]:
         return HTMLResponse("Order not found.", status_code=404)
     if A._deliverable_denied_reason(order, "txt"):
-        return RedirectResponse(f"/client/orders/{order_id}", status_code=303)
+        return RedirectResponse(f"/account/orders/{order_id}", status_code=303)
     allowed, retry_after = rate_limit.check(f"notes-ai:{user['id']}", limit=10, window_s=600)
     if not allowed:
         return HTMLResponse(f"Too many requests. Try again in {retry_after}s.", status_code=429)
@@ -340,7 +340,7 @@ def notes_from_order(request: Request, order_id: str, kind: str = Query("ai", al
     conn.commit()
     conn.close()
     track_feature(request, "note_created", source="transcript" if kind == "transcript" else "ai")
-    return RedirectResponse(f"/client/notes?id={note_id}", status_code=303)
+    return RedirectResponse(f"/account/notes?id={note_id}", status_code=303)
 
 
 # ================================================================================================ ANALYTICS
@@ -419,7 +419,7 @@ def _donut(parts: list[tuple[str, float, str]]) -> str:
     return f'<svg viewBox="0 0 140 140" role="img" aria-label="Conversation sentiment" class="an-donut">{"".join(rings)}</svg>'
 
 
-@router.get("/client/analytics", response_class=HTMLResponse)
+@router.get("/account/analytics", response_class=HTMLResponse)
 def analytics_page(request: Request, months_back: str = Query("12", alias="range")):
     user = _client(request)
     if not user:
@@ -510,7 +510,7 @@ def _parse_vocab_lines(raw: str) -> list[tuple[str, str]]:
     return out
 
 
-@router.get("/client/vocabulary", response_class=HTMLResponse)
+@router.get("/account/vocabulary", response_class=HTMLResponse)
 def vocabulary_page(request: Request, error: str | None = None, notice: str | None = None, page: int = 1):
     user = _client(request)
     if not user:
@@ -520,14 +520,14 @@ def vocabulary_page(request: Request, error: str | None = None, notice: str | No
     return _render(request, "account_vocabulary.html", user, terms=terms, terms_total=len(all_terms), page=page, pages=pages, error=error, notice=notice, limit=MAX_VOCAB_TERMS)
 
 
-@router.post("/client/vocabulary/add")
+@router.post("/account/vocabulary/add")
 def vocabulary_add(request: Request, entries: str = Form("")):
     user = _client(request)
     if not user:
         return _to_login(request)
     items = _parse_vocab_lines(entries)
     if not items:
-        return RedirectResponse("/client/vocabulary?error=" + quote("Type a word or name to add."), status_code=303)
+        return RedirectResponse("/account/vocabulary?error=" + quote("Type a word or name to add."), status_code=303)
     cid = user["client_scope_id"]
     have = len(list_vocab(cid))
     conn = db.get_conn()
@@ -546,10 +546,10 @@ def vocabulary_add(request: Request, entries: str = Form("")):
     note = f"Added {added}." if added else "Those are already in your list."
     if have + added >= MAX_VOCAB_TERMS:
         note += f" Your list is full ({MAX_VOCAB_TERMS} terms)."
-    return RedirectResponse("/client/vocabulary?notice=" + quote(note), status_code=303)
+    return RedirectResponse("/account/vocabulary?notice=" + quote(note), status_code=303)
 
 
-@router.post("/client/vocabulary/delete")
+@router.post("/account/vocabulary/delete")
 def vocabulary_delete(request: Request, term_id: str = Form(...)):
     user = _client(request)
     if not user:
@@ -558,7 +558,7 @@ def vocabulary_delete(request: Request, term_id: str = Form(...)):
     conn.execute("DELETE FROM vocab_terms WHERE id = ? AND client_id = ?", (term_id, user["client_scope_id"]))
     conn.commit()
     conn.close()
-    return RedirectResponse("/client/vocabulary?notice=Removed.", status_code=303)
+    return RedirectResponse("/account/vocabulary?notice=Removed.", status_code=303)
 
 
 # ================================================================================================ REWARDS
@@ -611,7 +611,7 @@ def record_referral(new_user, code: str | None) -> bool:
     finally:
         conn.close()
     if minutes:
-        db.create_notification(ref["id"], "referral", f"A friend joined with your link: +{minutes:.0f} minutes added", "/client/rewards")
+        db.create_notification(ref["id"], "referral", f"A friend joined with your link: +{minutes:.0f} minutes added", "/account/rewards")
     return True
 
 
@@ -633,7 +633,7 @@ def on_plan_paid(user_id: str, plan: str) -> None:
     finally:
         conn.close()
     if minutes:
-        db.create_notification(row["referrer_id"], "referral", f"A friend you invited upgraded: +{minutes:.0f} minutes added", "/client/rewards")
+        db.create_notification(row["referrer_id"], "referral", f"A friend you invited upgraded: +{minutes:.0f} minutes added", "/account/rewards")
 
 
 @router.get("/r/{code}")
@@ -645,7 +645,7 @@ def referral_landing(request: Request, code: str):
     return resp
 
 
-@router.get("/client/rewards", response_class=HTMLResponse)
+@router.get("/account/rewards", response_class=HTMLResponse)
 def rewards_page(request: Request):
     user = _client(request)
     if not user:
@@ -665,17 +665,17 @@ def rewards_page(request: Request):
 
 
 # ================================================================================================ PLANS
-@router.get("/client/plans")
+@router.get("/account/plans")
 def plans_page(request: Request):
     """Billing and Plans are one page now: the plans are on the billing page."""
     user = _client(request)
     if not user:
         return _to_login(request)
-    return RedirectResponse("/client/billing#change-plan", status_code=303)
+    return RedirectResponse("/account/billing#change-plan", status_code=303)
 
 
 # ================================================================================================ WORKSPACE
-@router.get("/client/workspace", response_class=HTMLResponse)
+@router.get("/account/workspace", response_class=HTMLResponse)
 def workspace_page(request: Request, members_page: int = 1):
     user = _client(request)
     if not user:
@@ -689,12 +689,12 @@ def workspace_page(request: Request, members_page: int = 1):
     notes = conn.execute("SELECT id, title, updated_at, author_id FROM notes WHERE client_id = ? ORDER BY updated_at DESC LIMIT 5", (owner_id,)).fetchall()
     conn.close()
     sources = [
-        {"name": "Zoom", "state": "live", "note": "Send Kauli to a meeting", "href": "/client/meetings"},
-        {"name": "Microsoft Teams", "state": "live", "note": "Meetings and channel alerts", "href": "/client/meetings"},
-        {"name": "Google Meet", "state": "live", "note": "Send Kauli to a meeting", "href": "/client/meetings"},
-        {"name": "Google Drive", "state": "soon", "note": "Import from Drive", "href": "/client/integrations"},
-        {"name": "OneDrive", "state": "soon", "note": "Import from OneDrive", "href": "/client/integrations"},
-        {"name": "Dropbox", "state": "soon", "note": "Import from Dropbox", "href": "/client/integrations"},
+        {"name": "Zoom", "state": "live", "note": "Send Kauli to a meeting", "href": "/account/meetings"},
+        {"name": "Microsoft Teams", "state": "live", "note": "Meetings and alerts", "href": "/account/meetings"},
+        {"name": "Google Meet", "state": "live", "note": "Send Kauli to a meeting", "href": "/account/meetings"},
+        {"name": "Google Drive", "state": "soon", "note": "Import from Drive", "href": "/account/integrations"},
+        {"name": "OneDrive", "state": "soon", "note": "Import from OneDrive", "href": "/account/integrations"},
+        {"name": "Dropbox", "state": "soon", "note": "Import from Dropbox", "href": "/account/integrations"},
     ]
     return _render(request, "account_workspace.html", user, owner=owner, members=members, orders=orders, notes=notes, is_owner=_owner(user),
                    members_page=members_page, members_pages=members_pages, sources=sources, when=lambda ts: datetime.fromtimestamp(_epoch(ts)).strftime("%b %d, %H:%M"))
@@ -711,9 +711,9 @@ INTEGRATIONS = [
      "desc": "Post finished transcripts to a Teams channel."},
     {"id": "notion", "name": "Notion", "cat": "Notes & Documentation", "kind": "built", "state": "live", "href": "/settings?tab=integrations#notion",
      "desc": "Send transcripts and notes to a Notion database."},
-    {"id": "zoom", "name": "Zoom", "cat": "Meetings", "kind": "built", "state": "live", "href": "/client/meetings",
+    {"id": "zoom", "name": "Zoom", "cat": "Meetings", "kind": "built", "state": "live", "href": "/account/meetings",
      "desc": "Send Kauli to a Zoom meeting; it records and transcribes."},
-    {"id": "meet", "name": "Google Meet", "cat": "Meetings", "kind": "built", "state": "live", "href": "/client/meetings",
+    {"id": "meet", "name": "Google Meet", "cat": "Meetings", "kind": "built", "state": "live", "href": "/account/meetings",
      "desc": "Send Kauli to a Meet call and get the transcript afterwards."},
     {"id": "youtube", "name": "YouTube", "cat": "Meetings", "kind": "built", "state": "live", "href": "/settings?tab=integrations",
      "desc": "Transcribe a video from its link and send captions back to your channel."},
@@ -737,7 +737,7 @@ INTEGRATIONS = [
      "desc": "Turn finished transcripts into Asana tasks through Zapier."},
     {"id": "monday", "name": "monday.com", "cat": "Project Management", "kind": "built", "state": "soon", "href": "",
      "desc": "Send transcripts to monday.com boards through Zapier."},
-    {"id": "gdocs", "name": "Google Docs", "cat": "Notes & Documentation", "kind": "built", "state": "live", "href": "/client/integrations",
+    {"id": "gdocs", "name": "Google Docs", "cat": "Notes & Documentation", "kind": "built", "state": "live", "href": "/account/integrations",
      "desc": "Save transcripts directly to Google Docs for easy editing, sharing, and collaboration."},
     {"id": "gsheets", "name": "Google Sheets", "cat": "Notes & Documentation", "kind": "built", "state": "soon", "href": "",
      "desc": "Add a row to a Google Sheet for every finished transcript."},
@@ -765,14 +765,14 @@ def calendar_interest(client_id: str) -> set[str]:
     return {r["provider"] for r in rows}
 
 
-@router.get("/client/integrations", response_class=HTMLResponse)
+@router.get("/account/integrations", response_class=HTMLResponse)
 def integrations_page(request: Request, notice: str | None = None):
     user = _client(request)
     if not user:
         return _to_login(request)
     on = cloud_import.config()
     cloud = {"gdrive": "google", "onedrive": "onedrive", "dropbox": "dropbox"}
-    items = [({**i, "state": "live", "href": "/client#order-form", "import": True} if cloud.get(i["id"]) in on else i) for i in INTEGRATIONS]
+    items = [({**i, "state": "live", "href": "/account#order-form", "import": True} if cloud.get(i["id"]) in on else i) for i in INTEGRATIONS]
     # one-click connections: Google Docs always shows (as "Coming soon" until its keys are set); Slack switches from the old
     # webhook set-up to Connect only once its app is set up
     mine = connections.connections_for(user["client_scope_id"])
@@ -792,7 +792,7 @@ def integrations_page(request: Request, notice: str | None = None):
                    interest=calendar_interest(user["client_scope_id"]), notice=notice)
 
 
-@router.post("/client/integrations/request")
+@router.post("/account/integrations/request")
 def integrations_request(request: Request, body: str = Form(...)):
     user = _client(request)
     if not user:
@@ -807,10 +807,10 @@ def integrations_request(request: Request, body: str = Form(...)):
         conn.close()
         track_feature(request, "integration_request")
         db.notify_all_staff("integration_request", "Integration request: " + text[:60], "/staff/support")
-    return RedirectResponse("/client/integrations?notice=" + quote("Thanks. We read every request." if text else "Write a few words first."), status_code=303)
+    return RedirectResponse("/account/integrations?notice=" + quote("Thanks. We read every request." if text else "Write a few words first."), status_code=303)
 
 
-@router.post("/client/calendar/interest")
+@router.post("/account/calendar/interest")
 def calendar_notify(request: Request, provider: str = Form(...)):
     user = _client(request)
     if not user:
@@ -822,7 +822,7 @@ def calendar_notify(request: Request, provider: str = Form(...)):
         conn.commit()
         conn.close()
     track_feature(request, "calendar_interest", provider=provider)
-    return RedirectResponse("/client/integrations?notice=" + quote("Noted. We will email you the day calendar connections open."), status_code=303)
+    return RedirectResponse("/account/integrations?notice=" + quote("Noted. We will email you the day calendar connections open."), status_code=303)
 
 
 # ================================================================================================ ASSISTANT
@@ -966,7 +966,7 @@ def _own_order_id(user, order_id) -> str | None:
     return order["id"] if order and order["client_id"] == user["client_scope_id"] else None
 
 
-@router.get("/client/assistant/threads")
+@router.get("/account/assistant/threads")
 def assistant_threads(request: Request):
     user = _client(request)
     if not user:
@@ -978,7 +978,7 @@ def assistant_threads(request: Request):
                                       "order_id": r["order_id"], "messages": _thread_messages(r["id"])} for r in rows]})
 
 
-@router.get("/client/assistant/feed")
+@router.get("/account/assistant/feed")
 def assistant_feed(request: Request):
     """Everything addressed to this customer in one list with one unread count: see assistant_core.feed."""
     user = _client(request)
@@ -987,7 +987,7 @@ def assistant_feed(request: Request):
     return JSONResponse(assistant_core.feed(user), headers={"Cache-Control": "no-store"})
 
 
-@router.post("/client/assistant/feed/read")
+@router.post("/account/assistant/feed/read")
 async def assistant_feed_read(request: Request):
     user = _client(request)
     if not user:
@@ -1000,7 +1000,7 @@ async def assistant_feed_read(request: Request):
     return JSONResponse({"ok": True})
 
 
-@router.post("/client/assistant/seen")
+@router.post("/account/assistant/seen")
 async def assistant_seen(request: Request):
     user = _client(request)
     if not user:
@@ -1046,7 +1046,7 @@ def _escalate(request: Request, user, thread, announce: bool = True) -> None:
         pass
 
 
-@router.post("/client/assistant/message")
+@router.post("/account/assistant/message")
 async def assistant_message(request: Request):
     user = _client(request)
     if not user:
@@ -1102,7 +1102,7 @@ async def assistant_message(request: Request):
     return JSONResponse({"thread_id": tid, "reply": r["text"], "handoff": r["handoff"], "escalated": False})
 
 
-@router.post("/client/assistant/escalate")
+@router.post("/account/assistant/escalate")
 async def assistant_escalate(request: Request):
     user = _client(request)
     if not user:
@@ -1173,12 +1173,12 @@ def staff_support_reply(request: Request, thread_id: str, body: str = Form(...),
     text = body.strip()[:4000]
     if text:
         _add_message(thread_id, "staff", text)
-        db.create_notification(thread["user_id"], "support_reply", "The Kauli team replied to your question", "/client/home")
+        db.create_notification(thread["user_id"], "support_reply", "The Kauli team replied to your question", "/account/home")
         target = db.get_user(thread["user_id"])
         try:
             if target and mailer.email_configured():
                 inner = f"<p>{html.escape(text)}</p><p>You can reply from the help assistant in your Kauli account.</p>"
-                mailer.send_as("support", target["email"], "Reply from the Kauli team", mailer.wrap_email_html(inner, cta_text="Open Kauli", cta_url=f"{A._site_base(request)}/client/home"), tags=["support"])
+                mailer.send_as("support", target["email"], "Reply from the Kauli team", mailer.wrap_email_html(inner, cta_text="Open Kauli", cta_url=f"{A._site_base(request)}/account/home"), tags=["support"])
         except Exception:  # noqa: BLE001
             pass
     if close:
@@ -1376,7 +1376,7 @@ VIDEOS = [
 ]
 
 
-@router.get("/client/resources", response_class=HTMLResponse)
+@router.get("/account/resources", response_class=HTMLResponse)
 def resources_page(request: Request):
     user = _client(request)
     if not user:

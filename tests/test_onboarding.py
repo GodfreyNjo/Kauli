@@ -134,13 +134,13 @@ def test_the_satisfaction_question_comes_after_the_first_third_and_sixth_result_
     env.db.set_plan_chosen("u1")
     ids = _ready(env, wav_bytes, 4)
     assert onboarding.csat_due("u1", ids[0]) and not onboarding.csat_due("u1", ids[1]) and onboarding.csat_due("u1", ids[2]) and not onboarding.csat_due("u1", ids[3])
-    page = env.client.get(f"/client/orders/{ids[0]}").text
-    assert "How easy was it to get this result?" in page and f'/client/orders/{ids[0]}/rate' in page
-    assert "How easy was it" not in env.client.get(f"/client/orders/{ids[1]}").text
-    r = env.client.post(f"/client/orders/{ids[0]}/rate", data={"score": "5", "comment": "Quick and clear"}, follow_redirects=False)
+    page = env.client.get(f"/account/orders/{ids[0]}").text
+    assert "How easy was it to get this result?" in page and f'/account/orders/{ids[0]}/rate' in page
+    assert "How easy was it" not in env.client.get(f"/account/orders/{ids[1]}").text
+    r = env.client.post(f"/account/orders/{ids[0]}/rate", data={"score": "5", "comment": "Quick and clear"}, follow_redirects=False)
     assert r.status_code == 303 and not onboarding.csat_due("u1", ids[0])
-    env.client.post(f"/client/orders/{ids[0]}/rate", data={"score": "1"})                       # a second answer for the same order is ignored
-    env.client.post(f"/client/orders/{ids[2]}/rate", data={"score": "9"})                       # and so is a score that is not 1 to 5
+    env.client.post(f"/account/orders/{ids[0]}/rate", data={"score": "1"})                       # a second answer for the same order is ignored
+    env.client.post(f"/account/orders/{ids[2]}/rate", data={"score": "9"})                       # and so is a score that is not 1 to 5
     s = onboarding.csat_summary()
     assert s["n"] == 1 and s["avg"] == 5 and s["recent"][0]["comment"] == "Quick and clear" and onboarding.csat_due("u1", ids[2])
 

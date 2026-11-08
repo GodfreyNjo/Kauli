@@ -81,7 +81,7 @@ def test_internal_links_on_the_public_pages_all_resolve(env):
     for path in ["/", "/human-review", "/languages", "/try", "/developers", "/blog", "/fr", "/sw"]:
         html = env.client.get(path).text
         for href in _tags(html, r'<a\s[^>]*href="(/[^"#?]*)'):
-            if href in seen or href.startswith(("/static/", "/lang/", "/login", "/client", "/staff", "/blog/")):
+            if href in seen or href.startswith(("/static/", "/lang/", "/login", "/account", "/staff", "/blog/")):
                 continue
             seen.add(href)
             if env.client.get(href, follow_redirects=False).status_code >= 400:
@@ -90,7 +90,7 @@ def test_internal_links_on_the_public_pages_all_resolve(env):
 
 
 def test_private_and_utility_pages_tell_crawlers_to_stay_out(env):
-    for path in ("/client/home", "/client/pending", "/settings", "/login", "/forgot-password", "/lang/fr"):
+    for path in ("/account/home", "/account/pending", "/settings", "/login", "/forgot-password", "/lang/fr"):
         r = env.client.get(path, follow_redirects=False)
         assert "noindex" in r.headers.get("x-robots-tag", ""), path
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
@@ -100,7 +100,7 @@ def test_private_and_utility_pages_tell_crawlers_to_stay_out(env):
 
 def test_robots_txt_keeps_crawlers_out_of_private_places_and_welcomes_ai_crawlers(env):
     body = env.client.get("/robots.txt").text
-    for private in ("/client", "/staff", "/settings", "/lang/", "/actor", "/api/"):
+    for private in ("/account", "/staff", "/settings", "/lang/", "/actor", "/api/"):
         assert f"Disallow: {private}" in body, private
     for bot in ("GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "OAI-SearchBot", "ChatGPT-User", "Applebot-Extended", "CCBot"):
         assert f"User-agent: {bot}\nAllow: /" in body, bot
@@ -153,7 +153,7 @@ def test_the_blog_has_an_rss_feed_and_public_pages_allow_rich_previews(env):
     assert "max-image-preview:large" in home.headers["x-robots-tag"] and "noindex" not in home.headers["x-robots-tag"]
     assert env.client.get("/solutions/call-centers").status_code == 200
     assert "/solutions/call-centers" in env.client.get("/sitemap.xml").text
-    private = env.client.get("/client/home")
+    private = env.client.get("/account/home")
     assert "noindex" in private.headers.get("x-robots-tag", "")
 
 

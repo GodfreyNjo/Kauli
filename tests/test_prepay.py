@@ -19,14 +19,14 @@ def _unchoose(env):
 def _quote(env, minutes, **form):
     data = {"minutes": str(minutes), "service_level": "transcribe", "review_tier": "ai", "source_lang": "sw", "target_lang": "same", "name": "Site 1 Women_mixdown.mp3"}
     data.update(form)
-    return env.client.post("/client/orders/quote", data=data).json()
+    return env.client.post("/account/orders/quote", data=data).json()
 
 
 def test_the_price_is_the_length_minus_the_free_minutes_times_the_rate_and_it_is_said_in_words(env):
     q = _quote(env, 191.7532)
     assert q["can_prepay"] and q["needs_payment"] and q["total_usd"] == 19.41 and q["charge_usd"] == 19.41
     assert q["explain"] == "191.8 min - 30.0 free = 161.8 min x $0.12 = $19.41"           # 191.75 - 30 = 161.75 minutes, at $0.12
-    assert q["prepay_url"] == "/client/pay-first"
+    assert q["prepay_url"] == "/account/pay-first"
     assert abs(q["credits"] - 194.1) < 1e-6                                                    # $19.41 of prepaid credits, to the cent
     small = _quote(env, 25)
     assert small["can_prepay"] and small["needs_payment"] is False and "prepay_url" not in small   # inside the free minutes: upload and process as usual
@@ -49,28 +49,28 @@ def test_a_new_customers_free_first_order_is_not_asked_for_money(env):
 
 
 def test_the_pay_first_page_checkout_and_the_way_back(env, monkeypatch):
-    assert env.client.get("/client/pay-first").status_code == 303                          # nothing to pay first: back to the order form
+    assert env.client.get("/account/pay-first").status_code == 303                          # nothing to pay first: back to the order form
     _quote(env, 191.7532)
-    page = env.client.get("/client/pay-first")
+    page = env.client.get("/account/pay-first")
     assert page.status_code == 200 and "Pay first, then we upload" in page.text and "$19.41" in page.text
     assert "191.8 min - 30.0 free = 161.8 min x $0.12 = $19.41" in page.text and "not uploaded until your payment goes through" in page.text
     monkeypatch.setattr(env.app.billing, "paystack_configured", lambda: True)
     monkeypatch.setattr(env.app.billing, "paystack_initialize", lambda *a, **k: {"authorization_url": "https://paystack.test/pay/abc"})
-    go = env.client.post("/client/pay-first", data={"provider": "paystack"})
+    go = env.client.post("/account/pay-first", data={"provider": "paystack"})
     assert go.status_code == 303 and go.headers["location"] == "https://paystack.test/pay/abc"
     conn = env.db.get_conn()
     pay = conn.execute("SELECT * FROM payments WHERE user_id = 'u1' ORDER BY created_at DESC LIMIT 1").fetchone()
     conn.close()
     meta = json.loads(pay["meta"])
-    assert abs(pay["amount_usd"] - 19.41) < 1e-9 and meta["kind"].startswith("credits_topup:194.1") and meta["return_to"] == "/client?prepaid=1" and pay["order_id"] is None
+    assert abs(pay["amount_usd"] - 19.41) < 1e-9 and meta["kind"].startswith("credits_topup:194.1") and meta["return_to"] == "/account?prepaid=1" and pay["order_id"] is None
     # Paystack sends the customer back: the payment is confirmed and they land on the order form, where the file goes up
     monkeypatch.setattr(env.app.billing, "paystack_verify", lambda pid: {"status": "success", "reference": "ref-1"})
     back = env.client.get(f"/billing/callback/paystack?payment_id={pay['id']}")
-    assert back.status_code == 303 and back.headers["location"].startswith("/client?prepaid=1&notice=")
+    assert back.status_code == 303 and back.headers["location"].startswith("/account?prepaid=1&notice=")
     assert abs(env.db.wallet_credits_remaining("u1") - 194.1) < 1e-6
     # The credits now cover the order, so the order form uploads it and it starts at once
     assert _quote(env, 191.7532)["needs_payment"] is False
-    assert env.client.get("/client/pay-first/status").json() == {"covered": True}
+    assert env.client.get("/account/pay-first/status").json() == {"covered": True}
     cost = env.app.billing.order_cost_usd(191.7532, "transcribe", "free", 30.0, wallet_credits_available=194.1, market="intl", review_tier="ai")
     assert cost["total_usd"] == 0.0 and cost["credits_applied_usd"] == 19.41
 
@@ -79,20 +79,20 @@ def test_a_failed_payment_goes_back_to_the_pay_first_page_not_the_order_form(env
     _quote(env, 191.7532)
     monkeypatch.setattr(env.app.billing, "paystack_configured", lambda: True)
     monkeypatch.setattr(env.app.billing, "paystack_initialize", lambda *a, **k: {"authorization_url": "https://paystack.test/pay/abc"})
-    env.client.post("/client/pay-first", data={"provider": "paystack"})
+    env.client.post("/account/pay-first", data={"provider": "paystack"})
     conn = env.db.get_conn()
     pid = conn.execute("SELECT id FROM payments WHERE user_id = 'u1' ORDER BY created_at DESC LIMIT 1").fetchone()[0]
     conn.close()
     monkeypatch.setattr(env.app.billing, "paystack_verify", lambda p: {"status": "failed"})
     back = env.client.get(f"/billing/callback/paystack?payment_id={pid}")
-    assert back.status_code == 303 and back.headers["location"].startswith("/client/pay-first?error=")
+    assert back.status_code == 303 and back.headers["location"].startswith("/account/pay-first?error=")
 
 
 def test_the_pay_page_for_an_order_shows_how_the_price_is_worked_out(env, wav_bytes, monkeypatch):
     monkeypatch.setattr(env.app, "probe_duration_minutes", lambda path: 191.7532)
     order = env.order_from(env.place(wav_bytes))
     assert order["status"] == "pending_payment" and abs(order["cost_usd"] - 19.41) < 1e-9
-    page = env.client.get(f"/client/orders/{order['id']}/pay").text
+    page = env.client.get(f"/account/orders/{order['id']}/pay").text
     assert "How this price is worked out" in page and "Your free minutes cover 30.0 of them" in page and "191.8 min - 30.0 free = 161.8 min x $0.12 = $19.41" in page
 
 

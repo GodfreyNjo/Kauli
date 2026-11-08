@@ -53,7 +53,7 @@ def test_a_dry_run_changes_nothing_and_a_real_run_makes_the_account_new(env, wav
     assert _count(env, "SELECT COUNT(*) FROM payments WHERE id = 'p1'") == 1                  # financial records are kept
     assert list(Path(env.db.DB_PATH).parent.glob("backup-before-reset-*.db"))                 # and a backup was taken first
 
-    assert env.client.get("/client").status_code == 200                                       # the account works as a new one
+    assert env.client.get("/account").status_code == 200                                       # the account works as a new one
     assert env.order_from(env.place(wav_bytes))["client_id"] == "u1"
 
 

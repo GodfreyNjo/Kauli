@@ -2,7 +2,7 @@
 {% block title %}Additional charge{% endblock %}
 {% block content %}
 <div class="card" style="max-width:560px;">
-  <a href="/client/orders/{{ order['id'] }}" class="breadcrumb">&larr; back to this order</a>
+  <a href="/account/orders/{{ order['id'] }}" class="breadcrumb">&larr; back to this order</a>
   <h1>{{ order['original_filename'] }}</h1>
 
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
@@ -42,7 +42,7 @@
   {% endif %}
 
   {% if order['difficulty_surcharge_status'] != 'pending_approval' %}
-    <p data-persist class="ok">Nothing pending here - <a href="/client/orders/{{ order['id'] }}">view your order</a>.</p>
+    <p data-persist class="ok">Nothing pending here - <a href="/account/orders/{{ order['id'] }}">view your order</a>.</p>
   {% else %}
     <div class="modal-warning" style="margin-bottom:18px;">
       This order needed additional work beyond what was originally covered: <strong>{{ reason_label }}</strong>.
@@ -53,7 +53,7 @@
        of this order's base cost.</p>
     <p style="font-size:1.6rem; font-weight:700; margin:10px 0;">${{ "%.2f"|format(order['difficulty_surcharge_usd']) }}</p>
 
-    <form method="post" action="/client/orders/{{ order['id'] }}/difficulty-surcharge/pay" style="margin-top:18px;" id="pay-form">
+    <form method="post" action="/account/orders/{{ order['id'] }}/difficulty-surcharge/pay" style="margin-top:18px;" id="pay-form">
       <label>Pay with
         <select name="provider" id="provider-select">
           <option value="paystack" {% if not paystack_configured %}disabled{% endif %}>
@@ -75,7 +75,7 @@
       <button type="submit" id="pay-submit">Pay ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }}</button>
     </form>
     <p class="muted" style="margin-top:14px;">Think this doesn't apply to your file? Send us a message from
-       <a href="/client/orders/{{ order['id'] }}">the order page</a> and we'll take another look.</p>
+       <a href="/account/orders/{{ order['id'] }}">the order page</a> and we'll take another look.</p>
   {% endif %}
 </div>
 

@@ -24,7 +24,7 @@
       {% else %}
         <details style="margin:-8px 0 12px;">
           <summary style="cursor:pointer; font-size:0.85rem; color:var(--muted);">Think this is a mistake? Contact us</summary>
-          <form method="post" action="/client/request-exception" style="margin-top:10px;">
+          <form method="post" action="/account/request-exception" style="margin-top:10px;">
             <input type="hidden" name="context" value="{{ exception_context }}">
             <label>Tell us why we should lift this for your account
               <textarea name="note" rows="2" placeholder="e.g. I'm a broadcaster with a real batch of videos to submit today"></textarea>
@@ -66,7 +66,7 @@
        data-premium-asr-rate="{{ addons['premium_asr']['rate_per_min'] if 'premium_asr' in addons else 0 }}"
        data-rush-pct="{{ rush_surcharge_pct }}"></div>
 
-  <form method="post" action="/client/orders" enctype="multipart/form-data" class="order-form" id="order-form">
+  <form method="post" action="/account/orders" enctype="multipart/form-data" class="order-form" id="order-form">
     <input type="hidden" name="idempotency_key" id="idempotency-key-field">
 
     <div class="wizard-pane" data-pane="1">
@@ -300,7 +300,7 @@
           <div class="pricing-total"><span>Estimated total</span><span id="price-total">$0.00</span></div>
           <p class="muted" style="font-size:0.78rem; margin-bottom:0;">
              {{ "%.1f"|format(free_minutes_remaining)|replace('.0', '') }} free minute{{ '' if free_minutes_remaining == 1 else 's' }}
-             left this month. <a href="/client/billing">Plan &amp; usage &rarr;</a></p>
+             left this month. <a href="/account/billing">Plan &amp; usage &rarr;</a></p>
           <details class="od-more">
             <summary>How free minutes apply</summary>
             <p>Free minutes cover Instant AI transcription, and on Pro and Premium translation too. They are applied automatically, and the final cost is confirmed once we have processed the file. Results download once you have chosen a plan. Dubbing and human review are billed from the first minute.</p>
@@ -442,7 +442,7 @@
         document.getElementById("exit-send").addEventListener("click", function () {
           var picked = document.querySelector('input[name="exit-reason"]:checked');
           if (!picked) { thanks.textContent = "Choose one of the reasons first."; return; }
-          fetch("/client/exit-reason", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+          fetch("/account/exit-reason", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ reason: picked.value, note: document.getElementById("exit-note").value, step: "review" }) })
             .then(function (r) { return r.json(); })
             .then(function (d) { var ok = !!d.ok; thanks.textContent = ok ? "Thank you. That helps us make this better." : (d.error || "Could not send."); if (ok && window.kpToast) kpToast("Thank you. That helps us.", "success"); })
@@ -473,28 +473,28 @@
   {% else %}
     <div class="ds-tabs filter-tabs" id="order-status-filter">
       {% for key, label in [('', 'All'), ('processing', 'Processing'), ('in_review', 'In review'), ('needs_you', 'Needs attention'), ('ready', 'Completed')] %}
-      <a href="/client?{% if key %}status={{ key }}&amp;{% endif %}{% if order_list.folder %}folder={{ order_list.folder|urlencode }}&amp;{% endif %}{% if order_list.q %}q={{ order_list.q|urlencode }}{% endif %}#my-orders"
+      <a href="/account?{% if key %}status={{ key }}&amp;{% endif %}{% if order_list.folder %}folder={{ order_list.folder|urlencode }}&amp;{% endif %}{% if order_list.q %}q={{ order_list.q|urlencode }}{% endif %}#my-orders"
          class="{{ 'is-on active' if order_list.status == key else '' }}"{% if order_list.status == key %} aria-current="true"{% endif %}>{{ label }} <small>{{ order_list.counts[key] }}</small></a>
       {% endfor %}
     </div>
     <div class="ds-tools">
-      <form method="get" action="/client#my-orders" class="ds-search ol-search" role="search">{{ ico('search', 18) }}
+      <form method="get" action="/account#my-orders" class="ds-search ol-search" role="search">{{ ico('search', 18) }}
         <input type="search" id="order-search" name="q" value="{{ order_list.q }}" placeholder="Search by file name, order ID or service..." aria-label="Search your orders">
         {% if order_list.status %}<input type="hidden" name="status" value="{{ order_list.status }}">{% endif %}
         {% if order_list.folder %}<input type="hidden" name="folder" value="{{ order_list.folder }}">{% endif %}
       </form>
       {% if folders %}
       <div class="ds-tabs filter-tabs" id="folder-filter" style="margin:0;">
-        <a href="/client{% if order_list.status %}?status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if not order_list.folder else '' }}">All folders</a>
+        <a href="/account{% if order_list.status %}?status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if not order_list.folder else '' }}">All folders</a>
         {% for f in folders %}
-        <a href="/client?folder={{ f|urlencode }}{% if order_list.status %}&amp;status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if order_list.folder == f else '' }}">{{ f }}</a>
+        <a href="/account?folder={{ f|urlencode }}{% if order_list.status %}&amp;status={{ order_list.status }}{% endif %}#my-orders" class="{{ 'is-on' if order_list.folder == f else '' }}">{{ f }}</a>
         {% endfor %}
       </div>
       {% endif %}
     </div>
 
     {% if not orders %}
-    <p class="ds-empty ol-none">No orders match. <a href="/client#my-orders">Show all</a></p>
+    <p class="ds-empty ol-none">No orders match. <a href="/account#my-orders">Show all</a></p>
     {% else %}
     <div class="ds-scroll ol-wrap">
     <table class="orders-table orders-compact">
@@ -507,7 +507,7 @@
         <td class="hide-sm num">#{{ o['id'][:6]|upper }}</td>
         <td class="ol-name">
           <div class="ds-file">{{ file_ic(o['original_filename']) }}<div>
-            <a href="/client/orders/{{ o['id'] }}" class="order-table-name" title="{{ o['original_filename'] }}"><strong>{{ o['original_filename'] }}</strong></a>
+            <a href="/account/orders/{{ o['id'] }}" class="order-table-name" title="{{ o['original_filename'] }}"><strong>{{ o['original_filename'] }}</strong></a>
             {% if o['id'] in unread %}<span class="unread-dot" title="New message"></span>{% endif %}
             <small>{% if o['folder_name'] %}{{ o['folder_name'] }} &middot; {% endif %}{{ o['duration_minutes']|round(1) }} min</small>
           </div></div>
@@ -519,20 +519,20 @@
         <td class="hide-sm ds-langs"><b>{{ o['source_lang']|upper }}{% if o['target_lang'] != o['source_lang'] %} &rarr; {{ o['target_lang']|upper }}{% endif %}</b></td>
         <td class="ol-status">
           {% if o['status'] == 'pending_payment' %}
-            <a href="/client/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
+            <a href="/account/orders/{{ o['id'] }}/pay" class="pay-now-pill">Pay ${{ "%.2f"|format(o['cost_usd'] or 0) }}</a>
           {% else %}
             {{ status_pill(o['status']) }}
           {% endif %}
-          {% if o['difficulty_surcharge_status'] == 'pending_approval' %}<a href="/client/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Extra charge</a>{% endif %}
+          {% if o['difficulty_surcharge_status'] == 'pending_approval' %}<a href="/account/orders/{{ o['id'] }}/difficulty-surcharge" class="pay-now-pill">Extra charge</a>{% endif %}
         </td>
         <td class="hide-sm num ol-date">{{ o['created_at']|int|short_date }}</td>
-        <td class="ol-go"><a href="/client/orders/{{ o['id'] }}" class="ds-act row-action-btn" title="Open" aria-label="Open {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
+        <td class="ol-go"><a href="/account/orders/{{ o['id'] }}" class="ds-act row-action-btn" title="Open" aria-label="Open {{ o['original_filename'] }}">{{ ico('arrow', 16) }}</a></td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
     </div>
-    <div class="ds-pager">{{ pager(order_list.page, order_list.pages, "/client", order_list.params) }}</div>
+    <div class="ds-pager">{{ pager(order_list.page, order_list.pages, "/account", order_list.params) }}</div>
     {% endif %}
   {% endif %}
   </section>
@@ -544,7 +544,7 @@
 <script>
   (function () {
     function markSeen() {
-      fetch("/client/tour/seen", { method: "POST" }).catch(function () {});
+      fetch("/account/tour/seen", { method: "POST" }).catch(function () {});
     }
     // The real "first successful action" only - upload, tell us the
     // languages, then continue - not a tour of every field on this page.
@@ -575,7 +575,7 @@
     {% if request.query_params.get('yt_error') == 'resolve_failed' %}<p class="error">Couldn't find that channel on YouTube - double check the link.</p>{% endif %}
     {% if request.query_params.get('yt_error') == 'rate_limited' %}<p class="error">Too many channels added too quickly - wait a few minutes and try again.</p>{% endif %}
 
-    <form method="post" action="/client/youtube-watches" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <form method="post" action="/account/youtube-watches" style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
       <label style="flex:1; min-width:220px;">Channel or playlist URL
         <input type="text" name="channel_url" placeholder="https://youtube.com/@yourchannel" required>
       </label>
@@ -592,7 +592,7 @@
         <span>{{ w['label'] or w['playlist_id'] }}
           {% if w['last_error'] %}<span class="error" style="font-size:0.78rem;"> - last check failed: {{ w['last_error'] }}</span>{% endif %}
         </span>
-        <form method="post" action="/client/youtube-watches/{{ w['id'] }}/remove">
+        <form method="post" action="/account/youtube-watches/{{ w['id'] }}/remove">
           <button type="submit" class="row-action-chip">Remove</button>
         </form>
       </div>
@@ -612,7 +612,7 @@
         </div>
         <div style="display:flex; gap:8px; flex-shrink:0;">
           <button type="button" class="row-action-chip" onclick="document.querySelector('[data-source=&quot;youtube&quot;]').click(); var f = document.getElementById('youtube-url-input'); f.value='https://www.youtube.com/watch?v={{ imp['video_id'] }}'; f.scrollIntoView({behavior:'smooth', block:'center'}); f.focus();">Use in new order</button>
-          <form method="post" action="/client/youtube-imports/{{ imp['id'] }}/dismiss">
+          <form method="post" action="/account/youtube-imports/{{ imp['id'] }}/dismiss">
             <button type="submit" class="row-action-chip">Dismiss</button>
           </form>
         </div>

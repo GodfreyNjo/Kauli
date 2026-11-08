@@ -51,7 +51,7 @@ def test_a_customer_is_told_when_work_on_their_order_starts_once_and_only_for_th
     sent = _mail(monkeypatch)
     order = _order(env, wav_bytes)
     assert lifecycle.order_received(order) is True and len(sent) == 1
-    assert sent[0]["sender_name"] == "Kauli Orders" and sent[0]["subject"].startswith("We have your order") and f"/client/orders/{order['id']}" in sent[0]["html"]
+    assert sent[0]["sender_name"] == "Kauli Orders" and sent[0]["subject"].startswith("We have your order") and f"/account/orders/{order['id']}" in sent[0]["html"]
     assert "Stop these emails" not in sent[0]["html"]                                          # a confirmation is not marketing
     assert lifecycle.order_received(order) is False and len(sent) == 1                         # never twice
     other = _order(env, wav_bytes)

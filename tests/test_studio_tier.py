@@ -151,18 +151,18 @@ def test_studio_is_for_dubbing_only(studio):
         assert "made for dubbing" in studio.go(service_level=service).text, service
     assert studio.db.list_orders_for_client("u1") == []
     assert studio.order_from(studio.go())["review_tier"] == "human"                      # the dub itself is fine
-    page = studio.client.get("/client").text
+    page = studio.client.get("/account").text
     assert 'id="studio-option"' in page and "For dubbing:" in page
     js = studio.client.get("/static/client_wizard.js").text
     assert "studioOption.hidden = !studioWanted" in js and 'selected.value === "dub"' in js
 
 
 def test_the_wizard_offers_studio_only_when_it_can_be_sold(studio, monkeypatch):
-    html = studio.client.get("/client").text
+    html = studio.client.get("/account").text
     assert 'value="studio"' in html and "Top tier" in html and 'data-premium-asr-rate="0.1"' in html
     assert "+$0.40/min" in html and "$0.90" in html and "ElevenLabs" not in html and 'id="price-studio-row"' in html
     monkeypatch.delenv("ELEVENLABS_API_KEY")
-    assert 'value="studio"' not in studio.client.get("/client").text
+    assert 'value="studio"' not in studio.client.get("/account").text
 
 
 def test_the_worker_does_not_double_label_speakers_for_studio_and_refunds_a_failed_recogniser(studio):
@@ -196,7 +196,7 @@ def test_extra_languages_are_on_by_default_and_the_owner_can_switch_them_off(stu
     assert studio.app._review_extra_languages() == set()
     r = studio.go(source_lang="zh", target_lang="en", review_tier="human")
     assert "Instant AI" in r.text and studio.db.list_orders_for_client("u1") == []         # as before: AI only
-    assert 'data-extra-review-langs=""' in studio.client.get("/client").text
+    assert 'data-extra-review-langs=""' in studio.client.get("/account").text
 
 
 @pytest.fixture
@@ -249,7 +249,7 @@ def test_extra_language_review_is_refused_where_it_would_lose_money(extras, monk
 
 
 def test_the_wizard_lists_the_extra_languages_for_human_review_when_on(extras):
-    html = extras.client.get("/client").text
+    html = extras.client.get("/account").text
     assert 'label="Human review by language specialists"' in html and 'data-extra-review-langs="de,es,zh"' in html
     assert 'data-premium-langs="de,en,es,sw,zh"' in html
     ai_group = html.split('label="Instant AI transcription only"')[1].split("</optgroup>")[0]

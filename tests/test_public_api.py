@@ -78,7 +78,7 @@ def test_creating_a_free_instant_ai_order_over_the_api(api, wav_bytes):
     assert body["status"] != "pending_payment" and body["review_tier"] == "ai"
     assert body["service_level"] == "transcribe" and body["source_lang"] == "en"
     assert body["deliverables"] == {}                       # nothing downloads until the account has chosen a plan
-    assert body["plan_required"] is True and body["choose_plan_url"].endswith("/client/billing?choose_plan=1")
+    assert body["plan_required"] is True and body["choose_plan_url"].endswith("/account/billing?choose_plan=1")
     assert api.submitted == [body["id"]]
     assert api.db.get_order(body["id"])["is_free_preview"] == 1
 
@@ -88,7 +88,7 @@ def test_an_order_that_needs_payment_comes_back_402_with_a_payment_link(api, wav
     assert r.status_code == 402, r.text
     body = r.json()
     assert body["payment_required"] is True and body["status"] == "pending_payment"
-    assert body["payment_url"].endswith(f"/client/orders/{body['id']}/pay")
+    assert body["payment_url"].endswith(f"/account/orders/{body['id']}/pay")
     assert abs(body["cost_usd"] - 1.79) < 0.01              # same price card as the dashboard
     assert api.submitted == []                              # nothing runs before payment
     assert body["deliverables"] == {}
@@ -155,7 +155,7 @@ def test_staff_keys_cannot_create_client_orders(api, wav_bytes):
 def test_the_api_identity_never_leaks_into_browser_requests(api, wav_bytes):
     api.post(wav_bytes)
     # a plain browser request after an API call has no user, key or not
-    assert api.client.get("/client", follow_redirects=False).status_code in (302, 303, 307)
+    assert api.client.get("/account", follow_redirects=False).status_code in (302, 303, 307)
 
 
 def test_languages_list_is_public(api):

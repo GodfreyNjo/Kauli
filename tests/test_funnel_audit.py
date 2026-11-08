@@ -50,7 +50,7 @@ def test_each_kind_of_stuck_client_is_told_apart_and_gets_a_draft_written_from_w
     lost, pay, idle = _by(r, "lost"), _by(r, "pay"), _by(r, "idle")
     assert lost["code"] == "lost_upload" and lost["severity"] == "high"
     assert "Hi Amina," in lost["body"] and "can't see an order" in lost["body"] and lost["body"].rstrip().endswith("Kauli Team")
-    assert pay["code"] == "waiting_to_pay" and "$19.41" in pay["body"] and "town hall.mp4" in pay["body"] and "https://kauli.example/client/orders/o1" in pay["body"]
+    assert pay["code"] == "waiting_to_pay" and "$19.41" in pay["body"] and "town hall.mp4" in pay["body"] and "https://kauli.example/account/orders/o1" in pay["body"]
     assert "discount" not in pay["body"].lower() and "M-Pesa" in pay["body"]
     assert idle["code"] == "never_started" and "Hi Chidi," in idle["body"] and "free" in idle["body"]
     assert {"lost_upload", "waiting_to_pay", "never_started"} <= {d["code"] for d in r["stuck"]}
@@ -74,13 +74,13 @@ def test_paying_internal_and_staff_accounts_are_not_counted_as_stuck(env):
 def test_only_staff_can_open_the_analysis_and_it_changes_nothing(env):
     _client(env, "idle", "idle@example.com", "Chidi Eze")
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
-    assert env.client.get("/staff/clients/analysis").status_code in (302, 303, 307)
+    assert env.client.get("/staff/customers/analysis").status_code in (302, 303, 307)
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("u1")), "role": "staff"})
-    html = env.client.get("/staff/clients/analysis?partial=1").text
+    html = env.client.get("/staff/customers/analysis?partial=1").text
     assert "Sign-up analysis" in html and "Review &amp; send email" in html and 'id="fa-drafts"' in html
-    full = env.client.get("/staff/clients/analysis").text
-    assert "Back to Clients" in full
-    assert env.client.get("/staff/clients").text.count("Analyse sign-ups") >= 1
+    full = env.client.get("/staff/customers/analysis").text
+    assert "Back to Customers" in full
+    assert env.client.get("/staff/customers").text.count("Analyse sign-ups") >= 1
 
 
 def test_sending_the_follow_up_is_staff_only_escaped_recorded_and_never_done_twice_in_a_day(env):
@@ -88,23 +88,23 @@ def test_sending_the_follow_up_is_staff_only_escaped_recorded_and_never_done_twi
     sent = []
     env.monkeypatch.setattr(env.app.mailer, "email_configured", lambda: True)
     env.monkeypatch.setattr(env.app.mailer, "send_as", lambda purpose, to, subject, html, text=None, **kw: (sent.append((to, subject, html, text)) or (True, "msg-1")))
-    form = {"subject": "Your free minutes on Kauli", "body": "Hi Chidi,\n\nStart here: https://kauli.example/client <script>x</script>\n\nKauli Team"}
+    form = {"subject": "Your free minutes on Kauli", "body": "Hi Chidi,\n\nStart here: https://kauli.example/account <script>x</script>\n\nKauli Team"}
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("u1")), "role": "client"})
-    assert env.client.post("/staff/clients/idle/followup", data=form).status_code == 403          # a client cannot send it
+    assert env.client.post("/staff/customers/idle/followup", data=form).status_code == 403          # a client cannot send it
     assert not sent
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("u1")), "role": "staff", "email": "team@example.com"})
-    assert env.client.post("/staff/clients/idle/followup", data={"subject": "x", "body": "short"}).status_code == 400
-    ok = env.client.post("/staff/clients/idle/followup", data=form)
+    assert env.client.post("/staff/customers/idle/followup", data={"subject": "x", "body": "short"}).status_code == 400
+    ok = env.client.post("/staff/customers/idle/followup", data=form)
     assert ok.status_code == 200 and ok.json()["ok"] is True
     to, subject, html, text = sent[0]
     assert to == "idle@example.com" and subject == "Your free minutes on Kauli"
-    assert "&lt;script&gt;" in html and "<script>" not in html and 'href="https://kauli.example/client"' in html       # escaped, and the address is a link
+    assert "&lt;script&gt;" in html and "<script>" not in html and 'href="https://kauli.example/account"' in html       # escaped, and the address is a link
     conn = env.db.get_conn()
     row = conn.execute("SELECT kind, status FROM onboarding_messages WHERE user_id = 'idle'").fetchone()
     note = conn.execute("SELECT staff_notes FROM users WHERE id = 'idle'").fetchone()[0]
     conn.close()
     assert tuple(row) == ("staff_followup", "sent") and "team@example.com" in note
-    again = env.client.post("/staff/clients/idle/followup", data=form)
+    again = env.client.post("/staff/customers/idle/followup", data=form)
     assert again.status_code == 429 and len(sent) == 1                                              # a double click cannot send it twice
     assert _by(funnel_audit.analyse(), "idle")["followups"] == 1
 
@@ -114,8 +114,8 @@ def test_nothing_is_sent_when_email_is_not_set_up_or_the_provider_refuses(env):
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("u1")), "role": "staff", "email": "team@example.com"})
     form = {"subject": "Your free minutes on Kauli", "body": "Hi Chidi,\n\nStart here, whenever you are ready.\n\nKauli Team"}
     env.monkeypatch.setattr(env.app.mailer, "email_configured", lambda: False)
-    assert env.client.post("/staff/clients/idle/followup", data=form).status_code == 503
+    assert env.client.post("/staff/customers/idle/followup", data=form).status_code == 503
     env.monkeypatch.setattr(env.app.mailer, "email_configured", lambda: True)
     env.monkeypatch.setattr(env.app.mailer, "send_as", lambda *a, **k: (False, "Brevo 401: nope"))
-    refused = env.client.post("/staff/clients/idle/followup", data=form)
+    refused = env.client.post("/staff/customers/idle/followup", data=form)
     assert refused.status_code == 502 and refused.json()["ok"] is False and "Brevo 401" in refused.json()["error"]

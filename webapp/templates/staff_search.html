@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Search</h1>
 <form method="get" action="/staff/search" class="search-form" style="margin-bottom:20px;">
-  <input type="text" name="q" value="{{ q }}" placeholder="Search jobs, clients, leads..." autofocus
+  <input type="text" name="q" value="{{ q }}" placeholder="Search jobs, customers, leads..." autofocus
          style="max-width:420px;">
   <button type="submit" class="btn">Search</button>
 </form>
@@ -18,7 +18,7 @@
 <div class="card">
   <h2 style="margin-top:0;">Jobs</h2>
   <table>
-    <thead><tr><th>File</th><th>Client</th><th>Status</th></tr></thead>
+    <thead><tr><th>File</th><th>Customer</th><th>Status</th></tr></thead>
     <tbody>
       {% for o in results.orders %}
       <tr class="clickable-row" data-href="/staff/orders/{{ o['id'] }}" tabindex="0">
@@ -34,7 +34,7 @@
 
 {% if results.clients %}
 <div class="card">
-  <h2 style="margin-top:0;">Clients</h2>
+  <h2 style="margin-top:0;">Customers</h2>
   <table>
     <thead><tr><th>Name</th><th>Email</th></tr></thead>
     <tbody>

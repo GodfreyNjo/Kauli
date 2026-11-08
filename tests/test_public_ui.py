@@ -190,7 +190,7 @@ def test_integrations_section_is_honest_about_what_exists(client, monkeypatch):
     for name in ("API", "MCP server", "Webhooks"):
         assert re.search(rf'<a href="/developers[^"]*" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S)
     for name in ("Slack", "Microsoft Teams", "Notion", "Discord", "Google Calendar", "Outlook Calendar"):
-        assert re.search(rf'<a href="/login\?next=/client/integrations" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S), name
+        assert re.search(rf'<a href="/login\?next=/account/integrations" class="int-chip">.*?{re.escape(name)}.*?Available', block, re.S), name
     # ...and nothing unbuilt is ever presented as available
     for name in ("Zoom", "Google Drive", "Dropbox", "OneDrive", "Google Docs", "HubSpot", "Salesforce"):
         m = re.search(rf'<span class="int-name">{re.escape(name)}</span>\s*<span class="int-badge (\w+)">', block)

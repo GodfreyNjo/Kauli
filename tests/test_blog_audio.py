@@ -270,11 +270,11 @@ def test_staff_can_take_an_episode_out_of_the_podcast_and_delete_it(env, monkeyp
 def test_resources_is_inside_the_account_with_the_promo_and_guides_you_can_hear(env, monkeypatch):
     post = _post(env)
     _make(env, monkeypatch, post)
-    page = env.client.get("/client/resources").text
+    page = env.client.get("/account/resources").text
     assert "Resources" in page and 'data-video-id="i6R3flz8V1I"' in page and "/static/promo-thumbnail.jpg" in page
     assert "<iframe" not in page.split("<script>")[0] and "youtube-nocookie.com/embed/" in page
     assert "How to Publish Transcripts with Webhooks" in page and "/blog-audio/webhooks-guide-summary.mp3" in page and "/podcast.xml" in page
-    assert 'href="/help"' in page and 'href="/docs/api"' in page and 'href="/client/resources"' in page
+    assert 'href="/help"' in page and 'href="/docs/api"' in page and 'href="/account/resources"' in page
 
 
 def test_the_promo_is_not_on_any_public_page(env):

@@ -12,7 +12,7 @@ from tests.test_order_flow import env, wav_bytes  # noqa: E402,F401  (fixtures)
 
 
 def test_step_one_shows_two_cards_with_the_ids_the_script_needs(env):
-    html = env.client.get("/client").text
+    html = env.client.get("/account").text
     for needed in ('id="card-file"', 'id="card-youtube"', 'id="source-switch"', 'id="dropzone"', 'id="dropzone-text"',
                    'id="file-input"', 'id="youtube-url-input"', 'id="youtube-go"', 'id="source-file"', 'id="source-youtube"',
                    'data-source="file"', 'data-source="youtube"', 'name="audio"', 'name="youtube_url"'):
@@ -27,7 +27,7 @@ def test_step_one_shows_two_cards_with_the_ids_the_script_needs(env):
 
 
 def test_the_file_card_is_active_by_default(env):
-    html = env.client.get("/client").text
+    html = env.client.get("/account").text
     assert re.search(r'class="src-card is-active" id="card-file"', html)
     assert re.search(r'class="src-card " id="card-youtube"', html)
 
@@ -36,8 +36,9 @@ def test_a_failed_youtube_fetch_comes_back_with_the_link_kept_and_that_card_acti
     def boom(url, out_dir):
         raise RuntimeError("nope")
     env.monkeypatch.setattr(env.app, "_download_youtube", boom)
-    r = env.client.post("/client/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe",
-                                                 "review_tier": "ai", "youtube_url": "https://youtu.be/abc123XYZ00"})
+    form = {"source_lang": "en", "target_lang": "en", "service_level": "transcribe", "review_tier": "ai",
+            "youtube_url": "https://youtu.be/abc123XYZ00"}
+    r = env.client.post("/account/orders", data=form)
     assert r.status_code == 200 and "Couldn" in r.text
     assert 'value="https://youtu.be/abc123XYZ00"' in r.text
     assert re.search(r'class="src-card is-active" id="card-youtube"', r.text)

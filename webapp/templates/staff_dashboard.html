@@ -54,7 +54,7 @@
     <button type="button" data-tab="delivered">Delivered <span class="tab-count">{{ delivered_n }}</span></button>
   </div>
   <div class="qp-quick">
-    <label class="qp-select"><span class="sr-only">Client</span>
+    <label class="qp-select"><span class="sr-only">Customer</span>
       <select id="filter-client"><option value="all">All clients</option>
         {% for name in rows|map(attribute='order')|map(attribute='client_name')|unique|sort %}<option value="{{ name|lower }}">{{ name }}</option>{% endfor %}
       </select></label>
@@ -108,7 +108,7 @@
     <thead><tr>
       <th style="width:28px;"><input type="checkbox" id="queue-select-all" aria-label="Select all orders"></th>
       <th class="sortable" data-sort="text" data-col="1">Job</th>
-      <th class="sortable" data-sort="text" data-col="2">Client</th>
+      <th class="sortable" data-sort="text" data-col="2">Customer</th>
       <th>Service / route</th>
       <th>Status</th>
       <th>Assignee</th>
@@ -467,7 +467,7 @@
   }
   applyColumns();
   document.getElementById('queue-columns-toggle').addEventListener('click', function () {
-    var labels = ['', 'Job', 'Client', 'Service/route', 'Status', 'Assignee', 'Review progress', 'Deadline', 'Time in stage', 'Created'];
+    var labels = ['', 'Job', 'Customer', 'Service/route', 'Status', 'Assignee', 'Review progress', 'Deadline', 'Time in stage', 'Created'];
     var choice = prompt('Hide which column? Type its name (' + ALL_COLUMNS.map(function (i) { return labels[i]; }).join(', ') + '), or leave blank to show all again.');
     if (choice === null) return;
     if (!choice.trim()) { hiddenCols = []; }

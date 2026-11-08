@@ -13,7 +13,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from . import billing, db, mailer
+from . import billing, db, mailer, sessions
 
 router = APIRouter()
 A = None
@@ -62,11 +62,11 @@ def _facts(user) -> dict:
             "pro_price": billing.PLANS["pro"]["price_usd"]}
 
 
-@router.get("/client/close-account", response_class=HTMLResponse)
+@router.get("/account/close-account", response_class=HTMLResponse)
 def close_page(request: Request, error: str | None = None):
     user = _client(request)
     if not user:
-        return RedirectResponse("/login?next=/client/close-account", status_code=303)
+        return RedirectResponse("/login?next=/account/close-account", status_code=303)
     return A.templates.TemplateResponse(request, "account_close.html", {"user": user, "role": "client", "reasons": REASONS, "facts": _facts(user), "error": error})
 
 
@@ -84,14 +84,14 @@ def _confirmation_email(user, facts: dict) -> tuple[str, str, str]:
     return "Your Kauli account is closed", inner, body
 
 
-@router.post("/client/close-account")
+@router.post("/account/close-account")
 def close_account(request: Request, confirm_text: str = Form(""), reason: str = Form(""), detail: str = Form(""), competitor: str = Form("")):
     user = _client(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
 
     def back(message: str):
-        return RedirectResponse(f"/client/close-account?error={quote(message)}", status_code=303)
+        return RedirectResponse(f"/account/close-account?error={quote(message)}", status_code=303)
 
     if confirm_text.strip().lower() != user["email"].strip().lower():
         return back("Type your email exactly as shown to confirm.")
@@ -122,7 +122,7 @@ def close_account(request: Request, confirm_text: str = Form(""), reason: str = 
             mailer.send_as("support", user["email"], subject, mailer.wrap_email_html(inner, base_url=A._site_base(request)), body)
     except Exception:  # noqa: BLE001 - closing must never fail because an email did
         pass
-    request.session.clear()
+    sessions.sign_out(request)
     return RedirectResponse("/login?notice=account_closed", status_code=303)
 
 

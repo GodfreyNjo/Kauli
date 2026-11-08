@@ -46,7 +46,7 @@
     </ul>
   </section>
   <section class="crm-card" aria-labelledby="crm-onb-h">
-    <header><h2 id="crm-onb-h">Client onboarding</h2><a class="rp-link" href="#onboarding">{{ pending_onboarding_messages|length }} pending</a></header>
+    <header><h2 id="crm-onb-h">Customer onboarding</h2><a class="rp-link" href="#onboarding">{{ pending_onboarding_messages|length }} pending</a></header>
     {% if pending_onboarding_messages %}
     {% set m = pending_onboarding_messages[0] %}
     <div class="crm-msg">
@@ -79,7 +79,7 @@
 {% endif %}
 
 <div class="card" id="onboarding">
-  <h2 style="margin-top:0;">Client onboarding</h2>
+  <h2 style="margin-top:0;">Customer onboarding</h2>
   <p class="muted" style="margin-top:0; font-size:0.85rem;">There's no email service connected yet, so nothing here
      sends itself - every message below is real, ready to use, and waiting for you to actually send it (email or
      WhatsApp) and click "Mark as sent".</p>
@@ -114,7 +114,7 @@
   {% if clients_needing_nudge %}
   <h3 style="margin-top:20px;">Signed up, never uploaded anything (48h+)</h3>
   <table>
-    <thead><tr><th>Client</th><th>Waiting</th><th></th></tr></thead>
+    <thead><tr><th>Customer</th><th>Waiting</th><th></th></tr></thead>
     <tbody>
       {% for c in clients_needing_nudge %}
       <tr>
@@ -134,7 +134,7 @@
   {% if pending_deletion_requests %}
   <h3 style="margin-top:20px;">Data deletion requests</h3>
   <table>
-    <thead><tr><th>Client</th><th>Requested</th><th></th></tr></thead>
+    <thead><tr><th>Customer</th><th>Requested</th><th></th></tr></thead>
     <tbody>
       {% for r in pending_deletion_requests %}
       <tr>
@@ -237,7 +237,7 @@
       <a href="#log-lead-form" onclick="document.getElementById('log-lead-form').open = true;">Add lead</a>
       <a href="/staff/newsletter">Send campaign</a>
       <a href="/staff/ops">View reports</a>
-      <a href="/staff/clients">Clients</a>
+      <a href="/staff/customers">Customers</a>
     </div>
   </section>
   <section class="crm-card" aria-labelledby="crm-fn-h">

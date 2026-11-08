@@ -36,7 +36,7 @@
           {% if is_owner %}<form method="post" action="/settings/team/remove"><input type="hidden" name="member_id" value="{{ m['id'] }}"><button class="secondary" type="submit" aria-label="Remove {{ m['invited_email'] }}">Remove</button></form>{% endif %}</li>
         {% endfor %}
       </ul>
-      {{ pager(members_page, members_pages, '/client/workspace', {}, 'members_page') }}
+      {{ pager(members_page, members_pages, '/account/workspace', {}, 'members_page') }}
       {% if is_owner %}
       <form method="post" action="/settings/team/invite" class="ws-invite">
         <input type="email" name="email" placeholder="teammate@company.com" required aria-label="Teammate's email">
@@ -52,9 +52,9 @@
       <h2 id="ws-files">Shared files</h2>
       {% if orders %}
       <ul class="ws-list">
-        {% for o in orders %}<li><a href="/client/orders/{{ o['id'] }}">{{ o['original_filename'] }}</a><small class="muted">{{ when(o['created_at']) }}</small></li>{% endfor %}
+        {% for o in orders %}<li><a href="/account/orders/{{ o['id'] }}">{{ o['original_filename'] }}</a><small class="muted">{{ when(o['created_at']) }}</small></li>{% endfor %}
       </ul>
-      <a href="/client/home">All files</a>
+      <a href="/account/home">All files</a>
       {% else %}<p class="muted">Files anyone on the team uploads appear here.</p>{% endif %}
     </section>
 
@@ -62,9 +62,9 @@
       <h2 id="ws-notes">Shared notes</h2>
       {% if notes %}
       <ul class="ws-list">
-        {% for n in notes %}<li><a href="/client/notes?id={{ n['id'] }}">{{ n['title'] }}</a><small class="muted">{{ when(n['updated_at']) }}</small></li>{% endfor %}
+        {% for n in notes %}<li><a href="/account/notes?id={{ n['id'] }}">{{ n['title'] }}</a><small class="muted">{{ when(n['updated_at']) }}</small></li>{% endfor %}
       </ul>
-      <a href="/client/notes">All notes</a>
+      <a href="/account/notes">All notes</a>
       {% else %}<p class="muted">Notes your team writes appear here.</p>{% endif %}
     </section>
   </div>

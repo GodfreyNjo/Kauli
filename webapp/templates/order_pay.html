@@ -7,7 +7,7 @@
 {% set tier_name = t('tier_human') if order['review_tier'] == 'human' else t('tier_ai') %}
 {% set service_names = {'transcribe': t('svc_transcribe'), 'translate': t('svc_translate'), 'dub': t('svc_dub')} %}
 <div class="pay-wrap">
-  <a href="/client" class="breadcrumb">&larr; {{ t('pay_back') }}</a>
+  <a href="/account" class="breadcrumb">&larr; {{ t('pay_back') }}</a>
 
   {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
   {% if error %}<p class="error">{{ error }}</p>{% endif %}
@@ -48,7 +48,7 @@
   {% endif %}
 
   {% if order['status'] != 'pending_payment' %}
-    <div class="pay-card"><p data-persist class="ok" style="margin:0;">{{ t('pay_paid') }} <a href="/client/orders/{{ order['id'] }}">{{ t('view') }}</a></p></div>
+    <div class="pay-card"><p data-persist class="ok" style="margin:0;">{{ t('pay_paid') }} <a href="/account/orders/{{ order['id'] }}">{{ t('view') }}</a></p></div>
   {% else %}
   <div class="pay-grid">
     <section class="pay-card pay-summary" aria-labelledby="pay-file">
@@ -74,7 +74,7 @@
       <p class="pay-sub"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>{{ t('pay_starts') }}</p>
     </section>
 
-    <form method="post" action="/client/orders/{{ order['id'] }}/pay" id="pay-form" class="pay-card pay-method">
+    <form method="post" action="/account/orders/{{ order['id'] }}/pay" id="pay-form" class="pay-card pay-method">
       <h2>{{ t('pay_with') }}</h2>
       <div class="pay-options" role="radiogroup" aria-label="Payment method" id="provider-select">
         <label class="pay-option{% if not paystack_configured %} is-off{% endif %}">

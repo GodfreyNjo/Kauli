@@ -223,7 +223,7 @@ def purchase_features(conn, now: float | None = None) -> dict[str, dict]:
         conn, "SELECT client_id AS u, COUNT(*) AS n, SUM(CASE WHEN service_level IN ('translate','dub') THEN 1 ELSE 0 END) AS tr, "
               "COALESCE(SUM(duration_minutes), 0) AS mins FROM orders GROUP BY client_id")}
     plans_view = {r["u"] for r in _rows(conn, "SELECT DISTINCT user_id AS u FROM site_hits WHERE user_id IS NOT NULL AND ts >= ? AND "
-                                                "(path LIKE '/client/plans%' OR path LIKE '/client/billing%')", (since,))}
+                                                "(path LIKE '/account/plans%' OR path LIKE '/account/billing%')", (since,))}
     paid = {r["u"] for r in _rows(conn, "SELECT DISTINCT user_id AS u FROM payments WHERE status = 'completed' AND amount_usd > 0")}
     out = {}
     for u in _owners(conn):

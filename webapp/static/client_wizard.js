@@ -1,6 +1,6 @@
 var kT = window.kauliT || function (s, v) { return s; };   // the words the scripts show, in the reader's language (see webapp/js_strings.py)
 /* Client job-submission wizard: 3 steps over one real <form> (still a
- * single POST to /client/orders - nothing here changes what the backend
+ * single POST to /account/orders - nothing here changes what the backend
  * receives, it just paces how much of the form is on screen at once).
  * Also drives the drag-and-drop file zone and a live, client-side cost
  * estimate that mirrors billing.order_cost_usd's math so what someone
@@ -114,9 +114,9 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     try {
       var body = "step=" + encodeURIComponent(step);
       if (navigator.sendBeacon) {
-        navigator.sendBeacon("/client/wizard-event", new Blob([body], { type: "application/x-www-form-urlencoded" }));
+        navigator.sendBeacon("/account/wizard-event", new Blob([body], { type: "application/x-www-form-urlencoded" }));
       } else if (window.fetch) {
-        fetch("/client/wizard-event", {
+        fetch("/account/wizard-event", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: body, keepalive: true,
@@ -635,7 +635,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     const select = $("#premium-voice-select");
     if (!select || premiumVoicesLoaded) return;
     premiumVoicesLoaded = true;
-    fetch("/client/premium-voices", { credentials: "same-origin" })
+    fetch("/account/premium-voices", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((data) => {
         const keep = select.dataset.selected || "";
@@ -722,7 +722,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
   //
   // A selected FILE (not a YouTube link) goes through two real requests,
   // not one:
-  //   1. POST /client/orders/presign-upload - tiny JSON request/response,
+  //   1. POST /account/orders/presign-upload - tiny JSON request/response,
   //      goes through this app and the Tunnel same as always (no size
   //      concern - it carries no file bytes).
   //   2. PUT the raw file straight to the presigned R2 URL - never
@@ -835,7 +835,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
         // stays visible right up until the real result is ready.
         //
         // Real bug this fixes: on a VALIDATION error, the server renders
-        // the dashboard directly at the POST target (/client/orders,
+        // the dashboard directly at the POST target (/account/orders,
         // no redirect) - xhr.responseURL in that case is just that same
         // POST-only URL, which has no GET handler at all. Blindly
         // replaceState-ing to it left the address bar pointed at a URL
@@ -844,15 +844,15 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
         // a redirect first, so xhr.responseURL differs from form.action
         // in that case; only fall back to the real, always-GET-able
         // dashboard URL when it doesn't.
-        var landedUrl = (xhr.responseURL && xhr.responseURL !== form.action) ? xhr.responseURL : "/client";
+        var landedUrl = (xhr.responseURL && xhr.responseURL !== form.action) ? xhr.responseURL : "/account";
         // A real redirect means success - the order really was created,
         // so the saved upload_key is spent and safe to forget. An error
         // (no redirect) leaves it in place so "Continue with this file"
         // is still there for a genuine retry.
-        if (landedUrl !== "/client") { clearResumableUpload(); logWizardEvent("submitted"); clearStaged(); kpUp({ active: false, url: landedUrl }); }
+        if (landedUrl !== "/account") { clearResumableUpload(); logWizardEvent("submitted"); clearStaged(); kpUp({ active: false, url: landedUrl }); }
         else kpUp({ active: false, error: "Your order could not be started." });
         if (!stillHere(form)) return;               // they moved on: the tray tells them, and the page they are on is left alone
-        if (landedUrl !== "/client") {
+        if (landedUrl !== "/account") {
           // Success: the order exists and its page (the payment page, or the order itself) is an ordinary address. Go there the normal way, so this page
           // stays exactly as it is until the next one is ready. Rewriting the whole document in place dropped the styles for a moment and let
           // unsized icons fill the screen.
@@ -877,7 +877,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
       presignBody.append("filename", file.name);
       presignBody.append("content_type", file.type || "application/octet-stream");
       const presignXhr = new XMLHttpRequest();
-      presignXhr.open("POST", "/client/orders/presign-upload", true);
+      presignXhr.open("POST", "/account/orders/presign-upload", true);
       uploadTransferActive = true;
       presignXhr.onload = function () {
         let data;
@@ -977,7 +977,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
           const pre = new FormData();
           pre.append("filename", f.name);
           pre.append("content_type", f.type || "application/octet-stream");
-          const px = await send("POST", "/client/orders/presign-upload", pre);
+          const px = await send("POST", "/account/orders/presign-upload", pre);
           let data = null;
           try { data = JSON.parse(px.responseText); } catch (err) { data = null; }
           if (px.status !== 200 || !data || !data.put_url) throw new Error((data && data.error) || "Could not prepare the upload.");
@@ -993,7 +993,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
           fd.set("idempotency_key", window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + i);
           const res = await send("POST", form.action, fd);
           const landed = res.responseURL || "";
-          if (landed && landed !== form.action && /\/client\/orders\/[^/?#]+/.test(landed)) {
+          if (landed && landed !== form.action && /\/account\/orders\/[^/?#]+/.test(landed)) {
             okCount += 1; lastUrl = landed; setRow("Submitted", "ok");
           } else {
             throw new Error(errorFrom(res.responseText));
@@ -1007,7 +1007,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
       }
       if (!failed.length) {
         progressLabel.textContent = okCount + " orders started";
-        const dest = okCount === 1 ? lastUrl : "/client/pending";
+        const dest = okCount === 1 ? lastUrl : "/account/pending";
         clearStaged();
         kpUp({ active: false, url: dest });
         if (stillHere(form)) window.location.href = dest;
@@ -1031,7 +1031,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
         fd.delete("audio"); fd.delete("style_guide");
         fd.set("minutes", String(fileDurationMinutes));
         fd.set("name", fileQueue[0].name);
-        fetch("/client/orders/quote", { method: "POST", body: fd, credentials: "same-origin" })
+        fetch("/account/orders/quote", { method: "POST", body: fd, credentials: "same-origin" })
           .then((r) => (r.ok ? r.json() : null))
           .then((d) => resolve(d && d.can_prepay && d.needs_payment && d.prepay_url ? d.prepay_url : null))
           .catch(() => resolve(null));

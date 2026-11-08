@@ -101,7 +101,7 @@ def test_the_plan_cards_use_the_agreed_wording(env):
 
 
 def test_the_account_plans_page_uses_the_same_wording(env):
-    page = env.client.get("/client/billing").text
+    page = env.client.get("/account/billing").text
     assert "Managed billing and invoicing" in page and "Dedicated account manager" in page and "All benefits in Pro and Premium" in page
     assert "Invoicing and bank transfer" not in page and "A named contact" not in page
     assert "All benefits in Free" in page and "All benefits in Pro" in page

@@ -105,7 +105,7 @@ def test_the_code_is_unique_tied_to_the_email_and_never_repeats(env, monkeypatch
     assert len(set(codes.values())) == 2                                                   # a different code for each person
     for to, subject, html, text in sent:
         assert "Kauli Team" in text and "Godfrey" not in text and "%" not in text and "discount" not in text.lower()
-        assert "free" in text and codes[to] in html and f"/client/winback/{codes[to]}" in text
+        assert "free" in text and codes[to] in html and f"/account/winback/{codes[to]}" in text
     assert env.app.winback.send_all("https://kauli.test") == 0                              # one offer, ever
     assert len(sent) == 2
 
@@ -173,16 +173,16 @@ def test_the_customer_uses_the_link_or_types_the_code(env):
     w = env.app.winback
     w.send_offer(env.db.get_user("u1"), "went_quiet", "https://kauli.test")
     code = w.open_offer("u1")["id"]
-    assert "Get my free month" in env.client.get("/client/home").text                       # the banner
-    page = env.client.get(f"/client/winback/{code}").text
+    assert "Get my free month" in env.client.get("/account/home").text                       # the banner
+    page = env.client.get(f"/account/winback/{code}").text
     assert code in page and "A free month, on us" in page and "nothing to cancel" in page.lower() and "discount" not in page.lower()
-    assert "Have a code?" in env.client.get("/client/billing").text
-    r = env.client.post("/client/redeem", data={"code": "return-wrong-code"}, follow_redirects=False)
+    assert "Have a code?" in env.client.get("/account/billing").text
+    r = env.client.post("/account/redeem", data={"code": "return-wrong-code"}, follow_redirects=False)
     assert "error=" in r.headers["location"] and _plan(env, "u1") == "free"
-    r = env.client.post("/client/redeem", data={"code": code.lower()}, follow_redirects=False)
+    r = env.client.post("/account/redeem", data={"code": code.lower()}, follow_redirects=False)
     assert r.status_code == 303 and _plan(env, "u1") == "pro"
-    assert "Your free month is on" in env.client.get(f"/client/winback/{code}").text
-    assert "Get my free month" not in env.client.get("/client/home").text
+    assert "Your free month is on" in env.client.get(f"/account/winback/{code}").text
+    assert "Get my free month" not in env.client.get("/account/home").text
 
 
 def test_nothing_is_sent_on_its_own_unless_switched_on(env, monkeypatch):
@@ -210,4 +210,4 @@ def test_staff_see_who_qualifies_and_can_send_one(env):
 
 
 def test_the_code_box_is_on_the_billing_page_even_with_no_payments(env):
-    assert "Have a code?" in env.client.get("/client/billing").text
+    assert "Have a code?" in env.client.get("/account/billing").text

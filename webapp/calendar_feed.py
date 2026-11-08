@@ -158,15 +158,15 @@ def _client(request: Request):
 
 
 def _back(kind: str, text: str):
-    return RedirectResponse(f"/client/calendar?{kind}={quote(text)}", status_code=303)
+    return RedirectResponse(f"/account/calendar?{kind}={quote(text)}", status_code=303)
 
 
 # ---------------------------------------------------------------------------------------------------- routes
-@router.get("/client/calendar", response_class=HTMLResponse)
+@router.get("/account/calendar", response_class=HTMLResponse)
 def calendar_page(request: Request, notice: str | None = None, error: str | None = None, refresh: int = 0):
     user = _client(request)
     if not user:
-        return RedirectResponse("/login?next=/client/calendar", status_code=303)
+        return RedirectResponse("/login?next=/account/calendar", status_code=303)
     cid = user["client_scope_id"]
     feeds, problems = [], {}
     for feed in list_feeds(cid):
@@ -186,11 +186,11 @@ def calendar_page(request: Request, notice: str | None = None, error: str | None
         "can_add": len(feeds) < MAX_FEEDS, "notice": notice, "error": error, "now": datetime.now(timezone.utc)})
 
 
-@router.post("/client/calendar/connect")
+@router.post("/account/calendar/connect")
 def calendar_connect(request: Request, url: str = Form("")):
     user = _client(request)
     if not user:
-        return RedirectResponse("/login?next=/client/calendar", status_code=303)
+        return RedirectResponse("/login?next=/account/calendar", status_code=303)
     cid = user["client_scope_id"]
     url = normalise(url)
     if not host_ok(url):
@@ -219,11 +219,11 @@ def calendar_connect(request: Request, url: str = Form("")):
     return _back("notice", f"Connected. Kauli can see {len(events)} event{'' if len(events) == 1 else 's'} in the next {LOOKAHEAD_DAYS} days.")
 
 
-@router.post("/client/calendar/{feed_id}/disconnect")
+@router.post("/account/calendar/{feed_id}/disconnect")
 def calendar_disconnect(request: Request, feed_id: str):
     user = _client(request)
     if not user:
-        return RedirectResponse("/login?next=/client/calendar", status_code=303)
+        return RedirectResponse("/login?next=/account/calendar", status_code=303)
     conn = db.get_conn()
     conn.execute("DELETE FROM calendar_feeds WHERE id = ? AND client_id = ?", (feed_id, user["client_scope_id"]))
     conn.commit()
@@ -232,12 +232,12 @@ def calendar_disconnect(request: Request, feed_id: str):
     return _back("notice", "Disconnected. The private link has been deleted.")
 
 
-@router.post("/client/calendar/send")
+@router.post("/account/calendar/send")
 def calendar_send(request: Request, feed_id: str = Form(...), key: str = Form(...), source_lang: str = Form("en")):
     """Send Kauli to one meeting from a connected calendar. Uses the Meetings recorder, so its plan and minutes rules apply."""
     user = _client(request)
     if not user:
-        return RedirectResponse("/login?next=/client/calendar", status_code=303)
+        return RedirectResponse("/login?next=/account/calendar", status_code=303)
     feed = get_feed(user["client_scope_id"], feed_id)
     if not feed:
         return _back("error", "That calendar is not connected.")
@@ -255,4 +255,4 @@ def calendar_send(request: Request, feed_id: str = Form(...), key: str = Form(..
     if "error" in q:
         return _back("error", q["error"][0])
     A.account_hub.track_feature(request, "calendar_meeting_sent", platform=ev["platform"] or "")
-    return RedirectResponse("/client/meetings?notice=" + quote("Kauli will join " + ev["title"] + ". Tell everyone in it that the meeting is being recorded."), status_code=303)
+    return RedirectResponse("/account/meetings?notice=" + quote("Kauli will join " + ev["title"] + ". Tell everyone in it that the meeting is being recorded."), status_code=303)

@@ -11,7 +11,7 @@
   </div>
   {% if error %}<p class="hub-flash bad" role="alert">{{ error }}</p>{% endif %}
 
-  <form method="post" action="/client/close-account" id="close-form" class="cl-grid">
+  <form method="post" action="/account/close-account" id="close-form" class="cl-grid">
     <div class="cl-main">
       <section class="ds-card" aria-labelledby="cl-why">
         <div class="ds-card-head"><h2 id="cl-why">What is the main reason? <span class="muted cl-optional">Optional</span></h2></div>
@@ -26,38 +26,38 @@
             <strong>You only pay for what you use.</strong>
             <p>Pay as you go has no monthly fee, and your first 30 Instant AI minutes every month are free. Instant AI is our lowest-priced service; human review is only added when you choose it.
               {% if facts.paid %}You do not have to close your account to stop paying: moving to Pay as you go keeps everything and costs nothing a month.{% else %}You are already on Pay as you go, so there is no monthly fee to stop.{% endif %}</p>
-            <div class="cl-actions"><a class="ds-btn small" href="/client/billing#change-plan">See plans</a>
-              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small ghost" formaction="/client/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>{% endif %}</div>
+            <div class="cl-actions"><a class="ds-btn small" href="/account/billing#change-plan">See plans</a>
+              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small ghost" formaction="/account/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>{% endif %}</div>
           </div>
           <div class="cl-panel" data-for="missing_feature" hidden>
             <strong>Tell us what is missing: it goes straight to the team.</strong>
             <p>Write it in the box below. Some things already exist and are easy to miss: connect Kauli to thousands of apps with Zapier or Make, send transcripts to Google Docs, Slack or Notion, and import files from Drive, OneDrive or Dropbox.</p>
-            <div class="cl-actions"><a class="ds-btn small ghost" href="/client/integrations">See integrations</a></div>
+            <div class="cl-actions"><a class="ds-btn small ghost" href="/account/integrations">See integrations</a></div>
           </div>
           <div class="cl-panel" data-for="switching" hidden>
             <strong>Your files are yours: take them with you.</strong>
             <p>Download your transcripts and subtitles first. Which service are you moving to? It helps us see where we fall short.</p>
             <label class="cl-field">Service (optional)<input type="text" name="competitor" maxlength="80" placeholder="For example, Otter, Rev, Descript"></label>
-            <div class="cl-actions"><a class="ds-btn small ghost" href="/client/files">Download my files</a></div>
+            <div class="cl-actions"><a class="ds-btn small ghost" href="/account/files">Download my files</a></div>
           </div>
           <div class="cl-panel" data-for="finished" hidden>
             <strong>Projects finish. You do not have to close anything.</strong>
             <p>A free account costs nothing and keeps all your transcripts here for whenever the next project comes. Your first 30 Instant AI minutes every month are free.
               {% if facts.paid %}Move to Pay as you go and nothing more will be charged.{% endif %}</p>
-            <div class="cl-actions"><a class="ds-btn small" href="/client/home">Keep my account</a>
-              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small ghost" formaction="/client/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>{% endif %}</div>
+            <div class="cl-actions"><a class="ds-btn small" href="/account/home">Keep my account</a>
+              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small ghost" formaction="/account/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>{% endif %}</div>
           </div>
           <div class="cl-panel" data-for="pause" hidden>
             <strong>Take a break without losing anything.</strong>
             <p>We do not have a pause button, but this does the same thing: stop the plan renewing and keep the account on Pay as you go. It costs nothing, your files stay, and your free monthly minutes carry on whenever you come back.</p>
             <div class="cl-actions">
-              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small" formaction="/client/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>
-              {% else %}<a class="ds-btn small" href="/client/home">Keep my account</a>{% endif %}</div>
+              {% if facts.recurring and facts.is_owner %}<button type="submit" class="ds-btn small" formaction="/account/billing/cancel-subscription" formnovalidate>Stop my plan renewing, keep my account</button>
+              {% else %}<a class="ds-btn small" href="/account/home">Keep my account</a>{% endif %}</div>
           </div>
           <div class="cl-panel" data-for="not_using" hidden>
             <strong>You have {{ facts.orders }} order{{ '' if facts.orders == 1 else 's' }} and {{ facts.free_left }} free minutes left this month.</strong>
             <p>A short tour can make Kauli much easier to use, and the sample shows what a finished project looks like.</p>
-            <div class="cl-actions"><a class="ds-btn small" href="/client/resources">Watch the tour</a><a class="ds-btn small ghost" href="/try">Explore a sample</a></div>
+            <div class="cl-actions"><a class="ds-btn small" href="/account/resources">Watch the tour</a><a class="ds-btn small ghost" href="/try">Explore a sample</a></div>
           </div>
         </div>
 
@@ -72,7 +72,7 @@
           <li>You are signed out everywhere, and cannot sign in with this account unless we reopen it.</li>
           <li>{% if facts.paid %}Your <strong>{{ facts.plan_name }}</strong> plan stops renewing straight away and you will not be charged again{% if facts.period_end %}. What you already paid for ran until {{ facts.period_end }}{% endif %}.{% else %}You are on Pay as you go, so there is nothing to cancel and nothing more to pay.{% endif %}</li>
           <li>Your orders and payment records are kept for accounting. To have your files deleted as well, <a href="/settings?tab=security">request deletion in Settings</a>.</li>
-          <li>Want a copy first? <a href="/client/files">Download your files</a> before you close.</li>
+          <li>Want a copy first? <a href="/account/files">Download your files</a> before you close.</li>
           <li>We email you a confirmation with all of this.</li>
           <li><strong>Changed your mind?</strong> Reply to that email and we will reopen your account with everything as it was.</li>
         </ul>
@@ -86,7 +86,7 @@
           <input type="email" name="confirm_text" required autocomplete="off" placeholder="{{ user['email'] }}">
         </label>
         <button type="submit" class="ds-btn cl-close">Close my account</button>
-        <a href="/client/home" class="ds-btn ghost cl-keep">Keep my account</a>
+        <a href="/account/home" class="ds-btn ghost cl-keep">Keep my account</a>
       </section>
     </aside>
   </form>

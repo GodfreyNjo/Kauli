@@ -133,7 +133,7 @@ def send_offer(user, segment: str, base_url: str) -> bool:
         conn.close()
         return False
     conn.close()
-    link = f"{base_url}/client/winback/{code}"
+    link = f"{base_url}/account/winback/{code}"
     try:
         if mailer.email_configured():
             subject, inner, text = _email(user, segment, plan, code, link)
@@ -213,34 +213,34 @@ def _owner(request: Request):
     return user if user and user["role"] == "client" and user["client_scope_id"] == user["id"] else None
 
 
-@router.get("/client/winback/{code}", response_class=HTMLResponse)
+@router.get("/account/winback/{code}", response_class=HTMLResponse)
 def winback_page(request: Request, code: str, error: str | None = None):
     user = A.current_user(request)
     if not user or user["role"] != "client":
-        return RedirectResponse(f"/login?next=/client/winback/{quote(code)}", status_code=303)
+        return RedirectResponse(f"/login?next=/account/winback/{quote(code)}", status_code=303)
     conn = db.get_conn()
     offer = conn.execute("SELECT * FROM winback_offers WHERE id = ? AND user_id = ?", (code.strip().upper(), user["id"])).fetchone()
     conn.close()
     if not offer:
-        return RedirectResponse("/client/billing?error=" + quote("That code is not valid for this account."), status_code=303)
+        return RedirectResponse("/account/billing?error=" + quote("That code is not valid for this account."), status_code=303)
     ended = offer["sent_at"] < time.time() - OFFER_VALID_DAYS * 86400 and not offer["claimed_at"]
     return A.templates.TemplateResponse(request, "winback.html", {
         "user": user, "role": "client", "offer": offer, "ended": ended, "error": error, "days": FREE_MONTH_DAYS, "plan_name": billing.PLANS[offer["plan"]]["name"],
         "until": _date(offer["expires_at"]) if offer["claimed_at"] else "", "open_until": _date(offer["sent_at"] + OFFER_VALID_DAYS * 86400)})
 
 
-@router.post("/client/winback/{code}")
+@router.post("/account/winback/{code}")
 def winback_claim(request: Request, code: str):
     user = _owner(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
     error = claim(user["id"], code)
     if error:
-        return RedirectResponse(f"/client/winback/{quote(code)}?error={quote(error)}", status_code=303)
-    return RedirectResponse(f"/client/winback/{quote(code.strip().upper())}", status_code=303)
+        return RedirectResponse(f"/account/winback/{quote(code)}?error={quote(error)}", status_code=303)
+    return RedirectResponse(f"/account/winback/{quote(code.strip().upper())}", status_code=303)
 
 
-@router.post("/client/redeem")
+@router.post("/account/redeem")
 def redeem(request: Request, code: str = Form("")):
     """The "Have a code?" box on the billing page."""
     user = _owner(request)
@@ -249,8 +249,8 @@ def redeem(request: Request, code: str = Form("")):
     code = code.strip().upper()
     error = claim(user["id"], code)
     if error:
-        return RedirectResponse("/client/billing?error=" + quote(error), status_code=303)
-    return RedirectResponse(f"/client/winback/{quote(code)}", status_code=303)
+        return RedirectResponse("/account/billing?error=" + quote(error), status_code=303)
+    return RedirectResponse(f"/account/winback/{quote(code)}", status_code=303)
 
 
 def _staff(request: Request):

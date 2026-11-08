@@ -493,7 +493,7 @@ def staff_transcribe(request: Request, episode_id: str, source_lang: str = Form(
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
     loc = resp.headers.get("location", "") if isinstance(resp, RedirectResponse) else ""
-    found = re.match(r"^/client/orders/([0-9a-f]+)", loc)
+    found = re.match(r"^/account/orders/([0-9a-f]+)", loc)
     if not found:
         return _back("error", "The order could not be placed. Check the publishing account's plan and minutes.")
     conn = db.get_conn()

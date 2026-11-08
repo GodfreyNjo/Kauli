@@ -252,13 +252,13 @@ def test_product_use_events_carry_kinds_and_counts_never_personal_data(env, wav_
     sent = []
     monkeypatch.setattr(env.app.ga_events, "send_event", lambda client_id, name, params=None: sent.append((name, params or {})))
     order = _finished(env, wav_bytes)
-    env.client.get(f"/client/orders/{order['id']}/export?format=csv")
-    env.client.post(f"/client/orders/{order['id']}/share", json={"action": "create"})
-    env.client.post("/client/notes/new")
-    env.client.post(f"/client/orders/{order['id']}/notes?as=transcript")
-    env.client.post("/client/vocabulary/add", data={"entries": "Secret Name | sekrit"})
-    env.client.post("/client/assistant/message", json={"text": "how do I download?"})
-    env.client.post("/client/calendar/interest", data={"provider": "google_calendar"})
+    env.client.get(f"/account/orders/{order['id']}/export?format=csv")
+    env.client.post(f"/account/orders/{order['id']}/share", json={"action": "create"})
+    env.client.post("/account/notes/new")
+    env.client.post(f"/account/orders/{order['id']}/notes?as=transcript")
+    env.client.post("/account/vocabulary/add", data={"entries": "Secret Name | sekrit"})
+    env.client.post("/account/assistant/message", json={"text": "how do I download?"})
+    env.client.post("/account/calendar/interest", data={"provider": "google_calendar"})
     names = [n for n, _ in sent]
     for expected in ("transcript_download", "transcript_share", "note_created", "vocabulary_added", "assistant_question", "calendar_interest"):
         assert expected in names, (expected, names)
@@ -273,5 +273,5 @@ def test_measuring_can_never_break_the_feature(env, wav_bytes, monkeypatch):
         raise RuntimeError("ga down")
     order = _finished(env, wav_bytes)
     monkeypatch.setattr(env.app.ga_events, "send_event", boom)
-    assert env.client.get(f"/client/orders/{order['id']}/export?format=txt").status_code == 200
-    assert env.client.post("/client/notes/new").status_code == 303
+    assert env.client.get(f"/account/orders/{order['id']}/export?format=txt").status_code == 200
+    assert env.client.post("/account/notes/new").status_code == 303

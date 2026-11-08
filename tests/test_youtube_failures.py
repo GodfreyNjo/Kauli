@@ -28,7 +28,7 @@ def test_the_client_sees_the_plain_message_and_the_real_error_is_logged(env, wav
         raise RuntimeError(RAW_BOT)
     env.monkeypatch.setattr(env.app, "_download_youtube", fail)
     with caplog.at_level("WARNING"):
-        r = env.client.post("/client/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe",
+        r = env.client.post("/account/orders", data={"source_lang": "en", "target_lang": "en", "service_level": "transcribe",
                                                      "review_tier": "ai", "youtube_url": "https://www.youtube.com/watch?v=x5B_I8h-4Oc"})
     assert r.status_code == 200 and "blocking automatic downloads" in r.text and "--cookies" not in r.text
     assert env.db.list_orders_for_client("u1") == []                                      # nothing was created or charged

@@ -71,7 +71,7 @@ def test_staff_can_switch_models_on_the_models_and_review_tabs_and_come_back_to_
     assert "(house choice)" in env.client.get("/staff/models").text                                # transcription still on the house choice
     review = env.client.get(f"/staff/orders/{order['id']}").text
     assert "Models in use" in review and f'name="next" value="/staff/orders/{order["id"]}"' in review
-    for bad in ("https://evil.example.com/x", "//evil.example.com", "/client/home", "/staff/models\nx"):
+    for bad in ("https://evil.example.com/x", "//evil.example.com", "/account/home", "/staff/models\nx"):
         r = env.client.post("/staff/providers/default", data={"kind": "tts", "name": "piper", "next": bad}, follow_redirects=False)
         assert r.headers["location"].startswith("/staff/providers?"), bad                          # never sent anywhere but a staff page
     assert env.client.post("/staff/providers/default", data={"kind": "asr", "name": "nonsense", "next": "/staff/models"}, follow_redirects=False).headers["location"].startswith("/staff/models?error=")
@@ -146,7 +146,7 @@ def test_a_transcript_is_ordered_and_arrives_on_the_episode_through_the_signed_w
     assert hook["url"] == "https://kauli.test/webhooks/podcast-transcripts" and "connected</strong>" in env.client.get("/staff/podcast").text
     monkeypatch.setattr(podcast, "_download", lambda url, dest: dest.write_bytes(wav_bytes) or len(wav_bytes))
     seen = {}
-    monkeypatch.setattr(env.app, "create_order", lambda request, **kw: seen.update(kw, who=request.state.api_user["id"]) or RedirectResponse(f"/client/orders/{order['id']}", status_code=303))
+    monkeypatch.setattr(env.app, "create_order", lambda request, **kw: seen.update(kw, who=request.state.api_user["id"]) or RedirectResponse(f"/account/orders/{order['id']}", status_code=303))
     r = env.client.post(f"/staff/podcast/episodes/{ep['id']}/transcribe", data={"source_lang": "en"}, follow_redirects=False)
     assert "notice=" in r.headers["location"] and seen["who"] == "u1" and seen["idempotency_key"] == f"podcast-{ep['id']}" and seen["review_tier"] == "ai"
     assert podcast.get_episode(ep["id"])["transcript_status"] == "working" and podcast.get_episode(ep["id"])["transcript_order_id"] == order["id"]

@@ -9,13 +9,13 @@
   {% if key == current_plan %}
     <span class="plan-active-pill">&#10003; Your plan</span>
     {% if recurring and is_owner %}
-    <form method="post" action="/client/billing/cancel-subscription" style="margin-top:6px;"
-          onsubmit="return confirm('Stop auto-renewal? You keep this plan until the period you paid for ends.');">
+    <form method="post" action="/account/billing/cancel-subscription" style="margin-top:6px;"
+          data-confirm="Stop auto-renewal? You keep this plan until the period you paid for ends." data-danger>
       <button type="submit" class="secondary">Cancel auto-renewal</button>
     </form>
     {% elif is_owner %}<p class="muted an-note">This plan does not renew by itself. After it ends you move to Pay as you go.</p>{% endif %}
   {% elif is_owner %}
-    <form method="post" action="/client/billing/checkout" class="pl-buy">
+    <form method="post" action="/account/billing/checkout" class="pl-buy">
       <input type="hidden" name="plan" value="{{ key }}">
       <input type="hidden" name="interval" value="month">
       <label>Pay with
@@ -93,7 +93,7 @@
         <small class="muted">{% if outstanding_usd > 0 %}across orders awaiting payment{% else %}nothing owed right now{% endif %}</small></dd></div>
       {% if wallet_credits > 0 %}<div><dt>Credit balance</dt><dd style="color:var(--ok);">{{ "%.0f"|format(wallet_credits) }} <small class="muted">applied automatically to your orders</small></dd></div>{% endif %}
     </dl>
-    {% if outstanding_usd > 0 %}<a href="/client/pending" class="ds-btn small ghost" style="margin-top:12px;">See what is waiting</a>{% endif %}
+    {% if outstanding_usd > 0 %}<a href="/account/pending" class="ds-btn small ghost" style="margin-top:12px;">See what is waiting</a>{% endif %}
   </section>
 </div>
 
@@ -114,7 +114,7 @@
         <li>No lock-in: a subscription is optional</li>
       </ul>
       {% if not plan_is_chosen %}
-        <form method="post" action="/client/billing/choose-free">
+        <form method="post" action="/account/billing/choose-free">
           {% if free_plan_charge %}<input type="hidden" name="order_id" value="{{ free_plan_charge['order_id'] }}">{% endif %}
           <button type="submit">Subscribe to the Free plan{% if free_plan_charge and free_plan_charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(free_plan_charge['amount']) }}{% endif %}</button>
         </form>
@@ -173,7 +173,7 @@
     </article>
   </div>
   <p class="muted an-note">Included minutes are Instant AI transcription and renew every month.{% if meetings_enabled() %} Kauli can also join your meetings and use the same minutes.{% endif %} Need a different arrangement for a team or a newsroom? <a href="mailto:{{ contact_email }}">Email us</a>.</p>
-  {% if is_owner %}<p class="muted an-note pl-close-link">Not for you any more? You can <a href="/client/close-account">close your account</a> at any time.</p>{% endif %}
+  {% if is_owner %}<p class="muted an-note pl-close-link">Not for you any more? You can <a href="/account/close-account">close your account</a> at any time.</p>{% endif %}
 </section>
 
 <div class="card">
@@ -198,14 +198,14 @@
     <div class="ds-card-head"><h2>Your last payment did not go through</h2></div>
     <p>It happens to everyone: an expired card, low funds, a bank hiccup. Your plan stays active while we try again, and nothing has been lost.</p>
     <div class="cl-actions">
-      <a class="ds-btn" href="/client/billing/update-card">Update payment method</a>
-      <form method="post" action="/client/billing/switch-to-payg" onsubmit="return confirm('Move to Pay as you go? Nothing more will be charged and your files stay.');"><button type="submit" class="ds-btn ghost">Switch to Pay as you go</button></form>
+      <a class="ds-btn" href="/account/billing/update-card">Update payment method</a>
+      <form method="post" action="/account/billing/switch-to-payg" data-confirm="Move to Pay as you go? Nothing more will be charged and your files stay."><button type="submit" class="ds-btn ghost">Switch to Pay as you go</button></form>
     </div>
   </section>
   {% endif %}
   <section class="ds-card" id="have-a-code">
     <div class="ds-card-head"><h2>Have a code?</h2></div>
-    <form method="post" action="/client/redeem" class="cl-actions" style="margin-top:0;">
+    <form method="post" action="/account/redeem" class="cl-actions" style="margin-top:0;">
       <input type="text" name="code" placeholder="RETURN-XXXX-XXXX" autocomplete="off" required style="max-width:260px; text-transform:uppercase;">
       <button type="submit" class="ds-btn">Use code</button>
     </form>
@@ -228,7 +228,7 @@
       {% endfor %}
     </tbody>
   </table></div>
-  <div class="ds-pager">{{ pager(pay_page, pay_pages, '/client/billing', {}, 'payments_page', 'payment-history') }}</div>
+  <div class="ds-pager">{{ pager(pay_page, pay_pages, '/account/billing', {}, 'payments_page', 'payment-history') }}</div>
 </details>
 {% else %}
 <div class="ds-card ds-empty">

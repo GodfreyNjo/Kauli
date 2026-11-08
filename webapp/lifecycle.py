@@ -143,7 +143,7 @@ def order_received(order) -> bool:
     when = ("A person reviews every human-reviewed order, so it takes a little longer. The expected delivery time is on your order page, and we email you again the moment it is ready."
             if human else "Instant AI orders usually finish within minutes, and we email you again the moment yours is ready.")
     return _email("orders", client, f"We have your order: {order['original_filename']}", [f"Thanks. We have started work on {order['original_filename']}.", when],
-                  "Follow your order", f"{_base()}/client/orders/{order['id']}", unsubscribe=False)
+                  "Follow your order", f"{_base()}/account/orders/{order['id']}", unsubscribe=False)
 
 
 # ------------------------------------------------------------------------------------------------ 2. how did it go
@@ -255,7 +255,7 @@ def send_rebook(c: dict) -> bool:
     weeks = max(1, round(c["quiet"] / 7))
     return _email("success", u, "Got another recording?", [f"It has been about {weeks} week{'s' if weeks != 1 else ''} since your last project on Kauli, which is around when you usually come back.",
                                                            "If you have a new recording, you can upload it and have the transcript back in minutes. If something got in the way last time, just reply and tell us."],
-                  "Start a new order", f"{_base()}/client", unsubscribe=True)
+                  "Start a new order", f"{_base()}/account", unsubscribe=True)
 
 
 # ------------------------------------------------------------------------------------------------ 4. regulars
@@ -288,7 +288,7 @@ def send_vip(c: dict) -> bool:
     return _email("success", u, "You are one of our regulars", [f"You have had {c['orders']} projects delivered by Kauli in the last few months, and we noticed. Thank you.",
                                                                "From now on your messages to us are read first, and we will tell you about new things before we tell everyone else.",
                                                                "If there is something you wish Kauli did, reply to this email. It comes straight to a person on the team."],
-                  "Open my account", f"{_base()}/client/home", unsubscribe=True)
+                  "Open my account", f"{_base()}/account/home", unsubscribe=True)
 
 
 # ------------------------------------------------------------------------------------------------ the sweep
@@ -372,13 +372,13 @@ def staff_test(request: Request, kind: str = Form("review")):
                     extra_html=f'<p style="margin:0 0 14px;">If something was not right, please tell us first, <a href="{_base()}/help">here</a>, and we will put it right. You are always welcome to leave your review as well.</p>')
     elif kind == "rebook":
         ok = _email("success", me, "Got another recording?", ["It has been about 4 weeks since your last project on Kauli, which is around when you usually come back.",
-                                                              "If you have a new recording, you can upload it and have the transcript back in minutes."], "Start a new order", f"{_base()}/client", unsubscribe=True)
+                                                              "If you have a new recording, you can upload it and have the transcript back in minutes."], "Start a new order", f"{_base()}/account", unsubscribe=True)
     elif kind == "vip":
         ok = _email("success", me, "You are one of our regulars", ["You have had 5 projects delivered by Kauli in the last few months, and we noticed. Thank you.",
-                                                                  "From now on your messages to us are read first, and we will tell you about new things before we tell everyone else."], "Open my account", f"{_base()}/client/home", unsubscribe=True)
+                                                                  "From now on your messages to us are read first, and we will tell you about new things before we tell everyone else."], "Open my account", f"{_base()}/account/home", unsubscribe=True)
     else:
         ok = _email("orders", me, f"We have your order: {sample['filename']}", [f"Thanks. We have started work on {sample['filename']}.", "Instant AI orders usually finish within minutes, and we email you again the moment yours is ready."],
-                    "Follow your order", f"{_base()}/client", unsubscribe=False)
+                    "Follow your order", f"{_base()}/account", unsubscribe=False)
     return _back("notice" if ok else "error", f"A sample was sent to {user['email']}." if ok else "The sample could not be sent. Check that email is set up.")
 
 

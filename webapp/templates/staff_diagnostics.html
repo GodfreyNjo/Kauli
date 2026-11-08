@@ -23,7 +23,7 @@
     <div><dt>When</dt><dd>{{ found.created_at|int|timestamp_to_str }}</dd></div>
     <div><dt>Where in the code</dt><dd><code>{{ found.where_raised }}</code></dd></div>
     <div><dt>Request</dt><dd><code>{{ found.method }} {{ found.path }}</code></dd></div>
-    <div><dt>Account</dt><dd>{% if found.user_id %}<a href="/staff/clients/{{ found.user_id }}">{{ found.user_id[:8] }}</a>{% else %}not signed in{% endif %}</dd></div>
+    <div><dt>Account</dt><dd>{% if found.user_id %}<a href="/staff/customers/{{ found.user_id }}">{{ found.user_id[:8] }}</a>{% else %}not signed in{% endif %}</dd></div>
     <div><dt>Message</dt><dd>{{ found.message }}</dd></div>
   </dl>
   <h3>Stack trace</h3>

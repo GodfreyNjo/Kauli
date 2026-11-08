@@ -147,7 +147,7 @@ def test_the_live_preview_marks_which_captions_to_lift():
 def test_the_order_page_hands_the_ranges_to_the_player(env, wav_bytes):
     order = _finished(env, wav_bytes)
     screen_text.save(order["outdir"], [(0, 2500)])
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     cues = json.loads(page.split('id="order-cues">')[1].split("</script>")[0])
     assert cues and cues[0]["top"] is True and cues[1]["top"] is False
     assert 'classList.toggle("is-top"' in page

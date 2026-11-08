@@ -12,7 +12,7 @@
      free minutes to evaluate us before paying - their choice, your call. They need an account already.</p>
   <form method="post" action="/staff/billing/grant-trial">
     <div class="row">
-      <label>Client email
+      <label>Customer email
         <input type="email" name="client_email" required placeholder="client@example.com">
       </label>
       <label>Extra minutes
@@ -32,7 +32,7 @@
     <p class="muted" style="padding:20px 24px;">Nothing waiting.</p>
   {% else %}
   <table>
-    <thead><tr><th>Client</th><th>Email</th><th>For</th><th>Amount</th><th>Requested</th><th></th></tr></thead>
+    <thead><tr><th>Customer</th><th>Email</th><th>For</th><th>Amount</th><th>Requested</th><th></th></tr></thead>
     <tbody>
       {% for pay in pending_bank_payments %}
       <tr>
@@ -77,7 +77,7 @@
   <p class="muted">Nothing queued right now.</p>
   {% else %}
   <table>
-    <thead><tr><th>Receipt</th><th>Client</th><th>For</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Receipt</th><th>Customer</th><th>For</th><th>Amount</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for r in queued_receipts %}
       <tr>

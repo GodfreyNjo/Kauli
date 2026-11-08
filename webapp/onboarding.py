@@ -178,18 +178,18 @@ def csat_summary(days: int = 90, now: float | None = None) -> dict:
     return {"n": r["n"], "avg": round(r["avg"], 2) if r["avg"] else None, "recent": [dict(x) for x in recent]}
 
 
-@router.post("/client/orders/{order_id}/rate")
+@router.post("/account/orders/{order_id}/rate")
 def rate(request: Request, order_id: str, score: int = Form(0), comment: str = Form("")):
     user = A.current_user(request)
     if not user or user["role"] != "client":
         return RedirectResponse("/login", status_code=303)
     order = db.get_order(order_id)
     if not order or order["client_id"] != user["client_scope_id"]:
-        return RedirectResponse("/client/home", status_code=303)
+        return RedirectResponse("/account/home", status_code=303)
     if 1 <= score <= 5 and csat_due(order["client_id"], order_id):
         conn = db.get_conn()
         conn.execute("INSERT INTO csat_responses (id, user_id, order_id, score, comment, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                      (uuid.uuid4().hex, user["id"], order_id, score, comment.strip()[:300], time.time()))
         conn.commit()
         conn.close()
-    return RedirectResponse(f"/client/orders/{order_id}?notice=Thank+you%2C+that+helps+us+a+lot.", status_code=303)
+    return RedirectResponse(f"/account/orders/{order_id}?notice=Thank+you%2C+that+helps+us+a+lot.", status_code=303)

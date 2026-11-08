@@ -46,9 +46,9 @@ def test_the_page_hands_the_scripts_the_readers_language(env, monkeypatch):
     monkeypatch.setattr(page_translate, "translate_many", _fake_translate)
     monkeypatch.setattr(page_translate, "configured", lambda: True)
     monkeypatch.setattr(page_translate, "localize_html", lambda html, lang: (html, True))        # the page itself is not under test
-    page = env.client.get("/client/home", cookies={"kauli_lang": "hi"}).text
+    page = env.client.get("/account/home", cookies={"kauli_lang": "hi"}).text
     assert "window.KAULI_I18N" in page and "[hi] Checking your audio" in page and "window.kauliT = function" in page
-    english = env.client.get("/client/home", cookies={"kauli_lang": "en"}).text
+    english = env.client.get("/account/home", cookies={"kauli_lang": "en"}).text
     assert "[hi]" not in english and "window.KAULI_I18N = {}" in english
 
 

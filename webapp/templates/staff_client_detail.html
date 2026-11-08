@@ -3,7 +3,7 @@
 {% block title %}{{ client['display_name'] or client['email'] }}{% endblock %}
 {% block content %}
 {% set name = client['display_name'] or client['email'] %}
-<p class="cl-crumbs"><a href="/staff/clients">&larr; Clients</a> / {{ name }}</p>
+<p class="cl-crumbs"><a href="/staff/customers">&larr; Clients</a> / {{ name }}</p>
 <header class="cl-hero">
   <span class="cl-avatar" aria-hidden="true">{{ name[0]|upper }}</span>
   <div class="cl-hero-main">
@@ -19,23 +19,23 @@
 
 <nav class="cl-tabs" aria-label="Client sections">
   {% for key, label in [('overview', 'Overview'), ('orders', 'Orders'), ('team', 'Team'), ('billing', 'Billing'), ('settings', 'Settings')] %}
-  <a href="/staff/clients/{{ client['id'] }}?tab={{ key }}" class="{{ 'is-on' if tab == key else '' }}" {{ 'aria-current=page' if tab == key else '' }}>{{ label }}</a>
+  <a href="/staff/customers/{{ client['id'] }}?tab={{ key }}" class="{{ 'is-on' if tab == key else '' }}" {{ 'aria-current=page' if tab == key else '' }}>{{ label }}</a>
   {% endfor %}
 </nav>
 
 <div class="cl-body">
 {% if tab == 'overview' %}
     <div class="cl-cards">
-      <a class="cl-stat tone-green" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('check') }}</span><span><strong>{{ stats['completed'] }}</strong><small>Completed orders</small></span></a>
-      <a class="cl-stat tone-amber" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('spinner') }}</span><span><strong>{{ stats['in_progress'] }}</strong><small>In progress</small></span></a>
-      <a class="cl-stat tone-blue" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('eye') }}</span><span><strong>{{ stats['in_review'] }}</strong><small>In review</small></span></a>
-      <a class="cl-stat tone-red" href="/staff/clients/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('alert') }}</span><span><strong>{{ stats['needs_you'] }}</strong><small>Needs action</small></span></a>
-      <a class="cl-stat tone-violet" href="/staff/clients/{{ client['id'] }}?tab=billing"><span class="rp-ic">{{ icon_svg('card') }}</span><span><strong>${{ "%.0f"|format(stats['total_spent_usd']) }}</strong><small>Total spent</small></span></a>
+      <a class="cl-stat tone-green" href="/staff/customers/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('check') }}</span><span><strong>{{ stats['completed'] }}</strong><small>Completed orders</small></span></a>
+      <a class="cl-stat tone-amber" href="/staff/customers/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('spinner') }}</span><span><strong>{{ stats['in_progress'] }}</strong><small>In progress</small></span></a>
+      <a class="cl-stat tone-blue" href="/staff/customers/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('eye') }}</span><span><strong>{{ stats['in_review'] }}</strong><small>In review</small></span></a>
+      <a class="cl-stat tone-red" href="/staff/customers/{{ client['id'] }}?tab=orders"><span class="rp-ic">{{ icon_svg('alert') }}</span><span><strong>{{ stats['needs_you'] }}</strong><small>Needs action</small></span></a>
+      <a class="cl-stat tone-violet" href="/staff/customers/{{ client['id'] }}?tab=billing"><span class="rp-ic">{{ icon_svg('card') }}</span><span><strong>${{ "%.0f"|format(stats['total_spent_usd']) }}</strong><small>Total spent</small></span></a>
     </div>
     <div class="cl-two">
       <section class="crm-card">
-        <header><h2>Account</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=settings">Edit</a></header>
-        <form method="post" action="/staff/clients/{{ client['id'] }}/internal" style="margin:0 0 12px;">
+        <header><h2>Account</h2><a class="rp-link" href="/staff/customers/{{ client['id'] }}?tab=settings">Edit</a></header>
+        <form method="post" action="/staff/customers/{{ client['id'] }}/internal" style="margin:0 0 12px;">
           <label style="display:flex; gap:8px; align-items:center; font-size:0.88rem;">
             <input type="checkbox" name="internal" value="1" {{ 'checked' if client['is_internal'] else '' }} onchange="this.form.submit()" style="width:auto; margin:0;">
             Internal or test account <span class="muted">(left out of Site analytics, churn and revenue)</span>
@@ -53,7 +53,7 @@
         </ul>
       </section>
       <section class="crm-card">
-        <header><h2>Activity</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=orders">View all</a></header>
+        <header><h2>Activity</h2><a class="rp-link" href="/staff/customers/{{ client['id'] }}?tab=orders">View all</a></header>
         <ol class="cl-activity">
           {% if orders %}<li><i class="tone-violet"></i><span><b>Placed an order</b><small>{{ orders[0]['created_at']|int|timestamp_to_str }}</small></span></li>{% endif %}
           <li><i class="tone-blue"></i><span><b>Last seen</b><small>{{ client['last_seen_at']|time_ago }}</small></span></li>
@@ -62,7 +62,7 @@
       </section>
     </div>
     <section class="crm-card cl-recent">
-      <header><h2>Recent orders</h2><a class="rp-link" href="/staff/clients/{{ client['id'] }}?tab=orders">View all</a></header>
+      <header><h2>Recent orders</h2><a class="rp-link" href="/staff/customers/{{ client['id'] }}?tab=orders">View all</a></header>
       {% if orders %}
       <table class="rp-table"><thead><tr><th>File</th><th>Route</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>
         {% for o in orders[:5] %}<tr><td class="ellipsis-cell" style="max-width:280px;">{{ o['original_filename'] }}</td><td class="muted">{{ o['source_lang'] }} &rarr; {{ o['target_lang'] }}</td>
@@ -153,7 +153,7 @@
       <p class="muted" style="font-size:0.82rem; margin-top:0;">Which per-minute rates this account pays. Set automatically
         at signup from the visitor's country; clients can't change it themselves. "Existing account pricing" keeps the
         original human-reviewed rates.</p>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/market" class="row" style="align-items:flex-end;">
+      <form method="post" action="/staff/customers/{{ client['id'] }}/market" class="row" style="align-items:flex-end;">
         <label>Market
           <select name="market">
             {% for mkey, mlabel in markets.items() %}
@@ -168,7 +168,7 @@
     <div class="card">
       <h2 style="margin-top:0;">Internal notes</h2>
       <p class="muted" style="font-size:0.82rem; margin-top:0;">Never shown to the client - just for you.</p>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/notes">
+      <form method="post" action="/staff/customers/{{ client['id'] }}/notes">
         <textarea name="notes" rows="4" placeholder="Preferences, context, anything worth remembering&hellip;">{{ client['staff_notes'] or '' }}</textarea>
         <button type="submit" class="secondary" style="margin-top:10px;">Save notes</button>
       </form>
@@ -198,7 +198,7 @@
       <p class="muted" style="font-size:0.82rem;">Last resort only - after you've actually tried to get them
          onboarded and it hasn't worked out. Refunds the charge to their card and claws back whatever's left
          of the matching wallet credit (not what they've already spent).</p>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/refund-trial-verification">
+      <form method="post" action="/staff/customers/{{ client['id'] }}/refund-trial-verification">
         <button type="submit" class="secondary"
                 onclick="return confirm('Refund the $1 trial-verification charge to their card? This should only be used as a last resort.');">
           Refund trial verification
@@ -212,13 +212,13 @@
       <h2 style="margin-top:0; color:var(--err);">Account status</h2>
       {% if client['account_status'] == 'closed' %}
       <p class="muted" style="font-size:0.85rem;">This account is closed - they can't sign in. Order history is untouched.</p>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/reopen">
+      <form method="post" action="/staff/customers/{{ client['id'] }}/reopen">
         <button type="submit" class="secondary">Reopen account</button>
       </form>
       {% else %}
       <p class="muted" style="font-size:0.85rem;">Closing blocks sign-in without touching order/payment history -
          the same effect as the client closing it themselves.</p>
-      <form method="post" action="/staff/clients/{{ client['id'] }}/close">
+      <form method="post" action="/staff/customers/{{ client['id'] }}/close">
         <button type="submit" class="secondary" style="border-color:var(--err); color:var(--err);"
                 onclick="return confirm('Close this client\'s account? They won\'t be able to sign in until reopened.');">
           Close account

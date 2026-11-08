@@ -225,7 +225,7 @@ def test_nothing_is_sent_before_a_plan_is_chosen(notion):
     conn.commit()
     _fire(notion, order)
     assert notion.fake.created() == []
-    r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
+    r = notion.client.post(f"/account/orders/{order['id']}/send-to-notion")
     assert "Unlock+this+order" in r.headers["location"] and notion.fake.created() == []
 
 
@@ -234,12 +234,12 @@ def test_auto_send_off_means_manual_only(notion):
     order = _ready(notion)
     _fire(notion, order)
     assert notion.fake.created() == []
-    page = notion.client.get(f"/client/orders/{order['id']}").text
+    page = notion.client.get(f"/account/orders/{order['id']}").text
     assert "Send to Notion" in page and "Open in Notion" not in page
-    r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
+    r = notion.client.post(f"/account/orders/{order['id']}/send-to-notion")
     assert r.status_code == 303 and "notice=Sent+to+Notion" in r.headers["location"]
     assert len(notion.fake.created()) == 1
-    page = notion.client.get(f"/client/orders/{order['id']}").text
+    page = notion.client.get(f"/account/orders/{order['id']}").text
     assert "Open in Notion" in page and 'href="https://notion.so/page-1"' in page
 
 
@@ -260,10 +260,10 @@ def test_a_notion_failure_is_reported_logged_and_can_be_retried(notion):
     _fire(notion, order)                                              # must not raise
     assert notion.db.get_notion_export(order["id"]) is None            # the claim was released
     assert not notion.db.list_webhook_deliveries("u1", limit=3)[0]["ok"]
-    r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
+    r = notion.client.post(f"/account/orders/{order['id']}/send-to-notion")
     assert "error=" in r.headers["location"]
     notion.fake.fail_create = False
-    r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
+    r = notion.client.post(f"/account/orders/{order['id']}/send-to-notion")
     assert "notice=Sent+to+Notion" in r.headers["location"]
 
 
@@ -271,13 +271,13 @@ def test_an_unreadable_saved_token_asks_to_reconnect(notion, monkeypatch):
     _connect(notion)
     order = _ready(notion)
     monkeypatch.setattr(notion.app, "_session_secret", "a-different-secret")
-    r = notion.client.post(f"/client/orders/{order['id']}/send-to-notion")
+    r = notion.client.post(f"/account/orders/{order['id']}/send-to-notion")
     assert "Reconnect+Notion" in r.headers["location"] and notion.fake.created() == []
 
 
 def test_unknown_orders_are_not_found(notion):
     _connect(notion)
-    assert notion.client.post("/client/orders/doesnotexist/send-to-notion").status_code == 404
+    assert notion.client.post("/account/orders/doesnotexist/send-to-notion").status_code == 404
 
 
 def test_a_stuck_claim_can_be_retaken_but_a_fresh_one_cannot(notion):

@@ -35,7 +35,7 @@
     if (subject.length < 3 || body.length < 20) { setMsg('Write a subject and a message first.', true); return; }
     btn.disabled = true; btn.textContent = 'Sending...'; setMsg('');
     var fd = new FormData(); fd.append('subject', subject); fd.append('body', body);
-    fetch('/staff/clients/' + encodeURIComponent(current) + '/followup', { method: 'POST', body: fd, credentials: 'same-origin' })
+    fetch('/staff/customers/' + encodeURIComponent(current) + '/followup', { method: 'POST', body: fd, credentials: 'same-origin' })
       .then(function (r) { return r.json().catch(function () { return { ok: false, error: 'Unexpected reply (' + r.status + ').' }; }); })
       .then(function (res) {
         if (res.ok) {

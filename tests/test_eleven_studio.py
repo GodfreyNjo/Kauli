@@ -222,11 +222,11 @@ def test_clean_up_is_refused_without_a_key_or_a_safe_margin_or_spare_credits(stu
 
 
 def test_the_wizard_offers_clean_up_only_when_it_can_be_sold(studio, monkeypatch):
-    html = studio.client.get("/client").text
+    html = studio.client.get("/account").text
     assert 'id="audio-cleanup-checkbox"' in html and 'data-audio-cleanup-rate="0.3"' in html and 'data-audio-cleanup-rate-ai="0.18"' in html and "ElevenLabs" not in html
     assert 'id="price-audio-cleanup-row"' in html
     monkeypatch.delenv("ELEVENLABS_API_KEY")
-    assert 'id="audio-cleanup-checkbox"' not in studio.client.get("/client").text
+    assert 'id="audio-cleanup-checkbox"' not in studio.client.get("/account").text
 
 
 # ------------------------------------------------------------- the worker and the refunds

@@ -15,7 +15,7 @@
     <a href="/settings?tab=integrations" class="{{ 'active' if tab == 'integrations' }}">API &amp; integrations</a>
     {% endif %}
     <a href="/settings?tab=team" class="{{ 'active' if tab == 'team' }}">Team</a>
-    <a href="/client/billing">Billing</a>
+    <a href="/account/billing">Billing</a>
     {% endif %}
     <a href="/settings?tab=security" class="{{ 'active' if tab == 'security' }}">Security</a>
   </nav>
@@ -173,13 +173,13 @@
       {% endif %}
       <form method="post" action="/settings/api-key/generate" style="display:inline;">
         <button type="submit" class="secondary"
-                {% if api_key_row %}onclick="return confirm('Generate a new key? The current one stops working immediately.');"{% endif %}>
+                {% if api_key_row %}data-confirm="Generate a new key? The current one stops working immediately." data-danger{% endif %}>
           {{ 'Regenerate' if api_key_row else 'Generate API key' }}
         </button>
       </form>
       {% if api_key_row %}
       <form method="post" action="/settings/api-key/revoke" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Revoke your API key? Anything using it will stop working.');">Revoke</button>
+        <button type="submit" class="row-action-chip" data-confirm="Revoke your API key? Anything using it will stop working." data-danger>Revoke</button>
       </form>
       {% endif %}
       <p class="muted" style="font-size:0.78rem; margin-top:12px;">
@@ -216,7 +216,7 @@
         <button type="submit" class="secondary">Send a test message</button>
       </form>
       <form method="post" action="/settings/slack/delete" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Slack?');">Disconnect</button>
+        <button type="submit" class="row-action-chip" data-confirm="Disconnect Slack?" data-danger>Disconnect</button>
       </form>
       {% endif %}
 
@@ -248,7 +248,7 @@
         <button type="submit" class="secondary">Send a test message</button>
       </form>
       <form method="post" action="/settings/teams/delete" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Teams?');">Disconnect</button>
+        <button type="submit" class="row-action-chip" data-confirm="Disconnect Teams?" data-danger>Disconnect</button>
       </form>
       {% endif %}
 
@@ -282,7 +282,7 @@
       </form>
       {% if notion_row %}
       <form method="post" action="/settings/notion/delete" style="display:inline;">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect Notion?');">Disconnect</button>
+        <button type="submit" class="row-action-chip" data-confirm="Disconnect Notion?" data-danger>Disconnect</button>
       </form>
       {% endif %}
 
@@ -304,10 +304,10 @@
       <code style="display:block; padding:10px 12px; background:var(--hover); border-radius:8px;
                    font-size:0.82rem; word-break:break-all; margin-bottom:10px;">{{ webhook_row['secret'] }}</code>
       <form method="post" action="/settings/webhook/regenerate-secret" style="display:inline;">
-        <button type="submit" class="secondary" onclick="return confirm('Regenerate the signing secret? Update your verification code with the new one first.');">Regenerate secret</button>
+        <button type="submit" class="secondary" data-confirm="Regenerate the signing secret? Update your verification code with the new one first." data-danger>Regenerate secret</button>
       </form>
       <form method="post" action="/settings/webhook/delete" style="display:inline; margin-left:8px;">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Remove your webhook?');">Remove</button>
+        <button type="submit" class="row-action-chip" data-confirm="Remove your webhook?" data-danger>Remove</button>
       </form>
 
       {% if webhook_deliveries %}
@@ -343,11 +343,11 @@
       {% if youtube_connection %}
       <p style="font-size:0.85rem;">Connected as <strong>{{ youtube_connection['channel_title'] or 'your channel' }}</strong>
          &middot; since {{ youtube_connection['connected_at']|int|timestamp_to_str }}</p>
-      <form method="post" action="/client/youtube/disconnect">
-        <button type="submit" class="row-action-chip" onclick="return confirm('Disconnect your YouTube channel? You can reconnect any time.');">Disconnect</button>
+      <form method="post" action="/account/youtube/disconnect">
+        <button type="submit" class="row-action-chip" data-confirm="Disconnect your YouTube channel? You can reconnect any time." data-danger>Disconnect</button>
       </form>
       {% else %}
-      <a class="btn secondary" href="/client/youtube/connect?next={{ '/settings?tab=integrations'|urlencode }}">Connect your YouTube channel</a>
+      <a class="btn secondary" href="/account/youtube/connect?next={{ '/settings?tab=integrations'|urlencode }}">Connect your YouTube channel</a>
       {% endif %}
     </div>
   {% endif %}
@@ -378,7 +378,7 @@
                 <form method="post" action="/settings/team/remove" style="margin:0;">
                   <input type="hidden" name="member_id" value="{{ m['id'] }}">
                   <button type="submit" class="row-action-btn" title="Remove"
-                          onclick="return confirm('Remove this person from your team?');">&times;</button>
+                          data-confirm="Remove this person from your team?" data-danger>&times;</button>
                 </form>
               </td>
             </tr>
@@ -402,18 +402,26 @@
       <h2 style="margin-top:0;">Password</h2>
       {% if password_saved %}<p class="ok">✓ Password updated</p>{% endif %}
       {% if password_error %}<p class="error">{{ password_error }}</p>{% endif %}
-      <form method="post" action="/settings/change-password">
+      <form method="post" action="/settings/change-password" data-validate>
         <label>Current password
           <input type="password" name="current_password" required autocomplete="current-password">
         </label>
         <label>New password
-          <input type="password" name="new_password" required autocomplete="new-password">
+          <input type="password" name="new_password" required minlength="12" autocomplete="new-password"
+               pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{12,}"
+               title="Use at least 12 characters, with a lowercase letter, an uppercase letter, a number and a symbol">
         </label>
         <label>Confirm new password
           <input type="password" name="confirm_password" required autocomplete="new-password">
         </label>
         <button type="submit" class="secondary">Update password</button>
       </form>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Where you are signed in</h2>
+      <p class="muted">See the devices signed in to your account, and sign out any you do not recognise.</p>
+      <a href="/settings/sessions" class="btn secondary">Manage devices</a>
     </div>
 
     <div class="card">
@@ -496,7 +504,7 @@
            person reviews every request (order/payment records sometimes need to stick around a little
            longer for accounting reasons). See our <a href="/privacy">privacy policy</a> for what we keep.</p>
         <form method="post" action="/settings/request-deletion">
-          <button type="submit" class="secondary">Request my data be deleted</button>
+          <button type="submit" class="secondary" data-confirm="Request deletion of your data? A person will review it and email you." data-danger data-loading="Sending...">Request my data be deleted</button>
         </form>
       {% endif %}
     </div>
@@ -507,7 +515,7 @@
       <p class="muted" style="font-size:0.85rem;">You won't be able to sign in afterward. Your order history
          stays as it is unless you separately request deletion above - closing your account isn't the same
          as deleting your data.</p>
-      <a class="btn secondary" href="/client/close-account" style="border-color:var(--err); color:var(--err);">Close my account</a>
+      <a class="btn secondary" href="/account/close-account" style="border-color:var(--err); color:var(--err);">Close my account</a>
     </div>
     {% endif %}
   {% endif %}

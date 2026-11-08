@@ -245,10 +245,10 @@
       var a = document.createElement("a"); a.href = uploads.url; a.textContent = "Open it"; text.appendChild(a);
     } else if (uploads.error) {
       text.appendChild(document.createTextNode(uploads.error + " "));
-      var a2 = document.createElement("a"); a2.href = "/client"; a2.textContent = "Go back to it"; text.appendChild(a2);
+      var a2 = document.createElement("a"); a2.href = "/account"; a2.textContent = "Go back to it"; text.appendChild(a2);
     } else {
       text.appendChild(document.createTextNode(uploads.label || "Uploading"));
-      var back = document.createElement("a"); back.href = "/client"; back.textContent = "See it"; text.appendChild(document.createTextNode(" · ")); text.appendChild(back);
+      var back = document.createElement("a"); back.href = "/account"; back.textContent = "See it"; text.appendChild(document.createTextNode(" · ")); text.appendChild(back);
     }
     t.appendChild(ring); t.appendChild(text);
     if (!uploads.active) {

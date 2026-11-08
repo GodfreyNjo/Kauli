@@ -1,4 +1,4 @@
-{#- Numbered pages: 1 2 3 ... N, with previous and next. pager(page, pages, "/client/home", {"q": q}) keeps the other query parameters. -#}
+{#- Numbered pages: 1 2 3 ... N, with previous and next. pager(page, pages, "/account/home", {"q": q}) keeps the other query parameters. -#}
 {% macro pager(page, pages, base, params={}, key='page', anchor='') -%}
 {% if pages > 1 %}
 {% set extra = [] %}

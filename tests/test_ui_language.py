@@ -68,42 +68,42 @@ def test_the_sign_in_page_is_english_by_default_and_arabic_flips_direction(env):
 def test_the_dashboard_follows_the_language_on_the_account(env, wav_bytes):
     env.order_from(env.place(wav_bytes, review_tier="human"))
     env.db.set_ui_lang("u1", "es")
-    home = env.client.get("/client/home").text
+    home = env.client.get("/account/home").text
     assert '<html lang="es"' in home and "Subir archivos" in home and "Mis pedidos" in home and "Pendientes" in home
     assert "Pendiente de pago" in home and "Upload files" not in home and "Recent files" not in home
-    pending = env.client.get("/client/pending").text
+    pending = env.client.get("/account/pending").text
     assert "Pedidos pendientes" in pending and "Pagar ahora" in pending
-    pay = env.client.get(f"/client/orders/{env.db.list_orders_for_client('u1')[0]['id']}/pay").text
+    pay = env.client.get(f"/account/orders/{env.db.list_orders_for_client('u1')[0]['id']}/pay").text
     assert "Resumen del pedido" in pay and "Total a pagar" in pay and "Pagar $" in pay and "Order summary" not in pay
 
 
 def test_chinese_dates_numbers_and_arabic_layout_on_the_dashboard(env, wav_bytes):
     env.order_from(env.place(wav_bytes))
     env.db.set_ui_lang("u1", "zh")
-    home = env.client.get("/client/home").text
+    home = env.client.get("/account/home").text
     assert '<html lang="zh-Hans"' in home and "上传文件" in home and re.search(r"\d+月\d+日 \d\d:\d\d", home)
     env.db.set_ui_lang("u1", "ar")
-    assert '<html lang="ar" dir="rtl"' in env.client.get("/client/home").text
+    assert '<html lang="ar" dir="rtl"' in env.client.get("/account/home").text
 
 
 def test_the_switcher_saves_the_choice_for_every_device_and_cannot_be_abused(env):
-    r = env.client.get("/lang/de?next=/client/home", follow_redirects=False)
-    assert r.status_code == 303 and r.headers["location"] == "/client/home" and "kauli_lang=de" in r.headers["set-cookie"]
+    r = env.client.get("/lang/de?next=/account/home", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/account/home" and "kauli_lang=de" in r.headers["set-cookie"]
     assert env.db.get_user("u1")["ui_lang"] == "de"
-    assert "Übersicht" in env.client.get("/client/home").text
+    assert "Übersicht" in env.client.get("/account/home").text
     assert env.client.get("/lang/xx", follow_redirects=False).status_code == 404
     assert env.client.get("/lang/fr?next=https://evil.example/", follow_redirects=False).headers["location"] == "/"
     assert env.client.get("/lang/fr?next=//evil.example", follow_redirects=False).headers["location"] == "/"
     assert env.client.get("/lang/fr", follow_redirects=False).headers["x-robots-tag"] == "noindex, nofollow"
     env.client.get("/lang/en")
-    assert ">Home<" in env.client.get("/client/home").text
+    assert ">Home<" in env.client.get("/account/home").text
 
 
 def test_the_account_menu_lists_every_language(env):
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     for name in ui_text.NATIVE.values():
         assert name in page
-    assert "/lang/ko?next=/client/home" in page
+    assert "/lang/ko?next=/account/home" in page
 
 
 def test_staff_screens_stay_in_english_whatever_the_cookie_says(env):
@@ -120,13 +120,13 @@ def test_the_live_progress_panel_speaks_the_clients_language(env, wav_bytes):
     conn.execute("UPDATE orders SET status = 'processing' WHERE id = ?", (order["id"],))
     conn.commit()
     conn.close()
-    en = env.client.get(f"/client/orders/{order['id']}/progress").json()
+    en = env.client.get(f"/account/orders/{order['id']}/progress").json()
     assert en["title"] == "Your transcript is being made" and en["steps"][0]["label"] == "Preparing your file"
     env.db.set_ui_lang("u1", "fr")
-    fr = env.client.get(f"/client/orders/{order['id']}/progress").json()
+    fr = env.client.get(f"/account/orders/{order['id']}/progress").json()
     assert fr["title"] == "Nous préparons votre transcription" and fr["steps"][0]["label"] == "Préparation de votre fichier"
     assert fr["what"] == "transcript"                                          # the stable key is unchanged
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert "Nous préparons votre transcription" in page and "Vous pouvez fermer cette page" in page
 
 
@@ -136,8 +136,8 @@ def test_signing_in_keeps_the_language_from_the_translated_site(env):
     session = SimpleNamespace(user=SimpleNamespace(id="u1", email="client@example.com"))
     request = SimpleNamespace(cookies={"kauli_lang": "pt"}, session={}, headers={}, client=None,
                               base_url="http://t/", state=SimpleNamespace())
-    resp = env.app._complete_auth_session(request, session, "/client/home")
+    resp = env.app._complete_auth_session(request, session, "/account/home")
     assert env.db.get_user("u1")["ui_lang"] == "pt" and "kauli_lang=pt" in resp.headers["set-cookie"]
     request.cookies = {}
-    env.app._complete_auth_session(request, session, "/client/home")
+    env.app._complete_auth_session(request, session, "/account/home")
     assert env.db.get_user("u1")["ui_lang"] == "pt"                            # a new device with no cookie keeps the account's language

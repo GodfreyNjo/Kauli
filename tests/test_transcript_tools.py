@@ -12,7 +12,7 @@ from test_media_preview import _finished  # noqa: E402
 
 def _export(env, order, **params):
     q = "&".join(f"{k}={v}" for k, v in params.items())
-    return env.client.get(f"/client/orders/{order['id']}/export?{q}")
+    return env.client.get(f"/account/orders/{order['id']}/export?{q}")
 
 
 # ------------------------------------------------------------------------------------------------ download
@@ -50,7 +50,7 @@ def test_a_translated_order_can_download_either_side(env, wav_bytes):
     conn.commit()
     conn.close()
     order = env.db.get_order(order["id"])
-    assert env.client.post(f"/client/orders/{order['id']}/transcript", json={"edits": [{"segment_id": "s1", "target": "Hola a todos"}]}).status_code == 200
+    assert env.client.post(f"/account/orders/{order['id']}/transcript", json={"edits": [{"segment_id": "s1", "target": "Hola a todos"}]}).status_code == 200
     source = _export(env, order, format="txt", side="source").text
     target = _export(env, order, format="txt", side="target").text
     assert "Hello there" in source and "Hola a todos" not in source
@@ -77,7 +77,7 @@ def test_bad_formats_and_foreign_orders_are_refused(env, wav_bytes):
 
 def test_a_script_the_pdf_cannot_draw_says_so_instead_of_failing(env, wav_bytes):
     order = _finished(env, wav_bytes)
-    r = env.client.post(f"/client/orders/{order['id']}/transcript", json={"edits": [{"segment_id": "s1", "source": "你好世界"}]})
+    r = env.client.post(f"/account/orders/{order['id']}/transcript", json={"edits": [{"segment_id": "s1", "source": "你好世界"}]})
     assert r.status_code == 200
     pdf = _export(env, order, format="pdf")
     assert pdf.status_code == 400 and "Word" in pdf.json()["error"]
@@ -86,7 +86,7 @@ def test_a_script_the_pdf_cannot_draw_says_so_instead_of_failing(env, wav_bytes)
 
 # ------------------------------------------------------------------------------------------------ share
 def _share(env, order, **body):
-    return env.client.post(f"/client/orders/{order['id']}/share", json=body or {"action": "create"})
+    return env.client.post(f"/account/orders/{order['id']}/share", json=body or {"action": "create"})
 
 
 def test_a_share_link_shows_the_transcript_read_only_and_can_be_switched_off(env, wav_bytes):
@@ -142,7 +142,7 @@ def test_share_pages_stay_out_of_search(env):
 # ------------------------------------------------------------------------------------------------ the page
 def test_the_order_page_has_the_toolbar_and_hooks_for_it(env, wav_bytes):
     order = _finished(env, wav_bytes)
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     for needle in ('id="tx-tools"', 'id="tx-share-dialog"', 'id="tx-download-dialog"', 'id="tx-find-panel"', 'id="tx-keys-dialog"',
                    "/static/transcript_tools.js", 'class="tx-time"', 'id="tx-hide-speaker"', 'id="tx-hide-time"', 'id="tx-undo"'):
         assert needle in page, needle
@@ -157,5 +157,5 @@ def test_a_human_reviewed_order_still_gets_download_and_share_but_not_the_edit_t
     conn.execute("UPDATE orders SET review_tier = 'human' WHERE id = ?", (order["id"],))
     conn.commit()
     conn.close()
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="tx-tools"' in page and 'id="tx-undo"' not in page and 'id="tx-replace-all"' not in page

@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block theme %}dark{% endblock %}
-{% block title %}Clients{% endblock %}
+{% block title %}Customers{% endblock %}
 {% block content %}
 {% set tones = ['#7c5cff', '#2f6fe0', '#1fa55a', '#f0782a', '#e0489a', '#14a3b8', '#d99a14'] %}
 <header class="rp-head">
-  <div><h1>Clients</h1><p>Manage all your clients in one place. Every real account, not a prospect: people who have not signed up yet are in the <a href="/staff/leads">CRM</a>.</p></div>
+  <div><h1>Customers</h1><p>Manage all your customers in one place. Every real account, not a prospect: people who have not signed up yet are in the <a href="/staff/leads">CRM</a>.</p></div>
   <div class="rp-head-actions"><button type="button" class="rp-btn primary" id="fa-open" aria-controls="fa-panel" aria-expanded="false">Analyse sign-ups</button></div>
 </header>
 <div id="fa-panel" hidden aria-live="polite"></div>
-<script src="/static/funnel_analysis.js?v=1" defer></script>
+<script src="/static/funnel_analysis.js?v=2" defer></script>
 
 <div class="cl-bar">
-  <form method="get" action="/staff/clients" class="cl-search" role="search">
-    <input type="search" name="q" value="{{ q }}" placeholder="Search by name or email..." aria-label="Search clients by name or email">
+  <form method="get" action="/staff/customers" class="cl-search" role="search">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search by name or email..." aria-label="Search customers by name or email">
   </form>
   <div class="cl-pills" id="cl-pills" role="group" aria-label="Show">
     <button type="button" class="is-on" data-show="all">All</button>
@@ -28,14 +28,14 @@
 
 <div class="crm-card cl-card">
   <table class="cl-table" id="cl-table">
-    <thead><tr><th>Client</th><th>Plan</th><th class="num">Orders</th><th class="num">Spent</th><th>Joined</th><th>Last seen</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Customer</th><th>Plan</th><th class="num">Orders</th><th class="num">Spent</th><th>Joined</th><th>Last seen</th><th>Status</th><th></th></tr></thead>
     <tbody>
       {% for c in clients %}
       {% set active = c['account_status'] != 'closed' and c['last_seen_at'] and (now_ts - c['last_seen_at']) < 30 * 86400 %}
-      <tr data-active="{{ '1' if active else '0' }}" data-plan="{{ c['plan'] }}" data-internal="{{ '1' if c['is_internal'] else '0' }}" data-href="/staff/clients/{{ c['id'] }}" tabindex="0" role="link">
+      <tr data-active="{{ '1' if active else '0' }}" data-plan="{{ c['plan'] }}" data-internal="{{ '1' if c['is_internal'] else '0' }}" data-href="/staff/customers/{{ c['id'] }}" tabindex="0" role="link">
         <td>
           <span class="cl-who"><i style="background: {{ tones[loop.index0 % 7] }}" aria-hidden="true">{{ ((c['display_name'] or c['email'] or '?')[0])|upper }}</i>
-            <span><a href="/staff/clients/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
+            <span><a href="/staff/customers/{{ c['id'] }}">{{ c['display_name'] or c['email'] }}</a>
               {% if c['signup_ip_is_datacenter'] %}<span class="status status-pending_payment" style="font-size:0.66rem;" title="Signed up from a known cloud/hosting IP ({{ c['signup_ip'] }}): worth a look, not proof of anything on its own.">Datacenter IP</span>{% endif %}
               {% if c['is_internal'] %}<span class="cl-tag">Internal</span>{% endif %}
               <small>{{ c['email'] }}</small></span></span>
@@ -46,10 +46,10 @@
         <td class="muted">{{ c['created_at']|int|timestamp_to_str if c['created_at'] else '-' }}</td>
         <td class="muted">{{ c['last_seen_at']|time_ago }}</td>
         <td>{% if c['account_status'] == 'closed' %}<span class="cl-status closed">Closed</span>{% elif active %}<span class="cl-status on">Active</span>{% else %}<span class="cl-status off">Inactive</span>{% endif %}</td>
-        <td class="cl-go"><a href="/staff/clients/{{ c['id'] }}" aria-label="Open {{ c['display_name'] or c['email'] }}">&#8942;</a></td>
+        <td class="cl-go"><a href="/staff/customers/{{ c['id'] }}" aria-label="Open {{ c['display_name'] or c['email'] }}">&#8942;</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="8" class="muted" style="padding:20px 24px;">{% if q %}No clients match "{{ q }}".{% else %}No client accounts yet.{% endif %}</td></tr>
+      <tr><td colspan="8" class="muted" style="padding:20px 24px;">{% if q %}No customers match "{{ q }}".{% else %}No customer accounts yet.{% endif %}</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -66,7 +66,7 @@
       rows.forEach(function (r) { r.style.display = 'none'; });
       m.slice((page - 1) * size, page * size).forEach(function (r) { r.style.display = ''; });
       var from = m.length ? (page - 1) * size + 1 : 0, to = Math.min(page * size, m.length);
-      document.getElementById('cl-count').textContent = 'Showing ' + from + '-' + to + ' of ' + m.length + ' client' + (m.length === 1 ? '' : 's');
+      document.getElementById('cl-count').textContent = 'Showing ' + from + '-' + to + ' of ' + m.length + ' customer' + (m.length === 1 ? '' : 's');
       var pager = document.getElementById('cl-pager'); pager.hidden = pages <= 1; document.getElementById('cl-page').textContent = page + ' / ' + pages;
       document.getElementById('cl-prev').disabled = page <= 1; document.getElementById('cl-next').disabled = page >= pages;
     }
@@ -90,7 +90,7 @@
     function run() {
       open.disabled = true; open.textContent = 'Analysing...'; panel.hidden = false;
       panel.innerHTML = '<p class="muted" style="padding:12px 0;">Looking at every sign-up, order, payment and visit...</p>';
-      fetch('/staff/clients/analysis?partial=1', { credentials: 'same-origin' }).then(function (r) {
+      fetch('/staff/customers/analysis?partial=1', { credentials: 'same-origin' }).then(function (r) {
         if (!r.ok) throw new Error(r.status); return r.text();
       }).then(function (html) {
         panel.innerHTML = html; open.setAttribute('aria-expanded', 'true'); panel.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -11,7 +11,7 @@ from test_order_flow import env, wav_bytes  # noqa: E402,F401
 
 def _pay_page(env, wav, **overrides):
     order = env.order_from(env.place(wav, review_tier="human", **overrides))
-    return order, env.client.get(f"/client/orders/{order['id']}/pay").text
+    return order, env.client.get(f"/account/orders/{order['id']}/pay").text
 
 
 def test_payment_page_shows_the_order_the_price_and_why_it_is_safe(env, wav_bytes):
@@ -35,7 +35,7 @@ def _set_created(env, ts):
 
 def test_mobile_money_is_only_offered_in_kenya_and_to_the_older_kenyan_accounts(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
-    url = f"/client/orders/{order['id']}/pay"
+    url = f"/account/orders/{order['id']}/pay"
     env.db.set_billing_market("u1", "intl")
     elsewhere = env.client.get(url, headers={"cf-ipcountry": "DE"}).text
     assert 'type="radio" name="provider" value="paystack"' in elsewhere
@@ -51,12 +51,12 @@ def test_mobile_money_is_only_offered_in_kenya_and_to_the_older_kenyan_accounts(
 def test_bank_transfer_is_kept_for_existing_clients_and_hidden_for_new_ones(env, wav_bytes):
     from webapp import app as app_mod
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
-    url = f"/client/orders/{order['id']}/pay"
+    url = f"/account/orders/{order['id']}/pay"
     _set_created(env, app_mod.BANK_TRANSFER_LEGACY_BEFORE - 86400)           # joined before the change
     assert 'value="bank"' in env.client.get(url).text
     _set_created(env, app_mod.BANK_TRANSFER_LEGACY_BEFORE + 86400)           # joined after it
     assert 'value="bank"' not in env.client.get(url).text and "Bank transfer" not in env.client.get(url).text
-    billing = env.client.get("/client/billing").text
+    billing = env.client.get("/account/billing").text
     assert 'value="bank"' not in billing and "Bank transfer</option>" not in billing
 
 
@@ -65,8 +65,8 @@ def test_a_new_client_cannot_pay_by_bank_or_mpesa_by_posting_directly(env, wav_b
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
     _set_created(env, app_mod.BANK_TRANSFER_LEGACY_BEFORE + 86400)
     env.db.set_billing_market("u1", "intl")
-    r = env.client.post(f"/client/orders/{order['id']}/pay", data={"provider": "bank"})
+    r = env.client.post(f"/account/orders/{order['id']}/pay", data={"provider": "bank"})
     assert r.status_code == 303 and "not+available" in r.headers["location"]
-    r2 = env.client.post(f"/client/orders/{order['id']}/pay", data={"provider": "mpesa", "phone": "254700000000"}, headers={"cf-ipcountry": "DE"})
+    r2 = env.client.post(f"/account/orders/{order['id']}/pay", data={"provider": "mpesa", "phone": "254700000000"}, headers={"cf-ipcountry": "DE"})
     assert r2.status_code == 303 and "only+available+in+Kenya" in r2.headers["location"]
     assert env.db.get_order(order["id"])["status"] == "pending_payment"

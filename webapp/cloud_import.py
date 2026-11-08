@@ -136,7 +136,7 @@ def _google_info(file_id: str, token: str) -> dict:
     return r.json()
 
 
-@router.get("/client/import/config")
+@router.get("/account/import/config")
 def import_config(request: Request):
     user = A.current_user(request)
     if not user or user["role"] != "client":
@@ -144,7 +144,7 @@ def import_config(request: Request):
     return JSONResponse(config())
 
 
-@router.post("/client/import/fetch")
+@router.post("/account/import/fetch")
 async def import_fetch(request: Request):
     """Body: {"provider": "dropbox"|"onedrive", "url", "name"} or {"provider": "google", "file_id", "token", "name"}. Returns {upload_key, filename, size}."""
     user = A.current_user(request)

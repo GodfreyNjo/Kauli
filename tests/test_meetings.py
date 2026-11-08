@@ -57,7 +57,7 @@ def meet(env, monkeypatch, wav_bytes):
 def _send(meet, url="https://zoom.us/j/123456789", **extra):
     data = {"meeting_url": url, "title": "Weekly planning", "source_lang": "en", "join_at": ""}
     data.update(extra)
-    return meet.env.client.post("/client/meetings", data=data)
+    return meet.env.client.post("/account/meetings", data=data)
 
 
 def test_only_real_meeting_links_are_accepted():
@@ -82,9 +82,9 @@ def test_the_bot_status_is_read_in_plain_words():
 
 def test_nothing_is_offered_until_the_meeting_service_is_switched_on(env, monkeypatch):
     monkeypatch.delenv("RECALL_API_KEY", raising=False)
-    assert "coming soon" in env.client.get("/client/meetings").text
-    assert 'href="/client/meetings"' not in env.client.get("/client/home").text
-    r = env.client.post("/client/meetings", data={"meeting_url": "https://zoom.us/j/1", "source_lang": "en"})
+    assert "coming soon" in env.client.get("/account/meetings").text
+    assert 'href="/account/meetings"' not in env.client.get("/account/home").text
+    r = env.client.post("/account/meetings", data={"meeting_url": "https://zoom.us/j/1", "source_lang": "en"})
     assert r.status_code == 303 and "not+switched+on" in r.headers["location"].replace("%20", "+")
     assert env.client.post("/webhooks/recall", content=b"{}", headers=_signed(b"{}")).status_code == 401      # no secret, so no webhook
 
@@ -94,7 +94,7 @@ def test_a_client_on_the_free_plan_is_pointed_to_a_plan_and_nothing_is_sent(meet
     r = _send(meet)
     assert r.status_code == 303 and "Pro+and+Premium" in r.headers["location"].replace("%20", "+")
     assert meet.state.posts == []
-    page = meet.env.client.get("/client/meetings").text
+    page = meet.env.client.get("/account/meetings").text
     assert "Pro and Premium plans" in page and "disabled" in page
 
 
@@ -115,9 +115,9 @@ def test_sending_the_bot_records_the_meeting_and_lists_it(meet):
     assert "recording" in meet.state.posts[0]["chat"]["on_bot_join"]["message"]                    # the room is told
     rows = meet.env.db.list_meetings_for_client("u1")
     assert len(rows) == 1 and rows[0]["platform"] == "zoom" and rows[0]["provider_bot_id"] == "bot-1"
-    page = meet.env.client.get("/client/meetings").text
+    page = meet.env.client.get("/account/meetings").text
     assert "Weekly planning" in page and "Zoom" in page and "Recording" in page          # the fake service says it is recording
-    assert 'href="/client/meetings"' in meet.env.client.get("/client/home").text         # and the sidebar now shows the tab
+    assert 'href="/account/meetings"' in meet.env.client.get("/account/home").text         # and the sidebar now shows the tab
     bad = _send(meet, url="https://example.com/meeting")
     assert "Zoom%2C+Google+Meet" in bad.headers["location"] or "Zoom" in bad.headers["location"]
     assert len(meet.state.posts) == 1
@@ -164,13 +164,13 @@ def test_a_finished_meeting_becomes_one_instant_ai_order_even_if_the_webhook_rep
     o = orders[0]
     assert o["review_tier"] == "ai" and o["service_level"] == "transcribe" and o["source_lang"] == "en" and o["folder_name"] == "Meetings"
     assert o["status"] in ("queued", "processing") and o["cost_usd"] == 0                # covered by the plan's own minutes, so it just runs
-    assert "Transcript ready" in meet.env.client.get("/client/meetings").text
+    assert "Transcript ready" in meet.env.client.get("/account/meetings").text
 
 
 def test_a_meeting_that_could_not_be_recorded_says_why(meet):
     _send(meet)
     meet.state.bot = {"id": "bot-1", "status_changes": [{"code": "fatal", "sub_code": "recording_permission_denied"}]}
-    page = meet.env.client.get("/client/meetings").text                          # opening the page also refreshes
+    page = meet.env.client.get("/account/meetings").text                          # opening the page also refreshes
     m = meet.env.db.list_meetings_for_client("u1")[0]
     assert m["status"] == "failed" and "did not allow Kauli to record" in page
     assert meet.env.db.list_orders_for_client("u1") == []
@@ -179,9 +179,9 @@ def test_a_meeting_that_could_not_be_recorded_says_why(meet):
 def test_cancelling_sends_the_bot_away_and_only_for_its_owner(meet):
     _send(meet)
     m = meet.env.db.list_meetings_for_client("u1")[0]
-    r = meet.env.client.post(f"/client/meetings/{m['id']}/cancel")
+    r = meet.env.client.post(f"/account/meetings/{m['id']}/cancel")
     assert r.status_code == 303 and meet.state.leaves and meet.env.db.get_meeting(m["id"])["status"] == "cancelled"
-    assert meet.env.client.post("/client/meetings/not-a-meeting/cancel").status_code == 404
+    assert meet.env.client.post("/account/meetings/not-a-meeting/cancel").status_code == 404
 
 
 def test_the_home_page_lists_meeting_platforms_as_available_only_when_switched_on(meet, monkeypatch):

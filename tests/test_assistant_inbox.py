@@ -10,7 +10,7 @@ from webapp import account_hub, assistant_core  # noqa: E402
 
 
 def _ask(env, text, thread_id=None, **extra):
-    return env.client.post("/client/assistant/message", json={"text": text, "thread_id": thread_id, **extra}).json()
+    return env.client.post("/account/assistant/message", json={"text": text, "thread_id": thread_id, **extra}).json()
 
 
 def _staff(env):
@@ -122,67 +122,67 @@ def test_a_request_about_an_order_lands_on_that_orders_message_thread(env, wav_b
 def test_the_feed_merges_notifications_and_replies_with_one_unread_count(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes))
     env.db.get_or_create_user("s1", "staff@example.com", "staff")
-    env.db.create_notification("u1", "order_ready", "clip.wav is ready", link=f"/client/orders/{order['id']}")
-    env.db.create_notification("u1", "referral", "A friend joined", link="/client/rewards")
+    env.db.create_notification("u1", "order_ready", "clip.wav is ready", link=f"/account/orders/{order['id']}")
+    env.db.create_notification("u1", "referral", "A friend joined", link="/account/rewards")
     env.db.create_message(order["id"], "s1", "client", "We fixed the names you mentioned.")
-    env.db.create_notification("u1", "staff_message", "New message about clip.wav", link=f"/client/orders/{order['id']}")
-    feed = env.client.get("/client/assistant/feed").json()
+    env.db.create_notification("u1", "staff_message", "New message about clip.wav", link=f"/account/orders/{order['id']}")
+    feed = env.client.get("/account/assistant/feed").json()
     titles = [i["title"] for i in feed["items"]]
     assert "clip.wav is ready" in titles and "Reply from the team: clip.wav" in titles and "New message about clip.wav" not in titles   # no double
     assert feed["unread"] == 3 and {i["kind"]: i["important"] for i in feed["items"]}["referral"] is False
     reply = [i for i in feed["items"] if i["source"] == "message"][0]
-    assert reply["body"] == "We fixed the names you mentioned." and reply["link"] == f"/client/orders/{order['id']}"
-    env.client.post("/client/assistant/feed/read", json={})
-    assert env.client.get("/client/assistant/feed").json()["unread"] == 1                     # the team's reply stays until the order is opened
+    assert reply["body"] == "We fixed the names you mentioned." and reply["link"] == f"/account/orders/{order['id']}"
+    env.client.post("/account/assistant/feed/read", json={})
+    assert env.client.get("/account/assistant/feed").json()["unread"] == 1                     # the team's reply stays until the order is opened
 
 
 def test_a_team_reply_in_a_conversation_is_unread_until_seen(env):
     staff_on = _staff(env)
     tid = _ask(env, "zzzz qqqq xxxx")["thread_id"]
-    env.client.post("/client/assistant/escalate", json={"thread_id": tid})
+    env.client.post("/account/assistant/escalate", json={"thread_id": tid})
     mine = env.app.current_user
     staff_on()
     assert env.client.post(f"/staff/support/{tid}/reply", data={"body": "We can help with that."}).status_code == 303
     env.monkeypatch.setattr(env.app, "current_user", mine)
-    feed = env.client.get("/client/assistant/feed").json()
+    feed = env.client.get("/account/assistant/feed").json()
     thread_items = [i for i in feed["items"] if i["source"] == "thread"]
     assert thread_items and thread_items[0]["unread"] and thread_items[0]["body"] == "We can help with that."
-    env.client.post("/client/assistant/seen", json={"thread_id": tid})
-    assert not [i for i in env.client.get("/client/assistant/feed").json()["items"] if i["source"] == "thread" and i["unread"]]
+    env.client.post("/account/assistant/seen", json={"thread_id": tid})
+    assert not [i for i in env.client.get("/account/assistant/feed").json()["items"] if i["source"] == "thread" and i["unread"]]
 
 
 def test_the_feed_and_threads_need_a_sign_in_and_stay_private(env):
     mine = env.app.current_user
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)
-    assert env.client.get("/client/assistant/feed").status_code == 401
-    assert env.client.post("/client/assistant/seen", json={}).status_code == 401
+    assert env.client.get("/account/assistant/feed").status_code == 401
+    assert env.client.post("/account/assistant/seen", json={}).status_code == 401
     env.monkeypatch.setattr(env.app, "current_user", mine)
 
 
 def test_the_order_page_opens_the_assistant_instead_of_a_separate_message_box(env, wav_bytes):
     order = env.order_from(env.place(wav_bytes, review_tier="human"))
-    html = env.client.get(f"/client/orders/{order['id']}").text
+    html = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="ask-assistant"' in html and "Questions or changes?" in html and 'id="message-body"' not in html and "Write a message" not in html
-    page = env.client.get("/client/home").text
+    page = env.client.get("/account/home").text
     assert 'id="as-count"' in page and 'id="as-feed"' in page and 'id="as-toast"' in page and ">Inbox" in page and 'id="notif-bell"' in page   # the bell stays
 
 
 def test_an_instant_ai_order_has_no_questions_or_revision_requests(env, wav_bytes):
     ai = env.order_from(env.place(wav_bytes))
     assert ai["review_tier"] == "ai"
-    html = env.client.get(f"/client/orders/{ai['id']}").text
+    html = env.client.get(f"/account/orders/{ai['id']}").text
     assert 'id="ask-assistant"' not in html and 'id="request-revision-btn"' not in html and "Questions or changes?" not in html
     _staff(env)
     r = _ask(env, "I'd like a revision, the names are wrong", order_id=ai["id"])
     assert r["escalated"] is False and "not reviewed by a person" in r["reply"] and "Edit transcript" in r["reply"]
     assert env.db.list_messages(ai["id"], include_internal=False) == [] and not env.db.list_recent_notifications("s1")     # nobody was bothered
-    post = env.client.post(f"/client/orders/{ai['id']}/messages", data={"body": "hello"}, follow_redirects=False)
+    post = env.client.post(f"/account/orders/{ai['id']}/messages", data={"body": "hello"}, follow_redirects=False)
     assert post.status_code == 303 and "error=" in post.headers["location"] and env.db.list_messages(ai["id"], include_internal=False) == []
     refund = _ask(env, "I want a refund for this", order_id=ai["id"])                          # money is still a person's job, on any order
     assert refund["escalated"] is True and env.db.list_recent_notifications("s1")
     assert env.db.list_messages(ai["id"], include_internal=False) == []                        # but it goes to the support desk, not an order thread
     human = env.order_from(env.place(wav_bytes, review_tier="human"))
-    assert "Questions or changes?" in env.client.get(f"/client/orders/{human['id']}").text
+    assert "Questions or changes?" in env.client.get(f"/account/orders/{human['id']}").text
 
 
 def test_the_summary_and_questions_sit_below_the_video_and_transcript_area():

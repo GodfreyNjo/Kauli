@@ -13,6 +13,6 @@ def test_render(env, wav_bytes):
         env.db.create_lead(nm, nm.lower() + "@example.org", None, nm + " Co", "hello", None, source=src)
     env.db.get_or_create_user("staff1", "staff@example.com", "staff")
     env.monkeypatch.setattr(env.app, "current_user", lambda request: {**dict(env.db.get_user("staff1")), "role": "staff", "display_name": "Godfrey Njoroge"})
-    for name, path in (("q", "/staff/jobs"), ("rep", "/staff/ops"), ("crm", "/staff/leads"), ("cl", "/staff/clients"), ("cd", "/staff/clients/u1")):
+    for name, path in (("q", "/staff/jobs"), ("rep", "/staff/ops"), ("crm", "/staff/leads"), ("cl", "/staff/customers"), ("cd", "/staff/customers/u1")):
         r = env.client.get(path); assert r.status_code == 200, path
         (OUT / (name + ".html")).write_text(r.text, encoding="utf-8")

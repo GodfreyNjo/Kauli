@@ -227,14 +227,14 @@
   </p>
   <div class="downloads">
     {% if burned_ready %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/burned">Download burned captions</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/burned">Download burned captions</a>
     {% else %}
       <form method="post" action="/staff/orders/{{ order['id'] }}/render/burned">
         <button type="submit" class="secondary">Generate burned-in captions</button>
       </form>
     {% endif %}
     {% if dubbed_ready %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Download dubbed video</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/dubbed">Download dubbed video</a>
     {% else %}
       <form method="post" action="/staff/orders/{{ order['id'] }}/render/dubbed">
         <button type="submit" class="secondary">Generate dubbed video</button>

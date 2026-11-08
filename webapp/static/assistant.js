@@ -53,7 +53,7 @@
     if (!text || busy) return;
     busy = true; show("chat"); bubble("user", text); input.value = "";
     var wait = bubble("bot", "...");
-    api("/client/assistant/message", { text: text, thread_id: threadId, topic: topic || "", order_id: ctxOrder }).then(function (d) {
+    api("/account/assistant/message", { text: text, thread_id: threadId, topic: topic || "", order_id: ctxOrder }).then(function (d) {
       threadId = d.thread_id; wait.querySelector("p").textContent = d.reply;
       $("as-handoff").hidden = !d.handoff || d.escalated;
       log.scrollTop = log.scrollHeight;
@@ -76,7 +76,7 @@
 
   $("as-escalate").addEventListener("click", function () {
     var btn = this; btn.disabled = true;
-    api("/client/assistant/escalate", { thread_id: threadId }).then(function () {
+    api("/account/assistant/escalate", { thread_id: threadId }).then(function () {
       $("as-handoff").hidden = true;
       bubble("bot", "I have passed this to the Kauli team. They will reply here and by email.");
     }).catch(function (e) { bubble("bot", e.message); }).then(function () { btn.disabled = false; });
@@ -94,7 +94,7 @@
     threadId = t.id; ctxOrder = t.order_id || null; log.textContent = "";
     t.messages.forEach(function (m) { bubble(m.sender, m.body); });
     $("as-handoff").hidden = t.escalated; show("chat");
-    api("/client/assistant/seen", { thread_id: t.id }).then(refresh).catch(function () { /* a nicety */ });
+    api("/account/assistant/seen", { thread_id: t.id }).then(refresh).catch(function () { /* a nicety */ });
   }
   function drawFeed(d) {
     var ul = $("as-feed"); ul.textContent = "";
@@ -139,7 +139,7 @@
     setTimeout(hideToast, 12000);
   }
   function refresh() {
-    return Promise.all([api("/client/assistant/feed"), api("/client/assistant/threads")]).then(function (r) {
+    return Promise.all([api("/account/assistant/feed"), api("/account/assistant/threads")]).then(function (r) {
       var d = r[0]; threadsCache = r[1].threads;
       drawFeed(d); drawThreads(); badge(d.unread);
       // a pop-up only for something important and new, once, and never while the assistant is open
@@ -155,7 +155,7 @@
   $("as-toast-btn").addEventListener("click", function () { setOpen(true); show("msgs"); });
   $("as-toast-x").addEventListener("click", hideToast);
   $("as-readall").addEventListener("click", function () {
-    api("/client/assistant/feed/read", {}).then(refresh).catch(function () { /* a nicety */ });
+    api("/account/assistant/feed/read", {}).then(refresh).catch(function () { /* a nicety */ });
   });
   $("as-tab-home").addEventListener("click", function () { show(threadId ? "chat" : "home"); });
   $("as-tab-msgs").addEventListener("click", function () { show("msgs"); refresh(); });

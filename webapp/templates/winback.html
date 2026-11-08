@@ -8,16 +8,16 @@
       <h1>Your free month is on</h1>
       <p class="wb-big">{{ plan_name }}, free</p>
       <p>Your <strong>{{ plan_name }}</strong> plan is yours until <strong>{{ until }}</strong>. No card, nothing to cancel: it simply ends after the month, and your 30 free minutes every month carry on as usual.</p>
-      <p><a class="ds-btn" href="/client">Start a project</a></p>
+      <p><a class="ds-btn" href="/account">Start a project</a></p>
     {% elif ended %}
       <h1>This code has expired</h1>
       <p>It was open until {{ open_until }}. Your account and your free monthly minutes are all still here.</p>
-      <p><a class="ds-btn" href="/client/home">Go to my account</a></p>
+      <p><a class="ds-btn" href="/account/home">Go to my account</a></p>
     {% else %}
       <h1>A free month, on us</h1>
       <p class="wb-big">{{ plan_name }}, free for {{ days }} days</p>
       <p>Your personal code is <strong>{{ offer['id'] }}</strong>. It works for your account only and can be used once, until {{ open_until }}. No card needed and nothing to cancel.</p>
-      <form method="post" action="/client/winback/{{ offer['id'] }}"><button type="submit" class="ds-btn">Start my free month</button></form>
+      <form method="post" action="/account/winback/{{ offer['id'] }}"><button type="submit" class="ds-btn">Start my free month</button></form>
     {% endif %}
   </section>
 </div>

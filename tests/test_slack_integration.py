@@ -101,7 +101,7 @@ def test_order_ready_posts_a_message_without_download_links_by_default(slack):
     assert "clip.wav" in msg["text"] and msg["blocks"][0]["text"]["text"] == "Your Kauli order is ready"
     buttons = msg["blocks"][-1]["elements"]
     assert [b["text"]["text"] for b in buttons] == ["Open order"]
-    assert buttons[0]["url"] == f"https://kauli.test/client/orders/{order['id']}"
+    assert buttons[0]["url"] == f"https://kauli.test/account/orders/{order['id']}"
     assert not any(b["type"] == "context" for b in msg["blocks"])                   # plan already chosen: no note
     slack.db.get_conn().close()
     conn = slack.db.get_conn()

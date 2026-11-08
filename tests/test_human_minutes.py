@@ -92,10 +92,10 @@ def test_human_minutes_renew_with_the_period_and_cannot_be_double_spent(env):
 
 def test_the_pages_show_the_human_minutes(env):
     _plan(env, "pro")
-    assert "human-reviewed minutes" in env.client.get("/client/billing").text
-    billing_page = env.client.get("/client/billing").text
+    assert "human-reviewed minutes" in env.client.get("/account/billing").text
+    billing_page = env.client.get("/account/billing").text
     assert "Human-reviewed minutes left" in billing_page and "human-reviewed minutes</strong> included every month" in billing_page
-    assert 'data-human-minutes="5.0"' in env.client.get("/client").text
+    assert 'data-human-minutes="5.0"' in env.client.get("/account").text
     env.monkeypatch.setattr(env.app, "current_user", lambda request: None)                  # a visitor sees the public pricing
     home = env.client.get("/").text
     assert "5 human-reviewed minutes" in home and "15 human-reviewed minutes" in home
@@ -110,7 +110,7 @@ def test_instant_ai_orders_cannot_ask_for_speaker_labels_but_human_review_can(en
     assert human["instr_speaker_ids"] == 1
     meeting = env.order_from(env.place(wav_bytes, review_tier="ai", instr_speaker_ids="1", idempotency_key="meeting-abc"))
     assert meeting["instr_speaker_ids"] == 1                                                # the meeting notetaker identifies its own speakers
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert 'id="speaker-label-field"' in page and "to label speakers" in page
     js = (Path(__file__).parent.parent / "webapp/static/client_wizard.js").read_text(encoding="utf-8")
     assert "speaker-label-field" in js
@@ -121,7 +121,7 @@ def test_flash_messages_fade_away_but_lasting_facts_stay(env):
     assert "data-persist" in js and "mouseenter" in js and 'searchParams.has(k)' in js
     # accessibility: notices fade (and wait while hovered or focused), errors stay until dismissed, every message has a dismiss button and is announced
     assert "SHOW_MS = 10000" in js and "errors stay until dismissed" in js and "flash-x" in js and "kpAnnounce" in js
-    page = env.client.get("/client").text
+    page = env.client.get("/account").text
     assert "/static/flash.js" in page
     root = Path(__file__).parent.parent / "webapp/templates"
     for name, text in (("order_detail.html", "Ready. Download your files below."), ("order_detail.html", "Something went wrong on our end"),
@@ -169,7 +169,7 @@ def test_only_the_first_order_is_free_and_only_for_short_enough_instant_ai(env, 
 
 def test_unlocking_is_choosing_a_plan_with_no_card_step(env, wav_bytes):
     _fresh(env)
-    home = env.client.get("/client/home").text
-    assert "Subscribe to the Free plan (pay as you go) to download and edit your files" in home and 'href="/client/billing?choose_plan=1"' in home
-    assert "/client/verify-trial" not in home and "$1" not in home
-    assert "not reviewed by a person" not in env.client.get("/client").text
+    home = env.client.get("/account/home").text
+    assert "Subscribe to the Free plan (pay as you go) to download and edit your files" in home and 'href="/account/billing?choose_plan=1"' in home
+    assert "/account/verify-trial" not in home and "$1" not in home
+    assert "not reviewed by a person" not in env.client.get("/account").text

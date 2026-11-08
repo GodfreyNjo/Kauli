@@ -469,8 +469,8 @@
       <span class="m-section-eyebrow m-eyebrow-lined">Integrations</span>
       <h2 class="m-h2">Connect Kauli to your tools</h2>
       <p class="m-lede">Bring your tools together and get more done.</p>
-      {% set meet_state = 'live' if meetings_enabled() else 'soon' %}{% set meet_href = '/login?next=/client/meetings' if meetings_enabled() else None %}
-      {% set mine = '/login?next=/client/integrations' %}{% set st = integration_state %}
+      {% set meet_state = 'live' if meetings_enabled() else 'soon' %}{% set meet_href = '/login?next=/account/meetings' if meetings_enabled() else None %}
+      {% set mine = '/login?next=/account/integrations' %}{% set st = integration_state %}
       {% set integrations = [
         ("Developers &amp; automation", "M8 9l-4 3 4 3M16 9l4 3-4 3M13.5 6l-3 12", "Integrate with your developer tools and automate your workflow.",
           [("API", "live", "/developers", "api"), ("MCP server", "live", "/developers#mcp", "mcp"),

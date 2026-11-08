@@ -45,7 +45,7 @@ def test_the_public_address_and_its_www_twin_are_both_ours(env, monkeypatch):
 
 def test_signed_in_pages_and_the_login_page_are_never_cached_but_public_pages_are_left_alone(env):
     assert env.client.get("/login").headers["cache-control"] == "no-store"
-    assert env.client.get("/client", follow_redirects=False).headers.get("cache-control") == "no-store"
+    assert env.client.get("/account", follow_redirects=False).headers.get("cache-control") == "no-store"
     assert "no-store" not in env.client.get("/pricing").headers.get("cache-control", "")
     assert env.client.get("/robots.txt").headers.get("cache-control") is None
 

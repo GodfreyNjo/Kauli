@@ -107,7 +107,7 @@ def test_burned_in_captions_sit_lower_centre_away_from_the_bottom_edge(monkeypat
 def test_the_order_page_paints_live_captions_from_the_same_cues(env, wav_bytes):
     from test_media_preview import _finished
     order = _finished(env, wav_bytes)
-    page = env.client.get(f"/client/orders/{order['id']}").text
+    page = env.client.get(f"/account/orders/{order['id']}").text
     assert 'id="order-cues"' in page and "function paintCue" in page
     cues = __import__("json").loads(re.search(r'id="order-cues">(.*?)</script>', page, re.S).group(1))
     assert cues and all({"s", "e", "t"} <= set(c) and c["e"] - c["s"] <= 6000 for c in cues)

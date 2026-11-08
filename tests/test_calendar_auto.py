@@ -146,13 +146,13 @@ def test_the_calendar_cards_and_the_meetings_page_offer_one_click(env, monkeypat
                 "SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "NOTION_CLIENT_ID", "NOTION_CLIENT_SECRET", "RECALL_API_KEY"):
         monkeypatch.delenv(key, raising=False)                                                  # a page that depends on what is set up starts from nothing set up
     monkeypatch.setenv("RECALL_API_KEY", "k")
-    page = env.client.get("/client/integrations").text
-    assert 'data-connect="gcal"' not in page and 'href="/client/calendar"' in page                 # no keys yet: the private-link way still works
+    page = env.client.get("/account/integrations").text
+    assert 'data-connect="gcal"' not in page and 'href="/account/calendar"' in page                 # no keys yet: the private-link way still works
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_ID", "id")
     monkeypatch.setenv("GOOGLE_OAUTH_CLIENT_SECRET", "secret")
-    assert 'data-connect="gcal"' in env.client.get("/client/integrations").text
-    assert "Connect my calendar" in env.client.get("/client/meetings").text
+    assert 'data-connect="gcal"' in env.client.get("/account/integrations").text
+    assert "Connect my calendar" in env.client.get("/account/meetings").text
     _connect(env)
-    page = env.client.get("/client/integrations").text
+    page = env.client.get("/account/integrations").text
     assert 'data-settings="gcal"' in page and 'data-disconnect="gcal"' in page
-    assert "Kauli Notetaker is on your calendar (Google Calendar (me@example.com))" in env.client.get("/client/meetings").text
+    assert "Kauli Notetaker is on your calendar (Google Calendar (me@example.com))" in env.client.get("/account/meetings").text

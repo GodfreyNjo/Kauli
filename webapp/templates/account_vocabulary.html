@@ -16,7 +16,7 @@
   <div class="an-grid-2">
     <section class="hub-card" aria-labelledby="vc-add">
       <h2 id="vc-add">Add words</h2>
-      <form method="post" action="/client/vocabulary/add" class="vc-form">
+      <form method="post" action="/account/vocabulary/add" class="vc-form">
         <label for="vc-entries">One per line. Add spellings the machine gets wrong after a bar.</label>
         <textarea id="vc-entries" name="entries" rows="6" placeholder="Kauli | cowley, kowli&#10;Wanjiru&#10;Forge Media Services" required></textarea>
         <button type="submit">Add to vocabulary</button>
@@ -30,10 +30,10 @@
       <ul class="vc-terms">
         {% for t in terms %}
         <li><span><strong>{{ t['term'] }}</strong>{% if t['variants'] %}<small class="muted">also heard as: {{ t['variants'] }}</small>{% endif %}</span>
-          <form method="post" action="/client/vocabulary/delete"><input type="hidden" name="term_id" value="{{ t['id'] }}"><button type="submit" class="secondary" aria-label="Remove {{ t['term'] }}">Remove</button></form></li>
+          <form method="post" action="/account/vocabulary/delete"><input type="hidden" name="term_id" value="{{ t['id'] }}"><button type="submit" class="secondary" aria-label="Remove {{ t['term'] }}">Remove</button></form></li>
         {% endfor %}
       </ul>
-      {{ pager(page, pages, '/client/vocabulary') }}
+      {{ pager(page, pages, '/account/vocabulary') }}
       {% else %}<p class="muted">No words yet. Add the names people say most in your recordings.</p>{% endif %}
     </section>
   </div>

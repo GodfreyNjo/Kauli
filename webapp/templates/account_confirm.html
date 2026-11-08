@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Confirm it is you{% endblock %}
+{% block content %}
+<div class="acct-page acct-narrow">
+  <h1>Confirm it is you</h1>
+  <p class="muted">For your security, please confirm before we continue. You will not be asked again for the next 10 minutes.</p>
+  {% if notice %}<p class="ok" role="status">{{ notice }}</p>{% endif %}
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" action="/settings/confirm" class="acct-card" data-validate>
+    <input type="hidden" name="next" value="{{ next }}">
+    <h2>With your password</h2>
+    <label for="sudo-password">Password</label>
+    <input id="sudo-password" type="password" name="password" autocomplete="current-password" required minlength="1">
+    <button type="submit" class="btn" data-loading="Checking...">Confirm</button>
+  </form>
+
+  <form method="post" action="/settings/confirm" class="acct-card" data-validate>
+    <input type="hidden" name="next" value="{{ next }}">
+    <h2>With a code sent to your email</h2>
+    <p class="muted">Signed in with Google or an emailed link, and have no password? Use this. We send a 6-digit code to {{ masked_email }}.</p>
+    {% if code_sent %}
+    <label for="sudo-code">6-digit code</label>
+    <input id="sudo-code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required>
+    <button type="submit" class="btn" data-loading="Checking...">Confirm with code</button>
+    {% endif %}
+  </form>
+  <form method="post" action="/settings/confirm/send-code" class="acct-actions">
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="secondary" data-loading="Sending...">{{ 'Send a new code' if code_sent else 'Email me a code' }}</button>
+  </form>
+  <p><a href="{{ next }}">Cancel</a></p>
+</div>
+{% endblock %}

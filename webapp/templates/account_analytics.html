@@ -9,7 +9,7 @@
       <p class="muted">How your team uses Kauli: how much, in which languages, and how conversations feel.</p>
     </div>
     <nav class="hub-chips" aria-label="Time range">
-      {% for r in ['3', '6', '12'] %}<a href="/client/analytics?range={{ r }}" class="{{ 'is-on' if range == r else '' }}"{% if range == r %} aria-current="true"{% endif %}>{{ r }} months</a>{% endfor %}
+      {% for r in ['3', '6', '12'] %}<a href="/account/analytics?range={{ r }}" class="{{ 'is-on' if range == r else '' }}"{% if range == r %} aria-current="true"{% endif %}>{{ r }} months</a>{% endfor %}
     </nav>
   </div>
 
@@ -17,7 +17,7 @@
   <div class="hub-card hub-empty">
     <p><strong>Nothing to chart yet.</strong></p>
     <p class="muted">Once your first files are transcribed, your minutes, languages and conversation sentiment appear here.</p>
-    <a class="btn cta-olive" href="/client#order-form">Upload a file</a>
+    <a class="btn cta-olive" href="/account#order-form">Upload a file</a>
   </div>
   {% else %}
   <div class="an-tiles">

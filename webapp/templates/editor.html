@@ -143,10 +143,10 @@
         {% endif %}
         {% if is_video and not youtube_video_id and dubbed_video_ready %}
         <video id="voice-track-media" style="display:none;" playsinline controls
-               src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
+               src="/account/orders/{{ order['id'] }}/download/dubbed"></video>
         {% elif dub_audio_ready %}
         <audio id="voice-track-media" style="display:none;" controls
-               src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+               src="/account/orders/{{ order['id'] }}/download/audio"></audio>
         {% endif %}
       </div>
       <div class="voice-mode-banner" id="voice-mode-banner" hidden>
@@ -275,7 +275,7 @@
            client will get streaming underneath it as it plays (real line-wrapping and the 6s on-screen cap
            included - this is what the delivered .srt/.vtt actually contain, not the raw text) - not the
            source {{ source_lang_name }} audio above.</p>
-        <audio id="preview-audio" controls style="width:100%;" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+        <audio id="preview-audio" controls style="width:100%;" src="/account/orders/{{ order['id'] }}/download/audio"></audio>
         <div class="preview-caption" id="preview-caption">&nbsp;</div>
         <p class="preview-flag-note muted" id="preview-flag-note" hidden></p>
         {% elif order['tts'] == 'stub' %}

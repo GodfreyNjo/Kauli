@@ -140,7 +140,7 @@ def test_no_public_page_shows_a_phone_number_or_our_whatsapp(demo):
 def test_the_app_and_staff_pages_have_no_whatsapp_link_either(demo, monkeypatch):
     monkeypatch.setattr(demo.app, "current_user",
                         lambda request: {**dict(demo.db.get_user("u1")), "client_scope_id": "u1"})
-    for path in ("/client", "/client/billing", "/client/files", "/settings"):
+    for path in ("/account", "/account/billing", "/account/files", "/settings"):
         html = demo.client.get(path).text
         assert not _CONTACT_LEAK.search(html), (path, _CONTACT_LEAK.search(html).group(0))
         assert "mailto:hello@kauli-forgemedia.com" in html, path

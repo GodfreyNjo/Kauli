@@ -3,12 +3,12 @@
 {% block content %}
 {% macro free_plan_form(charge, order_id, subscribed) %}
 {% if subscribed %}
-<form method="post" action="/client/orders/{{ order_id }}/unlock" class="free-plan-form">
+<form method="post" action="/account/orders/{{ order_id }}/unlock" class="free-plan-form">
   <input type="hidden" name="provider" value="paystack">
   <button type="submit" class="btn">Unlock this order{% if charge and charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(charge['amount']) }}{% endif %}</button>
 </form>
 {% else %}
-<form method="post" action="/client/billing/choose-free" class="free-plan-form">
+<form method="post" action="/account/billing/choose-free" class="free-plan-form">
   <input type="hidden" name="order_id" value="{{ order_id }}">
   <button type="submit" class="btn">Subscribe to the Free plan{% if charge and charge['amount'] > 0 %} &middot; pay ${{ '%.2f'|format(charge['amount']) }} for this order{% endif %}</button>
 </form>
@@ -20,7 +20,7 @@
 {% set od_secs = ((order['duration_minutes'] or 0) * 60)|round|int %}
 <div class="od-head">
   <div class="od-head-main">
-    <a href="/client" class="breadcrumb">&larr; Back to my orders</a>
+    <a href="/account" class="breadcrumb">&larr; Back to my orders</a>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     {% if notice %}<p class="ok">{{ notice }}</p>{% endif %}
     <h1>{{ order['original_filename'] }}</h1>
@@ -29,7 +29,7 @@
       {% if '.' in order['original_filename'] %}<span>{{ order['original_filename'].rsplit('.', 1)[-1]|upper }}</span><i>&middot;</i>{% endif %}
       {% if od_secs %}<span>{{ '%d:%02d'|format(od_secs // 60, od_secs % 60) }}</span><i>&middot;</i>{% endif %}
       <span>Uploaded {{ order['created_at']|date_only }}</span>
-      {% if order['reuse_of'] %}<i>&middot;</i><span>Built from your <a href="/client/orders/{{ order['reuse_of'] }}">earlier transcript</a></span>{% endif %}
+      {% if order['reuse_of'] %}<i>&middot;</i><span>Built from your <a href="/account/orders/{{ order['reuse_of'] }}">earlier transcript</a></span>{% endif %}
       {% if order['is_rush'] %}<span class="status" style="color:var(--err); background:var(--err-soft);">⚡ Rush</span>{% endif %}
     </p>
   </div>
@@ -51,11 +51,11 @@
          otherwise the client's own video, YouTube link or audio with the real captions running over it. #}
       {% if dubbed_ready %}
       <div class="order-media-wrap">
-        <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/dubbed"></video>
+        <video controls class="order-preview-media" src="/account/orders/{{ order['id'] }}/download/dubbed"></video>
       </div>
       {% elif burned_ready %}
       <div class="order-media-wrap">
-        <video controls class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/burned"></video>
+        <video controls class="order-preview-media" src="/account/orders/{{ order['id'] }}/download/burned"></video>
       </div>
       {% elif order['source_youtube_id'] %}
       <div class="order-media-wrap">
@@ -65,18 +65,18 @@
       </div>
       {% elif has_dub %}
       <div class="order-audio-stage">
-        <audio controls class="order-preview-media" id="order-preview-audio" src="/client/orders/{{ order['id'] }}/download/audio"></audio>
+        <audio controls class="order-preview-media" id="order-preview-audio" src="/account/orders/{{ order['id'] }}/download/audio"></audio>
         <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
       </div>
       {% elif source_media_ready and source_is_video %}
       <div class="order-media-wrap">
-        <video controls preload="metadata" class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/source"></video>
+        <video controls preload="metadata" class="order-preview-media" src="/account/orders/{{ order['id'] }}/download/source"></video>
         <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
       </div>
       {% elif source_media_ready %}
       <div class="order-audio-stage">
         <div class="order-audio-wave" aria-hidden="true">{% for i in range(28) %}<i style="--d:{{ (i * 5) % 9 }}"></i>{% endfor %}</div>
-        <audio controls preload="metadata" class="order-preview-media" src="/client/orders/{{ order['id'] }}/download/source"></audio>
+        <audio controls preload="metadata" class="order-preview-media" src="/account/orders/{{ order['id'] }}/download/source"></audio>
         <p class="order-caption-overlay" id="order-caption-overlay" hidden></p>
       </div>
       {% endif %}
@@ -162,7 +162,7 @@
     <div class="sm-actions">
     <button type="button" class="secondary sm-primary" id="sm-open"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>{{ 'Create another summary' if summaries else 'Create summary' }}</button>
     {% if can_export_transcript %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/notes" class="notes-make">
+    <form method="post" action="/account/orders/{{ order['id'] }}/notes" class="notes-make">
       <button type="submit" class="secondary"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6"/></svg>Create AI notes</button>
       <span class="muted">An editable note with the overview, key points and action items.</span>
     </form>
@@ -255,7 +255,7 @@
       if (smHas(t.id)) { smDlg.close(); smList.querySelector('[data-template="' + t.id + '"]').scrollIntoView({ behavior: "smooth", block: "center" }); return; }
       smBusy = true; smGrid.classList.add("is-busy"); smStatus.textContent = "Writing your " + t.name + " summary from the transcript...";
       var fd = new FormData(); fd.append("template", t.id);
-      fetch("/client/orders/" + orderId + "/ai-summary", { method: "POST", body: fd })
+      fetch("/account/orders/" + orderId + "/ai-summary", { method: "POST", body: fd })
         .then(function (r) { return r.json(); })
         .then(function (data) {
           smBusy = false; smGrid.classList.remove("is-busy");
@@ -295,7 +295,7 @@
         chatLog.scrollTop = chatLog.scrollHeight;
         askInput.value = "";
         askInput.disabled = true;
-        fetch("/client/orders/" + orderId + "/ai-ask", {
+        fetch("/account/orders/" + orderId + "/ai-ask", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ question: question }),
         })
@@ -428,7 +428,7 @@
           if (any) edits.push(e);
         });
         saveBtn.disabled = true; statusEl.textContent = "Saving...";
-        fetch("/client/orders/" + orderId + "/transcript", { method: "POST", credentials: "same-origin",
+        fetch("/account/orders/" + orderId + "/transcript", { method: "POST", credentials: "same-origin",
               headers: { "Content-Type": "application/json" }, body: JSON.stringify({ edits: edits }) })
           .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
           .then(function (res) {
@@ -512,7 +512,7 @@
       <summary>
         {% if order['folder_name'] %}Folder: <strong>{{ order['folder_name'] }}</strong>{% else %}Not in a folder{% endif %} - move &raquo;
       </summary>
-      <form method="post" action="/client/orders/{{ order['id'] }}/folder" style="margin-top:8px; max-width:320px;">
+      <form method="post" action="/account/orders/{{ order['id'] }}/folder" style="margin-top:8px; max-width:320px;">
         <label style="font-size:0.78rem;">Move to folder <span class="muted">(leave blank to remove from folders)</span>
           <input type="text" name="folder_name" list="order-folder-list" value="{{ order['folder_name'] or '' }}"
                  placeholder="e.g. Q3 campaign, NGO field reports">
@@ -550,7 +550,7 @@
     <details class="od-more">
       <summary>Translate or dub this in another language</summary>
       {% if source_media_ready or order['source_youtube_id'] %}
-      <p><a href="/client/orders/{{ order['id'] }}/more">Do more with this file &rarr;</a> We already have it, so there is nothing to upload again.</p>
+      <p><a href="/account/orders/{{ order['id'] }}/more">Do more with this file &rarr;</a> We already have it, so there is nothing to upload again.</p>
       {% else %}
       <p>Upload the file again on a new order and pick another target language.</p>
       {% endif %}
@@ -568,7 +568,7 @@
       speaker rather than one of our standard voices. Voice cloning is only ever used to translate what
       the speaker actually said, never to put new words in their voice - see our
       <a href="/terms#deepfakes" target="_blank" rel="noopener">no-deepfakes policy</a>.
-      <form method="post" action="/client/orders/{{ order['id'] }}/grant-voice-clone-consent" style="margin-top:10px;">
+      <form method="post" action="/account/orders/{{ order['id'] }}/grant-voice-clone-consent" style="margin-top:10px;">
         <button type="submit" class="secondary">I confirm I have the rights and consent to voice cloning on this order</button>
       </form>
     </div>
@@ -578,7 +578,7 @@
   {% if order['status'] == 'failed' %}
     <p data-persist class="error">Something went wrong on our end - we've been notified and will follow up.</p>
   {% elif order['status'] in ['queued', 'processing'] and live %}
-    <section class="live" id="live-progress" lang="{{ page_lang() }}" data-url="/client/orders/{{ order['id'] }}/progress" aria-live="polite">
+    <section class="live" id="live-progress" lang="{{ page_lang() }}" data-url="/account/orders/{{ order['id'] }}/progress" aria-live="polite">
       <div class="live-wave" aria-hidden="true">{% for i in range(18) %}<i style="--d:{{ (i * 7) % 11 }}"></i>{% endfor %}</div>
       <h2 id="live-title">{{ live['title'] }}</h2>
       <p class="live-sub" id="live-sub">{{ live['sub'] }}</p>
@@ -638,7 +638,7 @@
       })();
     </script>
   {% elif order['status'] in ['queued', 'processing'] %}
-    <p class="kp-status" id="od-processing" data-url="/client/orders/{{ order['id'] }}/progress" role="status"><span class="kp-ring is-spinning" aria-hidden="true"><b></b></span><span class="kp-text">Your file is being processed<span class="kp-dots" aria-hidden="true"></span> This page updates by itself.</span></p>
+    <p class="kp-status" id="od-processing" data-url="/account/orders/{{ order['id'] }}/progress" role="status"><span class="kp-ring is-spinning" aria-hidden="true"><b></b></span><span class="kp-text">Your file is being processed<span class="kp-dots" aria-hidden="true"></span> This page updates by itself.</span></p>
     <script>
       (function () {
         var box = document.getElementById('od-processing'), fails = 0;
@@ -662,7 +662,7 @@
     <div class="modal-warning" style="font-size:0.85rem;">
       No need to submit a new order or pay again - reply on the message thread below and, if we need a
       corrected file, attach it here. We'll pick this same order back up as soon as it's sorted.
-      <form method="post" action="/client/orders/{{ order['id'] }}/resume" enctype="multipart/form-data" style="margin-top:10px;">
+      <form method="post" action="/account/orders/{{ order['id'] }}/resume" enctype="multipart/form-data" style="margin-top:10px;">
         <label>Replace the file <span class="muted">(only if we asked for one)</span>
           <input type="file" name="audio" accept="audio/*,video/*">
         </label>
@@ -674,7 +674,7 @@
       Your delivery is ready, but this order needed additional work beyond what was originally covered - a
       ${{ "%.2f"|format(order['difficulty_surcharge_usd']) }} charge applies before it unlocks.
     </div>
-    <a class="btn" href="/client/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px;">Review &amp; pay charge →</a>
+    <a class="btn" href="/account/orders/{{ order['id'] }}/difficulty-surcharge" style="margin-top:10px;">Review &amp; pay charge →</a>
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] and order_locked %}
     <div class="modal-warning">
       Your results are ready to read. Free minutes cover processing and reading only, so downloading and editing need this order to be paid for.
@@ -700,10 +700,10 @@
   {% elif order['status'] in ['ready_for_delivery', 'delivered'] %}
     <p data-persist class="ok od-ready">Ready. Download your files below.</p>
     {% if (source_media_ready or order['source_youtube_id']) and order['status'] in ('ready_for_delivery', 'delivered') %}
-    <p class="more-from"><a class="btn more-btn" href="/client/orders/{{ order['id'] }}/more"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M11 14h5M13.5 11.5 16 14l-2.5 2.5"/></svg>Do more with this file <b aria-hidden="true">&rarr;</b></a> <span class="muted">Translate it, dub it or have it checked, without uploading again.</span></p>
+    <p class="more-from"><a class="btn more-btn" href="/account/orders/{{ order['id'] }}/more"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M11 14h5M13.5 11.5 16 14l-2.5 2.5"/></svg>Do more with this file <b aria-hidden="true">&rarr;</b></a> <span class="muted">Translate it, dub it or have it checked, without uploading again.</span></p>
     {% endif %}
     {% if csat_due %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/rate" class="csat-card">
+    <form method="post" action="/account/orders/{{ order['id'] }}/rate" class="csat-card">
       <strong>How easy was it to get this result?</strong>
       <div class="csat-stars" role="radiogroup" aria-label="Rating from 1 to 5">
         {% for n in [1, 2, 3, 4, 5] %}<label><input type="radio" name="score" value="{{ n }}" required><span>{{ n }}</span></label>{% endfor %}
@@ -725,8 +725,8 @@
         <li><strong>Context, not just words</strong><span>Idioms, tone and who is speaking are carried into {{ human_check['target'] }} the way a native reader expects.</span></li>
         <li><strong>Marked ready only after review</strong><span>An editor signs it off, so you can publish or send it with confidence.</span></li>
       </ul>
-      <form method="post" action="/client/orders/{{ order['id'] }}/upgrade-review" class="hc-buy"
-            onsubmit="return confirm('Add human review to this translation for ${{ "%.2f"|format(human_check['price']) }}? A dedicated editor will check it before it is marked final.');">
+      <form method="post" action="/account/orders/{{ order['id'] }}/upgrade-review" class="hc-buy"
+            data-confirm="Add human review to this translation for ${{ "%.2f"|format(human_check['price']) }}? A dedicated editor will check it before it is marked final.">
         <input type="hidden" name="provider" value="paystack">
         <div class="hc-price"><b>${{ "%.2f"|format(human_check['price']) }}</b><span>for this file{% if human_check['per_min'] %} &middot; +${{ "%.2f"|format(human_check['per_min']) }}/min on {{ human_check['minutes']|round(1) }} min{% endif %}. You pay only the difference from what you already paid.</span></div>
         <div class="hc-actions"><button type="submit" data-cta="human-check">Add human review - ${{ "%.2f"|format(human_check['price']) }}</button>
@@ -743,28 +743,28 @@
       })();
     </script>
     {% elif upsell['upgrade'] and paystack_configured %}
-    <form method="post" action="/client/orders/{{ order['id'] }}/upgrade-review" class="od-upsell"
-          onsubmit="return confirm('Add human review to this order for ${{ "%.2f"|format(upsell['upgrade']) }}? A dedicated editor will check it before it is marked final.');">
+    <form method="post" action="/account/orders/{{ order['id'] }}/upgrade-review" class="od-upsell"
+          data-confirm="Add human review to this order for ${{ "%.2f"|format(upsell['upgrade']) }}? A dedicated editor will check it before it is marked final.">
       <input type="hidden" name="provider" value="paystack">
       <button type="submit" class="secondary">Add human review - ${{ "%.2f"|format(upsell['upgrade']) }}</button>
       <small class="muted">An editor checks it against the audio. You keep these files meanwhile.</small>
     </form>
     {% endif %}
     <div class="downloads">
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/docx">Transcript (.docx)</a>
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/txt">Transcript (.txt)</a>
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/docx">Transcript (.docx)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/txt">Transcript (.txt)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/transcript">Source transcript (.srt)</a>
       {% if has_translation %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/srt">Subtitles (.srt)</a>
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/vtt">Subtitles (.vtt)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/srt">Subtitles (.srt)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/vtt">Subtitles (.vtt)</a>
       {% endif %}
       {% if has_dub %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/audio">Dubbed audio (.wav)</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/audio">Dubbed audio (.wav)</a>
       {% if burned_ready %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/burned">Video with burned-in captions</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/burned">Video with burned-in captions</a>
       {% endif %}
       {% if dubbed_ready %}
-      <a class="btn" href="/client/orders/{{ order['id'] }}/download/dubbed">Dubbed video</a>
+      <a class="btn" href="/account/orders/{{ order['id'] }}/download/dubbed">Dubbed video</a>
       {% endif %}
       {% endif %}
       <details class="dl-more">
@@ -772,8 +772,8 @@
         <div class="dl-more-menu">
           <p class="dl-more-h">More caption formats</p>
           <p class="muted">TTML is the standard behind broadcast and many web and streaming players. SBV is what YouTube's caption uploader reads.</p>
-          <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/ttml">Captions (.ttml)</a>
-          <a class="btn secondary" href="/client/orders/{{ order['id'] }}/download/sbv">Captions (.sbv)</a>
+          <a class="btn secondary" href="/account/orders/{{ order['id'] }}/download/ttml">Captions (.ttml)</a>
+          <a class="btn secondary" href="/account/orders/{{ order['id'] }}/download/sbv">Captions (.sbv)</a>
         </div>
       </details>
     </div>
@@ -787,14 +787,14 @@
         <li data-captioned="{{ look.state or '' }}">
           <span class="cv-name">{{ look.label }}</span>
           {% if look.state == 'ready' %}
-            <a class="btn" href="/client/orders/{{ order['id'] }}/download/captioned_{{ look.key }}">Download video</a>
+            <a class="btn" href="/account/orders/{{ order['id'] }}/download/captioned_{{ look.key }}">Download video</a>
           {% elif look.state == 'rendering' %}
-            <span class="kp-status" data-kp-url="/client/orders/{{ order['id'] }}/captioned-video/status?style={{ look.key }}" role="status" aria-live="polite">
+            <span class="kp-status" data-kp-url="/account/orders/{{ order['id'] }}/captioned-video/status?style={{ look.key }}" role="status" aria-live="polite">
               <span class="kp-ring{{ '' if look.pct is not none else ' is-spinning' }}" style="--p: {{ look.pct or 0 }}" aria-hidden="true"><b>{% if look.pct is not none %}{{ look.pct }}%{% endif %}</b></span>
               <span class="kp-text">Creating your video<span class="kp-dots" aria-hidden="true"></span></span>
             </span>
           {% else %}
-            <form method="post" action="/client/orders/{{ order['id'] }}/captioned-video">
+            <form method="post" action="/account/orders/{{ order['id'] }}/captioned-video">
               <input type="hidden" name="style" value="{{ look.key }}">
               <button type="submit" class="secondary">{{ 'Try again' if look.state == 'failed' else 'Create' }}</button>
             </form>
@@ -823,7 +823,7 @@
         })();
       </script>
       {% else %}
-      <p class="muted">Captioned videos come with Premium and up, or as an add-on on a new order. <a href="/client/billing?upgrade_for=video">See plans</a></p>
+      <p class="muted">Captioned videos come with Premium and up, or as an add-on on a new order. <a href="/account/billing?upgrade_for=video">See plans</a></p>
       {% endif %}
     </details>
     {% endif %}
@@ -832,7 +832,7 @@
       {% if notion_export and notion_export['page_url'] %}
       <a class="btn secondary" href="{{ notion_export['page_url'] }}" target="_blank" rel="noopener">Open in Notion &nearr;</a>
       {% else %}
-      <form method="post" action="/client/orders/{{ order['id'] }}/send-to-notion" style="display:inline;">
+      <form method="post" action="/account/orders/{{ order['id'] }}/send-to-notion" style="display:inline;">
         <button type="submit" class="secondary">Send to Notion</button>
       </form>
       {% endif %}
@@ -868,13 +868,13 @@
         {{ order['target_lang']|upper }} caption track, published immediately - review the file first if
         you want to check it before it goes live on YouTube.
       </p>
-      <form method="post" action="/client/orders/{{ order['id'] }}/push-captions-youtube" style="display:inline;">
+      <form method="post" action="/account/orders/{{ order['id'] }}/push-captions-youtube" style="display:inline;">
         <button type="submit" class="btn secondary">Push {{ order['target_lang']|upper }} captions to this video</button>
       </form>
       {% else %}
       <p class="muted" style="font-size:0.85rem; margin-bottom:10px;">Connect your YouTube channel to push
          these captions directly onto the original video instead of downloading and uploading them by hand.</p>
-      <a class="btn secondary" href="/client/youtube/connect?next={{ ('/client/orders/' ~ order['id'])|urlencode }}">Connect your YouTube channel</a>
+      <a class="btn secondary" href="/account/youtube/connect?next={{ ('/account/orders/' ~ order['id'])|urlencode }}">Connect your YouTube channel</a>
       {% endif %}
     </div>
     {% endif %}

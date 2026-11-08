@@ -1,4 +1,4 @@
-{# The sign-up analysis (webapp/funnel_audit.py): shown inside the Clients page when staff press "Analyse sign-ups", and on its own page. Read-only. #}
+{# The sign-up analysis (webapp/funnel_audit.py): shown inside the Customers page when staff press "Analyse sign-ups", and on its own page. Read-only. #}
 {% set a = analysis %}
 {% set tot = a.totals %}
 <section class="fa" aria-label="Sign-up analysis">
@@ -14,7 +14,7 @@
   </div>
 
   <div class="fa-summary">
-    <div><b>{{ tot.clients }}</b><span>real clients</span></div>
+    <div><b>{{ tot.clients }}</b><span>real customers</span></div>
     <div><b>{{ tot.paying }}</b><span>paying</span></div>
     <div class="fa-bad"><b>{{ tot.stuck }}</b><span>not yet paying</span></div>
     <div><b>{{ a.funnel[3].count }}</b><span>placed an order</span></div>
@@ -41,20 +41,20 @@
     <header><span class="fa-pill">{{ s.priority|capitalize }}</span><h4>{{ s.title }}</h4></header>
     <p><b>Why:</b> {{ s.why }}</p>
     <p><b>Do this:</b> {{ s.do }}</p>
-    {% if s.clients %}<p class="fa-chips">{% for c in s.clients %}<a href="/staff/clients/{{ c.id }}">{{ c.name }}</a>{% endfor %}</p>{% endif %}
+    {% if s.clients %}<p class="fa-chips">{% for c in s.clients %}<a href="/staff/customers/{{ c.id }}">{{ c.name }}</a>{% endfor %}</p>{% endif %}
   </article>
   {% else %}
   <p class="muted">Nothing needs attention right now.</p>
   {% endfor %}
 
-  <h3>Clients who are not paying yet, and how to help each one</h3>
+  <h3>Customers who are not paying yet, and how to help each one</h3>
   {% if a.stuck %}
   <div class="fa-table-wrap"><table class="fa-table">
-    <thead><tr><th>Client</th><th>Joined</th><th>Got as far as</th><th>What happened</th><th>How to help</th><th></th></tr></thead>
+    <thead><tr><th>Customer</th><th>Joined</th><th>Got as far as</th><th>What happened</th><th>How to help</th><th></th></tr></thead>
     <tbody>
     {% for d in a.stuck %}
       <tr class="fa-sev-{{ d.severity }}">
-        <td><a href="/staff/clients/{{ d.id }}">{{ d.name }}</a><small>{{ d.email }}</small></td>
+        <td><a href="/staff/customers/{{ d.id }}">{{ d.name }}</a><small>{{ d.email }}</small></td>
         <td class="muted">{{ d.signup_days }} d ago</td>
         <td>{{ a.funnel[d.stage].label }}</td>
         <td>{{ d.why }}{% if d.nudges %} <small>{{ d.nudges }} reminder email(s) sent, no result.</small>{% endif %}</td>
@@ -100,7 +100,7 @@
       <p class="muted" id="fa-dlg-to"></p>
       <label for="fa-dlg-subject">Subject</label>
       <input type="text" id="fa-dlg-subject" maxlength="160" autocomplete="off">
-      <label for="fa-dlg-body">Message (written from what this client did; change anything you like)</label>
+      <label for="fa-dlg-body">Message (written from what this customer did; change anything you like)</label>
       <textarea id="fa-dlg-body" rows="14"></textarea>
       <p class="muted fa-dlg-note">It goes out from "Kauli Team" as a one-to-one message, is saved in their message history and noted on their account. Replies come to your team inbox.</p>
       <p class="fa-dlg-msg" id="fa-dlg-msg" role="status" aria-live="polite"></p>
