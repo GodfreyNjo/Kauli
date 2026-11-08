@@ -23,7 +23,8 @@ docstring instead, then run the script.
 | `calendar_feed.py` | 258 | Connect a Google or Outlook calendar with its private calendar link, see the next meetings that have a video link, and send Kauli to one |
 | `charts.py` | 122 | Real inline SVG bar charts for staff pages - CRM (staff_leads.html) and Reports (staff_ops.html) - following the dataviz skill loaded for this work: horizontal bars (<=24px thick, 4px rounded ends), d... |
 | `check_youtube.py` | 45 | Checks whether this server can fetch a YouTube link right now, and says which mitigations are configured |
-| `cloud_import.py` | 193 | Import a recording straight from Google Drive, OneDrive or Dropbox |
+| `cloud_import.py` | 266 | Import a recording straight from Google Drive, OneDrive or Dropbox |
+| `cloud_links.py` | 94 | Turn a share link from Google Drive, OneDrive or Dropbox into an address the server can download |
 | `connections.py` | 633 | One-click integrations: Connect, sign in on the provider's own page, "Connection successful", then a few switches |
 | `db.py` | 5755 | The database: every table, its migrations, and every read and write the site makes (SQLite) |
 | `demo_content.py` | 300 | Content for the interactive "Hear Kauli" demo (/try) |

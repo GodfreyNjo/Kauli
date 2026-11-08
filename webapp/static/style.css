@@ -8575,3 +8575,38 @@ html[data-theme="dark"] .rv-type { background: #14213a; border-color: #243556; c
 .hm-card.is-soon .hm-card-foot strong::after { content: none; }
 .hm-card.is-soon::before { content: "Soon"; position: absolute; top: 10px; left: 10px; padding: 2px 9px; border-radius: 999px; background: #e8f0ff; color: #2b63d9; font-size: .68rem; font-weight: 700; }
 .hm-art { max-width: 128px; max-height: 84px; }
+
+/* clearer card names: up to two lines, centred under the picture */
+.hm-card-foot { min-height: 2.5em; align-items: center; }
+.hm-card-foot strong { white-space: normal; line-height: 1.2; font-size: clamp(.82rem, .9vw, .95rem); overflow: visible; }
+.hm-card { padding-bottom: 10px; }
+@media (max-width: 560px) { .hm-card-foot strong { font-size: .8rem; } }
+
+/* Record & Transcribe: timer, level meter, pause, playback */
+.mk-rec { flex-direction: column; align-items: stretch; gap: 10px; }
+.mk-rec-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; }
+.mk-rec-pause { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid #d5e0f2; background: #fff; color: var(--navy, #0b2a55); font: inherit; font-weight: 700; cursor: pointer; }
+.mk-rec-meter { display: inline-block; width: 110px; height: 8px; border-radius: 999px; background: #e3ebf8; overflow: hidden; }
+.mk-rec-meter i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #2fbf71, #f2c230 70%, #e23b3b); transition: width .08s linear; }
+.mk-rec-done { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; }
+.mk-rec-done[hidden] { display: none; }
+.mk-rec-done audio { height: 40px; max-width: 100%; }
+.mk-rec-continue { min-height: 42px; padding: 0 20px; border: 0; border-radius: 12px; color: #fff; font: inherit; font-weight: 700; cursor: pointer; background: linear-gradient(145deg, #2a86f4, #0b5ad8); box-shadow: 0 12px 22px -14px rgba(20, 100, 225, .9); }
+
+/* Transcribe from Cloud: the paste-a-link form (the picker buttons sit under it when their keys are set) */
+.cloud-import { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px; border-radius: 16px; border: 1px solid #d9e3f4; background: #f6f9ff; }
+.cloud-import .ci-link { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.cloud-import .ci-label { font-size: .9rem; font-weight: 800; opacity: 1; color: var(--navy, #0b2a55); }
+.cloud-import .ci-field { display: flex; gap: 8px; }
+.cloud-import .ci-field input { flex: 1; min-width: 0; min-height: 42px; border-radius: 12px; border: 1.5px solid #d5e0f2; background: #fff; padding: 0 12px; font: inherit; font-size: .92rem; }
+.cloud-import .ci-field input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, .14); }
+.cloud-import .ci-go { flex: none; min-height: 42px; padding: 0 20px; border: 0; border-radius: 12px; color: #fff; font-weight: 700; background: linear-gradient(145deg, #2a86f4, #0b5ad8); cursor: pointer; }
+.cloud-import .ci-go:disabled { opacity: .6; cursor: progress; }
+.cloud-import .ci-hint { font-size: .8rem; color: #5a6c8a; }
+.cloud-import .ci-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.cloud-import .ci-buttons:empty { display: none; }
+html[data-theme="dark"] .cloud-import { background: #14213a; border-color: #243556; }
+html[data-theme="dark"] .cloud-import .ci-label { color: #eaf1ff; }
+html[data-theme="dark"] .cloud-import .ci-field input { background: #0f1a2e; border-color: #243556; color: #eaf1ff; }
+html[data-theme="dark"] .mk-rec-pause { background: #14213a; border-color: #243556; color: #eaf1ff; }
+html[data-theme="dark"] .mk-rec-meter { background: #243556; }

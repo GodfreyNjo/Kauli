@@ -12,6 +12,9 @@ Each provider is inert until its keys are in .env:
     GOOGLE_PICKER_APP_ID                 the Google Cloud project NUMBER
     ONEDRIVE_CLIENT_ID                   an Azure app registration (Application/client ID) with the site as a redirect URI
 Setup steps are in marketing/cloud-import-setup.md.
+
+Without any keys, a customer can still paste a share link ("Anyone with the link") from any of the three: see
+cloud_links.py for how the link becomes a download address, and import_link below.
 """
 from __future__ import annotations
 
@@ -26,7 +29,7 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from . import db, rate_limit, upload_security
+from . import cloud_links, db, rate_limit, upload_security
 
 router = APIRouter()
 A = None
@@ -35,6 +38,7 @@ MEDIA_SUFFIXES = {".mp3", ".wav", ".m4a", ".flac", ".ogg", ".opus", ".aac", ".wm
 ALLOWED_HOSTS = {
     "dropbox": (".dropbox.com", ".dropboxusercontent.com"),
     "onedrive": (".sharepoint.com", ".1drv.com", ".1drv.ms", ".live.com", ".microsoftpersonalcontent.com", ".onedrive.com"),
+    "gdrive": (".drive.google.com", ".usercontent.google.com", ".googleusercontent.com"),      # a public Drive link
 }
 KEEP_SECONDS = 24 * 3600
 
@@ -43,7 +47,6 @@ def register(app_module) -> None:
     global A
     A = app_module
     app_module.app.include_router(router)
-    app_module.templates.env.globals["cloud_import_config"] = config   # the home card shows only when it works
 
 
 def config() -> dict:
@@ -100,8 +103,11 @@ def display_name(upload_key: str) -> str:
     return upload_key.split(":", 2)[2] if upload_key.count(":") >= 2 else "recording"
 
 
-def _download(url: str, dest: Path, headers: dict | None = None, provider: str | None = None, limit: int | None = None) -> int:
-    """Streams a file to disk with a size ceiling. Redirects are followed by hand and must stay on the provider's own hosts."""
+def _download(url: str, dest: Path, headers: dict | None = None, provider: str | None = None, limit: int | None = None,
+              meta: dict | None = None) -> int:
+    """Streams a file to disk with a size ceiling. Redirects are followed by hand and must stay on the provider's own hosts.
+
+    When `meta` is given it is filled with the content type and the announced file name of the final response."""
     limit = limit or upload_security.MAX_UPLOAD_BYTES
     with httpx.Client(follow_redirects=False, timeout=httpx.Timeout(30.0, read=120.0)) as client:
         for _ in range(4):
@@ -113,6 +119,9 @@ def _download(url: str, dest: Path, headers: dict | None = None, provider: str |
                     continue
                 if r.status_code != 200:
                     raise ValueError(f"The provider refused the download ({r.status_code}). Pick the file again.")
+                if meta is not None:
+                    meta["type"] = r.headers.get("content-type", "")
+                    meta["disposition"] = r.headers.get("content-disposition", "")
                 size = int(r.headers.get("content-length") or 0)
                 if size and size > limit:
                     raise ValueError(f"That file is larger than the {limit // (1024 * 1024 * 1024)} GB limit.")
@@ -191,3 +200,67 @@ async def import_fetch(request: Request):
         return JSONResponse({"error": "Could not download that file. Check your connection and try again."}, status_code=502)
     A.account_hub.track_feature(request, "cloud_import", provider=provider)
     return JSONResponse({"ok": True, "upload_key": f"import:{token_id}:{name}", "filename": name, "size": size})
+
+
+DOWNLOAD_FAILED = "Could not download that file. Check your connection and try again."
+LINK_HELP = 'That link did not work. Set sharing to "Anyone with the link", copy the link again and paste it here.'
+
+
+def _link_file_name(hint: str, meta: dict) -> str:
+    """The name to keep the file under: the server's header or the link, and the content type if it has no suffix."""
+    kind = (meta.get("type") or "").lower()
+    if kind.startswith(("text/", "application/json")):
+        raise ValueError(LINK_HELP)                                     # a sign-in or error page, not the file
+    name = safe_name(cloud_links.name_from_headers(meta.get("disposition"), kind) or hint)
+    if Path(name).suffix.lower() not in MEDIA_SUFFIXES:
+        suffix = cloud_links.suffix_from_type(kind)
+        if not suffix:
+            raise ValueError("That is not an audio or video file we can transcribe.")
+        name = Path(name).stem + suffix
+    return name
+
+
+def _stage_link(client_id: str, found: cloud_links.Resolved) -> dict:
+    """Download the file behind a share link into the private staging folder. ValueError carries a message to show."""
+    d = imports_dir(client_id)
+    _purge(d)
+    token_id = uuid.uuid4().hex
+    part, meta = d / f"{token_id}.part", {}
+    try:
+        size = _download(found.url, part, None, found.provider, meta=meta)
+        name = _link_file_name(found.name, meta)
+        part.rename(d / f"{token_id}{Path(name).suffix.lower()}")
+    except ValueError as exc:
+        part.unlink(missing_ok=True)
+        refused = str(exc).startswith(("The provider refused", "The file's address leads"))
+        raise ValueError(LINK_HELP if refused else str(exc)) from exc
+    except Exception:
+        part.unlink(missing_ok=True)
+        raise
+    return {"ok": True, "upload_key": f"import:{token_id}:{name}", "filename": name, "size": size}
+
+
+@router.post("/account/import/link")
+async def import_link(request: Request):
+    """Body: {"url": a Google Drive, OneDrive or Dropbox share link}. Returns {upload_key, filename, size}. No keys."""
+    user = A.current_user(request)
+    if not user or user["role"] != "client":
+        return JSONResponse({"error": "Sign in to continue."}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Bad request."}, status_code=400)
+    found = cloud_links.resolve(str(body.get("url") or ""))
+    if not found:
+        return JSONResponse({"error": "Paste a share link from Google Drive, OneDrive or Dropbox."}, status_code=400)
+    allowed, retry = rate_limit.check(f"import:{user['id']}", limit=10, window_s=600)
+    if not allowed:
+        return JSONResponse({"error": f"Too many imports. Try again in {retry}s."}, status_code=429)
+    try:
+        staged = _stage_link(user["client_scope_id"], found)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    except httpx.HTTPError:
+        return JSONResponse({"error": DOWNLOAD_FAILED}, status_code=502)
+    A.account_hub.track_feature(request, "cloud_import", provider="link")
+    return JSONResponse(staged)

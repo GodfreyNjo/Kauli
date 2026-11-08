@@ -22,14 +22,13 @@ def test_home_has_the_seven_action_cards_with_the_right_destinations(env):
     for expected in ("/account#order-form", "/account?source=record#order-form", "/account?source=youtube#order-form",
                      "/account/meetings", "/try", "/account/integrations"):
         assert expected in hrefs, expected
-    for label in ("Upload", "Record", "From YouTube", "Meeting", "From cloud", "See sample", "Connect tools"):
+    for label in ("Upload &amp; Transcribe", "Record &amp; Transcribe", "Transcribe from YouTube", "Transcribe Meeting",
+                  "Transcribe from Cloud", "See sample", "Connect tools"):
         assert f"<strong>{label}</strong>" in page, label
 
 
-def test_the_cloud_card_says_soon_until_a_cloud_service_is_set_up_and_then_opens_the_picker(env):
+def test_the_cloud_card_needs_no_setup_because_pasting_a_share_link_works_without_keys(env):
     env.monkeypatch.setenv("RECALL_API_KEY", "test-key")
-    assert "is-soon" in env.client.get("/account/home").text
-    env.monkeypatch.setenv("DROPBOX_APP_KEY", "test-key")
     page = env.client.get("/account/home").text
     assert "is-soon" not in page and "/account?source=cloud#order-form" in _hrefs(page)
 

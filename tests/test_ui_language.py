@@ -69,7 +69,8 @@ def test_the_dashboard_follows_the_language_on_the_account(env, wav_bytes):
     env.order_from(env.place(wav_bytes, review_tier="human"))
     env.db.set_ui_lang("u1", "es")
     home = env.client.get("/account/home").text
-    assert '<html lang="es"' in home and "Subir archivos" in home and "Mis pedidos" in home and "Pendientes" in home
+    assert ('<html lang="es"' in home and "Subir y transcribir" in home and "Mis pedidos" in home
+            and "Pendientes" in home)
     assert "Pendiente de pago" in home and "Upload files" not in home and "Recent files" not in home
     pending = env.client.get("/account/pending").text
     assert "Pedidos pendientes" in pending and "Pagar ahora" in pending
@@ -81,7 +82,7 @@ def test_chinese_dates_numbers_and_arabic_layout_on_the_dashboard(env, wav_bytes
     env.order_from(env.place(wav_bytes))
     env.db.set_ui_lang("u1", "zh")
     home = env.client.get("/account/home").text
-    assert '<html lang="zh-Hans"' in home and "上传文件" in home and re.search(r"\d+月\d+日 \d\d:\d\d", home)
+    assert '<html lang="zh-Hans"' in home and "上传并转写" in home and re.search(r"\d+月\d+日 \d\d:\d\d", home)
     env.db.set_ui_lang("u1", "ar")
     assert '<html lang="ar" dir="rtl"' in env.client.get("/account/home").text
 

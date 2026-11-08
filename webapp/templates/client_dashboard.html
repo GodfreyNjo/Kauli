@@ -104,8 +104,16 @@
             <p class="file-queue-note" id="file-queue-note" role="status"></p>
             <div class="cloud-import" id="cloud-import" hidden></div>
             <div class="mk-rec" id="mk-rec" hidden>
-              <button type="button" class="mk-rec-btn" id="rec-toggle" aria-pressed="false"><span class="mk-rec-dot" aria-hidden="true"></span><span id="rec-label">Record audio</span></button>
-              <span class="mk-rec-time" id="rec-time" aria-live="off" hidden>0:00</span>
+              <div class="mk-rec-row">
+                <button type="button" class="mk-rec-btn" id="rec-toggle" aria-pressed="false"><span class="mk-rec-dot" aria-hidden="true"></span><span id="rec-label">Record audio</span></button>
+                <button type="button" class="mk-rec-pause" id="rec-pause" hidden>Pause</button>
+                <span class="mk-rec-time" id="rec-time" aria-live="off" hidden>0:00</span>
+                <span class="mk-rec-meter" id="rec-meter" aria-hidden="true" hidden><i id="rec-level"></i></span>
+              </div>
+              <div class="mk-rec-done" id="rec-done" hidden>
+                <audio id="rec-preview" controls preload="metadata" aria-label="Play back your recording"></audio>
+                <button type="button" class="mk-rec-continue" id="rec-continue">Transcribe this &rarr;</button>
+              </div>
               <span class="mk-rec-note" id="rec-note" role="status" aria-live="polite"></span>
             </div>
           </div>
