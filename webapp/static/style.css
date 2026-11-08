@@ -8610,3 +8610,42 @@ html[data-theme="dark"] .cloud-import .ci-label { color: #eaf1ff; }
 html[data-theme="dark"] .cloud-import .ci-field input { background: #0f1a2e; border-color: #243556; color: #eaf1ff; }
 html[data-theme="dark"] .mk-rec-pause { background: #14213a; border-color: #243556; color: #eaf1ff; }
 html[data-theme="dark"] .mk-rec-meter { background: #243556; }
+
+/* ===== sizing for every redesigned page: the header picture never overlaps the steps, and everything tightens at narrower widths (browser zoom) ===== */
+.mk-title-art { top: 4px; width: 170px; }
+.mk-title { min-height: 76px; margin-bottom: 14px; }
+@media (max-width: 1280px) {
+  .mk-title-art { display: none; }
+  main:has(.wizard-card) .ds-head h1 { font-size: clamp(1.5rem, 2.2vw, 1.9rem); }
+  main:has(.wizard-card) .ds-head p { font-size: .92rem; margin-top: 2px; }
+  main:has(.wizard-card) .ds-head .ds-btn, main:has(.wizard-card) .ds-head .btn { min-height: 38px; padding: 0 16px; font-size: .9rem; }
+  .wizard-card.ds-card { padding: 16px 18px 0; border-radius: 22px; }
+  .mk-title-ic { width: 44px; height: 44px; border-radius: 13px; } .mk-title-ic svg { width: 24px; height: 24px; }
+  .mk-title { min-height: 52px; gap: 12px; margin-bottom: 10px; }
+  .mk-title .wizard-title { font-size: 1.4rem; } .mk-title .wizard-sub { font-size: .88rem; margin-top: 2px; }
+  .wizard-card #wizard-steps { margin: 2px 0 14px; }
+  .wizard-card #wizard-steps .wizard-step { padding: 3px 14px 3px 3px; gap: 8px; font-size: .86rem; }
+  .wizard-card .wizard-step-num { width: 30px; height: 30px; font-size: .85rem; }
+  .wizard-card .wizard-step-line { margin: 0 10px; }
+  .wizard-pane-title { font-size: 1.15rem; margin-bottom: 10px; }
+  .src-cards { gap: 40px; } .src-or { width: 38px; height: 38px; font-size: .72rem; }
+  .src-card { padding: 8px 16px 14px; border-radius: 20px; } .src-card h3 { font-size: 1.1rem; margin-bottom: 6px; }
+  .mk-art .hm-art { max-width: 108px; max-height: 68px; }
+  .src-card .dropzone { padding: 12px; } .src-card .dropzone-text { font-size: .9rem; }
+  .mk-choose { min-height: 36px; padding: 0 22px; font-size: .9rem; }
+  .src-card .src-chips li { font-size: .72rem; padding: 4px 10px; } .mk-limits { font-size: .82rem; margin-top: 10px; }
+  .src-link { min-height: 46px; } .src-go { width: 36px; height: 36px; }
+  .mk-sub { font-size: 1.05rem; margin: 16px 0 8px; } .mk-lang select { min-height: 42px; font-size: .92rem; }
+  .tiers legend { font-size: 1rem; } .tiers .tier-option strong { font-size: .95rem; } .tiers .tier-option p { font-size: .76rem; }
+  .pricing-summary .pricing-summary-heading { font-size: 1.05rem; padding: 12px 16px; }
+  .pricing-summary .pricing-total span:last-child { font-size: 1.5rem; }
+  .review-list > div:nth-child(1) dd { font-size: 1.1rem; }
+  .wizard-actions { padding: 10px 18px; margin: 14px -18px 0; }
+  .wizard-actions .wizard-next, .wizard-actions .wizard-submit { min-height: 40px; padding: 0 22px; font-size: .92rem; }
+  .mk-free-banner { padding: 6px 14px; font-size: .82rem; }
+  /* finished order */
+  .od-title-ic { width: 40px; height: 40px; border-radius: 12px; } .od-head h1 { font-size: 1.4rem; }
+  .od-state { padding: 6px 8px 6px 14px; border-radius: 18px; } .od-state strong { font-size: 1rem; } .od-dl { min-height: 38px; padding: 0 16px; font-size: .9rem; }
+  .mk-q { min-height: 84px; } .mk-q strong { font-size: .92rem; }
+  .order-transcript-header h2 { font-size: 1.05rem !important; }
+}
