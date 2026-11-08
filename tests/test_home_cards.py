@@ -22,8 +22,8 @@ def test_home_has_the_seven_action_cards_with_the_right_destinations(env):
     for expected in ("/account#order-form", "/account?source=record#order-form", "/account?source=youtube#order-form",
                      "/account/meetings", "/try", "/account/integrations"):
         assert expected in hrefs, expected
-    for label in ("Upload &amp; Transcribe", "Record &amp; Transcribe", "Transcribe from YouTube", "Transcribe Meeting",
-                  "Transcribe from Cloud", "See sample", "Connect tools"):
+    for label in ("Upload &amp; Process", "Record &amp; Process", "Process from YouTube", "Process Meeting",
+                  "Process from Cloud", "See sample", "Connect tools"):
         assert f"<strong>{label}</strong>" in page, label
 
 

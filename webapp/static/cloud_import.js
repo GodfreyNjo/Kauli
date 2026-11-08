@@ -1,4 +1,4 @@
-/* Transcribe from the cloud, on the upload step. Two ways in:
+/* Process from the cloud, on the upload step. Two ways in:
    1. Paste a share link from Google Drive, OneDrive or Dropbox ("Anyone with the link"). Needs no setup (POST /account/import/link).
    2. A button per service that has its keys in .env: the service's own picker opens in the browser and Kauli only receives the one
       file that was chosen (GET /account/import/config says which are switched on). */
@@ -85,7 +85,7 @@
   // the link form is always there: it needs no keys
   var form = document.createElement("form");
   form.className = "ci-link";
-  form.innerHTML = '<span class="ci-label">Transcribe from the cloud</span>' +
+  form.innerHTML = '<span class="ci-label">Process from the cloud</span>' +
     '<span class="ci-field"><input type="url" id="ci-link" placeholder="Paste a Google Drive, OneDrive or Dropbox share link" ' +
     'aria-label="Share link from Google Drive, OneDrive or Dropbox" autocomplete="off" maxlength="2000">' +
     '<button type="submit" class="ci-go">Import</button></span>' +

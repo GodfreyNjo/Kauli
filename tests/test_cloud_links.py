@@ -134,8 +134,8 @@ def test_the_cloud_card_is_always_live_and_the_card_names_are_clear(env):
     env.monkeypatch.setenv("RECALL_API_KEY", "key")
     page = env.client.get("/account/home").text
     assert "/account?source=cloud#order-form" in page and "is-soon" not in page
-    for label in ("Upload &amp; Transcribe", "Record &amp; Transcribe", "Transcribe from YouTube", "Transcribe Meeting",
-                  "Transcribe from Cloud"):
+    for label in ("Upload &amp; Process", "Record &amp; Process", "Process from YouTube", "Process Meeting",
+                  "Process from Cloud"):
         assert f"<strong>{label}</strong>" in page, label
 
 
@@ -155,4 +155,4 @@ def test_every_language_has_the_five_card_names():
     for code, catalog in ui_text.CATALOG.items():
         for key in ("act_upload_t", "act_rec_t", "act_yt_t", "act_meet_t", "act_cloud_t"):
             assert catalog.get(key), (code, key)
-    assert re.search(r"transcribe", ui_text.EN["act_cloud_t"], re.I)
+    assert re.search(r"process", ui_text.EN["act_cloud_t"], re.I)

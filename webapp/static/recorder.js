@@ -1,7 +1,7 @@
-/* Record & Transcribe: record audio in the browser on the upload step.
+/* Record & Process: record audio in the browser on the upload step.
    While recording: a timer, a live level meter (so you can see the microphone is working) and Pause / Resume.
    When you stop: the take is added to the upload list as an ordinary file (through window.kauliAddFiles, set by client_wizard.js),
-   you can play it back, and "Transcribe this" moves on to the next step. Everything after that (price, languages, submit) is the same
+   you can play it back, and "Process this" moves on to the next step. Everything after that (price, languages, submit) is the same
    as for any file. Needs a microphone and MediaRecorder; where either is missing the control stays hidden. */
 (function () {
   "use strict";
