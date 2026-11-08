@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}Diagnostics{% endblock %}
+{% block content %}
+<header class="rp-head">
+  <div>
+    <h1>Diagnostics</h1>
+    <p>Every unexpected failure is recorded here with a reference number. Start from the number a customer quotes, or from the newest failure below. <a href="/staff/engineering/04-diagnostics-runbook">How to investigate a failure</a>.</p>
+  </div>
+</header>
+
+<form method="get" action="/staff/diagnostics" class="dg-lookup" role="search">
+  <label for="dg-ref">Reference number</label>
+  <input id="dg-ref" type="search" name="ref" value="{{ ref }}" placeholder="e.g. 3fa85f6457174562" autocomplete="off">
+  <button type="submit" class="rp-btn primary">Find</button>
+</form>
+
+{% if ref %}
+<section class="dg-card" aria-label="Failure {{ ref }}">
+  {% if found %}
+  <h2>{{ found.error_type }} <small>{{ found.id }}</small></h2>
+  <dl class="dg-facts">
+    <div><dt>When</dt><dd>{{ found.created_at|int|timestamp_to_str }}</dd></div>
+    <div><dt>Where in the code</dt><dd><code>{{ found.where_raised }}</code></dd></div>
+    <div><dt>Request</dt><dd><code>{{ found.method }} {{ found.path }}</code></dd></div>
+    <div><dt>Account</dt><dd>{% if found.user_id %}<a href="/staff/clients/{{ found.user_id }}">{{ found.user_id[:8] }}</a>{% else %}not signed in{% endif %}</dd></div>
+    <div><dt>Message</dt><dd>{{ found.message }}</dd></div>
+  </dl>
+  <h3>Stack trace</h3>
+  <pre class="dg-stack">{{ found.stack }}</pre>
+  <p class="muted">The same reference is in the server log on every line of this request: <code>docker logs kauli | grep {{ found.id }}</code></p>
+  {% else %}
+  <p>No failure is recorded under <code>{{ ref }}</code>. It may be older than the last 2,000 failures, or it may be a request that did not fail. Search the server log: <code>docker logs kauli | grep {{ ref }}</code></p>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="dg-card" aria-label="Recent failures">
+  <h2>Failures in the last 7 days</h2>
+  {% if groups %}
+  <div class="dg-table-wrap"><table class="dg-table">
+    <thead><tr><th>Failure</th><th>Where</th><th class="num">Times</th><th>Last seen</th><th>Newest reference</th></tr></thead>
+    <tbody>
+    {% for g in groups %}
+      <tr>
+        <td><b>{{ g.error_type }}</b><small>{{ g.latest_message }}</small></td>
+        <td><code>{{ g.where_raised }}</code><small>{{ g.latest_path }}</small></td>
+        <td class="num">{{ g.times }}</td>
+        <td class="muted">{{ g.last_seen|int|time_ago }}</td>
+        <td><a href="/staff/diagnostics?ref={{ g.latest_reference }}"><code>{{ g.latest_reference }}</code></a></td>
+      </tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}
+  <p class="muted">No unexpected failures recorded in the last 7 days.</p>
+  {% endif %}
+</section>
+
+<section class="dg-card" aria-label="Configuration checks">
+  <h2>Outside services</h2>
+  <p class="muted">Yes or no only; secrets are never shown here. A service that is off explains many symptoms.</p>
+  <ul class="dg-checks">
+    {% for name, on, affects in checks %}
+    <li><span class="dg-dot {{ 'is-on' if on else 'is-off' }}" aria-hidden="true"></span><b>{{ name }}</b> <span class="{{ 'ok' if on else 'muted' }}">{{ 'on' if on else 'off' }}</span><small>{{ affects }}</small></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

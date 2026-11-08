@@ -8033,3 +8033,37 @@ body.m-public #faq .m-faq-item summary:focus-visible { outline: 3px solid #0a4fb
 .pay-math li { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; }
 .pay-math li b { white-space: nowrap; }
 .pay-math-sum { margin: 10px 0 0; padding-top: 8px; border-top: 1px dashed var(--border-subtle); font-size: 0.88rem; color: var(--muted); }
+
+/* ---- Staff: Engineering guide and Diagnostics ---- */
+.eg { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px; align-items: start; }
+.eg-nav { position: sticky; top: 16px; display: grid; gap: 4px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); }
+.eg-nav a { padding: 8px 12px; border-radius: 8px; color: inherit; text-decoration: none; font-size: 0.92rem; }
+.eg-nav a:hover { background: var(--hover); }
+.eg-nav a.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 700; }
+.eg-nav .eg-extra { margin-top: 8px; border-top: 1px solid var(--border-subtle); border-radius: 0 0 8px 8px; color: var(--muted); }
+.eg-body { padding: 8px 28px 28px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); line-height: 1.65; min-width: 0; }
+.eg-body h1 { font-size: 1.7rem; margin: 18px 0 10px; } .eg-body h2 { font-size: 1.3rem; margin: 28px 0 8px; } .eg-body h3 { font-size: 1.05rem; margin: 20px 0 6px; }
+.eg-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.92rem; display: block; overflow-x: auto; }
+.eg-body th, .eg-body td { text-align: left; padding: 8px 10px; border: 1px solid var(--border-subtle); vertical-align: top; }
+.eg-body th { background: color-mix(in srgb, var(--muted) 10%, transparent); }
+.eg-body code { padding: 1px 6px; border-radius: 6px; background: color-mix(in srgb, var(--muted) 14%, transparent); font-size: 0.9em; }
+.eg-body pre { overflow-x: auto; padding: 14px 16px; border-radius: 10px; background: color-mix(in srgb, #000 28%, var(--surface)); line-height: 1.5; }
+.eg-body pre code { padding: 0; background: none; }
+.eg-body blockquote { margin: 12px 0; padding: 6px 16px; border-left: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+@media (max-width: 900px) { .eg { grid-template-columns: 1fr; } .eg-nav { position: static; } .eg-body { padding: 4px 16px 20px; } }
+
+.dg-lookup { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 16px; }
+.dg-lookup label { font-weight: 700; } .dg-lookup input { margin: 0; min-width: 260px; flex: 1; max-width: 420px; }
+.dg-card { border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--surface); padding: 18px 22px 22px; margin: 0 0 16px; }
+.dg-card h2 { margin: 0 0 10px; font-size: 1.2rem; } .dg-card h2 small { color: var(--muted); font-weight: 500; font-size: 0.8rem; margin-left: 8px; }
+.dg-facts { display: grid; gap: 8px; margin: 0 0 12px; } .dg-facts div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 10px; }
+.dg-facts dt { color: var(--muted); } .dg-facts dd { margin: 0; overflow-wrap: anywhere; }
+.dg-stack { overflow-x: auto; padding: 14px 16px; border-radius: 10px; background: color-mix(in srgb, #000 28%, var(--surface)); font-size: 0.82rem; line-height: 1.5; white-space: pre; }
+.dg-table-wrap { overflow-x: auto; } .dg-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.dg-table th { text-align: left; font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 8px 10px; }
+.dg-table td { padding: 10px; border-top: 1px solid var(--border-subtle); vertical-align: top; } .dg-table td small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.dg-checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dg-checks li { display: grid; grid-template-columns: 14px auto auto minmax(0, 1fr); align-items: center; gap: 10px; }
+.dg-checks small { color: var(--muted); }
+.dg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); } .dg-dot.is-on { background: var(--ok, #1fa55a); }
+@media (max-width: 700px) { .dg-facts div { grid-template-columns: 1fr; } .dg-checks li { grid-template-columns: 14px auto auto; } .dg-checks small { grid-column: 2 / -1; } }

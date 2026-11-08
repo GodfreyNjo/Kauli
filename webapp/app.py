@@ -1,10 +1,9 @@
-"""Local demo platform for Kauli - client upload -> processing -> staff
-review -> delivery, as a clickable UI on top of the real pipeline.
+"""The Kauli website and portals: every page and API route, and the wiring of all the other modules.
 
-Auth is real (Supabase email/password) but everything else here still
-isn't production: no payments, not deployed, single-tenant SQLite. It
-exists so you can experience/demo the end-to-end flow before the roadmap's
-later phases get built for real. Run with:
+Customers upload and pay, the pipeline processes, staff review, results are delivered. Sign-in is Supabase
+(email and password) and Google; data is a single SQLite file (see db.py); payments are Paystack, M-Pesa and bank
+transfer (see billing.py). This file is large and is being split by topic: put new code in a module of its own
+(see the engineering guide, coding standards), not here. Run locally with:
     uvicorn webapp.app:app --reload --port 8000
 """
 from __future__ import annotations
@@ -57,7 +56,7 @@ from kauli.providers.asr import TRANSKRIPTOR_LANGUAGES  # noqa: E402
 from kauli.providers.asr_cloud import cheap_providers_configured  # noqa: E402
 from kauli.providers import own_quality  # noqa: E402
 from kauli import screen_text  # noqa: E402
-from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, funnel_audit, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi  # noqa: E402
+from . import js_strings, staff_integrations, locales as site_locales, seo_languages, demo_content, human_review_content, meeting_bot, ui_text, locations, solution_pages, blog_guides, account_hub, blog_audio, cloud_import, calendar_feed, calendar_auto, meeting_notes, podcast, lifecycle, provider_health, connections, summary_templates, account_closure, winback, dunning, site_analytics, funnel_audit, engagement, onboarding, repurpose, model_stats, transcript_reuse, page_translate, brand, seo_pages, usage_prompts, savings, weekly_kpi, diagnostics_routes  # noqa: E402
 from jinja2 import pass_context  # noqa: E402
 from markupsafe import Markup, escape as _escape  # noqa: E402
 from kauli.subtitles import to_srt, to_vtt, cue_dicts, _wrap_caption_text, _display_end_ms  # noqa: E402
@@ -12448,6 +12447,7 @@ account_closure.register(sys.modules[__name__])
 winback.register(sys.modules[__name__])
 dunning.register(sys.modules[__name__])
 engagement.register(sys.modules[__name__])
+diagnostics_routes.register(sys.modules[__name__])
 onboarding.register(sys.modules[__name__])
 repurpose.register(sys.modules[__name__])
 model_stats.register(sys.modules[__name__])

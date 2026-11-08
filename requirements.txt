@@ -115,3 +115,6 @@ PyJWT[crypto]>=2.8.0
 # --- calendar links (webapp/calendar_feed.py): read iCal feeds and expand recurring meetings ---
 icalendar>=6.0.0
 recurring-ical-events>=3.3.0
+
+# --- engineering guide for staff (webapp/engineering_docs.py): rendering the Markdown pages ---
+markdown>=3.5

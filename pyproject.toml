@@ -1,0 +1,43 @@
+# Project-wide tool settings. The standards these enforce are explained in docs/engineering/02-coding-standards.md.
+
+[tool.ruff]
+line-length = 120                     # PEP 8 allows up to 120 by team agreement; Black's 88 is too tight for this codebase's long prose comments
+target-version = "py312"
+extend-exclude = ["data", "output", ".venv", "marketing", "kauli/vendor"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",        # pycodestyle: the PEP 8 style rules (the Python counterpart of the Betty style checker for C)
+    "F",             # pyflakes: unused imports and variables, undefined names
+    "B",             # bugbear: patterns that are usually bugs
+    "N",             # pep8-naming: names that say what a thing is
+    "SIM",           # simplifications: code that can be said more simply
+    "C90",           # complexity: too many branches in one function
+    "PLR0912", "PLR0913", "PLR0915",   # too many branches, arguments or statements in one function
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.pylint]
+max-args = 8
+max-branches = 14
+max-statements = 40
+
+[tool.ruff.lint.per-file-ignores]
+# Tests import fixtures by name (a pytest convention), which looks like an unused or redefined import to a linter.
+"tests/*" = ["F401", "F811"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
+
+[tool.coverage.run]
+source = ["webapp", "kauli"]
+branch = true
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

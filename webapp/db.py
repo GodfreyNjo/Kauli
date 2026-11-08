@@ -1,10 +1,9 @@
-"""SQLite storage for the local demo platform.
+"""The database: every table, its migrations, and every read and write the site makes (SQLite).
 
-Auth itself is real now: Supabase Auth owns credentials (email/password),
-verified via webapp/supabase_auth.py. This table never sees a password -
-it only maps a Supabase user id -> our local role ('client'/'staff') and
-display name, and is the join target for orders. Still a local, single-
-machine SQLite demo otherwise - not the real Phase 2/3 platform.
+Sign-in credentials live in Supabase Auth (see supabase_auth.py), never here: the users table only maps an account
+to its role and profile, and is what orders, payments and everything else join to. One SQLite file on the server's
+data volume; the schema is in SCHEMA below and `init_db()` migrates an existing file forward on every start.
+Migrations only ever add; take a backup before shipping one (see the Deploying page of the engineering guide).
 """
 from __future__ import annotations
 
@@ -584,6 +583,7 @@ CREATE TABLE IF NOT EXISTS account_exit_surveys (
 -- that doesn't exist has no real user_id to attach, but the attempted
 -- email/IP is still worth keeping. Append-only by design (no update/delete
 -- helper below) - an audit log that can be edited after the fact isn't one.
+-- (The app_errors table, for unexpected failures, is created by webapp/diagnostics.py on first use.)
 CREATE TABLE IF NOT EXISTS security_events (
     id TEXT PRIMARY KEY,
     kind TEXT NOT NULL,          -- 'login_success' | 'login_failed' | 'signup' | 'password_changed' |

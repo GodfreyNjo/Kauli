@@ -1,0 +1,825 @@
+{
+ "file_lines": {
+  "kauli/pipeline.py": 914,
+  "webapp/account_hub.py": 1389,
+  "webapp/app.py": 12455,
+  "webapp/billing.py": 1046,
+  "webapp/blog_seed.py": 870,
+  "webapp/db.py": 5755,
+  "webapp/ui_text.py": 1836
+ },
+ "function_lines": {
+  "kauli/caption_formats.py::to_ass": 41,
+  "kauli/mixer.py::build_timeline": 50,
+  "kauli/pipeline.py::_protect_untranslatable": 45,
+  "kauli/pipeline.py::apply_stretch_fit": 46,
+  "kauli/pipeline.py::run": 350,
+  "kauli/pipeline.py::translate_segment": 91,
+  "kauli/providers/asr.py::FasterWhisperASR.transcribe": 45,
+  "kauli/providers/asr.py::TranskriptorASR._transcribe_via_api": 41,
+  "kauli/providers/mt.py::_build_system_prompt": 45,
+  "kauli/screen_text.py::ranges_from_measures": 48,
+  "kauli/subtitles.py::build_cues": 50,
+  "scripts/make_demo_audio.py::main": 50,
+  "scripts/make_demo_videos.py::backdrop": 56,
+  "scripts/make_demo_videos.py::draw_person": 66,
+  "scripts/make_demo_videos.py::render": 79,
+  "scripts/make_podcast_episode.py::build": 71,
+  "scripts/make_podcast_youtube.py::thumbnail": 51,
+  "scripts/make_promo_music.py::compose": 60,
+  "scripts/make_promo_video.py::mix_and_mux": 46,
+  "scripts/reset_test_account.py::main": 75,
+  "webapp/account_hub.py::_kb": 50,
+  "webapp/account_hub.py::analytics_page": 44,
+  "webapp/account_hub.py::assistant_message": 53,
+  "webapp/app.py::_activate_payment": 177,
+  "webapp/app.py::_autolink_key_terms": 43,
+  "webapp/app.py::_build_source_cells": 47,
+  "webapp/app.py::_checkout": 131,
+  "webapp/app.py::_client_dashboard_error": 44,
+  "webapp/app.py::_complete_auth_session": 78,
+  "webapp/app.py::_daily_trend_svg": 55,
+  "webapp/app.py::_deadline_watch_once": 54,
+  "webapp/app.py::_finish_meeting": 42,
+  "webapp/app.py::_fire_client_webhook": 58,
+  "webapp/app.py::_language_page_dict": 52,
+  "webapp/app.py::_llms_text": 91,
+  "webapp/app.py::_maybe_auto_render_video_deliverables": 42,
+  "webapp/app.py::_mcp_call_tool": 55,
+  "webapp/app.py::_notion_push_order": 43,
+  "webapp/app.py::_pick_mt": 51,
+  "webapp/app.py::_queue_first_payment_message": 45,
+  "webapp/app.py::_render_segment_audio": 70,
+  "webapp/app.py::_resolve_uploaded_audio": 47,
+  "webapp/app.py::_retranslate_and_resync": 55,
+  "webapp/app.py::api_create_order": 52,
+  "webapp/app.py::billing_page": 47,
+  "webapp/app.py::calendly_webhook": 41,
+  "webapp/app.py::client_dashboard": 67,
+  "webapp/app.py::client_edit_transcript": 56,
+  "webapp/app.py::client_files": 41,
+  "webapp/app.py::client_order_detail": 77,
+  "webapp/app.py::client_resume_order": 69,
+  "webapp/app.py::create_order": 597,
+  "webapp/app.py::current_user": 42,
+  "webapp/app.py::download_deliverable": 112,
+  "webapp/app.py::editor_redub": 45,
+  "webapp/app.py::editor_retranscribe": 112,
+  "webapp/app.py::editor_retranslate": 52,
+  "webapp/app.py::editor_retranslate_all": 62,
+  "webapp/app.py::editor_save_source": 77,
+  "webapp/app.py::editor_set_voice_direction": 56,
+  "webapp/app.py::guest_trial_start": 59,
+  "webapp/app.py::localize_pages": 62,
+  "webapp/app.py::login": 48,
+  "webapp/app.py::paystack_webhook": 55,
+  "webapp/app.py::request_callback": 46,
+  "webapp/app.py::settings_form": 69,
+  "webapp/app.py::settings_save": 49,
+  "webapp/app.py::settings_team_invite": 42,
+  "webapp/app.py::signup": 42,
+  "webapp/app.py::sitemap": 68,
+  "webapp/app.py::staff_blog_update": 51,
+  "webapp/app.py::staff_editor": 126,
+  "webapp/app.py::staff_jobs": 61,
+  "webapp/app.py::staff_newsletter_send": 77,
+  "webapp/app.py::staff_ops": 44,
+  "webapp/app.py::staff_ops_decision": 52,
+  "webapp/app.py::staff_overview": 88,
+  "webapp/app.py::staff_review": 41,
+  "webapp/app.py::staff_set_dub_voice": 54,
+  "webapp/app.py::status_page": 49,
+  "webapp/billing.py::mpesa_stk_push": 41,
+  "webapp/billing.py::order_cost_usd": 51,
+  "webapp/billing.py::paystack_initialize": 44,
+  "webapp/blog_audio.py::podcast_feed": 41,
+  "webapp/cloud_import.py::import_fetch": 45,
+  "webapp/db.py::client_funnel_stats": 62,
+  "webapp/db.py::get_or_create_user": 79,
+  "webapp/db.py::init_db": 611,
+  "webapp/db.py::margin_summary": 45,
+  "webapp/engagement.py::customers": 54,
+  "webapp/funnel_audit.py::_diagnose": 103,
+  "webapp/funnel_audit.py::_suggestions": 79,
+  "webapp/funnel_audit.py::analyse": 80,
+  "webapp/ga_reports.py::insights": 51,
+  "webapp/mailer.py::get_open_stats_for_tag": 44,
+  "webapp/mailer.py::send_email": 47,
+  "webapp/mailer.py::wrap_email_html": 50,
+  "webapp/onboarding.py::risk": 41,
+  "webapp/page_translate.py::localize_html": 79,
+  "webapp/podcast.py::staff_transcribe": 47,
+  "webapp/site_analytics.py::dashboard": 182,
+  "webapp/site_analytics.py::extras": 50,
+  "webapp/solution_pages.py::build": 672,
+  "webapp/solution_pages.py::refresh": 45,
+  "webapp/transcript_export.py::to_pdf": 46,
+  "webapp/upload_security.py::validate_media_upload": 88,
+  "webapp/weekly_kpi.py::build": 46,
+  "webapp/worker.py::_run_job": 118
+ },
+ "lint": {
+  "kauli/caption_formats.py": {
+   "E501": 19,
+   "SIM108": 1
+  },
+  "kauli/cli.py": {
+   "E401": 1,
+   "F401": 1
+  },
+  "kauli/mixer.py": {
+   "F401": 1
+  },
+  "kauli/models.py": {
+   "B905": 1,
+   "E501": 13
+  },
+  "kauli/pipeline.py": {
+   "B035": 1,
+   "B905": 2,
+   "C901": 1,
+   "E501": 25,
+   "F401": 1,
+   "PLR0912": 1,
+   "PLR0913": 1,
+   "PLR0915": 1,
+   "SIM105": 1
+  },
+  "kauli/providers/asr.py": {
+   "B905": 1,
+   "E501": 11,
+   "N818": 1
+  },
+  "kauli/providers/asr_cloud.py": {
+   "E501": 19,
+   "SIM905": 1
+  },
+  "kauli/providers/elevenlabs_audio.py": {
+   "E501": 1
+  },
+  "kauli/providers/mt.py": {
+   "E501": 28
+  },
+  "kauli/providers/own_quality.py": {
+   "E501": 7,
+   "E741": 2
+  },
+  "kauli/providers/tts.py": {
+   "E501": 7
+  },
+  "kauli/screen_text.py": {
+   "B905": 1,
+   "E501": 15,
+   "PLR0912": 1,
+   "PLR0915": 1,
+   "SIM105": 1
+  },
+  "kauli/speaker_gender.py": {
+   "N801": 1
+  },
+  "kauli/subtitles.py": {
+   "B905": 1,
+   "E501": 13,
+   "E741": 1
+  },
+  "scripts/eval_asr.py": {
+   "E501": 5
+  },
+  "scripts/eval_languages.py": {
+   "B023": 6,
+   "E501": 16,
+   "F401": 2
+  },
+  "scripts/export_model_quality.py": {
+   "E501": 2
+  },
+  "scripts/make_demo_audio.py": {
+   "E501": 6,
+   "PLR0915": 1
+  },
+  "scripts/make_demo_music.py": {
+   "B904": 1,
+   "E501": 9
+  },
+  "scripts/make_demo_videos.py": {
+   "B905": 3,
+   "C901": 3,
+   "E501": 35,
+   "E741": 1,
+   "N806": 1,
+   "PLR0912": 2,
+   "PLR0915": 3
+  },
+  "scripts/make_podcast_episode.py": {
+   "B904": 1,
+   "E501": 31,
+   "F541": 1,
+   "PLR0915": 1
+  },
+  "scripts/make_podcast_youtube.py": {
+   "B905": 1,
+   "E501": 21,
+   "E741": 1,
+   "F401": 1,
+   "PLR0915": 1
+  },
+  "scripts/make_promo_music.py": {
+   "C901": 1,
+   "E501": 5,
+   "PLR0915": 1
+  },
+  "scripts/make_promo_video.py": {
+   "E501": 59,
+   "F541": 2
+  },
+  "scripts/make_youtube_demos.py": {
+   "E501": 26
+  },
+  "scripts/prepare_madlad.py": {
+   "E501": 3
+  },
+  "scripts/reset_test_account.py": {
+   "C901": 1,
+   "E501": 16,
+   "F401": 1,
+   "PLR0912": 1,
+   "PLR0915": 1
+  },
+  "tests/conftest.py": {
+   "E501": 3
+  },
+  "tests/test_accessibility_page.py": {
+   "E501": 2
+  },
+  "tests/test_account_closure.py": {
+   "E501": 12
+  },
+  "tests/test_account_hub.py": {
+   "E501": 41,
+   "N801": 2
+  },
+  "tests/test_asr_cloud.py": {
+   "E501": 21,
+   "E741": 1
+  },
+  "tests/test_asr_key_chain.py": {
+   "E501": 3
+  },
+  "tests/test_assistant_inbox.py": {
+   "E501": 29,
+   "F841": 1,
+   "N801": 2
+  },
+  "tests/test_auto_switch.py": {
+   "E501": 25
+  },
+  "tests/test_billing_files_ui.py": {
+   "E501": 10
+  },
+  "tests/test_blog_audio.py": {
+   "E501": 21,
+   "N801": 2
+  },
+  "tests/test_brand_and_regions.py": {
+   "E501": 1
+  },
+  "tests/test_calendar_auto.py": {
+   "B018": 1,
+   "E501": 31
+  },
+  "tests/test_caption_formats.py": {
+   "E501": 7
+  },
+  "tests/test_captioned_video.py": {
+   "E501": 17,
+   "F541": 1
+  },
+  "tests/test_captions.py": {
+   "B007": 3,
+   "B905": 1,
+   "E501": 21,
+   "E741": 3,
+   "N802": 1,
+   "SIM905": 1
+  },
+  "tests/test_client_home.py": {
+   "E501": 4,
+   "F841": 1
+  },
+  "tests/test_client_sidebar.py": {
+   "E501": 13
+  },
+  "tests/test_cloud_and_calendar.py": {
+   "E501": 39
+  },
+  "tests/test_connections.py": {
+   "E501": 16
+  },
+  "tests/test_connections_more.py": {
+   "E501": 31
+  },
+  "tests/test_demo_page.py": {
+   "E501": 3
+  },
+  "tests/test_demo_speaker_labels.py": {
+   "E501": 3
+  },
+  "tests/test_demo_videos.py": {
+   "B007": 1,
+   "B905": 1,
+   "E501": 13
+  },
+  "tests/test_dunning.py": {
+   "E501": 13
+  },
+  "tests/test_editor_providers.py": {
+   "E501": 35
+  },
+  "tests/test_eleven_studio.py": {
+   "E501": 14,
+   "SIM300": 1
+  },
+  "tests/test_email_signoff.py": {
+   "E501": 2
+  },
+  "tests/test_engagement.py": {
+   "E501": 10
+  },
+  "tests/test_footer_podcast.py": {
+   "E501": 8
+  },
+  "tests/test_funnel_audit.py": {
+   "E501": 18
+  },
+  "tests/test_growth_flows.py": {
+   "E501": 28
+  },
+  "tests/test_human_minutes.py": {
+   "E501": 25,
+   "E741": 1
+  },
+  "tests/test_integrations_reach.py": {
+   "E501": 16
+  },
+  "tests/test_js_translation.py": {
+   "E501": 8
+  },
+  "tests/test_lara_translation.py": {
+   "E501": 1
+  },
+  "tests/test_lifecycle.py": {
+   "E501": 35,
+   "F841": 1
+  },
+  "tests/test_live_progress.py": {
+   "E501": 1
+  },
+  "tests/test_madlad_mt.py": {
+   "E501": 11
+  },
+  "tests/test_market_pricing.py": {
+   "E501": 3
+  },
+  "tests/test_media_preview.py": {
+   "E501": 4
+  },
+  "tests/test_meetings.py": {
+   "E501": 17
+  },
+  "tests/test_model_stats.py": {
+   "E501": 8
+  },
+  "tests/test_mt_providers.py": {
+   "E401": 1,
+   "E402": 2,
+   "E501": 8
+  },
+  "tests/test_multi_upload.py": {
+   "E501": 2
+  },
+  "tests/test_notion_export.py": {
+   "B018": 1,
+   "E501": 1
+  },
+  "tests/test_onboarding.py": {
+   "E501": 13
+  },
+  "tests/test_order_flow.py": {
+   "E501": 24
+  },
+  "tests/test_own_asr.py": {
+   "E501": 7,
+   "SIM905": 1
+  },
+  "tests/test_own_models_first.py": {
+   "E501": 20
+  },
+  "tests/test_page_translate.py": {
+   "E501": 25
+  },
+  "tests/test_pages_and_edits.py": {
+   "E501": 34
+  },
+  "tests/test_pay_page.py": {
+   "E501": 1
+  },
+  "tests/test_paystack_setup.py": {
+   "B008": 1,
+   "E501": 11
+  },
+  "tests/test_pipeline.py": {
+   "E401": 2,
+   "E501": 16,
+   "E702": 3
+  },
+  "tests/test_pivot_pages.py": {
+   "E501": 15,
+   "E731": 1
+  },
+  "tests/test_plan_allocations.py": {
+   "E501": 10
+  },
+  "tests/test_plan_gate.py": {
+   "E501": 9
+  },
+  "tests/test_plans_v2.py": {
+   "E501": 25
+  },
+  "tests/test_podcast.py": {
+   "E501": 48,
+   "SIM300": 1
+  },
+  "tests/test_premium_voice.py": {
+   "E501": 17
+  },
+  "tests/test_prepay.py": {
+   "E501": 21
+  },
+  "tests/test_progress.py": {
+   "E501": 8
+  },
+  "tests/test_provider_failover.py": {
+   "E501": 16
+  },
+  "tests/test_provider_switchboard.py": {
+   "E501": 22
+  },
+  "tests/test_public_api.py": {
+   "E501": 2
+  },
+  "tests/test_public_ui.py": {
+   "E501": 16
+  },
+  "tests/test_repurpose.py": {
+   "E501": 12
+  },
+  "tests/test_reset_test_account.py": {
+   "E501": 4
+  },
+  "tests/test_screen_text.py": {
+   "E501": 18,
+   "E741": 2
+  },
+  "tests/test_seo_audit.py": {
+   "C901": 1,
+   "E501": 7
+  },
+  "tests/test_seo_pages.py": {
+   "E501": 17
+  },
+  "tests/test_site_analytics.py": {
+   "B023": 1,
+   "E501": 36,
+   "F841": 2
+  },
+  "tests/test_site_analytics_ui.py": {
+   "E501": 12,
+   "F841": 1
+  },
+  "tests/test_site_dashboard.py": {
+   "E501": 32
+  },
+  "tests/test_slack_integration.py": {
+   "E501": 2
+  },
+  "tests/test_speaker_names.py": {
+   "E501": 34
+  },
+  "tests/test_staff_integrations.py": {
+   "E501": 23
+  },
+  "tests/test_staff_overview_ui.py": {
+   "E501": 16
+  },
+  "tests/test_stray_ending.py": {
+   "E501": 12
+  },
+  "tests/test_studio_tier.py": {
+   "E501": 37,
+   "F841": 1
+  },
+  "tests/test_summary_templates.py": {
+   "E501": 15
+  },
+  "tests/test_teams_integration.py": {
+   "E501": 1
+  },
+  "tests/test_transcript_reuse.py": {
+   "E501": 30
+  },
+  "tests/test_transcript_tools.py": {
+   "E501": 12
+  },
+  "tests/test_transkriptor.py": {
+   "B905": 1,
+   "E401": 1
+  },
+  "tests/test_try_demo_and_pricing.py": {
+   "E501": 5
+  },
+  "tests/test_ui_language.py": {
+   "E501": 7
+  },
+  "tests/test_upload_cards.py": {
+   "E501": 1
+  },
+  "tests/test_usual_languages.py": {
+   "B905": 2,
+   "E501": 3
+  },
+  "tests/test_vocab_hints.py": {
+   "E501": 2
+  },
+  "tests/test_web_security.py": {
+   "E501": 21,
+   "E741": 2
+  },
+  "tests/test_winback.py": {
+   "B007": 1,
+   "E501": 9
+  },
+  "tests/test_youtube_failures.py": {
+   "E501": 9
+  },
+  "tests/tmp_render_pages.py": {
+   "B007": 1,
+   "E401": 1,
+   "E501": 4,
+   "E702": 4
+  },
+  "webapp/account_closure.py": {
+   "E501": 21,
+   "SIM105": 1
+  },
+  "webapp/account_hub.py": {
+   "B905": 3,
+   "E501": 182,
+   "E741": 1,
+   "F401": 1,
+   "SIM105": 1,
+   "SIM905": 3
+  },
+  "webapp/app.py": {
+   "B008": 19,
+   "B905": 1,
+   "C901": 11,
+   "E501": 532,
+   "E741": 5,
+   "F541": 6,
+   "F841": 1,
+   "N806": 1,
+   "PLR0912": 5,
+   "PLR0913": 7,
+   "PLR0915": 9,
+   "SIM102": 1,
+   "SIM103": 1,
+   "SIM105": 1,
+   "SIM115": 1,
+   "SIM118": 6
+  },
+  "webapp/assistant_core.py": {
+   "E501": 47,
+   "SIM118": 1
+  },
+  "webapp/billing.py": {
+   "E501": 28,
+   "PLR0913": 1,
+   "SIM300": 1
+  },
+  "webapp/blog_audio.py": {
+   "B008": 1,
+   "E501": 33,
+   "SIM105": 1,
+   "SIM300": 1
+  },
+  "webapp/blog_guides.py": {
+   "E501": 97
+  },
+  "webapp/blog_seed.py": {
+   "E501": 132
+  },
+  "webapp/brand.py": {
+   "E501": 8
+  },
+  "webapp/calendar_auto.py": {
+   "E501": 19,
+   "F401": 1
+  },
+  "webapp/calendar_feed.py": {
+   "E501": 17
+  },
+  "webapp/check_youtube.py": {
+   "E501": 2
+  },
+  "webapp/cloud_import.py": {
+   "E501": 14
+  },
+  "webapp/connections.py": {
+   "E501": 80,
+   "SIM105": 1
+  },
+  "webapp/db.py": {
+   "C901": 1,
+   "E501": 93,
+   "PLR0912": 1,
+   "PLR0913": 7,
+   "PLR0915": 1
+  },
+  "webapp/demo_content.py": {
+   "E501": 50,
+   "F811": 2
+  },
+  "webapp/dunning.py": {
+   "E501": 24
+  },
+  "webapp/engagement.py": {
+   "E501": 37,
+   "F541": 1,
+   "PLR0915": 1
+  },
+  "webapp/funnel_audit.py": {
+   "C901": 1,
+   "E501": 95,
+   "F841": 2,
+   "PLR0915": 2
+  },
+  "webapp/ga_events.py": {
+   "SIM105": 1
+  },
+  "webapp/ga_reports.py": {
+   "B905": 2,
+   "C901": 1,
+   "E501": 30
+  },
+  "webapp/human_review_content.py": {
+   "E501": 55
+  },
+  "webapp/js_strings.py": {
+   "E501": 6
+  },
+  "webapp/lead_playbook.py": {
+   "E501": 44
+  },
+  "webapp/lifecycle.py": {
+   "B905": 1,
+   "E501": 56,
+   "F401": 1,
+   "SIM118": 1
+  },
+  "webapp/locales.py": {
+   "E501": 105
+  },
+  "webapp/locations.py": {
+   "E501": 18
+  },
+  "webapp/mailer.py": {
+   "E501": 6
+  },
+  "webapp/mcp_server.py": {
+   "C901": 1,
+   "E501": 4
+  },
+  "webapp/meeting_bot.py": {
+   "E501": 11
+  },
+  "webapp/meeting_notes.py": {
+   "E501": 8
+  },
+  "webapp/model_stats.py": {
+   "E501": 30
+  },
+  "webapp/nav_icons.py": {
+   "E501": 15,
+   "SIM108": 1
+  },
+  "webapp/notion_export.py": {
+   "B904": 1,
+   "E501": 1
+  },
+  "webapp/onboarding.py": {
+   "E501": 30,
+   "F401": 1,
+   "SIM105": 1
+  },
+  "webapp/order_ai_assist.py": {
+   "E501": 8
+  },
+  "webapp/page_translate.py": {
+   "B905": 1,
+   "C901": 1,
+   "E501": 36,
+   "PLR0915": 1,
+   "SIM905": 6
+  },
+  "webapp/paystack_setup.py": {
+   "E501": 10
+  },
+  "webapp/podcast.py": {
+   "E501": 43,
+   "SIM105": 1
+  },
+  "webapp/provider_health.py": {
+   "C901": 1,
+   "E501": 61,
+   "PLR0912": 1
+  },
+  "webapp/r2_uploads.py": {
+   "SIM105": 1
+  },
+  "webapp/repurpose.py": {
+   "E501": 22,
+   "SIM108": 1,
+   "SIM118": 1
+  },
+  "webapp/savings.py": {
+   "E501": 4
+  },
+  "webapp/seo_pages.py": {
+   "E501": 80,
+   "F541": 1,
+   "SIM108": 1
+  },
+  "webapp/site_analytics.py": {
+   "B005": 1,
+   "E501": 163,
+   "F841": 2,
+   "PLR0913": 2,
+   "PLR0915": 1
+  },
+  "webapp/solution_pages.py": {
+   "E501": 250
+  },
+  "webapp/staff_integrations.py": {
+   "E501": 19
+  },
+  "webapp/summary_templates.py": {
+   "E501": 6
+  },
+  "webapp/supabase_auth.py": {
+   "E501": 3,
+   "SIM105": 1
+  },
+  "webapp/tat.py": {
+   "SIM114": 1
+  },
+  "webapp/transcript_export.py": {
+   "B905": 1,
+   "E501": 7
+  },
+  "webapp/transcript_reuse.py": {
+   "E501": 21,
+   "SIM118": 1
+  },
+  "webapp/ui_text.py": {
+   "E501": 12
+  },
+  "webapp/upload_security.py": {
+   "E501": 1,
+   "F401": 1,
+   "N818": 1,
+   "PLR0915": 1,
+   "SIM105": 1
+  },
+  "webapp/usage_prompts.py": {
+   "E501": 11,
+   "SIM105": 1
+  },
+  "webapp/web_security.py": {
+   "E501": 4
+  },
+  "webapp/weekly_kpi.py": {
+   "E501": 25,
+   "SIM108": 1
+  },
+  "webapp/winback.py": {
+   "E501": 28
+  },
+  "webapp/worker.py": {
+   "C901": 1,
+   "E501": 7,
+   "PLR0915": 1,
+   "SIM105": 1,
+   "SIM118": 1
+  }
+ }
+}

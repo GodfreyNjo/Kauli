@@ -229,11 +229,12 @@
         <div class="snav-sec"><span>Help</span></div>
         {{ snav('/staff/guide', 'Editor guide', 'book_open', ['/staff/guide']) }}
         {{ snav('/staff/handbook', 'Handbook', 'book', ['/staff/handbook']) }}
+        {{ snav('/staff/engineering', 'Engineering guide', 'puzzle', ['/staff/engineering']) }}
         {{ snav('/staff/resources', 'Resources', 'folder', ['/staff/resources']) }}
         {{ snav('/status', 'Status', 'pulse', ['=/status']) }}
         {% if user['is_admin'] %}
         <div class="snav-sec"><span>Admin</span></div>
-        {{ snav('/staff/admin', 'Admin', 'shield', ['/staff/admin'], [('/staff/voice-actors', 'Voice talent', 'mic', '/staff/voice-actors'), ('/staff/security', 'Security log', 'lock', '/staff/security')]) }}
+        {{ snav('/staff/admin', 'Admin', 'shield', ['/staff/admin'], [('/staff/voice-actors', 'Voice talent', 'mic', '/staff/voice-actors'), ('/staff/security', 'Security log', 'lock', '/staff/security'), ('/staff/diagnostics', 'Diagnostics', 'alert', '/staff/diagnostics')]) }}
         {% endif %}
         {% elif user['role'] == 'voice_actor' %}
         <a href="/actor" class="{{ 'active' if request.url.path == '/actor' else '' }}">{{ nav_icon('briefcase') }}<span class="label">My jobs</span></a>

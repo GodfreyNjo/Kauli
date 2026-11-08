@@ -1,3 +1,4 @@
+"""Run the processing pipeline from the command line, without the website: `python -m kauli.cli run ...`."""
 from __future__ import annotations
 
 import argparse

@@ -1,0 +1,6 @@
+# Tools for working on the code (not needed to run the site). Install with: pip install -r requirements.txt -r requirements-dev.txt
+# Pinned exactly, because the quality baseline counts findings and a new linter version can find different things.
+ruff==0.17.4
+coverage==7.17.2
+pytest>=8
+pre-commit>=3.7

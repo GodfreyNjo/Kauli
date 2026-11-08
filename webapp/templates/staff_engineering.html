@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block theme %}{{ theme }}{% endblock %}
+{% block title %}{{ page.title }} - Engineering guide{% endblock %}
+{% block content %}
+<header class="rp-head">
+  <div>
+    <h1>Engineering guide</h1>
+    <p>How the system is built, the standards the code follows, how to work on it, and how to find and fix a failure. It lives in the same repository as the code, so it is changed together with it.</p>
+  </div>
+</header>
+<div class="eg">
+  <nav class="eg-nav" aria-label="Engineering guide pages">
+    {% for p in pages %}<a href="/staff/engineering/{{ p.slug }}"{% if p.slug == page.slug %} class="is-on" aria-current="page"{% endif %}>{{ p.title }}</a>{% endfor %}
+    {% if user['is_admin'] %}<a href="/staff/diagnostics" class="eg-extra">Diagnostics (recent failures)</a>{% endif %}
+  </nav>
+  <article class="eg-body">{{ page.html|safe }}</article>
+</div>
+{% endblock %}
