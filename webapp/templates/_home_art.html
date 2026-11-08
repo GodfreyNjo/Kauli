@@ -61,6 +61,47 @@
 </svg>
 {%- endmacro %}
 
+{#- Record: a microphone on a blue disc, with a waveform. -#}
+{% macro art_record() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <ellipse cx="100" cy="112" rx="58" ry="7" fill="#3b82f6" fill-opacity=".14"/>
+  <rect x="30" y="52" width="86" height="32" rx="16" fill="#3b82f6"/>
+  <g stroke="#fff" stroke-width="3" stroke-linecap="round"><path d="M44 66v4M52 60v16M60 64v8M68 56v24M76 63v10M84 58v20M92 64v8M100 61v14M108 66v4"/></g>
+  <circle cx="132" cy="62" r="30" fill="#2a76e8"/>
+  <rect x="124" y="42" width="16" height="28" rx="8" fill="#fff"/>
+  <path d="M118 62a14 14 0 0 0 28 0M132 76v8M125 84h14" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round"/>
+</svg>
+{%- endmacro %}
+
+{#- Meeting: a screen with two meeting-app badges and a person. -#}
+{% macro art_meeting() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <ellipse cx="100" cy="114" rx="60" ry="7" fill="#3b82f6" fill-opacity=".12"/>
+  <rect x="42" y="22" width="112" height="76" rx="14" fill="#fff" stroke="#d6e3f8" stroke-width="2"/>
+  <g stroke="#cbd9f0" stroke-width="4" stroke-linecap="round"><path d="M58 42h40M58 54h56M58 66h30"/></g>
+  <path d="M58 54h56" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="140" cy="36" r="15" fill="#e3eeff" stroke="#fff" stroke-width="3"/><circle cx="140" cy="32" r="5" fill="#5b8def"/><path d="M130 46a10 10 0 0 1 20 0z" fill="#5b8def"/>
+  <circle cx="54" cy="94" r="17" fill="#fff" stroke="#e1e9f7" stroke-width="2"/>
+  <path d="M46 88h11a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H46a3 3 0 0 1-3-3v-7a3 3 0 0 1 3-3zm14 4 7-4v14l-7-4z" fill="#00ac47"/>
+  <circle cx="148" cy="96" r="17" fill="#fff" stroke="#e1e9f7" stroke-width="2"/>
+  <rect x="139" y="87" width="18" height="18" rx="4" fill="#5059c9"/><path d="M143 92h10M148 92v9" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+</svg>
+{%- endmacro %}
+
+{#- From cloud: a cloud with a download arrow above a waveform pill. -#}
+{% macro art_cloud() -%}
+<svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">
+  <ellipse cx="100" cy="114" rx="52" ry="7" fill="#3b82f6" fill-opacity=".12"/>
+  <rect x="62" y="40" width="76" height="62" rx="12" fill="#eaf1fd" stroke="#d3e1f7" stroke-width="2"/>
+  <g stroke="#c4d6f2" stroke-width="4" stroke-linecap="round"><path d="M74 54h30M74 64h44"/></g>
+  <rect x="72" y="82" width="56" height="18" rx="9" fill="#3b82f6"/>
+  <g stroke="#fff" stroke-width="2.6" stroke-linecap="round"><path d="M82 88v4M88 85v10M94 87v6M100 84v12M106 88v4M112 86v8M118 89v2"/></g>
+  <circle cx="100" cy="30" r="22" fill="#2a76e8"/>
+  <path d="M91 32a6 6 0 0 1 1-12 8 8 0 0 1 15 2 5 5 0 0 1 0 10" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M100 25v13m0 0-5-5m5 5 5-5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+{%- endmacro %}
+
 {#- The upload card on the new-project page: a media file with a waveform and an upload badge. -#}
 {% macro art_media() -%}
 <svg viewBox="0 0 200 130" role="img" aria-hidden="true" class="hm-art">

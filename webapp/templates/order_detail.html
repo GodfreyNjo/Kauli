@@ -84,6 +84,10 @@
       {% if dubbed_ready or has_dub or source_media_ready or order['source_youtube_id'] %}
       <div class="order-media-tools">
         <button type="button" class="order-cc-toggle" id="order-cc-toggle" aria-pressed="true" hidden>Captions: On</button>
+        {% if can_export_transcript %}<span class="mk-share">
+          <button type="button" class="mk-chip" data-open="tx-share-dialog">{{ '' }}<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg> Share</button>
+          <button type="button" class="mk-chip" data-open="tx-download-dialog"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg> Download</button>
+        </span>{% endif %}
         <p class="muted order-preview-hint">Tap any line of the transcript to jump to it.</p>
       </div>
       {% endif %}

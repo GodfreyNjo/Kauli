@@ -43,6 +43,7 @@ def register(app_module) -> None:
     global A
     A = app_module
     app_module.app.include_router(router)
+    app_module.templates.env.globals["cloud_import_config"] = config   # the home card shows only when it works
 
 
 def config() -> dict:

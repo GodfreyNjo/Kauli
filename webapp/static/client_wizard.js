@@ -173,7 +173,25 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     set("rv-rate", isNaN(perMin) ? "-" : formatMoney(perMin));
     const length = $("#price-duration");
     set("rv-duration", length && length.textContent && length.textContent !== "\u2014" ? "\u00d7 " + length.textContent : "");
+    // A chip with what kind of file it is (MP4, WAV...), and which delivery is chosen.
+    const kind = usingYoutube ? "YouTube" : (file && file.name.includes(".") ? file.name.split(".").pop().toUpperCase().slice(0, 5) : "");
+    const chip = $("#rv-type");
+    if (chip) { chip.textContent = kind; chip.hidden = !kind; }
+    document.querySelectorAll(".rv-tier").forEach((b) => b.setAttribute("aria-pressed", String(!!tier && tier.value === b.dataset.tier)));
   }
+
+  // The delivery switch on the review step does exactly what picking it on step 2 does.
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest ? event.target.closest(".rv-tier") : null;
+    if (!button) return;
+    const radio = document.querySelector('input[name="review_tier"][value="' + button.dataset.tier + '"]');
+    const holder = radio ? radio.closest("label") : null;
+    if (!radio || radio.disabled || (holder && holder.hidden)) return;
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    updatePricing();
+    updateReview();
+  });
 
   function step1Valid() {
     const usingYoutube = $('#source-switch [data-source="youtube"]').classList.contains("active");
@@ -254,6 +272,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
   let fileQueue = [];
 
   function probeDuration(file) {
+    if (file.kauliSeconds) return Promise.resolve(file.kauliSeconds / 60);        // a recording knows its own length (a browser recording has no length in its header)
     return new Promise((resolve) => {
       const el = document.createElement(file.type.startsWith("video/") ? "video" : "audio");
       el.preload = "metadata";
@@ -338,6 +357,8 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     if (note) note.textContent = skipped ? "You can send up to " + MAX_FILES + " files at once. The rest were left out." : "";
     syncQueue();
   }
+
+  window.kauliAddFiles = addFiles;                  // used by the recorder (recorder.js)
 
   function bindDropzone() {
     const dz = $("#dropzone");
@@ -1142,9 +1163,15 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     restoreStagedFiles();
     showStep(1);
     // the dashboard's "Paste a YouTube link" card lands here with ?source=youtube
-    if (new URLSearchParams(window.location.search).get("source") === "youtube") {
+    const landed = new URLSearchParams(window.location.search).get("source");
+    if (landed === "youtube") {
       const yt = $('#source-switch [data-source="youtube"]');
       if (yt) yt.click();
+    }
+    // the home page's Record and From cloud cards land on the upload step at the right control
+    if (landed === "record" || landed === "cloud") {
+      const target = document.getElementById(landed === "record" ? "rec-toggle" : "cloud-import");
+      if (target) { target.scrollIntoView({ block: "center" }); if (landed === "record") target.focus(); }
     }
   }
   // Run now when the page was swapped in place (the DOMContentLoaded of a page that is already loaded never comes again).

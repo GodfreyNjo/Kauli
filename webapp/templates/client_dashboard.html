@@ -103,6 +103,11 @@
             <ul class="file-queue" id="file-queue" aria-live="polite"></ul>
             <p class="file-queue-note" id="file-queue-note" role="status"></p>
             <div class="cloud-import" id="cloud-import" hidden></div>
+            <div class="mk-rec" id="mk-rec" hidden>
+              <button type="button" class="mk-rec-btn" id="rec-toggle" aria-pressed="false"><span class="mk-rec-dot" aria-hidden="true"></span><span id="rec-label">Record audio</span></button>
+              <span class="mk-rec-time" id="rec-time" aria-live="off" hidden>0:00</span>
+              <span class="mk-rec-note" id="rec-note" role="status" aria-live="polite"></span>
+            </div>
           </div>
           <ul class="src-chips" aria-label="Common formats"><li>MP3</li><li>WAV</li><li>M4A</li><li>FLAC</li><li>MP4</li><li>MOV</li><li>MKV</li></ul>
           <p class="mk-limits" title="Also OGG, Opus, AAC, WMA, WebM and AVI"><span>Up to <b>10</b> files</span><span>&le; <b>2 GB</b> per file</span></p>
@@ -191,7 +196,7 @@
             <label class="tier-option">
               <input type="radio" name="review_tier" value="{{ tkey }}" {% if tkey == chosen_tier %}checked{% endif %}>
               <div>
-                <strong>{{ tier['name'] }}</strong>
+                <strong>{{ tier['name'] }}{% if tkey == 'ai' %} <span class="tier-badge tier-fast">Fast</span>{% endif %}</strong>
                 <p>{{ tier['blurb'] }}</p>
               </div>
             </label>
@@ -312,7 +317,7 @@
       <div class="review-card" id="review-card" aria-live="polite">
         <div class="rv-wrap">
           <dl class="review-list">
-            <div><dt>File</dt><dd id="rv-file">-</dd></div>
+            <div><dt>File</dt><dd><span class="rv-type" id="rv-type" hidden></span><span id="rv-file">-</span></dd></div>
             <div><dt>Languages</dt><dd id="rv-langs">-</dd></div>
             <div><dt>Service</dt><dd id="rv-service">-</dd></div>
           </dl>
@@ -322,6 +327,15 @@
             <p class="rv-dur" id="rv-duration"></p>
             <div class="rv-total"><span>Total (est.)</span><b id="rv-total">-</b></div>
           </div>
+        </div>
+        <div class="rv-tiers" id="rv-tiers" role="group" aria-label="How should we deliver it?">
+          {% for tkey, tier in review_tiers.items() %}
+          <button type="button" class="rv-tier" data-tier="{{ tkey }}" aria-pressed="false">
+            <span class="rv-tier-ic" aria-hidden="true">{{ ico('bolt' if tkey == 'ai' else 'users', 22) }}</span>
+            <span><strong>{{ tier['name'] }}</strong><small>{{ 'Fast, clean transcript' if tkey == 'ai' else 'Higher accuracy, checked by a person' }}</small></span>
+            <span class="rv-tier-check" aria-hidden="true"></span>
+          </button>
+          {% endfor %}
         </div>
         <p class="muted" style="margin:10px 0 0; font-size:0.86rem;">If your minutes or credits don't cover this order, you pay securely on the next page before processing starts.</p>
       </div>
@@ -543,6 +557,7 @@
 
 <script src="/static/cloud_import.js?v={{ static_version('cloud_import.js') }}" defer></script>
 <script src="/static/client_wizard.js?v={{ static_version('client_wizard.js') }}"></script>
+<script src="/static/recorder.js?v={{ static_version('recorder.js') }}" defer></script>
 {% if show_tour %}
 <script src="/static/tour.js?v={{ static_version('tour.js') }}"></script>
 <script>
