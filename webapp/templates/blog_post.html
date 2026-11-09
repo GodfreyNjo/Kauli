@@ -90,7 +90,7 @@
       <ol id="blog-toc-list"></ol>
     </details>
 
-    <div class="m-blog-body" id="blog-body">{{ post['body_html']|autolink_terms(post['slug'])|blog_ctas(post) }}</div>
+    <div class="m-blog-body" id="blog-body">{{ post['body_html']|keep_published_links|autolink_terms(post['slug'])|blog_ctas(post) }}</div>
 
     {% if post['devto_url'] or post['medium_url'] %}
     <p class="muted" style="font-size:0.82rem;">Also published on

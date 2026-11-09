@@ -17,6 +17,7 @@ docstring instead, then run the script.
 | `blog_ai_assist.py` | 107 | AI-assisted blog drafting for staff - the honest, human-reviewed version of the "Research Specialist / Content Writer / SEO Optimizer / Social Media Manager" pipeline a marketing doc asked for |
 | `blog_audio.py` | 471 | Listenable blog posts: a narrated audio version of each post, a podcast feed for Apple Podcasts, Spotify and the rest, and the staff page that makes them |
 | `blog_guides.py` | 443 | Five guides written for the audiences the solution pages serve: podcasters with a website, teams that record meetings and interviews, media and broadcast partners, course creators, and NGOs and civil ... |
+| `blog_links.py` | 51 | Never link a visitor, or Google, to an article that is not published |
 | `blog_seed.py` | 870 | Blog posts written for US/global search intent (transcription, subtitles, translation) - the counterpart to the existing Kenya/Swahili-focused posts |
 | `brand.py` | 48 | The Kauli name and logo as each reader sees them |
 | `calendar_auto.py` | 160 | Kauli joins your meetings on its own: connect Google Calendar or Outlook with one click, and the notetaker is sent to every upcoming Zoom, Google Meet or Microsoft Teams call on that calendar, the way... |
@@ -40,7 +41,7 @@ docstring instead, then run the script.
 | `human_review_content.py` | 140 | Content for the human-review pages: /human-review and one page per language |
 | `ip_intel.py` | 99 | Real, free datacenter/hosting-IP detection - a legitimate, honest signal that a signup or login is coming from a cloud server rather than a residential connection, without a paid IP-reputation API/Red... |
 | `js_strings.py` | 67 | The words the page's scripts show, in the reader's language |
-| `late_routes.py` | 19 | Route modules that must be registered last, in this order, so that app.py does not need a line for each |
+| `late_routes.py` | 20 | Route modules that must be registered last, in this order, so that app.py does not need a line for each |
 | `lead_playbook.py` | 527 | Real, ready-to-use outreach content for the CRM's bulk-researched leads (NGOs, media houses, and future categories) - staff_lead_detail.html shows whichever stage matches the lead's own real pipeline ... |
 | `legacy_paths.py` | 44 | Old addresses that still work: they send the visitor to the new one |
 | `lifecycle.py` | 421 | The messages that follow a sale, each sent from the person a customer would expect to hear from: |

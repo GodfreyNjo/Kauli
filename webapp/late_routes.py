@@ -6,12 +6,13 @@ Order matters because FastAPI uses the first route that matches:
                          specific routes (such as the OAuth callbacks, which keep their old address because the
                          providers have it on file) are matched before them.
   3. account_security    the sign-in list and the "confirm it is you" pages
+  4. blog_links          template helpers that drop links to unpublished articles
 """
 from __future__ import annotations
 
-from . import account_security, diagnostics_routes, legacy_paths
+from . import account_security, blog_links, diagnostics_routes, legacy_paths
 
-IN_ORDER = (diagnostics_routes, legacy_paths, account_security)
+IN_ORDER = (diagnostics_routes, legacy_paths, account_security, blog_links)
 
 
 def register(app_module) -> None:

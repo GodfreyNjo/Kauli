@@ -129,6 +129,8 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     $("hd-video-sub").textContent = dubbed ? kT("Video dubbed in {lang}", { lang: kT(L.name) }) : kT("Video with live {lang} subtitles", { lang: kT(L.name) });
   }
 
+  var addressSync = false;                              // set once a visitor changes the demo; only then is the address updated
+
   function render() {
     stop();
     var s = scenario(), L = D.languages[state.lang];
@@ -171,6 +173,7 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
     var r = D.rates[s.service];
     $("hd-rate").innerHTML = "<strong>" + s.service_label + "</strong> from <b>$" + r.ai + "</b> per audio-minute with Instant AI, or <b>$" + r.human + "</b> human-reviewed.";
     if (window.location.pathname !== "/try") return;     // the home page keeps its own address
+    if (!addressSync) return;                            // not on first load: a page that rewrites its own address looks like a redirect to search engines
     try {
       var u = new URL(window.location.href);
       u.searchParams.set("use", state.scenario);
@@ -229,13 +232,13 @@ var kT = window.kauliT || function (s, v) { return s; };   // the words the scri
   $("hd-play-in").addEventListener("click", function () { play("in"); });
   $("hd-play-out").addEventListener("click", function () { play("out"); });
   [].forEach.call(document.querySelectorAll('input[name="hd-scenario"]'), function (r) {
-    r.addEventListener("change", function () { state.scenario = r.value; track("demo_scenario", { scenario: r.value }); render(); });
+    r.addEventListener("change", function () { addressSync = true; state.scenario = r.value; track("demo_scenario", { scenario: r.value }); render(); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-lang"]'), function (r) {
-    r.addEventListener("change", function () { state.lang = r.value; track("demo_language", { language: r.value }); render(); $("dm-pair").removeAttribute("open"); });
+    r.addEventListener("change", function () { addressSync = true; state.lang = r.value; track("demo_language", { language: r.value }); render(); $("dm-pair").removeAttribute("open"); });
   });
   [].forEach.call(document.querySelectorAll('input[name="hd-dir"]'), function (r) {
-    r.addEventListener("change", function () { state.dir = r.value; render(); $("dm-pair").removeAttribute("open"); });
+    r.addEventListener("change", function () { addressSync = true; state.dir = r.value; render(); $("dm-pair").removeAttribute("open"); });
   });
   document.addEventListener("click", function (e) { var d = $("dm-pair"); if (d && d.open && !d.contains(e.target)) d.removeAttribute("open"); });
   document.addEventListener("keydown", function (e) { var d = $("dm-pair"); if (e.key === "Escape" && d && d.open) { d.removeAttribute("open"); d.querySelector("summary").focus(); } });

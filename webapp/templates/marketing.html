@@ -518,7 +518,7 @@
           <ul class="int-list">
             {% for name, state, href, logo in tools %}
             <li data-state="{{ state }}">
-              {% if href %}<a href="{{ href }}" class="int-chip">{% else %}<span class="int-chip">{% endif %}
+              {% if href %}<a href="{{ href }}" class="int-chip"{% if href.startswith('/login') %} rel="nofollow"{% endif %}>{% else %}<span class="int-chip">{% endif %}
                 <span class="int-logo{{ ' multi' if '+' in logo else '' }}" aria-hidden="true">{% for part in logo.split('+') %}<img src="/static/integrations/{{ part }}.svg" alt="" width="24" height="24" loading="lazy">{% endfor %}</span>
                 <span class="int-name">{{ name }}</span>
                 <span class="int-badge {{ state }}">{{ 'Available' if state == 'live' else 'Coming soon' }}</span>
@@ -880,7 +880,7 @@
         {% for item in faq %}
         <details class="m-faq-item"{% if loop.first %} open{% endif %}>
           <summary>{{ item.q }}</summary>
-          <p>{{ item.a }}{% if item.link %} <a href="{{ item.link[0] }}">{{ item.link[1] }}</a>{% endif %}</p>
+          <p>{{ item.a }}{% if item.link and blog_link_ok(item.link[0]) %} <a href="{{ item.link[0] }}">{{ item.link[1] }}</a>{% endif %}</p>
         </details>
         {% endfor %}
       </div>
