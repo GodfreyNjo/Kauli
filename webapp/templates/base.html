@@ -447,10 +447,10 @@
 
       maybeLoadGA();
       maybeLoadOneTap();
-      // The notice appears 6 seconds after the page opens, so it does not cover the page the moment someone arrives. It is checked again when
+      // The notice appears 15 seconds after the page opens, so it does not cover the page the moment someone arrives. It is checked again when
       // the time is up, so a choice made in the meantime (for example from the footer's cookie preferences) is respected.
-      // performance.now() counts from the moment the visitor opened the page, so a slow page load does not push the notice later than 6 s.
-      if (getConsent() === null) setTimeout(function () { if (getConsent() === null) showBanner(); }, Math.max(0, 6000 - (window.performance && performance.now ? performance.now() : 0)));
+      // performance.now() counts from the moment the visitor opened the page, so a slow page load does not push the notice later than 15 s.
+      if (getConsent() === null) setTimeout(function () { if (getConsent() === null) showBanner(); }, Math.max(0, 15000 - (window.performance && performance.now ? performance.now() : 0)));
 
       if (acceptBtn) {
         acceptBtn.addEventListener("click", function () {
